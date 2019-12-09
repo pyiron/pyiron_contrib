@@ -57,6 +57,9 @@ class Vertex(LoggerMixin, ABC):
         self.archive.clock = 0
         self.archive.output = IODictionary()
         self.archive.input = IODictionary()
+        self.archive.whitelist = IODictionary()
+        self.archive.whitelist.input = IODictionary()
+        self.archive.whitelist.output = IODictionary()
         self._vertex_state = "next"
         self.possible_vertex_states = ["next"]
         self._name = None
@@ -123,28 +126,83 @@ class Vertex(LoggerMixin, ABC):
                     history.pop(0)
                 self.output[key] = history
 
+    def set_whitelist(self, archive, **kwargs):
+        """
+
+        Args:
+            archive: (str) either input or output
+            n:
+            **kwargs:
+
+        Returns:
+
+        """
+        dic = getattr(self, archive)
+        for k, v in kwargs.items():
+            if k not in dic:
+                self.logger.warning('The %s of vertex "%s" has no key "%s"! Available keys are: "%s"' % (archive, self.name, k, list(self.input.keys())))
+            else:
+                whitelist = getattr(self.archive.whitelist, archive)
+                whitelist[k] = v
+
+    def set_archive_period(self, archive, n, keys=None):
+        if keys is None:
+            keys = getattr(self, archive).keys()
+
+        self.set_whitelist(archive, **{
+            k: n for k in keys
+        })
+
+    def set_input_archive_period(self, n, keys=None):
+        self.set_archive_period('input', n, keys=keys)
+
+    def set_output_archive_period(self, n, keys=None):
+        self.set_archive_period('output', n, keys=keys)
+
+    def set_input_whitelist(self, **kwargs):
+        self.set_whitelist('input', **kwargs)
+
+    def set_output_whitelist(self, **kwargs):
+        self.set_whitelist('output', **kwargs)
+
     def _update_archive(self):
         # Update input
+
         for key, value in self.input.items():
-            if key not in self.archive.input:
-                self.archive.input[key] = [value]
-            else:
-                history = list(self.archive.input[key])
-                history.append(value)
-                self.archive.input[key] = history
-                # self.archive.input[key].append(value)
-                # TODO: This will get expensive for large histories, but a direct append doesn't work. Fix it.
+            if key in self.archive.whitelist.input:
+                # the keys there, but it could be explicitly set to < 0 or None
+                period = self.archive.whitelist.input[key]
+                if period is not None and period >= 0:
+                    # TODO: Notifaction when whitelist contains items which are not items of input
+                    # check if the period matches that of the key
+                    # with int we also can match 4.5 % 0.5
+                    if self.archive.clock % period == 0:
+                        if key not in self.archive.input:
+                            self.archive.input[key] = [value]
+                        else:
+                            history = list(self.archive.input[key])
+                            history.append(value)
+                            self.archive.input[key] = history
+                            # self.archive.input[key].append(value)
+                            # TODO: This will get expensive for large histories, but a direct append doesn't work. Fix it.
 
         # Update output
         for key, value in self.output.items():
-            val = value[-1]
-            if key not in self.archive.output:
-                self.archive.output[key] = [val]
-            else:
-                history = list(self.archive.output[key])
-                history.append(val)
-                self.archive.output[key] = history
-                # self.archive.output[key].append(val)
+            if key in self.archive.whitelist.output:
+                period = self.archive.whitelist.output[key]
+                if period is not None and period >= 0:
+                    # TODO: Notifaction when whitelist contains items which are not items of input
+                    # check if the period matches that of the key
+                    # with int we also can match 4.5 % 0.5
+                    if self.archive.clock % period == 0:
+                        val = value[-1]
+                        if key not in self.archive.output:
+                            self.archive.output[key] = [val]
+                        else:
+                            history = list(self.archive.output[key])
+                            history.append(val)
+                            self.archive.output[key] = history
+                            # self.archive.output[key].append(val)
 
     def update_and_archive(self, output_data):
         self._update_output(output_data)

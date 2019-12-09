@@ -351,28 +351,11 @@ class IODictionary(dict, LoggerMixin):
     _protected_members = [
         'resolve',
         'to_hdf',
-        'from_hdf',
-        'whitelist',
-        '_whitelist',
-        'set_whitelist'
+        'from_hdf'
     ]
 
     def __init__(self, **kwargs):
-        self._whitelist = {}
         super(IODictionary, self).__init__(**kwargs)
-
-    def set_whitelist(self, **kwargs):
-        for key, value in kwargs.items():
-            if key not in self.keys():
-                # give a warning
-                self.logger.warning('key "%s" is not in the IODictionary(%s)' % (key, list(self.keys())) )
-                continue
-            else:
-                self._whitelist[key] = value
-
-    @property
-    def whitelist(self):
-        return self._whitelist
 
     def __getattr__(self, item):
         if item in IODictionary._protected_members:
@@ -384,7 +367,7 @@ class IODictionary(dict, LoggerMixin):
             value = super(IODictionary, self).__getitem__(item)
             if isinstance(value, Pointer):
                 return ~value
-            elif isinstance(value, (list, set, tuple)):  # TODO: Allow other containers than list
+            elif isinstance(value, list):  # TODO: Allow other containers than list
                 cls = type(value)
                 return cls([element if not isinstance(element, Pointer) else ~element for element in value])
             else:
@@ -392,10 +375,7 @@ class IODictionary(dict, LoggerMixin):
         return super(IODictionary, self).__getitem__(item)
 
     def __setattr__(self, key, value):
-        if key in IODictionary._protected_members:
-            super(IODictionary, self).__setattr__(key, value)
-        else:
-            super(IODictionary, self).__setitem__(key, value)
+        super(IODictionary, self).__setitem__(key, value)
 
     def resolve(self):
         """
@@ -413,14 +393,6 @@ class IODictionary(dict, LoggerMixin):
             hdf5_server['TYPE'] = str(type(self))
             for key in list(self.keys()):
                 # default value is not to save any property
-                if key not in self.whitelist:
-                    # we do not save it to disk
-                    continue
-
-                if self.whitelist[key] is None or self.whitelist[key] < 0:
-                    # if whitelist key is None of a negative number we also do not save it to disk
-                    continue
-
                 try:
                     value = getattr(self, key)
                     try:

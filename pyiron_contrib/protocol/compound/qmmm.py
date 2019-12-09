@@ -30,8 +30,10 @@ class AddDisplacements(PrimitiveVertex):
 
     def __init__(self, name=None):
         super(AddDisplacements, self).__init__(name=name)
+        self.input.default.target_mask = None
+        self.input.default.displacement_mask = None
 
-    def command(self, target, displacement, target_mask=None, displacement_mask=None):
+    def command(self, target, displacement, target_mask, displacement_mask):
         result = target.copy()
         if target_mask is not None and isinstance(target_mask, list):
             target_mask = np.concatenate(target_mask)

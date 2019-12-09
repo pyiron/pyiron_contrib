@@ -4,7 +4,7 @@
 
 from __future__ import print_function
 from pyiron.base.job.generic import GenericJob
-from pyiron_mpie.flexible.protocol.utils import IODictionary, InputDictionary, LoggerMixin, Event, EventHandler, \
+from pyiron_contrib.protocol.utils import IODictionary, InputDictionary, LoggerMixin, Event, EventHandler, \
     Pointer, CrumbType
 from abc import ABC, abstractmethod
 from numpy import inf

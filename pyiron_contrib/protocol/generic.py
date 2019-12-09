@@ -206,8 +206,8 @@ class Vertex(LoggerMixin, ABC):
 
     def update_and_archive(self, output_data):
         self._update_output(output_data)
-        if self.archive.clock % self.archive.period == 0:
-            self._update_archive()
+        #if self.archive.clock % self.archive.period == 0:
+        self._update_archive()
 
     def finish(self):
         self._update_archive()

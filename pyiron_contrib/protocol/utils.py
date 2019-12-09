@@ -353,7 +353,7 @@ class IODictionary(dict, LoggerMixin):
         'to_hdf',
         'from_hdf',
         'whitelist',
-        '_whitelist'
+        '_whitelist',
         'set_whitelist'
     ]
 

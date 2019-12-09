@@ -60,18 +60,6 @@ def requires_arguments(func):
         args.remove('self')
     return len(args) > 0
 
-def recursive_numpy_array_stack(l):
-    result = []
-    for el in l:
-        if isinstance(el, (list, tuple)):
-            val = recursive_numpy_array_stack(el)
-        else:
-            val = el
-        result.append(val)
-    if all([isinstance(v , np.ndarray) for v in result]):
-        # Stack arrays
-        return np.array(result)
-
 flatten = lambda l: [item for sublist in l for item in sublist]
 
 def fullname(obj):
@@ -79,110 +67,8 @@ def fullname(obj):
     return '{}.{}'.format(obj_type.__module__, obj_type.__name__)
 
 
-def generic_to_hdf(hdf, key, object):
-    known_primitives = tuple(flatten([np.sctypes[group] for group in ('int', 'uint', 'float', 'complex')]) +
-                             [float, complex ,int, str, np.str])
-    known_types = (list, set, tuple, dict)
-
-    if hasattr(object, 'to_hdf'):
-        # If object is pointer we get nonesense make sure it is a functio
-        to_hdf = getattr(object, 'to_hdf')
-
-        if not isinstance(to_hdf, (FunctionType, MethodType)):
-            to_hdf_type = type(to_hdf)
-            raise ValueError('{}.to_hdf must be a function but was "{}" instead'.format(
-                fullname(object),
-                to_hdf_type.__name__,
-            ))
-        # Ok we are free to go that was simple
-        object.to_hdf(hdf, group_name=key)
-        # But let us return the function
-        return
-    elif not isinstance(object, known_types):
-        raise TypeError('Cannot serialize type "{}"'.format(fullname(object)))
-
-    assert isinstance(object, known_types)
-    assert not isinstance(object, known_primitives)
-    # numpy arrays must not arrive here
-    assert not isinstance(object, np.ndarray)
-
-    with hdf.open(key) as hdf_server:
-        # We only want to serialize complex objects
-
-        # All are iterables, but we handle numpy arrays differently
-        hdf_server['TYPE'] = str(type(object))
-        items = object.items() if isinstance(object, dict) \
-            else [('element_{}'.format(i), v) for i,v in enumerate(object)]
-        if isinstance(object, known_types):
-            for element_key, value in items:
-                # We try our best to write the values
-                if isinstance(value, known_types):
-                    generic_to_hdf(hdf, element_key, value)
-                elif isinstance(value, known_primitives):
-                    hdf_server[element_key] = value
-                elif isinstance(value, np.ndarray):
-                    # Check if we have a decent data type
-                    if value.dtype not in known_primitives:
-                        raise TypeError('numpy.ndarray has unsupported data type "{}"'.format(value.dtype))
-                    else:
-                        hdf_server[element_key] = value
-                elif hasattr(value, 'to_hdf'):
-                    to_hdf = getattr(object, 'to_hdf')
-                    if not isinstance(to_hdf, (FunctionType, MethodType)):
-                        to_hdf_type = type(to_hdf)
-                        raise ValueError('{}.to_hdf must be a function but was "{}" instead'.format(
-                            fullname(value),
-                            to_hdf_type.__name__,
-                        ))
-                    value.to_hdf(hdf, group_name=element_key)
-                else:
-                    try:
-                        hdf_server[element_key] = value
-                    except TypeError as e:
-                        getLogger('generic_to_hdf').exception('message', exc_info=e)
-                        raise
-        else:
-            raise TypeError
-
 def get_cls(string):
     return locate([v for v in re.findall(r'(?!\.)[\w\.]+(?!\.)', string)if v != 'class'][0])
-
-def generic_from_hdf(hdf_server):
-
-    known_types = (list, set, tuple, dict)
-    if 'TYPE' in hdf_server.list_nodes():
-        cls_ = get_cls(hdf_server['TYPE'])
-        if cls_ is None or not issubclass(cls_, known_types):
-            raise TypeError('Cannot find type "{}"'.format(hdf_server['TYPE']))
-
-        keys = []
-        elements = []
-        for key in hdf_server.list_nodes():
-            if key == 'TYPE':
-                continue
-            keys.append(key)
-            elements.append(hdf_server[key])
-        for key in hdf_server.list_groups():
-            keys.append(key)
-            if 'TYPE' in hdf_server[key].list_nodes():
-                sub_cls = get_cls(hdf_server[key]['TYPE'])
-                if sub_cls is not None and issubclass(cls_, known_types):
-                    elements.append(generic_from_hdf(hdf_server[key]))
-                else:
-                    raise TypeError
-            else:
-                elements.append(generic_from_hdf(hdf_server[key]))
-        combined = list(zip(keys, elements))
-        if issubclass(cls_, dict):
-            result = cls_(combined)
-        else:
-
-            result = sorted(combined, key=lambda t: int(t[0].split('element_')[-1]))
-            result = cls_([v for _, v in result])
-        return result
-    else:
-        return [hdf_server[k] for k in hdf_server.list_nodes() if k != 'TYPE'] + \
-               [hdf_server[k] for k in hdf_server.list_groups()]
 
 
 def is_iterable(o):
@@ -461,7 +347,36 @@ class IODictionary(dict, LoggerMixin):
     IODictionary as value items which can be resolved into the real values when desired.
     """
 
+    # those members are not accessible
+    _protected_members = [
+        'resolve',
+        'to_hdf',
+        'from_hdf',
+        'whitelist',
+        '_whitelist'
+        'set_whitelist'
+    ]
+
+    def __init__(self, **kwargs):
+        self._whitelist = {}
+        super(IODictionary, self).__init__(**kwargs)
+
+    def set_whitelist(self, **kwargs):
+        for key, value in kwargs.items():
+            if key not in self.keys():
+                # give a warning
+                self.logger.warning('key "%s" is not in the IODictionary(%s)' % (key, list(self.keys())) )
+                continue
+            else:
+                self._whitelist[key] = value
+
+    @property
+    def whitelist(self):
+        return self._whitelist
+
     def __getattr__(self, item):
+        if item in IODictionary._protected_members:
+            return object.__getattribute__(self, item)
         return self.__getitem__(item)
 
     def __getitem__(self, item):
@@ -469,7 +384,7 @@ class IODictionary(dict, LoggerMixin):
             value = super(IODictionary, self).__getitem__(item)
             if isinstance(value, Pointer):
                 return ~value
-            elif isinstance(value, list):  # TODO: Allow other containers than list
+            elif isinstance(value, (list, set, tuple)):  # TODO: Allow other containers than list
                 cls = type(value)
                 return cls([element if not isinstance(element, Pointer) else ~element for element in value])
             else:
@@ -477,7 +392,10 @@ class IODictionary(dict, LoggerMixin):
         return super(IODictionary, self).__getitem__(item)
 
     def __setattr__(self, key, value):
-        super(IODictionary, self).__setitem__(key, value)
+        if key in IODictionary._protected_members:
+            super(IODictionary, self).__setattr__(key, value)
+        else:
+            super(IODictionary, self).__setitem__(key, value)
 
     def resolve(self):
         """
@@ -494,6 +412,15 @@ class IODictionary(dict, LoggerMixin):
         with hdf.open(group_name) as hdf5_server:
             hdf5_server['TYPE'] = str(type(self))
             for key in list(self.keys()):
+                # default value is not to save any property
+                if key not in self.whitelist:
+                    # we do not save it to disk
+                    continue
+
+                if self.whitelist[key] is None or self.whitelist[key] < 0:
+                    # if whitelist key is None of a negative number we also do not save it to disk
+                    continue
+
                 try:
                     value = getattr(self, key)
                     try:

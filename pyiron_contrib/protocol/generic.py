@@ -139,11 +139,11 @@ class Vertex(LoggerMixin, ABC):
         """
         dic = getattr(self, archive)
         for k, v in kwargs.items():
-            if k not in dic:
-                self.logger.warning('The %s of vertex "%s" has no key "%s"! Available keys are: "%s"' % (archive, self.name, k, list(self.input.keys())))
-            else:
-                whitelist = getattr(self.archive.whitelist, archive)
-                whitelist[k] = v
+            #if k not in dic:
+                # self.logger.warning('The %s of vertex "%s" has no key "%s"! Available keys are: "%s"' % (archive, self.name, k, list(dic.keys())))
+            #else:
+            whitelist = getattr(self.archive.whitelist, archive)
+            whitelist[k] = v
 
     def set_archive_period(self, archive, n, keys=None):
         if keys is None:

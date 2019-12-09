@@ -4,14 +4,14 @@
 
 from __future__ import print_function
 
-from pyiron_mpie.flexible.protocol.generic import Protocol
-from pyiron_mpie.flexible.protocol.primitive.one_state import Counter, ExternalHamiltonian, WeightedSum, \
+from pyiron_contrib.protocol.generic import Protocol
+from pyiron_contrib.protocol.primitive.one_state import Counter, ExternalHamiltonian, WeightedSum, \
     HarmonicHamiltonian, Transpose, RandomVelocity, LangevinThermostat, \
     VerletPositionUpdate, VerletVelocityUpdate, BuildMixingPairs, DeleteAtom, Overwrite, Slice, VoronoiReflection, \
     WelfordOnline, Zeros
-from pyiron_mpie.flexible.protocol.primitive.two_state import IsGEq, ModIsZero
-from pyiron_mpie.flexible.protocol.list import SerialList, ParallelList, AutoList
-from pyiron_mpie.flexible.protocol.utils import Pointer
+from pyiron_contrib.protocol.primitive.two_state import IsGEq, ModIsZero
+from pyiron_contrib.protocol.list import SerialList, ParallelList, AutoList
+from pyiron_contrib.protocol.utils import Pointer
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.constants import physical_constants

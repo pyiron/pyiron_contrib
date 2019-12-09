@@ -4,12 +4,12 @@
 
 from __future__ import print_function
 
-from pyiron_mpie.flexible.protocol.generic import Protocol
-from pyiron_mpie.flexible.protocol.primitive.one_state import Counter, ExternalHamiltonian, GradientDescent, \
+from pyiron_contrib.protocol.generic import Protocol
+from pyiron_contrib.protocol.primitive.one_state import Counter, ExternalHamiltonian, GradientDescent, \
     NEBForces, InterpolatePositions
-from pyiron_mpie.flexible.protocol.primitive.two_state import IsGEq
-from pyiron_mpie.flexible.protocol.list import SerialList, ParallelList, AutoList
-from pyiron_mpie.flexible.protocol.utils import Pointer
+from pyiron_contrib.protocol.primitive.two_state import IsGEq
+from pyiron_contrib.protocol.list import SerialList, ParallelList, AutoList
+from pyiron_contrib.protocol.utils import Pointer
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator

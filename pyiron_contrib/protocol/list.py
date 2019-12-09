@@ -3,8 +3,8 @@
 # Distributed under the terms of "New BSD License", see the LICENSE file.
 
 from __future__ import print_function
-from pyiron_mpie.flexible.protocol.generic import Vertex, PrimitiveVertex, Protocol
-from pyiron_mpie.flexible.protocol.utils import InputDictionary, Pointer
+from pyiron_contrib.protocol.generic import Vertex, PrimitiveVertex, Protocol
+from pyiron_contrib.protocol.utils import InputDictionary, Pointer
 import numpy as np
 from abc import abstractmethod
 from multiprocessing import Process, Queue

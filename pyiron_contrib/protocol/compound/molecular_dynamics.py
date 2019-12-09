@@ -4,11 +4,11 @@
 
 from __future__ import print_function
 
-from pyiron_mpie.flexible.protocol.generic import Protocol
-from pyiron_mpie.flexible.protocol.primitive.one_state import Counter, ExternalHamiltonian, RandomVelocity, Zeros, \
+from pyiron_contrib.protocol.generic import Protocol
+from pyiron_contrib.protocol.primitive.one_state import Counter, ExternalHamiltonian, RandomVelocity, Zeros, \
     VerletPositionUpdate, VerletVelocityUpdate
-from pyiron_mpie.flexible.protocol.primitive.two_state import IsGEq
-from pyiron_mpie.flexible.protocol.utils import Pointer
+from pyiron_contrib.protocol.primitive.two_state import IsGEq
+from pyiron_contrib.protocol.utils import Pointer
 
 """
 Protocol for molecular dynamics.

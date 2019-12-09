@@ -3,7 +3,7 @@
 # Distributed under the terms of "New BSD License", see the LICENSE file.
 
 from __future__ import print_function
-from pyiron_mpie.flexible.protocol.generic import PrimitiveVertex
+from pyiron_contrib.protocol.generic import PrimitiveVertex
 import numpy as np
 
 """

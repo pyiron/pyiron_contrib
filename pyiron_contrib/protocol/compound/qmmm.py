@@ -499,11 +499,10 @@ class PartitionStructure(PrimitiveVertex):
 
     @staticmethod
     def _change_qm_species(qm_structure, domain_ids_qm, seed_species):
-        # The seed sites are the first in the qm structure
-
+        qm_structure_alchemized = qm_structure.copy()
         for index, species in zip(domain_ids_qm['seed'], seed_species):
-            qm_structure[index] = species
-        return qm_structure
+            qm_structure_alchemized[index] = species
+        return qm_structure_alchemized
 
     @staticmethod
     def _get_ids_within_box(structure, box):

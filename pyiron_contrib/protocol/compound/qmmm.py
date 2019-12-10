@@ -90,7 +90,7 @@ class QMMMProtocol(Protocol):
     def define_vertices(self):
         # Components
         g = self.graph
-        g.partion = PartitionStructure()
+        g.partition = PartitionStructure()
         g.calc_static_mm = ExternalHamiltonian()
         g.calc_static_qm = ExternalHamiltonian()
         g.clock = Counter()

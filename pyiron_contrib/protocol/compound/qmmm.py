@@ -36,6 +36,7 @@ class QMMM(Protocol):
     During setup, the domain indices are checked -- if None, build them from scratch using shells and the cell...stuff?
 
     Attributes:
+        structure (pyiron.atomistics.structure.atoms.Atoms): The full region I+II superstructure.
         mm_ref_job_full_path (str): Path to the pyiron job to use for evaluating forces and energies of the MM domains.
         qm_ref_job_full_path (str): Path to the pyiron job to use for evaluating forces and energies of the QM domain.
         domain_ids (dict): A dictionary of ids, `seed`, `core`, `buffer`, and `filler`, for mapping atoms of the MM
@@ -44,14 +45,15 @@ class QMMM(Protocol):
         seed_ids (int/list): The integer id (or ids) of atom(s) in the MM I+II superstructure to base the QM region on.
             These are the only atoms whose species can be changed. (Default is None, which raises an error unless
             `domain_ids` was explicitly provided -- else this parameter must be provided.)
-        seed_species (str/list): The species for each 'seed' atom in the QM domain. Value(s) should be a atomic symbol,
-            e.g. 'Mg'. (Default is None, which leaves all seeds the same as they occur in the input structure.)
         shell_cutoff (float): Maximum distance for two atoms to be considered neighbours in the construction of shells
             for automatic system partitioning. (Default is None, which will raise an error -- this parameter must be
-            provided.)
+            provided if domain partitioning is done using `seed_ids` and shells. When `domain_ids` are explicitly
+            provided, `shell_cutoff` is not needed.)
         n_core_shells (int): How many neighbour shells around the seed(s) to relax using QM forces. (Default is 2.)
         n_buffer_shells (int): How many neighbour shells around the region I core to relax using MM forces. (Default is
             2.)
+        seed_species (str/list): The species for each 'seed' atom in the QM domain. Value(s) should be a atomic symbol,
+            e.g. 'Mg'. (Default is None, which leaves all seeds the same as they occur in the input structure.)
         vacuum_width (float): Minimum vacuum distance between atoms in two periodic images of the QM domain. Influences
             the final simulation cell for the QM calculation. (Default is 2.)
         filler_width (float): Length added to the bounding box of the region I atoms to create a new box from which to
@@ -70,20 +72,28 @@ class QMMM(Protocol):
         self.shell_cutoff = None
         self.protocol_finished += self._compute_qmmm_energy
 
-        self.input.filler_width = 6.
-        self.input.default.gamma0 = 0.1
-        self.input.default.fix_com = True
-        self.input.default.use_adagrad = True
-        self.input.default.n_steps = 100
-        self.input.default.f_tol = 1e-4
+        id_ = self.input.default
+        id_.domain_ids = None
+        id_.seed_ids = None
+        id_.shell_cutoff = None
+        id_.n_core_shells = 2
+        id_.n_buffer_shells = 2
+        id_.vacuum_width = 2.
+        id_.filler_width = 6.
+
+        id_.n_steps = 100
+        id_.f_tol = 1e-4
+
+        id_.gamma0 = 0.1
+        id_.fix_com = True
+        id_.use_adagrad = True
 
     def define_vertices(self):
         # Components
         g = self.graph
-        # We need now to calc static Nodes one per job
+        g.partion = PartitionStructure()
         g.calc_static_mm = ExternalHamiltonian()
         g.calc_static_qm = ExternalHamiltonian()
-
         g.clock = Counter()
         g.force_norm_mm = Norm()
         g.force_norm_qm = Norm()
@@ -97,15 +107,14 @@ class QMMM(Protocol):
         g.gradient_descent_mm = GradientDescent()
         g.gradient_descent_qm = GradientDescent()
         g.calc_static_small = ExternalHamiltonian()
-        #g.compute = Compute()  # Argument sets compute.command
 
     def define_execution_flow(self):
         g = self.graph
         g.make_pipeline(
+            g.partion,
+            g.check_steps, 'false',
             g.calc_static_mm,
             g.calc_static_qm,
-            g.clock,
-            g.check_steps, 'false',
             g.force_norm_mm,
             g.max_force_mm,
             g.check_force_mm, 'true',
@@ -116,311 +125,164 @@ class QMMM(Protocol):
             g.gradient_descent_qm,
             g.update_buffer_qm,
             g.update_core_mm,
-            g.calc_static_mm
+            g.clock,
+            g.check_steps
         )
         g.make_edge(g.check_force_mm, g.gradient_descent_mm, 'false')
         g.make_edge(g.check_force_qm, g.calc_static_small, 'true')
         g.make_edge(g.check_steps, g.calc_static_small, 'true')
-        g.starting_vertex = g.calc_static_mm
-        g.restarting_vertex = g.calc_static_mm
+        g.starting_vertex = g.partion
+        g.restarting_vertex = g.clock
 
     def define_information_flow(self):
         gp = Pointer(self.graph)
         ip = Pointer(self.input)
         g = self.graph
 
+        g.partition.input.structure = ip.structure
+        g.partition.input.domain_ids = ip.domain_ids
+        g.partition.input.seed_ids = ip.seed_ids
+        g.partition.input.shell_cutoff = ip.shell_cutoff
+        g.partition.input.n_core_shells = ip.n_core_shells
+        g.partition.input.n_buffer_shells = ip.n_buffer_shells
+        g.partition.input.vacuum_width = ip.vacuum_width
+        g.partition.input.filler_width = ip.filler_width
+        g.partition.input.seed_species = ip.seed_species
+
         g.calc_static_mm.input.ref_job_full_path = ip.mm_ref_job_full_path
-        g.calc_static_mm.input.structure = sp.structure
-        g.calc_static_mm.input.default.positions = sp.structure.positions
-        g.calc_static_mm.input.positions = gp.gradient_descent_mm.output.positions[-1]
-        g.calc_static_mm.input.interesting_keys = ['forces', 'energy_pot']
+        g.calc_static_mm.input.structure = gp.partition.output.mm_full_structure
+        g.calc_static_mm.input.default.positions = gp.output.mm_full_structure.positions
+        g.calc_static_mm.input.positions = gp.update_core_mm.output.positions[-1]
 
         g.calc_static_small.input.ref_job_full_path = ip.mm_ref_job_full_path
-        g.calc_static_small.setup.structure = sp.qm_structure
-        g.calc_static_small.input.default.positions = sp.qm_structure.positions
-        g.calc_static_small.input.positions = gp.gradient_descent_qm.output.positions[-1]
+        g.calc_static_small.input.structure = gp.partition.output.mm_small_structure
+        g.calc_static_small.input.default.positions = gp.partition.output.mm_small_structure.positions
+        g.calc_static_small.input.positions = gp.update_core_mm.output.positions[-1]
 
         g.calc_static_qm.input.ref_job_full_path = ip.qm_ref_job_full_path
-        g.calc_static_qm.input.structure = sp.qm_structure
-        g.calc_static_qm.input.default.positions = sp.qm_structure.positions
-        g.calc_static_qm.input.positions = gp.gradient_descent_qm.output.positions[-1]
+        g.calc_static_qm.input.structure = gp.partition.output.qm_structure
+        g.calc_static_qm.input.default.positions = gp.partition.output.qm_structure.positions
+        g.calc_static_qm.input.positions = gp.update_buffer_qm.output.positions[-1]
 
         g.check_steps.input.target = gp.clock.output.n_counts[-1]
-        g.check_steps.input.threshold = ip.steps_max
+        g.check_steps.input.threshold = ip.n_steps
 
-        g.force_norm_mm.input.default.x = [np.inf]
         g.force_norm_mm.input.x = gp.calc_static_mm.output.forces[-1]
         g.force_norm_mm.input.ord = 2
         g.force_norm_mm.input.axis = -1
 
-        g.max_force_mm.input.default.a = [np.inf]
         g.max_force_mm.input.a = gp.force_norm_mm.output.n[-1]
         g.check_force_mm.input.target = gp.max_force_mm.output.amax[-1]
         g.check_force_mm.input.threshold = ip.f_tol
 
-        g.force_norm_qm.input.default.x = [np.inf]
-        g.force_norm_qm.input.x = gp.calc_static_qm.output.forces[-1][Pointer(self)._only_core]
+        g.force_norm_qm.input.x = gp.calc_static_qm.output.forces[-1][gp.partition.output.domain_ids_qm['only_core']]
         g.force_norm_qm.input.ord = 2
         g.force_norm_qm.input.axis = -1
 
-        g.max_force_qm.input.default.a = [np.inf]
         g.max_force_qm.input.a = gp.force_norm_qm.output.n[-1]
         g.check_force_qm.input.target = gp.max_force_qm.output.amax[-1]
         g.check_force_qm.input.threshold = ip.f_tol
 
-        g.gradient_descent_mm.input.default.forces = np.zeros((3,))
         g.gradient_descent_mm.input.forces = gp.calc_static_mm.output.forces[-1]
-        g.gradient_descent_mm.input.default.positions = sp.structure.positions
+        g.gradient_descent_mm.input.default.positions = gp.output.mm_full_structure.positions
         g.gradient_descent_mm.input.positions = gp.update_core_mm.output.positions[-1]
-        g.gradient_descent_mm.input.masses = sp.structure.get_masses
+        g.gradient_descent_mm.input.masses = gp.output.mm_full_structure.get_masses
+        g.gradient_descent_mm.input.mask = gp.partition.output.domain_ids['except_core']
         g.gradient_descent_mm.input.gamma0 = ip.gamma0
         g.gradient_descent_mm.input.fix_com = ip.fix_com
         g.gradient_descent_mm.input.use_adagrad = ip.use_adagrad
-        g.gradient_descent_mm.input.mask = Pointer(self)._except_core
 
-        g.gradient_descent_qm.input.default.forces =  np.zeros((3,))
         g.gradient_descent_qm.input.forces = gp.calc_static_qm.output.forces[-1]
-        g.gradient_descent_qm.input.default.positions = sp.qm_structure.positions
+        g.gradient_descent_qm.input.default.positions = gp.partition.output.qm_structure.positions
         g.gradient_descent_qm.input.positions = gp.update_buffer_qm.output.positions[-1]
-        g.gradient_descent_qm.input.masses = sp.qm_structure.get_masses
+        g.gradient_descent_qm.input.masses = gp.partition.output.qm_structure.get_masses
+        g.gradient_descent_qm.input.mask = gp.partition.output.domain_ids_qm['only_core']
         g.gradient_descent_qm.input.gamma0 = ip.gamma0
         g.gradient_descent_qm.input.fix_com = ip.fix_com
         g.gradient_descent_qm.input.use_adagrad = ip.use_adagrad
-        g.gradient_descent_qm.input.mask = Pointer(self)._only_core
 
-        g.update_core_mm.input.default.target = sp.structure.positions
+        g.update_core_mm.input.default.target = gp.partition.output.mm_full_structure.positions
         g.update_core_mm.input.target = gp.gradient_descent_mm.output.positions[-1]
         g.update_core_mm.input.target_mask = [
-            ip.domain_ids['seed'],
-            ip.domain_ids['core']
+            gp.partition.output.domain_ids['seed'],
+            gp.partition.output.domain_ids['core']
         ]
-        g.update_core_mm.input.default.displacement = np.zeros((3,))
         g.update_core_mm.input.displacement = gp.gradient_descent_qm.output.displacements[-1]
         g.update_core_mm.input.displacement_mask = [
-            ip.domain_ids_qm['seed'],
-            ip.domain_ids_qm['core']
+            gp.partition.output.domain_ids_qm['seed'],
+            gp.partition.output.domain_ids_qm['core']
         ]
 
-        g.update_buffer_qm.input.default.target = sp.qm_structure.positions
+        g.update_buffer_qm.input.default.target = gp.partition.output.qm_structure.positions
         g.update_buffer_qm.input.target = gp.gradient_descent_qm.output.positions[-1]
-        g.update_buffer_qm.input.target_mask = ip.domain_ids_qm['buffer']
-        g.update_buffer_qm.input.default.displacement = np.zeros((3,))
+        g.update_buffer_qm.input.target_mask = gp.partition.output.domain_ids_qm['buffer']
         g.update_buffer_qm.input.displacement = gp.gradient_descent_mm.output.displacements[-1]
-        g.update_buffer_qm.input.displacement_mask = ip.domain_ids['buffer']
+        g.update_buffer_qm.input.displacement_mask = gp.partition.output.domain_ids['buffer']
 
     def _compute_qmmm_energy(self):
         gp = Pointer(self.graph)
         o = self.output
-        self.output.energy_mm = gp.calc_static_mm.output.energy_pot[-1]
-        self.output.energy_qm = gp.calc_static_qm.output.energy_pot[-1]
-        self.output.energy_mm_one = gp.calc_static_small.output.energy_pot[-1]
-        self.output.energy_qmmm = self.output.energy_mm + self.output.energy_qm - self.output.energy_mm_one
-
-    def _except_core(self):
-        seed_ids = np.array(self.input.domain_ids['seed'])
-        core_ids = np.array(self.input.domain_ids['core'])
-        return np.setdiff1d(np.arange(len(self.setup.structure)), np.concatenate([seed_ids, core_ids]))
-
-    def _only_core(self):
-        return np.concatenate([self.input.domain_ids_qm['seed'], self.input.domain_ids_qm['core']])
-
-    def _qm_with_updated_buffer(self):
-        qm_buffer_ids = self.input.domain_ids_qm['buffer']
-        mm_buffer_ids = self.input.domain_ids['buffer']
-        mm_buffer_displacements = self.graph.gradient_descent_mm.displacements[-1]
-
-        qm_postitions = self.graph.gradient_descent_qm.output.positions[-1]
-        qm_postitions[qm_buffer_ids] += mm_buffer_displacements[mm_buffer_ids]
-
-    def save(self):
-        if 'qm_structure' not in self.setup:
-            self._set_qm_structure()
-        super(QMMM, self).save()
-
-    def _set_qm_structure(self):
-        superstructure = self.setup.structure
-
-        if 'domain_ids' not in self.input:
-            if self.input.seed_ids is None:
-                raise ValueError('Either the domain ids must be provided explicitly, or seed ids must be given.')
-            seed_ids = np.array(self.input.seed_ids, dtype=int)
-            shells = self._build_shells(superstructure,
-                                        self.input.n_core_shells + self.input.n_buffer_shells,
-                                        self.input.seed_ids)
-            core_ids = np.concatenate(shells[:self.input.n_core_shells])
-            buffer_ids = np.concatenate(shells[self.input.n_core_shells:])
-            region_I_ids = np.concatenate((seed_ids, core_ids, buffer_ids))
-
-            bb = self._get_bounding_box(superstructure[region_I_ids])
-            extra_box = 0.5 * np.array(self.input.filler_width)
-            bb[:, 0] -= extra_box
-            bb[:, 1] += extra_box
-
-            # Store it because get bounding box return a tight box and is different
-
-            filler_ids = self._get_ids_within_box(superstructure, bb)
-            filler_ids = np.setdiff1d(filler_ids, region_I_ids)
-
-            bb = self._get_bounding_box(superstructure[np.concatenate((region_I_ids, filler_ids))])
-
-            self.input.domain_ids = {'seed': seed_ids, 'core': core_ids, 'buffer': buffer_ids, 'filler': filler_ids}
-        elif 'seed_ids' not in self.input:
-            raise ValueError('Only *one* of `seed_ids` and `domain_ids` may be provided.')
-        # Use domains provided
-        else:
-            seed_ids = self.input.domain_ids['seed']
-            core_ids = self.input.domain_ids['core']
-            buffer_ids = self.input.domain_ids['buffer']
-            filler_ids = self.input.domain_ids['filler']
-            region_I_ids = np.concatenate((seed_ids, core_ids, buffer_ids))
-            bb = self._get_bounding_box(superstructure[np.concatenate((region_I_ids, filler_ids))])
-        # Extract the relevant atoms
-
-        # Build the domain ids in the qm structure
-        qm_structure = None
-        domain_ids_qm = {}
-        offset = 0
-        for key, ids in self.input.domain_ids.items():
-            if qm_structure is None:
-                qm_structure = superstructure[ids]
-            else:
-                qm_structure += superstructure[ids]
-            id_length = len(ids)
-            domain_ids_qm[key] = np.arange(id_length) + offset
-            offset += id_length
-
-        self.input.domain_ids_qm = domain_ids_qm
-        # And put everything in a box near (0,0,0)
-        extra_vacuum = 0.5 * self.input.vacuum_width
-        bb[:, 0] -= extra_vacuum
-        bb[:, 1] += extra_vacuum
-
-        # If the bounding box is larger than the MM superstructure
-        bs = np.abs(bb[:, 1] - bb[:, 0])
-        supercell_lengths = [np.linalg.norm(row) for row in superstructure.cell]
-        shrinkage = np.array([(box_size - cell_size) / 2.0 if box_size > cell_size else 0.0 for box_size, cell_size in
-                              zip(bs, supercell_lengths)])
-        if np.any(shrinkage > 0):
-            self.logger.info('The QM box is larger than the MM Box therefore I\'ll shrink it')
-            bb[:, 0] += shrinkage
-            bb[:, 1] -= shrinkage
-        elif any([0.9 < box_size / cell_size < 1.0 for box_size, cell_size in zip(bs, supercell_lengths)]):
-            # Check if the box is just slightly smaller than the superstructure cell
-            self.logger.warn(
-                'Your cell is nearly as large as your supercell. Probably you want to expand it a little bit')
-
-
-        qm_structure.cell = np.identity(3) * np.ptp(bb, axis=1)
-
-        box_center = tuple(np.dot(np.linalg.inv(superstructure.cell), np.mean(bb, axis=1)))
-        qm_structure.wrap(box_center)
-        # Wrap it to the unit cell
-        qm_structure.positions = np.dot(qm_structure.get_scaled_positions(), qm_structure.cell)
-        self.setup.qm_structure = qm_structure
+        o.energy_mm = gp.calc_static_mm.output.energy_pot[-1]
+        o.energy_qm = gp.calc_static_qm.output.energy_pot[-1]
+        o.energy_mm_one = gp.calc_static_small.output.energy_pot[-1]
+        o.energy_qmmm = o.energy_mm + o.energy_qm - o.energy_mm_one
 
     def show_mm(self):
-        s = self.setup.structure.copy()
-        for group, el in zip(self.input.domain_ids.keys(), ['La','He','W','Ar']):
-            s[self.input.domain_ids[group]] = el
-        return s.plot3d()
+        try:
+            mm_full_structure = self.graph.partition.output.mm_full_structure
+            mm_full_structure.positions = self.graph.update_core.output.positions
+            domain_ids = self.graph.partition.output.domain_ids
+        except:
+            raise  # Will figure out what to except later
+            # partitioned = self.partition_input()
+            # mm_full_structure = partitioned['mm_full_structure']
+            # domain_ids = partitioned['domain_ids']
+
+        color = 4 * np.ones(len(mm_full_structure))  # This 5th colour makes the balance of atoms
+        for n, group in enumerate(['seed', 'core', 'buffer', 'filler']):
+            color[domain_ids[group]] = n
+
+        return mm_full_structure.plot3d(scalar_field=color)
 
     def show_qm(self):
-        if 'qm_structure' not in self.setup:
-            self._set_qm_structure()
-        s = self.setup.qm_structure.copy()
-        for group, el in zip(self.input.domain_ids_qm.keys(), ['La','He','W','Ar']):
-            ids = self.input.domain_ids_qm[group]
-            for id_ in ids:
-                s[id_] = el
-        return s.plot3d()
+        try:
+            qm_structure = self.graph.partition.output.qm_structure
+            qm_structure.positions = self.graph.update_buffer.output.positions
+            domain_ids_qm = self.graph.partition.output.domain_ids_qm
+        except:
+            raise # Will figure out what to except later
+            # partitioned = self.partition_input()
+            # qm_structure = partitioned['qm_structure']
+            # domain_ids_qm = partitioned['domain_ids_qm']
 
-    @staticmethod
-    def _build_shells(structure, n_shells, seed_ids):
-        indices = [seed_ids]
-        current_shell_ids = seed_ids
-        for _ in range(n_shells):
-            neighbors = structure.get_neighbors(id_list=current_shell_ids)
-            new_ids = np.unique(neighbors.indices)
-            # Make it exclusive
-            for shell_ids in indices:
-                new_ids = np.setdiff1d(new_ids, shell_ids)
-            indices.append(new_ids)
-            current_shell_ids = new_ids
-        # Pop seed ids
-        indices.pop(0)
-        return indices
+        color = 4 * np.ones(len(qm_structure))  # If you see this 5th colour, something is wrong
+        for n, group in enumerate(['seed', 'core', 'buffer', 'filler']):
+            color[domain_ids_qm[group]] = n
 
-    @staticmethod
-    def _get_bounding_box(structure):
-        """
-        Finds the smallest rectangular prism which encloses all atoms in the structure after accounting for periodic
-        boundary conditions.
-
-        So what's the problem?
-
-        |      ooooo  |, easy, wrap by CoM
-        |ooo        oo|, easy, wrap by CoM
-        |o    ooo    o|,
-
-
-        Args:
-            structure (Atoms): The structure to bound.
-
-        Returns:
-            numpy.ndarray: A 3x2 array of the x-min through z-max values for the bounding rectangular prism.
-        """
-        wrapped_structure = structure.copy()
-        # Take the frist positions and wrap the atoms around there to determine the size of the bounding box
-        wrap_center = tuple(np.dot(np.linalg.inv(structure.cell), structure.positions[0, :]))
-        wrapped_structure.wrap(wrap_center)
-
-        bounding_box = np.vstack([
-            np.amin(wrapped_structure.positions, axis=0),
-            np.amax(wrapped_structure.positions, axis=0)
-        ]).T
-        return bounding_box
+        return qm_structure.plot3d(scalar_field=color)
 
     def show_boxes(self):
+        try:
+            structure = self.graph.partition.output.structure
+            qm_structure = self.graph.partition.output.qm_structure
+        except:
+            raise  # Will figure out what to except later
+            # partitioned = self.partition_input()
+            # structure = partitioned['structure']
+            # qm_structure = partitioned['qm_structure']
+        self._plot_boxes([structure.cell, qm_structure.cell],
+                         colors=['r','b'],
+                         titles=['MM Superstructure', 'QM Structure'])
 
-        self._plot_boxes([self.setup.structure.cell, self.setup.qm_structure.cell], colors=['r','b'],
-                             titles=['MM Superstructure', 'QM Structure'])
-
-    @staticmethod
-    def _get_ids_within_box(structure, box):
-        """
-        Finds all the atoms in a structure who have a periodic image inside the bounding box.
-
-        Args:
-            structure (Atoms): The structure to search.
-            box (np.ndarray): A 3x2 array of the x-min through z-max values for the bounding rectangular prism.
-
-        Returns:
-            np.ndarray: The integer ids of the atoms inside the box.
-        """
-        box_center = np.mean(box, axis=1)
-        box_center_direct = np.dot(np.linalg.inv(structure.cell), box_center)
-        # Wrap atoms so that they are the closest image to the box center
-        wrapped_structure = structure.copy()
-        wrapped_structure.wrap(tuple(box_center_direct))
-        pos = wrapped_structure.positions
-        # Keep only atoms inside the box limits
-        masks = []
-        for d in np.arange(len(box)):
-            masks.append(pos[:, d] > box[d, 0])
-            masks.append(pos[:, d] < box[d, 1])
-        total_mask = np.prod(masks, axis=0).astype(bool)
-        return np.arange(len(structure), dtype=int)[total_mask]
-
-    def _change_qm_species(self):
-        # The seed sites are the first in the qm structure
-
-        for index, species in zip(self.input.domain_ids_qm['seed'], self.input.seed_species):
-            self.setup.qm_structure[index] = species
-
-    def run_static(self):
-        self._set_qm_structure()
-        self._change_qm_species()
-        super(QMMM, self).run_static()
+    def partition_input(self):
+        i = self.input
+        return PartitionStructure.command(
+            PartitionStructure, i.structure,
+            i.domain_ids,
+            i.seed_ids, i.shell_cutoff, i.n_core_shells, i.n_buffer_shells,
+            i.vacuum_width, i.filler_width,
+            i.seed_species
+        )
 
     def to_hdf(self, hdf=None, group_name=None):
         """
@@ -544,3 +406,211 @@ class AddDisplacements(PrimitiveVertex):
         return {
             'positions': result
         }
+
+
+class PartitionStructure(PrimitiveVertex):
+    """
+
+    """
+    def __init__(self, name=None):
+        super(PartitionStructure, self).__init__(name=name)
+        id_ = self.input.default
+        id_.domain_ids = None
+        id_.seed_ids = None
+        id_.shell_cutoff = None
+        id_.n_core_shells = None
+        id_.n_buffer_shells = None
+        id_.filler_width = None
+
+    def command(
+            self, structure,
+            domain_ids,
+            seed_ids, shell_cutoff, n_core_shells, n_buffer_shells,
+            vacuum_width, filler_width,
+            seed_species
+    ):
+        domain_ids, domain_ids_qm, mm_small_structure = self._set_qm_structure(
+            structure,
+            domain_ids,
+            seed_ids, shell_cutoff, n_core_shells, n_buffer_shells,
+            vacuum_width, filler_width
+        )
+        qm_structure = self._change_qm_species(mm_small_structure, domain_ids_qm, seed_species)
+        domain_ids_qm['only_core'] = self._only_core(domain_ids_qm)
+        domain_ids['except_core'] = self._except_core(structure, domain_ids)
+        return {
+            'mm_full_structure': structure,
+            'mm_small_structure': mm_small_structure,
+            'qm_structure': qm_structure,
+            'domain_ids': domain_ids,
+            'domain_ids_qm': domain_ids_qm
+        }
+
+    def _set_qm_structure(
+            self,
+            superstructure,
+            domain_ids,
+            seed_ids, shell_cutoff, n_core_shells, n_buffer_shells,
+            vacuum_width, filler_width
+    ):
+        if domain_ids is not None and seed_ids is not None:
+            raise ValueError('Only *one* of `seed_ids` and `domain_ids` may be provided.')
+        elif domain_ids is not None:
+            seed_ids = domain_ids['seed']
+            core_ids = domain_ids['core']
+            buffer_ids = domain_ids['buffer']
+            filler_ids = domain_ids['filler']
+            region_I_ids = np.concatenate((seed_ids, core_ids, buffer_ids))
+            bb = self._get_bounding_box(superstructure[np.concatenate((region_I_ids, filler_ids))])
+        elif seed_ids is not None:
+            shells = self._build_shells(superstructure, n_core_shells + n_buffer_shells, shell_cutoff, seed_ids)
+            core_ids = np.concatenate(shells[:n_core_shells])
+            buffer_ids = np.concatenate(shells[n_core_shells:])
+            region_I_ids = np.concatenate((seed_ids, core_ids, buffer_ids))
+            bb = self._get_bounding_box(superstructure[region_I_ids])
+            extra_box = 0.5 * np.array(filler_width)
+            bb[:, 0] -= extra_box
+            bb[:, 1] += extra_box
+
+            # Store it because get bounding box return a tight box and is different
+            filler_ids = self._get_ids_within_box(superstructure, bb)
+            filler_ids = np.setdiff1d(filler_ids, region_I_ids)
+
+            bb = self._get_bounding_box(superstructure[np.concatenate((region_I_ids, filler_ids))])
+
+            domain_ids = {'seed': seed_ids, 'core': core_ids, 'buffer': buffer_ids, 'filler': filler_ids}
+        else:
+            raise ValueError('At least *one* of `seed_ids` and `domain_ids` must be provided.')
+
+
+        # Build the domain ids in the qm structure
+        qm_structure = None
+        domain_ids_qm = {}
+        offset = 0
+        for key, ids in domain_ids.items():
+            if qm_structure is None:
+                qm_structure = superstructure[ids]
+            else:
+                qm_structure += superstructure[ids]
+            id_length = len(ids)
+            domain_ids_qm[key] = np.arange(id_length) + offset
+            offset += id_length
+
+        # And put everything in a box near (0,0,0)
+        extra_vacuum = 0.5 * vacuum_width
+        bb[:, 0] -= extra_vacuum
+        bb[:, 1] += extra_vacuum
+
+        # If the bounding box is larger than the MM superstructure
+        bs = np.abs(bb[:, 1] - bb[:, 0])
+        supercell_lengths = [np.linalg.norm(row) for row in superstructure.cell]
+        shrinkage = np.array([(box_size - cell_size) / 2.0 if box_size > cell_size else 0.0
+                              for box_size, cell_size in zip(bs, supercell_lengths)])
+        if np.any(shrinkage > 0):
+            self.logger.info('The QM box is larger than the MM Box therefore I\'ll shrink it')
+            bb[:, 0] += shrinkage
+            bb[:, 1] -= shrinkage
+        elif any([0.9 < box_size / cell_size < 1.0 for box_size, cell_size in zip(bs, supercell_lengths)]):
+            # Check if the box is just slightly smaller than the superstructure cell
+            self.logger.warn(
+                'Your cell is nearly as large as your supercell. Probably you want to expand it a little bit')
+
+
+        qm_structure.cell = np.identity(3) * np.ptp(bb, axis=1)
+
+        box_center = tuple(np.dot(np.linalg.inv(superstructure.cell), np.mean(bb, axis=1)))
+        qm_structure.wrap(box_center)
+        # Wrap it to the unit cell
+        qm_structure.positions = np.dot(qm_structure.get_scaled_positions(), qm_structure.cell)
+
+        return domain_ids, domain_ids_qm, qm_structure
+
+    @staticmethod
+    def _change_qm_species(qm_structure, domain_ids_qm, seed_species):
+        # The seed sites are the first in the qm structure
+
+        for index, species in zip(domain_ids_qm['seed'], seed_species):
+            qm_structure[index] = species
+        return qm_structure
+
+    @staticmethod
+    def _get_ids_within_box(structure, box):
+        """
+        Finds all the atoms in a structure who have a periodic image inside the bounding box.
+
+        Args:
+            structure (Atoms): The structure to search.
+            box (np.ndarray): A 3x2 array of the x-min through z-max values for the bounding rectangular prism.
+
+        Returns:
+            np.ndarray: The integer ids of the atoms inside the box.
+        """
+        box_center = np.mean(box, axis=1)
+        box_center_direct = np.dot(np.linalg.inv(structure.cell), box_center)
+        # Wrap atoms so that they are the closest image to the box center
+        wrapped_structure = structure.copy()
+        wrapped_structure.wrap(tuple(box_center_direct))
+        pos = wrapped_structure.positions
+        # Keep only atoms inside the box limits
+        masks = []
+        for d in np.arange(len(box)):
+            masks.append(pos[:, d] > box[d, 0])
+            masks.append(pos[:, d] < box[d, 1])
+        total_mask = np.prod(masks, axis=0).astype(bool)
+        return np.arange(len(structure), dtype=int)[total_mask]
+
+    @staticmethod
+    def _build_shells(structure, n_shells, shell_cutoff, seed_ids):
+        indices = [seed_ids]
+        current_shell_ids = seed_ids
+        for _ in range(n_shells):
+            neighbors = structure.get_neighbors(id_list=current_shell_ids, cutoff=shell_cutoff)
+            new_ids = np.unique(neighbors.indices)
+            # Make it exclusive
+            for shell_ids in indices:
+                new_ids = np.setdiff1d(new_ids, shell_ids)
+            indices.append(new_ids)
+            current_shell_ids = new_ids
+        # Pop seed ids
+        indices.pop(0)
+        return indices
+
+    @staticmethod
+    def _get_bounding_box(structure):
+        """
+        Finds the smallest rectangular prism which encloses all atoms in the structure after accounting for periodic
+        boundary conditions.
+
+        So what's the problem?
+
+        |      ooooo  |, easy, wrap by CoM (centre of mass)
+        |ooo        oo|, easy, wrap by CoM
+        |o    ooo    o|, uh-oh! Need this function.
+
+
+        Args:
+            structure (Atoms): The structure to bound.
+
+        Returns:
+            numpy.ndarray: A 3x2 array of the x-min through z-max values for the bounding rectangular prism.
+        """
+        wrapped_structure = structure.copy()
+        # Take the frist positions and wrap the atoms around there to determine the size of the bounding box
+        wrap_center = tuple(np.dot(np.linalg.inv(structure.cell), structure.positions[0, :]))
+        wrapped_structure.wrap(wrap_center)
+
+        bounding_box = np.vstack([
+            np.amin(wrapped_structure.positions, axis=0),
+            np.amax(wrapped_structure.positions, axis=0)
+        ]).T
+        return bounding_box
+
+    @staticmethod
+    def _except_core(structure, domain_ids):
+        seed_ids = np.array(domain_ids['seed'])
+        core_ids = np.array(domain_ids['core'])
+        return np.setdiff1d(np.arange(len(structure)), np.concatenate([seed_ids, core_ids]))
+
+    @staticmethod
+    def _only_core(domain_ids_qm):
+        return np.concatenate([domain_ids_qm['seed'], domain_ids_qm['core']])

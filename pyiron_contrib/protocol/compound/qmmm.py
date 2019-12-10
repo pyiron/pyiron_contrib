@@ -16,7 +16,7 @@ Protocol for running the force-based quantum mechanics/molecular mechanics concu
 Huber et al., Comp. Mat. Sci. 118 (2016) 259-268
 """
 
-__author__ = "Dominik Noeger, Liam Huber"
+__author__ = "Dominik Gehringer, Liam Huber"
 __copyright__ = "Copyright 2019, Max-Planck-Institut für Eisenforschung GmbH " \
                 "- Computational Materials Design (CM) Department"
 __version__ = "0.0"
@@ -24,32 +24,6 @@ __maintainer__ = "Liam Huber"
 __email__ = "huber@mpie.de"
 __status__ = "development"
 __date__ = "June 6, 2019"
-
-
-class AddDisplacements(PrimitiveVertex):
-
-    def __init__(self, name=None):
-        super(AddDisplacements, self).__init__(name=name)
-        self.input.default.target_mask = None
-        self.input.default.displacement_mask = None
-
-    def command(self, target, displacement, target_mask, displacement_mask):
-        result = target.copy()
-        if target_mask is not None and isinstance(target_mask, list):
-            target_mask = np.concatenate(target_mask)
-        if displacement_mask is not None and isinstance(displacement_mask, list):
-            displacement_mask = np.concatenate(displacement_mask)
-        if target_mask is not None and displacement_mask is not None:
-            result[target_mask] += displacement[displacement_mask]
-        elif target_mask is not None and displacement_mask is None:
-            result[target_mask] += displacement
-        elif target_mask is None and displacement_mask is not None:
-            result += displacement[displacement_mask]
-        else:
-            result += displacement
-        return {
-            'positions': result
-        }
 
 
 class QMMM(Protocol):
@@ -109,48 +83,50 @@ class QMMM(Protocol):
 
     def define_vertices(self):
         # Components
+        g = self.graph
         # We need now to calc static Nodes one per job
-        self.graph.calc_static_mm = ExternalHamiltonian()
-        self.graph.calc_static_qm = ExternalHamiltonian()
+        g.calc_static_mm = ExternalHamiltonian()
+        g.calc_static_qm = ExternalHamiltonian()
 
-        self.graph.clock = Counter()
-        self.graph.force_norm_mm = Norm()
-        self.graph.force_norm_qm = Norm()
-        self.graph.max_force_mm = Max()
-        self.graph.max_force_qm = Max()
-        self.graph.check_force_mm = IsLEq()
-        self.graph.check_force_qm = IsLEq()
-        self.graph.check_steps = IsGEq()
-        self.graph.update_buffer_qm = AddDisplacements()
-        self.graph.update_core_mm = AddDisplacements()
-        self.graph.gradient_descent_mm = GradientDescent()
-        self.graph.gradient_descent_qm = GradientDescent()
-        self.graph.calc_static_small = ExternalHamiltonian()
-        #self.graph.compute = Compute()  # Argument sets compute.command
+        g.clock = Counter()
+        g.force_norm_mm = Norm()
+        g.force_norm_qm = Norm()
+        g.max_force_mm = Max()
+        g.max_force_qm = Max()
+        g.check_force_mm = IsLEq()
+        g.check_force_qm = IsLEq()
+        g.check_steps = IsGEq()
+        g.update_buffer_qm = AddDisplacements()
+        g.update_core_mm = AddDisplacements()
+        g.gradient_descent_mm = GradientDescent()
+        g.gradient_descent_qm = GradientDescent()
+        g.calc_static_small = ExternalHamiltonian()
+        #g.compute = Compute()  # Argument sets compute.command
 
     def define_execution_flow(self):
-        self.graph.make_pipeline(self.graph.calc_static_mm,
-                                 self.graph.calc_static_qm,
-                                 self.graph.clock,
-                                 self.graph.check_steps, 'false',
-                                 self.graph.force_norm_mm,
-                                 self.graph.max_force_mm,
-                                 self.graph.check_force_mm, 'true',
-                                 self.graph.force_norm_qm,
-                                 self.graph.max_force_qm,
-                                 self.graph.check_force_qm, 'false',
-                                 self.graph.gradient_descent_mm,
-                                 self.graph.gradient_descent_qm,
-                                 self.graph.update_buffer_qm,
-                                 self.graph.update_core_mm,
-                                 self.graph.calc_static_mm)
-        self.graph.make_edge(self.graph.check_force_mm, self.graph.gradient_descent_mm, 'false')
-        self.graph.make_edge(self.graph.check_force_qm, self.graph.calc_static_small, 'true')
-        self.graph.make_pipeline(self.graph.check_steps, 'true',
-                                 self.graph.calc_static_small)
-        self.graph.starting_vertex = self.graph.calc_static_mm
-        self.graph.restarting_vertex = self.graph.calc_static_mm
-
+        g = self.graph
+        g.make_pipeline(
+            g.calc_static_mm,
+            g.calc_static_qm,
+            g.clock,
+            g.check_steps, 'false',
+            g.force_norm_mm,
+            g.max_force_mm,
+            g.check_force_mm, 'true',
+            g.force_norm_qm,
+            g.max_force_qm,
+            g.check_force_qm, 'false',
+            g.gradient_descent_mm,
+            g.gradient_descent_qm,
+            g.update_buffer_qm,
+            g.update_core_mm,
+            g.calc_static_mm
+        )
+        g.make_edge(g.check_force_mm, g.gradient_descent_mm, 'false')
+        g.make_edge(g.check_force_qm, g.calc_static_small, 'true')
+        g.make_edge(g.check_steps, g.calc_static_small, 'true')
+        g.starting_vertex = g.calc_static_mm
+        g.restarting_vertex = g.calc_static_mm
 
     def define_information_flow(self):
         gp = Pointer(self.graph)
@@ -232,14 +208,14 @@ class QMMM(Protocol):
         g.update_core_mm.input.default.target = sp.structure.positions
         g.update_core_mm.input.target = gp.gradient_descent_mm.output.positions[-1]
         g.update_core_mm.input.target_mask = [
-            Pointer(self.input).domain_ids['seed'],
-            Pointer(self.input).domain_ids['core']
+            ip.domain_ids['seed'],
+            ip.domain_ids['core']
         ]
         g.update_core_mm.input.default.displacement = np.zeros((3,))
         g.update_core_mm.input.displacement = gp.gradient_descent_qm.output.displacements[-1]
         g.update_core_mm.input.displacement_mask = [
-            Pointer(self.input).domain_ids_qm['seed'],
-            Pointer(self.input).domain_ids_qm['core']
+            ip.domain_ids_qm['seed'],
+            ip.domain_ids_qm['core']
         ]
 
         g.update_buffer_qm.input.default.target = sp.qm_structure.positions
@@ -249,10 +225,9 @@ class QMMM(Protocol):
         g.update_buffer_qm.input.displacement = gp.gradient_descent_mm.output.displacements[-1]
         g.update_buffer_qm.input.displacement_mask = ip.domain_ids['buffer']
 
-
-
     def _compute_qmmm_energy(self):
         gp = Pointer(self.graph)
+        o = self.output
         self.output.energy_mm = gp.calc_static_mm.output.energy_pot[-1]
         self.output.energy_qm = gp.calc_static_qm.output.energy_pot[-1]
         self.output.energy_mm_one = gp.calc_static_small.output.energy_pot[-1]
@@ -265,7 +240,6 @@ class QMMM(Protocol):
 
     def _only_core(self):
         return np.concatenate([self.input.domain_ids_qm['seed'], self.input.domain_ids_qm['core']])
-
 
     def _qm_with_updated_buffer(self):
         qm_buffer_ids = self.input.domain_ids_qm['buffer']
@@ -308,7 +282,7 @@ class QMMM(Protocol):
 
             self.input.domain_ids = {'seed': seed_ids, 'core': core_ids, 'buffer': buffer_ids, 'filler': filler_ids}
         elif 'seed_ids' not in self.input:
-                raise ValueError('Only *one* of `seed_ids` and `domain_ids` may be provided.')
+            raise ValueError('Only *one* of `seed_ids` and `domain_ids` may be provided.')
         # Use domains provided
         else:
             seed_ids = self.input.domain_ids['seed']
@@ -332,14 +306,11 @@ class QMMM(Protocol):
             domain_ids_qm[key] = np.arange(id_length) + offset
             offset += id_length
 
-
-
         self.input.domain_ids_qm = domain_ids_qm
         # And put everything in a box near (0,0,0)
         extra_vacuum = 0.5 * self.input.vacuum_width
         bb[:, 0] -= extra_vacuum
         bb[:, 1] += extra_vacuum
-
 
         # If the bounding box is larger than the MM superstructure
         bs = np.abs(bb[:, 1] - bb[:, 0])
@@ -379,7 +350,6 @@ class QMMM(Protocol):
             for id_ in ids:
                 s[id_] = el
         return s.plot3d()
-
 
     @staticmethod
     def _build_shells(structure, n_shells, seed_ids):
@@ -463,7 +433,6 @@ class QMMM(Protocol):
 
         for index, species in zip(self.input.domain_ids_qm['seed'], self.input.seed_species):
             self.setup.qm_structure[index] = species
-
 
     def run_static(self):
         self._set_qm_structure()
@@ -566,3 +535,29 @@ class QMMM(Protocol):
         legend_titles = [title or 'Box {}'.format(i + 1) for i, title in enumerate(titles)]
         plt.figlegend(legend_lines, legend_titles, loc='lower center', fancybox=True, shadow=True)
         return plt
+
+
+class AddDisplacements(PrimitiveVertex):
+
+    def __init__(self, name=None):
+        super(AddDisplacements, self).__init__(name=name)
+        self.input.default.target_mask = None
+        self.input.default.displacement_mask = None
+
+    def command(self, target, displacement, target_mask, displacement_mask):
+        result = target.copy()
+        if target_mask is not None and isinstance(target_mask, list):
+            target_mask = np.concatenate(target_mask)
+        if displacement_mask is not None and isinstance(displacement_mask, list):
+            displacement_mask = np.concatenate(displacement_mask)
+        if target_mask is not None and displacement_mask is not None:
+            result[target_mask] += displacement[displacement_mask]
+        elif target_mask is not None and displacement_mask is None:
+            result[target_mask] += displacement
+        elif target_mask is None and displacement_mask is not None:
+            result += displacement[displacement_mask]
+        else:
+            result += displacement
+        return {
+            'positions': result
+        }

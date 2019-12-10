@@ -1,14 +1,18 @@
+from __future__ import print_function
 # coding: utf-8
 # Copyright (c) Max-Planck-Institut für Eisenforschung GmbH - Computational Materials Design (CM) Department
 # Distributed under the terms of "New BSD License", see the LICENSE file.
+import logging
 
-from __future__ import print_function
 from pyiron.base.job.generic import GenericJob
 from pyiron_contrib.protocol.utils import IODictionary, InputDictionary, LoggerMixin, Event, EventHandler, \
-    Pointer, CrumbType
+    Pointer, CrumbType, ordered_dict_get_last, Comparer
 from abc import ABC, abstractmethod
 from numpy import inf
 from collections import OrderedDict
+
+
+
 
 """
 The objective is to iterate over a directed acyclic graph of simulation instructions.
@@ -22,6 +26,8 @@ __maintainer__ = "Liam Huber"
 __email__ = "huber@mpie.de"
 __status__ = "development"
 __date__ = "Aug 16, 2019"
+
+
 
 
 class Vertex(LoggerMixin, ABC):
@@ -176,6 +182,7 @@ class Vertex(LoggerMixin, ABC):
 
     def _update_archive(self):
         # Update input
+        history_key = 't_%s' % self.archive.clock
 
         for key, value in self.input.items():
             if key in self.archive.whitelist.input:
@@ -184,13 +191,17 @@ class Vertex(LoggerMixin, ABC):
                 if period is not None and period >= 0:
                     # TODO: Notifaction when whitelist contains items which are not items of input
                     # check if the period matches that of the key
-                    # with int we also can match 4.5 % 0.5
                     if self.archive.clock % period == 0:
                         if key not in self.archive.input:
                             self.archive.input[key] = OrderedDict()
-                        self.archive.input[key][self.archive.clock] = value
-                            # self.archive.input[key].append(value)
-                            # TODO: This will get expensive for large histories, but a direct append doesn't work. Fix it.
+                            self.archive.input[key][history_key] = value
+                        else:
+                            # we want to archive it only if there is a change, thus get the last element
+                            last_val = ordered_dict_get_last(self.archive.input[key])
+                            if not Comparer(last_val) == value:
+                                self.archive.input[key][history_key] = value
+                            else:
+                                self.logger.info('Property "%s" did not change in input' % key)
 
         # Update output
         for key, value in self.output.items():
@@ -199,13 +210,18 @@ class Vertex(LoggerMixin, ABC):
                 if period is not None and period >= 0:
                     # TODO: Notifaction when whitelist contains items which are not items of input
                     # check if the period matches that of the key
-                    # with int we also can match 4.5 % 0.5
                     if self.archive.clock % period == 0:
                         val = value[-1]
                         if key not in self.archive.output:
                             self.archive.output[key] = OrderedDict()
-                        self.archive.output[key][self.archive.clock] = val
-                            # self.archive.output[key].append(val)
+                            self.archive.output[key][history_key] = val
+                        else:
+                            # we want to archive it only if there is a change, thus get the last element
+                            last_val = ordered_dict_get_last(self.archive.output[key])
+                            if not Comparer(last_val) == val:
+                                self.archive.output[key][history_key] = val
+                            else:
+                                self.logger.info('Property "%s" did not change in input' % key)
 
     def update_and_archive(self, output_data):
         self._update_output(output_data)
@@ -273,13 +289,13 @@ class Vertex(LoggerMixin, ABC):
                 self.output.from_hdf(hdf=hdf5_server, group_name="output")
                 self.archive.from_hdf(hdf=hdf5_server, group_name="archive")
 
-                # sort the dictionaries after loading
+                # sort the dictionaries after loading, do it for both input and output dictionaries
                 for archive_name in ('input', 'output'):
-                    archive = getattr(self, archive_name)
+                    archive = getattr(self.archive, archive_name)
                     for key in archive.keys():
                         history = archive[key]
-                        # create an ordered dictionary from it
-                        archive[key] = OrderedDict(sorted(history.items(), key=lambda item: item[0]))
+                        # create an ordered dictionary from it, convert it to integer back again
+                        archive[key] = OrderedDict(sorted(history.items(), key=lambda item: int(item[0].replace('t_', ''))))
 
 
 class PrimitiveVertex(Vertex):

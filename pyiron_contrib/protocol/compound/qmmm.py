@@ -291,7 +291,7 @@ class QMMMProtocol(Protocol):
         """
         Plots one or a list of cells in xy, yz and xt projection
         Args:
-            cells (numpy.ndarray): The cells to plot. A list of (3,3) or a single (3,3) matrix
+            cells (numpy.ndarray/list): The cells to plot. A list of (3,3) or a single (3,3) matrix
             translate (list): list of translations vectors for each cell list of (3,) numpy arrays.
             colors (list): list of colors for each cell in the list. e.g ['b', 'g', 'y'] or 'bgky'
             titles (list): list of names displayed for each cell. list of str

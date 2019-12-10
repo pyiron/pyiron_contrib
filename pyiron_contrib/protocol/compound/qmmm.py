@@ -26,7 +26,7 @@ __status__ = "development"
 __date__ = "June 6, 2019"
 
 
-class QMMM(Protocol):
+class QMMMProtocol(Protocol):
     """
     Relax a QM/MM coupled system.
 
@@ -69,7 +69,7 @@ class QMMM(Protocol):
 
     def __init__(self, project=None, name=None, job_name=None):
         self.setup = IODictionary()
-        super(QMMM, self).__init__(project=project, name=name, job_name=job_name)
+        super(QMMMProtocol, self).__init__(project=project, name=name, job_name=job_name)
 
         self.protocol_finished += self._compute_qmmm_energy
 

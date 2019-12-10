@@ -110,7 +110,7 @@ class QMMMProtocol(Protocol):
     def define_execution_flow(self):
         g = self.graph
         g.make_pipeline(
-            g.partion,
+            g.partition,
             g.check_steps, 'false',
             g.calc_static_mm,
             g.calc_static_qm,
@@ -130,7 +130,7 @@ class QMMMProtocol(Protocol):
         g.make_edge(g.check_force_mm, g.gradient_descent_mm, 'false')
         g.make_edge(g.check_force_qm, g.calc_static_small, 'true')
         g.make_edge(g.check_steps, g.calc_static_small, 'true')
-        g.starting_vertex = g.partion
+        g.starting_vertex = g.partition
         g.restarting_vertex = g.clock
 
     def define_information_flow(self):

@@ -35,7 +35,7 @@ class QMMMProtocol(Protocol):
 
     During setup, the domain indices are checked -- if None, build them from scratch using shells and the cell...stuff?
 
-    Attributes:
+    Input attributes:
         structure (pyiron.atomistics.structure.atoms.Atoms): The full region I+II superstructure.
         mm_ref_job_full_path (str): Path to the pyiron job to use for evaluating forces and energies of the MM domains.
         qm_ref_job_full_path (str): Path to the pyiron job to use for evaluating forces and energies of the QM domain.
@@ -65,6 +65,18 @@ class QMMMProtocol(Protocol):
         f_tol (float): The maximum force on any atom below which the calculation terminates. Only atoms which could be
             relaxed are considered, i.e. QM forces for region I core, and MM forces for region II and I buffer. (Filler
             atoms are not real, so we never care about their forces.) (Default is 1e-4 eV/angstrom.)
+
+    Output attributes:
+        energy_mm (float): The total energy in eV of the region I+II superstructure (without seed species) using the MM
+            representation.
+        energy_qm (float): The total energy in eV of the region I+filler structure (with seed species) using QM
+            representation.
+        energy_mm_small (float): The total energy in eV of the region I+filler structure (without seed species) using
+            the representation.
+        energy_qmmm (float): The composite QM/MM energy: `energy_mm` + `energy_qm` - `energy_mm_small` in eV.
+        max_force (float): The largest atomic force among QM forces on region I core atoms or MM forces on region I
+            buffer and region II atoms.
+        positions (numpy.ndarray): The per-atom vector of cartesian positions for the entire region I+II superstructure.
     """
 
     def __init__(self, project=None, name=None, job_name=None):
@@ -273,7 +285,7 @@ class QMMMProtocol(Protocol):
             structure = partitioned['mm_full_structure']
             qm_structure = partitioned['qm_structure']
         self._plot_boxes([structure.cell, qm_structure.cell],
-                         colors=['r','b'],
+                         colors=['r', 'b'],
                          titles=['MM Superstructure', 'QM Structure'])
 
     def partition_input(self):
@@ -287,7 +299,8 @@ class QMMMProtocol(Protocol):
             i.seed_species
         )
 
-    def _plot_boxes(self, cells, translate=None, colors=None, titles=None, default_color='b', size=(29, 21)):
+    @staticmethod
+    def _plot_boxes(cells, translate=None, colors=None, titles=None, default_color='b', size=(29, 21)):
         """
         Plots one or a list of cells in xy, yz and xt projection
         Args:
@@ -454,7 +467,6 @@ class PartitionStructure(PrimitiveVertex):
         else:
             raise ValueError('At least *one* of `seed_ids` and `domain_ids` must be provided.')
 
-
         # Build the domain ids in the qm structure
         qm_structure = None
         domain_ids_qm = {}
@@ -486,7 +498,6 @@ class PartitionStructure(PrimitiveVertex):
             # Check if the box is just slightly smaller than the superstructure cell
             self.logger.warn(
                 'Your cell is nearly as large as your supercell. Probably you want to expand it a little bit')
-
 
         qm_structure.cell = np.identity(3) * np.ptp(bb, axis=1)
 

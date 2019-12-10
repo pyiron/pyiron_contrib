@@ -36,12 +36,8 @@ class QMMM(Protocol):
     During setup, the domain indices are checked -- if None, build them from scratch using shells and the cell...stuff?
 
     Attributes:
-        mm_job (FlexibleGeneric): The job for running the MM calculation. Its structure is the region I+II
-            superstructure for the coupled calculation.
-        qm_job (FlexibleGeneric): The job for running the QM calculation. Its structure will be overwritten using the
-            MM job and the domain partitioning.
-        mm_small_job (FlexibleGeneric): The MM job automatically created using `mm_job` as a template to calculate the
-            MM interpretation of the energy of the QM job's structure.
+        mm_ref_job_full_path (str): Path to the pyiron job to use for evaluating forces and energies of the MM domains.
+        qm_ref_job_full_path (str): Path to the pyiron job to use for evaluating forces and energies of the QM domain.
         domain_ids (dict): A dictionary of ids, `seed`, `core`, `buffer`, and `filler`, for mapping atoms of the MM
             I+II superstructure to the various domains of the QM/MM coupling scheme. (Default is None, gets constructed
             using consecutive shells).
@@ -49,7 +45,7 @@ class QMMM(Protocol):
             These are the only atoms whose species can be changed. (Default is None, which raises an error unless
             `domain_ids` was explicitly provided -- else this parameter must be provided.)
         seed_species (str/list): The species for each 'seed' atom in the QM domain. Value(s) should be a atomic symbol,
-            e.g. 'Mg'. (Default is None, which leaves all seeds the same as they occur in the MM representation.)
+            e.g. 'Mg'. (Default is None, which leaves all seeds the same as they occur in the input structure.)
         shell_cutoff (float): Maximum distance for two atoms to be considered neighbours in the construction of shells
             for automatic system partitioning. (Default is None, which will raise an error -- this parameter must be
             provided.)
@@ -131,34 +127,21 @@ class QMMM(Protocol):
     def define_information_flow(self):
         gp = Pointer(self.graph)
         ip = Pointer(self.input)
-        sp = Pointer(self.setup)
         g = self.graph
 
-        g.calc_static_mm.setup.job_type = ip.job_type_mm
-        g.calc_static_mm.setup.project_path = self.project.path
-        g.calc_static_mm.setup.user = self.project.user
-        g.calc_static_mm.setup.protocol_name = self.name
-        g.calc_static_mm.setup.potential = sp.potential
-        g.calc_static_mm.setup.structure = sp.structure
+        g.calc_static_mm.input.ref_job_full_path = ip.mm_ref_job_full_path
+        g.calc_static_mm.input.structure = sp.structure
         g.calc_static_mm.input.default.positions = sp.structure.positions
         g.calc_static_mm.input.positions = gp.gradient_descent_mm.output.positions[-1]
         g.calc_static_mm.input.interesting_keys = ['forces', 'energy_pot']
 
-        g.calc_static_small.setup.job_type = ip.job_type_mm
-        g.calc_static_small.setup.project_path = self.project.path
-        g.calc_static_small.setup.user = self.project.user
-        g.calc_static_small.setup.protocol_name = self.name
-        g.calc_static_small.setup.potential = sp.potential
+        g.calc_static_small.input.ref_job_full_path = ip.mm_ref_job_full_path
         g.calc_static_small.setup.structure = sp.qm_structure
         g.calc_static_small.input.default.positions = sp.qm_structure.positions
         g.calc_static_small.input.positions = gp.gradient_descent_qm.output.positions[-1]
 
-        g.calc_static_qm.setup.job_type = ip.job_type_qm
-        g.calc_static_qm.setup.project_path = self.project.path
-        g.calc_static_qm.setup.user = self.project.user
-        g.calc_static_qm.setup.protocol_name = self.name
-        g.calc_static_qm.setup.potential = sp.potential
-        g.calc_static_qm.setup.structure = sp.qm_structure
+        g.calc_static_qm.input.ref_job_full_path = ip.qm_ref_job_full_path
+        g.calc_static_qm.input.structure = sp.qm_structure
         g.calc_static_qm.input.default.positions = sp.qm_structure.positions
         g.calc_static_qm.input.positions = gp.gradient_descent_qm.output.positions[-1]
 

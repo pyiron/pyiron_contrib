@@ -388,6 +388,61 @@ class IODictionary(dict, LoggerMixin):
             resolved[key] = self.__getitem__(key)
         return resolved
 
+    def _try_save_key(self, k, v, hdf):
+        if hasattr(v, 'to_hdf'):
+            v.to_hdf(hdf, group_name=k)
+            result = True
+        else:
+            try:
+                hdf[k] = v
+                result = True
+            except TypeError as e:
+                result = False
+        return result
+
+
+    def _generic_to_hdf(self, value, hdf, group_name=None):
+                if isinstance(value, dict):
+                    with hdf.open(group_name) as server:
+                        server['TYPE'] = str(type(value))
+                        server['FULLNAME'] = fullname(value)
+                        for k, v in value.items():
+                            # try to save it
+                            if not isinstance(k, str):
+                                self.logger.warning('Key "%s" is not string, it will be converted to %s' %( k, str(k)))
+                                k = str(k)
+                            if self._try_save_key(k, v, server):
+                                pass # everything was successful
+                            else:
+                                self._generic_to_hdf(v, server, group_name=k)
+                elif isinstance(value, (list, tuple)):
+                    # check if all do have the same type -> then we can make a numpy array out of it
+                    if len(value) == 0:
+                        pass # there is nothing to do, no data to store
+                    else:
+                        first_type = type(value[0])
+                        same = all([type(v) == first_type for v in value])
+                        # if all items are of the same type and it is simple
+                        if same and issubclass(first_type, (float, str, complex, int, np.ndarray)):
+                             # that is trivial we do have an array
+                            if issubclass(first_type, np.ndarray):
+                                # we do not want dtype object, thus we do make this distinction
+                                hdf[group_name] = np.array(value)
+                            else:
+                                hdf[group_name] = np.array(value, dtype=first_type)
+                        else:
+                            with hdf.open(group_name) as server:
+                                server['TYPE'] = str(type(value))
+                                server['FULLNAME'] = fullname(value)
+                                for i, v in enumerate(value):
+                                    if self._try_save_key(str(i), v, server):
+                                        pass  # everything was successful
+                                    else:
+                                        self._generic_to_hdf(v, server, group_name=str(i))
+
+
+
+
     def to_hdf(self, hdf, group_name=None):
         with hdf.open(group_name) as hdf5_server:
             hdf5_server['TYPE'] = str(type(self))
@@ -405,24 +460,13 @@ class IODictionary(dict, LoggerMixin):
                     continue
                 except TypeError as e:
                     # Saving a list of complex objects, e.g. Atoms, was failing. Here we save them individually
+                    # it seems pyiron could not handle those
                     self.logger.warning('TypeError(%s): %s : %s' %(e, key, value))
                     # TODO: Treat arbitrarily deep nesting of such objects
-                    with hdf5_server.open(key) as sub_server:
-                        for n, el in enumerate(getattr(self, key)):
-                            sub_server['element' + str(n)] = el
-                # From dominik's branch
-                #     # pyiron converts multidimensional arrays to arrays of objects we want to skip this strange behaviour
-                #     if isinstance(value, (list,tuple, dict, set)):
-                #         generic_to_hdf(hdf, key, value)
-                #         # Lets break the loop here
-                #     else:
-                #         try:
-                #             hdf5_server[key] = value
-                #         except TypeError as e:
-                #             # Saving a list of complex objects, e.g. Atoms, was failing. Here we save them individually
-                #             # TODO: Treat arbitrarily deep nesting of such objects
-                #             #self.logger.exception('Failed to serialize "{}"'.format(fullname(value)), exc_info=e)
-                #             generic_to_hdf(hdf, key, value)
+                   try:
+                       self._generic_to_hdf(value, hdf5_server, group_name=key)
+                   except Exception:
+                       raise
 
     def from_hdf(self, hdf, group_name):
         with hdf.open(group_name) as hdf5_server:

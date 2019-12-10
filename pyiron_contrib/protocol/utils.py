@@ -463,9 +463,9 @@ class IODictionary(dict, LoggerMixin):
                     # it seems pyiron could not handle those
                     self.logger.warning('TypeError(%s): %s : %s' %(e, key, value))
                     # TODO: Treat arbitrarily deep nesting of such objects
-                   try:
+                    try:
                        self._generic_to_hdf(value, hdf5_server, group_name=key)
-                   except Exception:
+                    except Exception:
                        raise
 
     def from_hdf(self, hdf, group_name):

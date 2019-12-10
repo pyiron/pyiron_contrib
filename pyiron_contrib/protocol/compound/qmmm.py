@@ -71,8 +71,6 @@ class QMMMProtocol(Protocol):
         self.setup = IODictionary()
         super(QMMMProtocol, self).__init__(project=project, name=name, job_name=job_name)
 
-        self.protocol_finished += self._compute_qmmm_energy
-
         id_ = self.input.default
         id_.domain_ids = None
         id_.seed_ids = None
@@ -220,13 +218,19 @@ class QMMMProtocol(Protocol):
         g.update_buffer_qm.input.displacement = gp.gradient_descent_mm.output.displacements[-1]
         g.update_buffer_qm.input.displacement_mask = gp.partition.output.domain_ids['buffer']
 
-    def _compute_qmmm_energy(self):
+    def get_output(self):
         gp = Pointer(self.graph)
-        o = self.output
-        o.energy_mm = gp.calc_static_mm.output.energy_pot[-1]
-        o.energy_qm = gp.calc_static_qm.output.energy_pot[-1]
-        o.energy_mm_one = gp.calc_static_small.output.energy_pot[-1]
-        o.energy_qmmm = o.energy_mm + o.energy_qm - o.energy_mm_one
+        e_mm = ~gp.calc_static_mm.output.energy_pot[-1]
+        e_qm = ~gp.calc_static_qm.output.energy_pot[-1]
+        e_mm_small = ~gp.calc_static_small.output.energy_pot[-1]
+        return {
+            'energy_mm': e_mm,
+            'energy_qm': e_qm,
+            'energy_mm_small': e_mm_small,
+            'energy_qmmm': e_mm + e_qm - e_mm_small,
+            'max_force': max(~gp.max_force_qm.output.amax[-1], ~gp.max_force_mm.output.amax[-1]),
+            'positions': ~gp.update_core_mm.output.positions[-1],
+        }
 
     def show_mm(self):
         try:

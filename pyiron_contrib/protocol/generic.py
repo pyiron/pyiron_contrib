@@ -8,6 +8,7 @@ from pyiron_contrib.protocol.utils import IODictionary, InputDictionary, LoggerM
     Pointer, CrumbType
 from abc import ABC, abstractmethod
 from numpy import inf
+from collections import OrderedDict
 
 """
 The objective is to iterate over a directed acyclic graph of simulation instructions.
@@ -128,13 +129,11 @@ class Vertex(LoggerMixin, ABC):
 
     def set_whitelist(self, archive, **kwargs):
         """
+        whitelist properties of either "input" or "output" archive and set their dump frequence
 
         Args:
             archive: (str) either input or output
-            n:
-            **kwargs:
-
-        Returns:
+            **kwargs: property names, values should be positive integers, specifies the dump freq, None = inf = < 0
 
         """
         dic = getattr(self, archive)
@@ -146,6 +145,16 @@ class Vertex(LoggerMixin, ABC):
             whitelist[k] = v
 
     def set_archive_period(self, archive, n, keys=None):
+        """
+        Sets the archive period for each property of to "n" if keys is not specified.
+        If keys is a list of property names, "n" will be set a s archiving period only for those
+
+        Args:
+            archive: (str) either input or output
+            n:
+            keys:
+
+        """
         if keys is None:
             keys = getattr(self, archive).keys()
 
@@ -178,11 +187,8 @@ class Vertex(LoggerMixin, ABC):
                     # with int we also can match 4.5 % 0.5
                     if self.archive.clock % period == 0:
                         if key not in self.archive.input:
-                            self.archive.input[key] = [value]
-                        else:
-                            history = list(self.archive.input[key])
-                            history.append(value)
-                            self.archive.input[key] = history
+                            self.archive.input[key] = OrderedDict()
+                        self.archive.input[key][self.archive.clock] = value
                             # self.archive.input[key].append(value)
                             # TODO: This will get expensive for large histories, but a direct append doesn't work. Fix it.
 
@@ -197,11 +203,8 @@ class Vertex(LoggerMixin, ABC):
                     if self.archive.clock % period == 0:
                         val = value[-1]
                         if key not in self.archive.output:
-                            self.archive.output[key] = [val]
-                        else:
-                            history = list(self.archive.output[key])
-                            history.append(val)
-                            self.archive.output[key] = history
+                            self.archive.output[key] = OrderedDict()
+                        self.archive.output[key][self.archive.clock] = val
                             # self.archive.output[key].append(val)
 
     def update_and_archive(self, output_data):
@@ -269,6 +272,14 @@ class Vertex(LoggerMixin, ABC):
                 self.input.from_hdf(hdf=hdf5_server, group_name="input")
                 self.output.from_hdf(hdf=hdf5_server, group_name="output")
                 self.archive.from_hdf(hdf=hdf5_server, group_name="archive")
+
+                # sort the dictionaries after loading
+                for archive_name in ('input', 'output'):
+                    archive = getattr(self, archive_name)
+                    for key in archive.keys():
+                        history = archive[key]
+                        # create an ordered dictionary from it
+                        archive[key] = OrderedDict(sorted(history.items(), key=lambda item: item[0]))
 
 
 class PrimitiveVertex(Vertex):

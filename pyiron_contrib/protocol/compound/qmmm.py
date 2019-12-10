@@ -284,38 +284,6 @@ class QMMM(Protocol):
             i.seed_species
         )
 
-    def to_hdf(self, hdf=None, group_name=None):
-        """
-        Store the Protocol in an HDF5 file.
-
-        Args:
-            hdf (ProjectHDFio): HDF5 group object - optional
-            group_name (str): HDF5 subgroup name - optional
-        """
-        super(QMMM, self).to_hdf(hdf=hdf, group_name=group_name)
-        with self.project_hdf5.open("input") as hdf5_server:
-            #hdf5_server["mmjobname"] = self._mm_job_name
-            #hdf5_server["qmjobname"] = self._qm_job_name
-            #hdf5_server["mmsmallajobname"] = self._mm_small_job_name
-            #hdf5_server["domainids"] = self.input.domain_ids  # TODO: Save the dict by component
-            hdf5_server["vacuumwidth"] = self.input.vacuum_width
-            hdf5_server["fillerwidth"] = self.input.filler_width
-
-    def from_hdf(self, hdf=None, group_name=None):
-        """
-        Load the Protocol from an HDF5 file.
-
-        Args:
-            hdf (ProjectHDFio): HDF5 group object - optional
-            group_name (str): HDF5 subgroup name - optional
-        """
-        super(QMMM, self).from_hdf(hdf=hdf, group_name=group_name)
-
-        with self.project_hdf5.open("input") as hdf5_server:
-            #self.input.domain_ids = hdf5_server["domainids"]  # TODO: Save the dict by component
-            self.input.vacuum_width = hdf5_server["vacuumwidth"]
-            self.input.filler_width = hdf5_server["fillerwidth"]
-
     def _plot_boxes(self, cells, translate=None, colors=None, titles=None, default_color='b', size=(29, 21)):
         """
         Plots one or a list of cells in xy, yz and xt projection

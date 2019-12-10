@@ -149,18 +149,18 @@ class QMMMProtocol(Protocol):
         g.partition.input.seed_species = ip.seed_species
 
         g.calc_static_mm.input.ref_job_full_path = ip.mm_ref_job_full_path
-        g.calc_static_mm.input.structure = gp.partition.output.mm_full_structure
-        g.calc_static_mm.input.default.positions = gp.output.mm_full_structure.positions
+        g.calc_static_mm.input.structure = gp.partition.output.mm_full_structure[-1]
+        g.calc_static_mm.input.default.positions = gp.partition.output.mm_full_structure[-1].positions
         g.calc_static_mm.input.positions = gp.update_core_mm.output.positions[-1]
 
         g.calc_static_small.input.ref_job_full_path = ip.mm_ref_job_full_path
-        g.calc_static_small.input.structure = gp.partition.output.mm_small_structure
-        g.calc_static_small.input.default.positions = gp.partition.output.mm_small_structure.positions
+        g.calc_static_small.input.structure = gp.partition.output.mm_small_structure[-1]
+        g.calc_static_small.input.default.positions = gp.partition.output.mm_small_structure[-1].positions
         g.calc_static_small.input.positions = gp.update_core_mm.output.positions[-1]
 
         g.calc_static_qm.input.ref_job_full_path = ip.qm_ref_job_full_path
-        g.calc_static_qm.input.structure = gp.partition.output.qm_structure
-        g.calc_static_qm.input.default.positions = gp.partition.output.qm_structure.positions
+        g.calc_static_qm.input.structure = gp.partition.output.qm_structure[-1]
+        g.calc_static_qm.input.default.positions = gp.partition.output.qm_structure[-1].positions
         g.calc_static_qm.input.positions = gp.update_buffer_qm.output.positions[-1]
 
         g.check_steps.input.target = gp.clock.output.n_counts[-1]
@@ -183,24 +183,24 @@ class QMMMProtocol(Protocol):
         g.check_force_qm.input.threshold = ip.f_tol
 
         g.gradient_descent_mm.input.forces = gp.calc_static_mm.output.forces[-1]
-        g.gradient_descent_mm.input.default.positions = gp.output.mm_full_structure.positions
+        g.gradient_descent_mm.input.default.positions = gp.partition.output.mm_full_structure[-1].positions
         g.gradient_descent_mm.input.positions = gp.update_core_mm.output.positions[-1]
-        g.gradient_descent_mm.input.masses = gp.output.mm_full_structure.get_masses
+        g.gradient_descent_mm.input.masses = gp.partition.output.mm_full_structure[-1].get_masses
         g.gradient_descent_mm.input.mask = gp.partition.output.domain_ids['except_core']
         g.gradient_descent_mm.input.gamma0 = ip.gamma0
         g.gradient_descent_mm.input.fix_com = ip.fix_com
         g.gradient_descent_mm.input.use_adagrad = ip.use_adagrad
 
         g.gradient_descent_qm.input.forces = gp.calc_static_qm.output.forces[-1]
-        g.gradient_descent_qm.input.default.positions = gp.partition.output.qm_structure.positions
+        g.gradient_descent_qm.input.default.positions = gp.partition.output.qm_structure[-1].positions
         g.gradient_descent_qm.input.positions = gp.update_buffer_qm.output.positions[-1]
-        g.gradient_descent_qm.input.masses = gp.partition.output.qm_structure.get_masses
+        g.gradient_descent_qm.input.masses = gp.partition.output.qm_structure[-1].get_masses
         g.gradient_descent_qm.input.mask = gp.partition.output.domain_ids_qm['only_core']
         g.gradient_descent_qm.input.gamma0 = ip.gamma0
         g.gradient_descent_qm.input.fix_com = ip.fix_com
         g.gradient_descent_qm.input.use_adagrad = ip.use_adagrad
 
-        g.update_core_mm.input.default.target = gp.partition.output.mm_full_structure.positions
+        g.update_core_mm.input.default.target = gp.partition.output.mm_full_structure[-1].positions
         g.update_core_mm.input.target = gp.gradient_descent_mm.output.positions[-1]
         g.update_core_mm.input.target_mask = [
             gp.partition.output.domain_ids['seed'],
@@ -212,7 +212,7 @@ class QMMMProtocol(Protocol):
             gp.partition.output.domain_ids_qm['core']
         ]
 
-        g.update_buffer_qm.input.default.target = gp.partition.output.qm_structure.positions
+        g.update_buffer_qm.input.default.target = gp.partition.output.qm_structure[-1].positions
         g.update_buffer_qm.input.target = gp.gradient_descent_qm.output.positions[-1]
         g.update_buffer_qm.input.target_mask = gp.partition.output.domain_ids_qm['buffer']
         g.update_buffer_qm.input.displacement = gp.gradient_descent_mm.output.displacements[-1]
@@ -234,8 +234,8 @@ class QMMMProtocol(Protocol):
 
     def show_mm(self):
         try:
-            mm_full_structure = self.graph.partition.output.mm_full_structure
-            mm_full_structure.positions = self.graph.update_core.output.positions
+            mm_full_structure = self.graph.partition.output.mm_full_structure[-1]
+            mm_full_structure.positions = self.graph.update_core.output.positions[-1]
             domain_ids = self.graph.partition.output.domain_ids
         except KeyError:
             partitioned = self.partition_input()
@@ -250,8 +250,8 @@ class QMMMProtocol(Protocol):
 
     def show_qm(self):
         try:
-            qm_structure = self.graph.partition.output.qm_structure
-            qm_structure.positions = self.graph.update_buffer.output.positions
+            qm_structure = self.graph.partition.output.qm_structure[-1]
+            qm_structure.positions = self.graph.update_buffer.output.positions[-1]
             domain_ids_qm = self.graph.partition.output.domain_ids_qm
         except KeyError:
             partitioned = self.partition_input()

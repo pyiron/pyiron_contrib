@@ -262,13 +262,6 @@ class Vertex(LoggerMixin, ABC):
             self._n_history = hdf["nhistory"]
             self.input.from_hdf(hdf=hdf, group_name="input")
             self.output.from_hdf(hdf=hdf, group_name="output")
-            # convert it to standard dictionaris in order not to confuse the underlying IO library
-            for archive_name in ('input', 'output'):
-                archive = getattr(self, archive_name)
-                for key in archive.keys():
-                    # convert it to a dictionary
-                    archive[key] = dict(archive[key])
-
             self.archive.from_hdf(hdf=hdf, group_name="archive")
         else:
             with hdf.open(group_name) as hdf5_server:

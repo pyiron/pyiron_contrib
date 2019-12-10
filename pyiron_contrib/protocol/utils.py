@@ -403,8 +403,9 @@ class IODictionary(dict, LoggerMixin):
                     # to_hdf will get called *before* protocols have run, so the pointers in these dictionaries
                     # won't be able to resolve. For now just let it not resolve and don't save it.
                     continue
-                except TypeError:
+                except TypeError as e:
                     # Saving a list of complex objects, e.g. Atoms, was failing. Here we save them individually
+                    self.logger.warning('TypeError(%s): %s : %s' %(e, key, value))
                     # TODO: Treat arbitrarily deep nesting of such objects
                     with hdf5_server.open(key) as sub_server:
                         for n, el in enumerate(getattr(self, key)):

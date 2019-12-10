@@ -61,6 +61,10 @@ class QMMM(Protocol):
             calculation.If the value is not positive, no filler atoms are used. The second, larger box uses the same
             center as the bounding box of the QM region I, so this length is split equally to the positive and negative
             sides for each cartesian direction. (Default is 6.)
+        n_steps (int): The maximum number of minimization steps to make. (Default is 100.)
+        f_tol (float): The maximum force on any atom below which the calculation terminates. Only atoms which could be
+            relaxed are considered, i.e. QM forces for region I core, and MM forces for region II and I buffer. (Filler
+            atoms are not real, so we never care about their forces.) (Default is 1e-4 eV/angstrom.)
     """
 
     def __init__(self, project=None, name=None, job_name=None):

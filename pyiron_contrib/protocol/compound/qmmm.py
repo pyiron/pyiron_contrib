@@ -71,9 +71,6 @@ class QMMM(Protocol):
         self.setup = IODictionary()
         super(QMMM, self).__init__(project=project, name=name, job_name=job_name)
 
-        self.seed_ids = None
-        self.seed_species = None
-        self.shell_cutoff = None
         self.protocol_finished += self._compute_qmmm_energy
 
         id_ = self.input.default

@@ -237,11 +237,10 @@ class QMMMProtocol(Protocol):
             mm_full_structure = self.graph.partition.output.mm_full_structure
             mm_full_structure.positions = self.graph.update_core.output.positions
             domain_ids = self.graph.partition.output.domain_ids
-        except:
-            raise  # Will figure out what to except later
-            # partitioned = self.partition_input()
-            # mm_full_structure = partitioned['mm_full_structure']
-            # domain_ids = partitioned['domain_ids']
+        except KeyError:
+            partitioned = self.partition_input()
+            mm_full_structure = partitioned['mm_full_structure']
+            domain_ids = partitioned['domain_ids']
 
         color = 4 * np.ones(len(mm_full_structure))  # This 5th colour makes the balance of atoms
         for n, group in enumerate(['seed', 'core', 'buffer', 'filler']):
@@ -254,11 +253,10 @@ class QMMMProtocol(Protocol):
             qm_structure = self.graph.partition.output.qm_structure
             qm_structure.positions = self.graph.update_buffer.output.positions
             domain_ids_qm = self.graph.partition.output.domain_ids_qm
-        except:
-            raise # Will figure out what to except later
-            # partitioned = self.partition_input()
-            # qm_structure = partitioned['qm_structure']
-            # domain_ids_qm = partitioned['domain_ids_qm']
+        except KeyError:
+            partitioned = self.partition_input()
+            qm_structure = partitioned['qm_structure']
+            domain_ids_qm = partitioned['domain_ids_qm']
 
         color = 4 * np.ones(len(qm_structure))  # If you see this 5th colour, something is wrong
         for n, group in enumerate(['seed', 'core', 'buffer', 'filler']):
@@ -270,19 +268,19 @@ class QMMMProtocol(Protocol):
         try:
             structure = self.graph.partition.output.structure
             qm_structure = self.graph.partition.output.qm_structure
-        except:
-            raise  # Will figure out what to except later
-            # partitioned = self.partition_input()
-            # structure = partitioned['structure']
-            # qm_structure = partitioned['qm_structure']
+        except KeyError:
+            partitioned = self.partition_input()
+            structure = partitioned['mm_full_structure']
+            qm_structure = partitioned['qm_structure']
         self._plot_boxes([structure.cell, qm_structure.cell],
                          colors=['r','b'],
                          titles=['MM Superstructure', 'QM Structure'])
 
     def partition_input(self):
         i = self.input
-        return PartitionStructure.command(
-            PartitionStructure, i.structure,
+        partition = PartitionStructure()
+        return partition.command(
+            i.structure,
             i.domain_ids,
             i.seed_ids, i.shell_cutoff, i.n_core_shells, i.n_buffer_shells,
             i.vacuum_width, i.filler_width,
@@ -396,7 +394,8 @@ class PartitionStructure(PrimitiveVertex):
         id_.filler_width = None
 
     def command(
-            self, structure,
+            self,
+            structure,
             domain_ids,
             seed_ids, shell_cutoff, n_core_shells, n_buffer_shells,
             vacuum_width, filler_width,
@@ -538,10 +537,10 @@ class PartitionStructure(PrimitiveVertex):
         current_shell_ids = seed_ids
         for _ in range(n_shells):
             neighbors = structure.get_neighbors(id_list=current_shell_ids, cutoff=shell_cutoff)
-            new_ids = np.unique(neighbors.indices)
-            # Make it exclusive
-            for shell_ids in indices:
-                new_ids = np.setdiff1d(new_ids, shell_ids)
+            new_ids = np.setdiff1d(
+                np.unique(np.concatenate(neighbors.indices)),
+                np.concatenate(indices)
+            )
             indices.append(new_ids)
             current_shell_ids = new_ids
         # Pop seed ids

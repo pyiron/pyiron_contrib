@@ -117,6 +117,15 @@ class Vertex(LoggerMixin, ABC):
         """What to do when this vertex is the active vertex during graph traversal."""
         pass
 
+    @property
+    def whitelist(self):
+        return {
+            'input': self.archive.whitelist.input,
+            'output': self.archive.whitelist.output
+        }
+
+
+
     def _update_output(self, output_data):
         if output_data is None:
             return
@@ -133,7 +142,20 @@ class Vertex(LoggerMixin, ABC):
                     history.pop(0)
                 self.output[key] = history
 
-    def set_whitelist(self, archive, **kwargs):
+
+    def set_whitelist(self, dictionary):
+        for k, v in dictionary:
+            if k not in ('input', 'output'):
+                raise ValueError
+
+            if isinstance(v, int):
+                self.set_archive_period(v)
+            elif isinstance(v, dict):
+                self._set_archive_whitelist(k, **v)
+            else:
+                raise TypeError
+
+    def _set_archive_whitelist(self, archive, **kwargs):
         """
         whitelist properties of either "input" or "output" archive and set their dump frequence
 
@@ -142,7 +164,6 @@ class Vertex(LoggerMixin, ABC):
             **kwargs: property names, values should be positive integers, specifies the dump freq, None = inf = < 0
 
         """
-        dic = getattr(self, archive)
         for k, v in kwargs.items():
             #if k not in dic:
                 # self.logger.warning('The %s of vertex "%s" has no key "%s"! Available keys are: "%s"' % (archive, self.name, k, list(dic.keys())))
@@ -164,7 +185,7 @@ class Vertex(LoggerMixin, ABC):
         if keys is None:
             keys = getattr(self, archive).keys()
 
-        self.set_whitelist(archive, **{
+        self._set_archive_whitelist(archive, **{
             k: n for k in keys
         })
 
@@ -175,10 +196,10 @@ class Vertex(LoggerMixin, ABC):
         self.set_archive_period('output', n, keys=keys)
 
     def set_input_whitelist(self, **kwargs):
-        self.set_whitelist('input', **kwargs)
+        self._set_archive_whitelist('input', **kwargs)
 
     def set_output_whitelist(self, **kwargs):
-        self.set_whitelist('output', **kwargs)
+        self._set_archive_whitelist('output', **kwargs)
 
     def _update_archive(self):
         # Update input

@@ -29,6 +29,7 @@ INTEGER_REGEX = re.compile(r'[-+]?([1-9]\d*|0)')
 TIMELINE_DICT_KEY_FORMAT ='t_{time}'
 GENERIC_LIST_INDEX_FORMAT = 'i_{index}'
 
+
 class IODictionary(dict, LoggerMixin):
     """
     A dictionary class representing the parameters of a Command class. The dictionary holds a path which is recipe
@@ -104,7 +105,6 @@ class IODictionary(dict, LoggerMixin):
             except TypeError as e:
                 result = False
         return result
-
 
     def _generic_to_hdf(self, value, hdf, group_name=None):
         """
@@ -257,15 +257,6 @@ class IODictionary(dict, LoggerMixin):
                     # to_hdf will get called *before* protocols have run, so the pointers in these dictionaries
                     # won't be able to resolve. For now just let it not resolve and don't save it.
                     continue
-                # except TypeError as e:
-                    # Saving a list of complex objects, e.g. Atoms, was failing. Here we save them individually
-                    # it seems pyiron could not handle those
-                    #self.logger.warning('TypeError(%s): %s : %s' % (e, key, value))
-                    # TODO: Treat arbitrarily deep nesting of such objects
-                #    try:
-                #         self._generic_to_hdf(value, hdf5_server, group_name=key)
-                #     except Exception:
-                #         raise
 
     def from_hdf(self, hdf, group_name):
         with hdf.open(group_name) as hdf5_server:
@@ -286,7 +277,6 @@ class IODictionary(dict, LoggerMixin):
                 # Groups are more complex data types with their own depth
                 # For now we only treat other IODicts and Atoms (i.e. structures) explicitly.
                 setattr(self, key, self._generic_from_hdf(hdf5_server, group_name=key))
-
 
 
 class InputDictionary(IODictionary):

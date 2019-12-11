@@ -161,17 +161,17 @@ class QMMMProtocol(Protocol):
         g.partition.input.seed_species = ip.seed_species
 
         g.calc_static_mm.input.ref_job_full_path = ip.mm_ref_job_full_path
-        g.calc_static_mm.input.structure = gp.partition.output.mm_full_structure[-1]
+        g.calc_static_mm.input.structure = gp.partition.output.mm_full_structure[-1].copy
         g.calc_static_mm.input.default.positions = gp.partition.output.mm_full_structure[-1].positions
         g.calc_static_mm.input.positions = gp.update_core_mm.output.positions[-1]
 
         g.calc_static_small.input.ref_job_full_path = ip.mm_ref_job_full_path
-        g.calc_static_small.input.structure = gp.partition.output.mm_small_structure[-1]
+        g.calc_static_small.input.structure = gp.partition.output.mm_small_structure[-1].copy
         g.calc_static_small.input.default.positions = gp.partition.output.mm_small_structure[-1].positions
         g.calc_static_small.input.positions = gp.update_buffer_qm.output.positions[-1]
 
         g.calc_static_qm.input.ref_job_full_path = ip.qm_ref_job_full_path
-        g.calc_static_qm.input.structure = gp.partition.output.qm_structure[-1]
+        g.calc_static_qm.input.structure = gp.partition.output.qm_structure[-1].copy
         g.calc_static_qm.input.default.positions = gp.partition.output.qm_structure[-1].positions
         g.calc_static_qm.input.positions = gp.update_buffer_qm.output.positions[-1]
 
@@ -253,8 +253,8 @@ class QMMMProtocol(Protocol):
     def show_mm(self):
         try:
             mm_full_structure = self.graph.partition.output.mm_full_structure[-1]
-            mm_full_structure.positions = self.graph.update_core.output.positions[-1]
-            domain_ids = self.graph.partition.output.domain_ids
+            mm_full_structure.positions = self.graph.update_core_mm.output.positions[-1]
+            domain_ids = self.graph.partition.output.domain_ids[-1]
         except KeyError:
             partitioned = self.partition_input()
             mm_full_structure = partitioned['mm_full_structure']
@@ -269,8 +269,8 @@ class QMMMProtocol(Protocol):
     def show_qm(self):
         try:
             qm_structure = self.graph.partition.output.qm_structure[-1]
-            qm_structure.positions = self.graph.update_buffer.output.positions[-1]
-            domain_ids_qm = self.graph.partition.output.domain_ids_qm
+            qm_structure.positions = self.graph.update_buffer_qm.output.positions[-1]
+            domain_ids_qm = self.graph.partition.output.domain_ids_qm[-1]
         except KeyError:
             partitioned = self.partition_input()
             qm_structure = partitioned['qm_structure']
@@ -284,8 +284,8 @@ class QMMMProtocol(Protocol):
 
     def show_boxes(self):
         try:
-            structure = self.graph.partition.output.structure
-            qm_structure = self.graph.partition.output.qm_structure
+            structure = self.graph.partition.output.structure[-1]
+            qm_structure = self.graph.partition.output.qm_structure[-1]
         except KeyError:
             partitioned = self.partition_input()
             structure = partitioned['mm_full_structure']

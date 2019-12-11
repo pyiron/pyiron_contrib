@@ -244,6 +244,7 @@ class IODictionary(dict, LoggerMixin):
     def to_hdf(self, hdf, group_name=None):
         with hdf.open(group_name) as hdf5_server:
             hdf5_server['TYPE'] = str(type(self))
+
             for key in list(self.keys()):
                 # default value is not to save any property
                 try:
@@ -257,15 +258,23 @@ class IODictionary(dict, LoggerMixin):
                     # to_hdf will get called *before* protocols have run, so the pointers in these dictionaries
                     # won't be able to resolve. For now just let it not resolve and don't save it.
                     continue
-                # except TypeError as e:
-                    # Saving a list of complex objects, e.g. Atoms, was failing. Here we save them individually
-                    # it seems pyiron could not handle those
-                    #self.logger.warning('TypeError(%s): %s : %s' % (e, key, value))
-                    # TODO: Treat arbitrarily deep nesting of such objects
-                #    try:
-                #         self._generic_to_hdf(value, hdf5_server, group_name=key)
-                #     except Exception:
-                #         raise
+                except RuntimeError as e:
+
+                    # if a "key" is initialized with a primitive value and the and the graph was already saved
+                    # it might happen that the "key" already exists hdf5_server[key] but is of wrong HDF5 type
+                    # e.g dataset instead of group. Thus the underlying library will raise an runtime error.
+                    # The current workaround now is to try to delete the dataset and rewrite it
+                    # TODO: Change to `del hdf5_server[key]` once pyiron.base.generic.hdfio is fixed
+                    import posixpath
+                    # hdf5_server.h5_path is relative
+                    del hdf5_server[posixpath.join(hdf5_server.h5_path, key)]
+                    # now we try again
+                    try:
+                        value.to_hdf(hdf5_server, group_name=key)
+                    except AttributeError:
+                        self._generic_to_hdf(value, hdf5_server, group_name=key)
+                    except Exception:
+                        raise
 
     def from_hdf(self, hdf, group_name):
         with hdf.open(group_name) as hdf5_server:

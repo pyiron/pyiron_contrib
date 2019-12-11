@@ -6,7 +6,7 @@ import logging
 
 from pyiron.base.job.generic import GenericJob
 from pyiron_contrib.protocol.utils import IODictionary, InputDictionary, LoggerMixin, Event, EventHandler, \
-    Pointer, CrumbType, ordered_dict_get_last, Comparer
+    Pointer, CrumbType, ordered_dict_get_last, Comparer, TimelineDict
 from abc import ABC, abstractmethod
 from numpy import inf
 from collections import OrderedDict
@@ -193,13 +193,14 @@ class Vertex(LoggerMixin, ABC):
                     # check if the period matches that of the key
                     if self.archive.clock % period == 0:
                         if key not in self.archive.input:
-                            self.archive.input[key] = OrderedDict()
+                            self.archive.input[key] = TimelineDict()
                             self.archive.input[key][history_key] = value
                         else:
                             # we want to archive it only if there is a change, thus get the last element
                             last_val = ordered_dict_get_last(self.archive.input[key])
                             if not Comparer(last_val) == value:
                                 self.archive.input[key][history_key] = value
+                                self.logger.info('Property "%s" did change in input (%s -> %s)' % (key, last_val, value))
                             else:
                                 self.logger.info('Property "%s" did not change in input' % key)
 
@@ -213,7 +214,7 @@ class Vertex(LoggerMixin, ABC):
                     if self.archive.clock % period == 0:
                         val = value[-1]
                         if key not in self.archive.output:
-                            self.archive.output[key] = OrderedDict()
+                            self.archive.output[key] = TimelineDict()
                             self.archive.output[key][history_key] = val
                         else:
                             # we want to archive it only if there is a change, thus get the last element
@@ -295,7 +296,7 @@ class Vertex(LoggerMixin, ABC):
                     for key in archive.keys():
                         history = archive[key]
                         # create an ordered dictionary from it, convert it to integer back again
-                        archive[key] = OrderedDict(sorted(history.items(), key=lambda item: int(item[0].replace('t_', ''))))
+                        archive[key] = TimelineDict(sorted(history.items(), key=lambda item: int(item[0].replace('t_', ''))))
 
 
 class PrimitiveVertex(Vertex):

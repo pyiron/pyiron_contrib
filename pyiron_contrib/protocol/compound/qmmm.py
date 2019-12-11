@@ -371,15 +371,6 @@ class QMMMProtocol(Protocol):
         plt.figlegend(legend_lines, legend_titles, loc='lower center', fancybox=True, shadow=True)
         return plt
 
-    def to_hdf(self, hdf=None, group_name=None):
-        try:
-            super(QMMMProtocol, self).to_hdf(hdf=hdf, group_name=group_name)
-        except RuntimeError:
-            print("mm type", self.project_hdf5['graph/vertices/calc_static_mm/input/structure/TYPE'])
-            print("mm struct", self.project_hdf5['graph/vertices/calc_static_mm/input/structure'])
-            print("qm type", self.project_hdf5['graph/vertices/calc_static_qm/input/structure/TYPE'])
-            print("qm struct", self.project_hdf5['graph/vertices/calc_static_qm/input/structure/TYPE'])
-
 
 class AddDisplacements(PrimitiveVertex):
 

@@ -161,17 +161,17 @@ class QMMMProtocol(Protocol):
         g.partition.input.seed_species = ip.seed_species
 
         g.calc_static_mm.input.ref_job_full_path = ip.mm_ref_job_full_path
-        g.calc_static_mm.input.structure = gp.partition.output.mm_full_structure[-1].copy
+        g.calc_static_mm.input.structure = gp.partition.output.mm_full_structure[-1]
         g.calc_static_mm.input.default.positions = gp.partition.output.mm_full_structure[-1].positions
         g.calc_static_mm.input.positions = gp.update_core_mm.output.positions[-1]
 
         g.calc_static_small.input.ref_job_full_path = ip.mm_ref_job_full_path
-        g.calc_static_small.input.structure = gp.partition.output.mm_small_structure[-1].copy
+        g.calc_static_small.input.structure = gp.partition.output.mm_small_structure[-1]
         g.calc_static_small.input.default.positions = gp.partition.output.mm_small_structure[-1].positions
         g.calc_static_small.input.positions = gp.update_buffer_qm.output.positions[-1]
 
         g.calc_static_qm.input.ref_job_full_path = ip.qm_ref_job_full_path
-        g.calc_static_qm.input.structure = gp.partition.output.qm_structure[-1].copy
+        g.calc_static_qm.input.structure = gp.partition.output.qm_structure[-1]
         g.calc_static_qm.input.default.positions = gp.partition.output.qm_structure[-1].positions
         g.calc_static_qm.input.positions = gp.update_buffer_qm.output.positions[-1]
 
@@ -371,6 +371,15 @@ class QMMMProtocol(Protocol):
         plt.figlegend(legend_lines, legend_titles, loc='lower center', fancybox=True, shadow=True)
         return plt
 
+    def to_hdf(self, hdf=None, group_name=None):
+        try:
+            super(QMMMProtocol, self).to_hdf(hdf=hdf, group_name=group_name)
+        except RuntimeError:
+            print("mm type", self.project_hdf5['graph/vertices/calc_static_mm/input/structure/TYPE'])
+            print("mm struct", self.project_hdf5['graph/vertices/calc_static_mm/input/structure'])
+            print("qm type", self.project_hdf5['graph/vertices/calc_static_qm/input/structure/TYPE'])
+            print("qm struct", self.project_hdf5['graph/vertices/calc_static_qm/input/structure/TYPE'])
+
 
 class AddDisplacements(PrimitiveVertex):
 
@@ -420,6 +429,7 @@ class PartitionStructure(PrimitiveVertex):
             vacuum_width, filler_width,
             seed_species
     ):
+        print("Running partition")
         domain_ids, domain_ids_qm, mm_small_structure = self._set_qm_structure(
             structure,
             domain_ids,

@@ -48,6 +48,7 @@ def ordered_dict_get_last(ordered_dict):
 
     return ordered_dict[next(reversed(ordered_dict))]
 
+
 class LoggerMixin(object):
     """
     A class which is meant to be inherited from. Provides a logger attribute. The loggers name is the fully

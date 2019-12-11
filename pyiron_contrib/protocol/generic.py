@@ -1,13 +1,18 @@
+from __future__ import print_function
 # coding: utf-8
 # Copyright (c) Max-Planck-Institut für Eisenforschung GmbH - Computational Materials Design (CM) Department
 # Distributed under the terms of "New BSD License", see the LICENSE file.
+import logging
 
-from __future__ import print_function
 from pyiron.base.job.generic import GenericJob
 from pyiron_contrib.protocol.utils import IODictionary, InputDictionary, LoggerMixin, Event, EventHandler, \
-    Pointer, CrumbType
+    Pointer, CrumbType, ordered_dict_get_last, Comparer
 from abc import ABC, abstractmethod
 from numpy import inf
+from collections import OrderedDict
+
+
+
 
 """
 The objective is to iterate over a directed acyclic graph of simulation instructions.
@@ -21,6 +26,8 @@ __maintainer__ = "Liam Huber"
 __email__ = "huber@mpie.de"
 __status__ = "development"
 __date__ = "Aug 16, 2019"
+
+
 
 
 class Vertex(LoggerMixin, ABC):
@@ -57,6 +64,9 @@ class Vertex(LoggerMixin, ABC):
         self.archive.clock = 0
         self.archive.output = IODictionary()
         self.archive.input = IODictionary()
+        self.archive.whitelist = IODictionary()
+        self.archive.whitelist.input = IODictionary()
+        self.archive.whitelist.output = IODictionary()
         self._vertex_state = "next"
         self.possible_vertex_states = ["next"]
         self._name = None
@@ -123,33 +133,100 @@ class Vertex(LoggerMixin, ABC):
                     history.pop(0)
                 self.output[key] = history
 
+    def set_whitelist(self, archive, **kwargs):
+        """
+        whitelist properties of either "input" or "output" archive and set their dump frequence
+
+        Args:
+            archive: (str) either input or output
+            **kwargs: property names, values should be positive integers, specifies the dump freq, None = inf = < 0
+
+        """
+        dic = getattr(self, archive)
+        for k, v in kwargs.items():
+            #if k not in dic:
+                # self.logger.warning('The %s of vertex "%s" has no key "%s"! Available keys are: "%s"' % (archive, self.name, k, list(dic.keys())))
+            #else:
+            whitelist = getattr(self.archive.whitelist, archive)
+            whitelist[k] = v
+
+    def set_archive_period(self, archive, n, keys=None):
+        """
+        Sets the archive period for each property of to "n" if keys is not specified.
+        If keys is a list of property names, "n" will be set a s archiving period only for those
+
+        Args:
+            archive: (str) either input or output
+            n:
+            keys:
+
+        """
+        if keys is None:
+            keys = getattr(self, archive).keys()
+
+        self.set_whitelist(archive, **{
+            k: n for k in keys
+        })
+
+    def set_input_archive_period(self, n, keys=None):
+        self.set_archive_period('input', n, keys=keys)
+
+    def set_output_archive_period(self, n, keys=None):
+        self.set_archive_period('output', n, keys=keys)
+
+    def set_input_whitelist(self, **kwargs):
+        self.set_whitelist('input', **kwargs)
+
+    def set_output_whitelist(self, **kwargs):
+        self.set_whitelist('output', **kwargs)
+
     def _update_archive(self):
         # Update input
+        history_key = 't_%s' % self.archive.clock
+
         for key, value in self.input.items():
-            if key not in self.archive.input:
-                self.archive.input[key] = [value]
-            else:
-                history = list(self.archive.input[key])
-                history.append(value)
-                self.archive.input[key] = history
-                # self.archive.input[key].append(value)
-                # TODO: This will get expensive for large histories, but a direct append doesn't work. Fix it.
+            if key in self.archive.whitelist.input:
+                # the keys there, but it could be explicitly set to < 0 or None
+                period = self.archive.whitelist.input[key]
+                if period is not None and period >= 0:
+                    # TODO: Notifaction when whitelist contains items which are not items of input
+                    # check if the period matches that of the key
+                    if self.archive.clock % period == 0:
+                        if key not in self.archive.input:
+                            self.archive.input[key] = OrderedDict()
+                            self.archive.input[key][history_key] = value
+                        else:
+                            # we want to archive it only if there is a change, thus get the last element
+                            last_val = ordered_dict_get_last(self.archive.input[key])
+                            if not Comparer(last_val) == value:
+                                self.archive.input[key][history_key] = value
+                            else:
+                                self.logger.info('Property "%s" did not change in input' % key)
 
         # Update output
         for key, value in self.output.items():
-            val = value[-1]
-            if key not in self.archive.output:
-                self.archive.output[key] = [val]
-            else:
-                history = list(self.archive.output[key])
-                history.append(val)
-                self.archive.output[key] = history
-                # self.archive.output[key].append(val)
+            if key in self.archive.whitelist.output:
+                period = self.archive.whitelist.output[key]
+                if period is not None and period >= 0:
+                    # TODO: Notifaction when whitelist contains items which are not items of input
+                    # check if the period matches that of the key
+                    if self.archive.clock % period == 0:
+                        val = value[-1]
+                        if key not in self.archive.output:
+                            self.archive.output[key] = OrderedDict()
+                            self.archive.output[key][history_key] = val
+                        else:
+                            # we want to archive it only if there is a change, thus get the last element
+                            last_val = ordered_dict_get_last(self.archive.output[key])
+                            if not Comparer(last_val) == val:
+                                self.archive.output[key][history_key] = val
+                            else:
+                                self.logger.info('Property "%s" did not change in input' % key)
 
     def update_and_archive(self, output_data):
         self._update_output(output_data)
-        if self.archive.clock % self.archive.period == 0:
-            self._update_archive()
+        #if self.archive.clock % self.archive.period == 0:
+        self._update_archive()
 
     def finish(self):
         self._update_archive()
@@ -211,6 +288,14 @@ class Vertex(LoggerMixin, ABC):
                 self.input.from_hdf(hdf=hdf5_server, group_name="input")
                 self.output.from_hdf(hdf=hdf5_server, group_name="output")
                 self.archive.from_hdf(hdf=hdf5_server, group_name="archive")
+
+                # sort the dictionaries after loading, do it for both input and output dictionaries
+                for archive_name in ('input', 'output'):
+                    archive = getattr(self.archive, archive_name)
+                    for key in archive.keys():
+                        history = archive[key]
+                        # create an ordered dictionary from it, convert it to integer back again
+                        archive[key] = OrderedDict(sorted(history.items(), key=lambda item: int(item[0].replace('t_', ''))))
 
 
 class PrimitiveVertex(Vertex):

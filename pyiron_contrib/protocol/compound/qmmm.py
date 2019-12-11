@@ -420,7 +420,6 @@ class PartitionStructure(PrimitiveVertex):
             vacuum_width, filler_width,
             seed_species
     ):
-        print("Running partition")
         domain_ids, domain_ids_qm, mm_small_structure = self._set_qm_structure(
             structure,
             domain_ids,

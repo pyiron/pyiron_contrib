@@ -138,7 +138,7 @@ class AtomsComparer(Comparer):
         assert isinstance(self.object, Atoms)
 
         index_spec_mapping = lambda atoms: {site.index: site.symbol for site in atoms}
-        # taken from
+        # compare structures
         # https://github.com/pyiron/pyiron/blob/c447ffb4f1e003d0ebaced50a12def46beefab4f/pyiron/atomistics/job/interactive.py
         conditions = [
             len(self.object) == len(b),

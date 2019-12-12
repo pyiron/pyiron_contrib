@@ -79,6 +79,19 @@ class QMMMProtocol(Protocol):
         positions (numpy.ndarray): The per-atom vector of cartesian positions for the entire region I+II superstructure.
     """
 
+    DefaultWhitelist = {
+        'calc_static_mm': {
+            'output': {
+                'energy_pot': 1
+            }
+        },
+        'calc_static_qm': {
+            'output': {
+                'energy_pot': 1
+            }
+        },
+    }
+
     def __init__(self, project=None, name=None, job_name=None):
         self.setup = IODictionary()
         super(QMMMProtocol, self).__init__(project=project, name=name, job_name=job_name)

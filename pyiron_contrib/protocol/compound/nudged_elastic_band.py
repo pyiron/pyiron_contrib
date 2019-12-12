@@ -58,6 +58,14 @@ class NEB(Protocol):
         forces_list (list[numpy.ndarray]): Atomic forces in eV/angstrom for each image, including spring forces.
     """
 
+    DefaultWhitelist = {
+        'calc_static': {
+            'output': {
+                'energy_pot': 1,
+            },
+        },
+    }
+
     def __init__(self, project=None, name=None, job_name=None):
         super(NEB, self).__init__(project=project, name=name, job_name=job_name)
 
@@ -116,6 +124,7 @@ class NEB(Protocol):
         g.calc_static.input.n_children = ip.n_images
         g.calc_static.direct.ref_job_full_path = ip.ref_job_full_path
         g.calc_static.direct.structure = ip.structure_initial
+        g.calc_static.broadcast.default.positions = gp.interpolate_images.output.interpolated_positions[-1]
         g.calc_static.broadcast.positions = gp.gradient_descent.output.positions[-1]
 
         g.neb_forces.input.default.positions_list = gp.interpolate_images.output.interpolated_positions[-1]

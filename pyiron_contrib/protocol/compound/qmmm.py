@@ -82,13 +82,13 @@ class QMMMProtocol(Protocol):
     DefaultWhitelist = {
         'calc_static_mm': {
             'output': {
-                'energy_pot': 1
-            }
+                'energy_pot': 1,
+            },
         },
         'calc_static_qm': {
             'output': {
-                'energy_pot': 1
-            }
+                'energy_pot': 1,
+            },
         },
     }
 
@@ -244,6 +244,8 @@ class QMMMProtocol(Protocol):
         g.update_buffer_qm.input.target_mask = gp.partition.output.domain_ids_qm[-1]['buffer']
         g.update_buffer_qm.input.displacement = gp.gradient_descent_mm.output.displacements[-1]
         g.update_buffer_qm.input.displacement_mask = gp.partition.output.domain_ids[-1]['buffer']
+
+        self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
 
     def get_output(self):
         gp = Pointer(self.graph)

@@ -241,13 +241,17 @@ class QMMMProtocol(Protocol):
             max_force = max(~gp.max_force_mm.output.amax[-1], ~gp.max_force_qm.output.amax[-1])
         except KeyError:
             max_force = ~gp.max_force_mm.output.amax[-1]
+        try:  # We might also be converged before ever running a step (e.g. for perfect bulk)
+            positions = ~gp.update_core_mm.output.positions[-1]
+        except KeyError:
+            positions = self.input.structure.positions
         return {
             'energy_mm': e_mm,
             'energy_qm': e_qm,
             'energy_mm_small': e_mm_small,
             'energy_qmmm': e_mm + e_qm - e_mm_small,
             'max_force': max_force,
-            'positions': ~gp.update_core_mm.output.positions[-1],
+            'positions': positions
         }
 
     def show_mm(self):

@@ -7,10 +7,9 @@ import sys
 from pyiron.base.job.generic import GenericJob
 from pyiron_contrib.protocol.utils import IODictionary, InputDictionary, LoggerMixin, Event, EventHandler, \
     Pointer, CrumbType, ordered_dict_get_last, Comparer, TimelineDict
+from pyiron_contrib.protocol.utils.pptree import print_tree as pptree
 from abc import ABC, abstractmethod
 from numpy import inf
-
-from collections import OrderedDict
 
 
 """
@@ -651,8 +650,7 @@ class Protocol(Vertex, GenericJob):
             self.whitelist = self.default_whitelist
             self.logger.debug('Whitelist configured for protocol "%s"' % self.name)
 
-    def format_whitelist(self, format='code', file=sys.stdout):
-        from pprint import pprint
+    def format_whitelist(self, format='tree', file=sys.stdout):
         if format == 'code':
             start = [self.name, 'graph']
             path_format = '{path} = {value}\n'
@@ -663,19 +661,11 @@ class Protocol(Vertex, GenericJob):
                     for key, value in vertex_conf.items():
                         key_path = archive_path + [key]
                         file.write(path_format.format(path='.'.join(key_path), value=value))
-        elif format == 'tree':
+        elif format == 'simple':
 
-            def count_paths(node):
-                if not isinstance(node, dict):
-                    return 1
-                else:
-                    s = 0
-                    for _, v in node.items():
-                        s += count_paths(v)
-                    return s
+            from pyiron_contrib.protocol.utils.pptree import count_paths
 
-
-            def tree_print(node, level=0):
+            def print_tree(node, level=0):
                 if not isinstance(node, dict):
                     return '%s\n' % str(node)
                 elif count_paths(node) == 0:
@@ -689,14 +679,13 @@ class Protocol(Vertex, GenericJob):
                             # now lets do the second part of the comma
                             # add an extra \n if val is a dectionary
                             output += '\n' if isinstance(val, dict) else ' '
-                            output += tree_print(val, level=level+1)
+                            output += print_tree(val, level=level+1)
                     return output
-
-            file.write(tree_print(self.whitelist))
-            print('COUNT_PATHS', count_paths(self.whitelist))
-        else:
-            from pprint import pprint
-            pprint(self.whitelist)
+            # print the result
+            file.write(print_tree(self.whitelist))
+        elif format == 'tree':
+            # print the nice tree
+            pptree(self.whitelist, file=file, name='%s.%s' % (self.name, 'whitelist'))
 
 
 

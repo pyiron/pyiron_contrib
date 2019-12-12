@@ -267,11 +267,10 @@ class Vertex(LoggerMixin, ABC):
 
     def update_and_archive(self, output_data):
         self._update_output(output_data)
-        #if self.archive.clock % self.archive.period == 0:
         self._update_archive()
 
     def finish(self):
-        self._update_archive()
+        pass
 
     def parallel_setup(self):
         """How to prepare to execute in parallel when there's a list of these vertices together."""

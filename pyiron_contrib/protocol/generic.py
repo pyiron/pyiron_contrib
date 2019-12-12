@@ -2,23 +2,22 @@ from __future__ import print_function
 # coding: utf-8
 # Copyright (c) Max-Planck-Institut für Eisenforschung GmbH - Computational Materials Design (CM) Department
 # Distributed under the terms of "New BSD License", see the LICENSE file.
-import logging
 
+import sys
 from pyiron.base.job.generic import GenericJob
 from pyiron_contrib.protocol.utils import IODictionary, InputDictionary, LoggerMixin, Event, EventHandler, \
     Pointer, CrumbType, ordered_dict_get_last, Comparer, TimelineDict
 from abc import ABC, abstractmethod
 from numpy import inf
+
 from collections import OrderedDict
-
-
 
 
 """
 The objective is to iterate over a directed acyclic graph of simulation instructions.
 """
 
-__author__ = "Liam Huber, Dominik Noeger, Jan Janssen"
+__author__ = "Liam Huber, Dominik Gehringer, Jan Janssen"
 __copyright__ = "Copyright 2019, Max-Planck-Institut für Eisenforschung GmbH " \
                 "- Computational Materials Design (CM) Department"
 __version__ = "0.0"
@@ -28,7 +27,8 @@ __status__ = "development"
 __date__ = "Aug 16, 2019"
 
 
-
+# defines the name, for which a subclass of Protocol will be searched in order to get a default whitelist configuration
+DEFAULT_WHITE_LIST_ATTRIBUTE_NAME = 'DefaultWhitelist'
 
 class Vertex(LoggerMixin, ABC):
     """
@@ -124,7 +124,9 @@ class Vertex(LoggerMixin, ABC):
             'output': self.archive.whitelist.output
         }
 
-
+    @whitelist.setter
+    def whitelist(self, value):
+        self.set_whitelist(value)
 
     def _update_output(self, output_data):
         if output_data is None:
@@ -144,12 +146,27 @@ class Vertex(LoggerMixin, ABC):
 
 
     def set_whitelist(self, dictionary):
-        for k, v in dictionary:
+        """
+        Sets whitelist of the current vertex. Argument defines the form:
+        ```
+            {'input': 5,
+             'output': 1}
+            # sets all keys of input to dump at every fith execution cycle
+            # sets all keys of output to dump at every execution cycle
+            {'input': {'structure': None,
+                        'forces': 5}
+            }
+            # disables the archiveing of input.structure but keeps forces
+        ```
+        Args:
+            dictionary: (dict) the whitelist specification
+        """
+        for k, v in dictionary.items():
             if k not in ('input', 'output'):
                 raise ValueError
 
             if isinstance(v, int):
-                self.set_archive_period(v)
+                self._set_archive_period(k, v)
             elif isinstance(v, dict):
                 self._set_archive_whitelist(k, **v)
             else:
@@ -171,35 +188,38 @@ class Vertex(LoggerMixin, ABC):
             whitelist = getattr(self.archive.whitelist, archive)
             whitelist[k] = v
 
-    def set_archive_period(self, archive, n, keys=None):
+    def _set_archive_period(self, archive, n, keys=None):
         """
         Sets the archive period for each property of to "n" if keys is not specified.
         If keys is a list of property names, "n" will be set a s archiving period only for those
 
         Args:
             archive: (str) either input or output
-            n:
-            keys:
+            n: (int) dump at every "n" steps
+            keys: (list of str) the affected keys
 
         """
         if keys is None:
-            keys = getattr(self, archive).keys()
-
+            keys = list(getattr(self, archive).keys())
         self._set_archive_whitelist(archive, **{
             k: n for k in keys
         })
 
     def set_input_archive_period(self, n, keys=None):
-        self.set_archive_period('input', n, keys=keys)
+        self._set_archive_period('input', n, keys=keys)
 
     def set_output_archive_period(self, n, keys=None):
-        self.set_archive_period('output', n, keys=keys)
+        self._set_archive_period('output', n, keys=keys)
 
     def set_input_whitelist(self, **kwargs):
         self._set_archive_whitelist('input', **kwargs)
 
     def set_output_whitelist(self, **kwargs):
         self._set_archive_whitelist('output', **kwargs)
+
+    def set_archive_period(self, n):
+        self.set_input_archive_period(n)
+        self.set_output_archive_period(n)
 
     def _update_archive(self):
         # Update input
@@ -387,6 +407,18 @@ class Protocol(Vertex, GenericJob):
 
         self.finished = False
 
+        self.restore_default_whitelist()
+
+
+    @property
+    def default_whitelist(self):
+        # set the default whitelist -> check if the class has an attribute, otherwise skip the configuration
+        cls = type(self)
+        if hasattr(cls, DEFAULT_WHITE_LIST_ATTRIBUTE_NAME):
+            return getattr(cls, DEFAULT_WHITE_LIST_ATTRIBUTE_NAME)
+        else:
+            return None
+
     @property
     def n_history(self):
         return self._n_history
@@ -474,6 +506,7 @@ class Protocol(Vertex, GenericJob):
         # what I should be using this for. But, I get a NotImplementedError if I leave it out, so here it is. -Liam
         pass
 
+
     def to_hdf(self, hdf=None, group_name=None):
         """
         Store the Protocol in an HDF5 file.
@@ -515,6 +548,156 @@ class Protocol(Vertex, GenericJob):
 
     def visualize(self, execution=True, dataflow=True):
         return self.graph.visualize(self.fullname(), execution=execution, dataflow=dataflow)
+
+    @property
+    def whitelist(self):
+        return {
+            vertex_name: vertex.whitelist for vertex_name, vertex in self.graph.vertices.items()
+        }
+
+    @whitelist.setter
+    def whitelist(self, value):
+        self.set_whitelist(value)
+
+    def _set_archive_period(self, archive, n, keys=None):
+        """
+        In constrast to Vertex._set_archive_period, this calls "n". if keys=None it will be applied to all vertices
+        Args:
+            archive: (str) input or output
+            n: (int) dump every "n" steps
+            keys: (list of str) the vertex names which the it should be applied to (default: None)
+        """
+        if keys is None:
+            keys = self.graph.vertices.keys()
+
+        for key in keys:
+            vertex = self.graph.vertices[key]
+            vertex._set_archive_period(archive, n)
+
+    def set_input_archive_period(self, n, keys=None):
+        self._set_archive_period('input', n, keys=keys)
+
+    def set_output_archive_period(self, n, keys=None):
+        self._set_archive_period('output', n, keys=keys)
+
+    def _set_archive_whitelist(self, archive, **kwargs):
+        """
+        Sets a whitelist configuration for this protocol
+        Args:
+            archive: (str) "input" or "output" the archive the whitelist should be applied to
+            **kwargs: vertex_name = dict the whitelist configuration
+        """
+        for key, value in kwargs.items():
+            if key not in self.graph.vertices:
+                self.logger.warning('Cannot set the whitelist of vertex "%s" since it is no a part of protocol "%s' % (key, self.name))
+                continue
+            vertex = self.graph.vertices[key]
+            vertex._set_archive_whitelist(archive, **value)
+
+    def set_input_whitelist(self, **kwargs):
+        self._set_archive_whitelist('input', **kwargs)
+
+    def set_output_whitelist(self, **kwargs):
+        self._set_archive_whitelist('output', **kwargs)
+
+    def set_whitelist(self, dictionary):
+        """
+        Sets the whitelist for this protocol. The first level of keys must contain valid vertex ids. (A warning will
+        be printed otherwise.
+            1. Level one: graph vertex ids -> specifies to which vertices the nested whitelist will be applied to
+            2. Level two: "input" or "output" -> defines which dictionary is affected by the archiving periods
+            3. Level three: the properties of the corresponding dictionary which will be affected
+        Example:
+        ```
+            { 'calc_static' : {
+                'input': 5 #sets all keys of input dict to 5,
+                'output': {
+                    'energy_pot': 1,
+                    'structure': None
+                }
+        ```
+
+        Args:
+            dictionary: (dict) the whitelist configuration
+        """
+
+        for key, vertex_dict in dictionary.items():
+            if key not in self.graph.vertices:
+                self.logger.warning(
+                    'Cannot set the whitelist of vertex "%s" since it is no a part of protocol "%s' % (key, self.name))
+                continue
+            vertex = self.graph.vertices[key]
+            # call it for each vertex
+            vertex.set_whitelist(vertex_dict)
+
+    def set_archive_period(self, n):
+        """
+        Sets the archive period for all key for both input and output dictionaries
+        Args:
+            n: (int) the archiving period
+        """
+        self.set_input_archive_period(n)
+        self.set_output_archive_period(n)
+
+    def restore_default_whitelist(self):
+        """
+        If the protcol type has an attribute DefaultWhitelist, it will be restored
+        """
+        if self.default_whitelist is not None:
+            # first we have to clear again all white lists
+            for vertex_name, vertex in self.graph.vertices.items():
+                vertex.archive.whitelist.input.clear()
+                vertex.archive.whitelist.output.clear()
+            self.whitelist = self.default_whitelist
+            self.logger.debug('Whitelist configured for protocol "%s"' % self.name)
+
+    def format_whitelist(self, format='code', file=sys.stdout):
+        from pprint import pprint
+        if format == 'code':
+            start = [self.name, 'graph']
+            path_format = '{path} = {value}\n'
+            for vertex_name, conf in self.whitelist.items():
+                vertex_path = start + [vertex_name, 'archive', 'whitelist']
+                for archive, vertex_conf in conf.items():
+                    archive_path = vertex_path + [archive]
+                    for key, value in vertex_conf.items():
+                        key_path = archive_path + [key]
+                        file.write(path_format.format(path='.'.join(key_path), value=value))
+        elif format == 'tree':
+
+            def count_paths(node):
+                if not isinstance(node, dict):
+                    return 1
+                else:
+                    s = 0
+                    for _, v in node.items():
+                        s += count_paths(v)
+                    return s
+
+
+            def tree_print(node, level=0):
+                if not isinstance(node, dict):
+                    return '%s\n' % str(node)
+                elif count_paths(node) == 0:
+                    return ''
+                else:
+                    output = ''
+                    for key, val in node.items():
+                        # only print the path if there is a leaf node
+                        if count_paths(val) > 0:
+                            output += '%s%s:' % ('\t'*level, key)
+                            # now lets do the second part of the comma
+                            # add an extra \n if val is a dectionary
+                            output += '\n' if isinstance(val, dict) else ' '
+                            output += tree_print(val, level=level+1)
+                    return output
+
+            file.write(tree_print(self.whitelist))
+            print('COUNT_PATHS', count_paths(self.whitelist))
+        else:
+            from pprint import pprint
+            pprint(self.whitelist)
+
 
 
 class Graph(dict, LoggerMixin):

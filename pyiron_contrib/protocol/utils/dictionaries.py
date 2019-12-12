@@ -23,7 +23,7 @@ __status__ = "development"
 __date__ = "December 10, 2019"
 
 # define a regex to find integer values
-INTEGER_REGEX = re.compile(r'[-+]?([1-9]\d*|0)')
+integer_regex = re.compile(r'[-+]?([1-9]\d*|0)')
 
 
 TIMELINE_DICT_KEY_FORMAT ='t_{time}'
@@ -353,7 +353,7 @@ class TimelineDict(LoggerMixin, OrderedDict):
     def _parse_key(self, k):
 
         # leftover should contain only a number, try to parse it
-        integer_matches = INTEGER_REGEX.findall(k)
+        integer_matches = integer_regex.findall(k)
         if len(integer_matches) > 1:
             self.logger.warning('More than one integer was found. I\'ll take the first one')
             integer_matches = [integer_matches[0]]

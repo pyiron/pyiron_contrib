@@ -1,7 +1,24 @@
+# coding: utf-8
+# Copyright (c) Max-Planck-Institut für Eisenforschung GmbH - Computational Materials Design (CM) Department
+# Distributed under the terms of "New BSD License", see the LICENSE file.
+
 from pyiron_contrib.protocol.utils.misc import LoggerMixin, ensure_iterable
 from pyiron.atomistics.structure.atoms import Atoms
 import numpy as np
 import logging
+
+"""
+Classes to override compare
+"""
+
+__author__ = "Dominik Gehringer, Liam Huber"
+__copyright__ = "Copyright 2019, Max-Planck-Institut für Eisenforschung GmbH " \
+                "- Computational Materials Design (CM) Department"
+__version__ = "0.0"
+__maintainer__ = "Liam Huber"
+__email__ = "huber@mpie.de"
+__status__ = "development"
+__date__ = "December 10, 2019"
 
 try:
     from xxhash import xxh64_hexdigest
@@ -138,7 +155,7 @@ class AtomsComparer(Comparer):
         assert isinstance(self.object, Atoms)
 
         index_spec_mapping = lambda atoms: {site.index: site.symbol for site in atoms}
-        # taken from
+        # compare structures
         # https://github.com/pyiron/pyiron/blob/c447ffb4f1e003d0ebaced50a12def46beefab4f/pyiron/atomistics/job/interactive.py
         conditions = [
             len(self.object) == len(b),
@@ -148,5 +165,7 @@ class AtomsComparer(Comparer):
             index_spec_mapping(self.object) == index_spec_mapping(b)
         ]
         return all(conditions)
+
+
 
 

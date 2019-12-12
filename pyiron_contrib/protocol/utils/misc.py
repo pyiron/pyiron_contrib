@@ -46,7 +46,8 @@ def ordered_dict_get_last(ordered_dict):
 
     """
 
-    return next(reversed(ordered_dict))
+    return ordered_dict[next(reversed(ordered_dict))]
+
 
 class LoggerMixin(object):
     """

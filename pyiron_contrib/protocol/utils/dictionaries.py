@@ -2,7 +2,9 @@
 # Copyright (c) Max-Planck-Institut für Eisenforschung GmbH - Computational Materials Design (CM) Department
 # Distributed under the terms of "New BSD License", see the LICENSE file.
 
+import re
 import numpy as np
+from collections import OrderedDict
 from pyiron_contrib.protocol.utils.pointer import Pointer
 from pyiron_contrib.protocol.utils.misc import  LoggerMixin, fullname
 from pyiron.atomistics.structure.atoms import Atoms
@@ -19,6 +21,13 @@ __maintainer__ = "Liam Huber"
 __email__ = "huber@mpie.de"
 __status__ = "development"
 __date__ = "December 10, 2019"
+
+# define a regex to find integer values
+integer_regex = re.compile(r'[-+]?([1-9]\d*|0)')
+
+
+TIMELINE_DICT_KEY_FORMAT ='t_{time}'
+GENERIC_LIST_INDEX_FORMAT = 'i_{index}'
 
 class IODictionary(dict, LoggerMixin):
     """
@@ -144,10 +153,11 @@ class IODictionary(dict, LoggerMixin):
                         server['TYPE'] = str(type(value))
                         server['FULLNAME'] = fullname(value)
                         for i, v in enumerate(value):
-                            if self._try_save_key(str(i), v, server):
+                            index_key = GENERIC_LIST_INDEX_FORMAT.format(index=i)
+                            if self._try_save_key(index_key, v, server):
                                 pass  # everything was successful
                             else:
-                                self._generic_to_hdf(v, server, group_name=str(i))
+                                self._generic_to_hdf(v, server, group_name=index_key)
         else:
             try:
                 hdf[group_name] = value
@@ -210,13 +220,16 @@ class IODictionary(dict, LoggerMixin):
                         if k in ('TYPE', 'FULLNAME'):
                             continue
                         # nodes are trivial
+                        index = int(k.replace('i_', ''))
                         result.append(server[k])
-                        indices.append(int(k))
+                        indices.append(index)
+                        # TODO: Since Atoms object appear as a node we might have to call it here too
 
                     for k in server.list_groups():
                         # we do have the recursive call here
+                        index = int(k.replace('i_', ''))
                         result.append(self._generic_from_hdf(server, group_name=k))
-                        indices.append(int(k))
+                        indices.append(index)
 
                     # sort it, with the keys as indices
                     result = sorted(enumerate(result), key=lambda t: indices[t[0]])
@@ -231,6 +244,7 @@ class IODictionary(dict, LoggerMixin):
     def to_hdf(self, hdf, group_name=None):
         with hdf.open(group_name) as hdf5_server:
             hdf5_server['TYPE'] = str(type(self))
+
             for key in list(self.keys()):
                 # default value is not to save any property
                 try:
@@ -244,15 +258,23 @@ class IODictionary(dict, LoggerMixin):
                     # to_hdf will get called *before* protocols have run, so the pointers in these dictionaries
                     # won't be able to resolve. For now just let it not resolve and don't save it.
                     continue
-                # except TypeError as e:
-                    # Saving a list of complex objects, e.g. Atoms, was failing. Here we save them individually
-                    # it seems pyiron could not handle those
-                    #self.logger.warning('TypeError(%s): %s : %s' % (e, key, value))
-                    # TODO: Treat arbitrarily deep nesting of such objects
-                #    try:
-                #         self._generic_to_hdf(value, hdf5_server, group_name=key)
-                #     except Exception:
-                #         raise
+                except RuntimeError as e:
+
+                    # if a "key" is initialized with a primitive value and the and the graph was already saved
+                    # it might happen that the "key" already exists hdf5_server[key] but is of wrong HDF5 type
+                    # e.g dataset instead of group. Thus the underlying library will raise an runtime error.
+                    # The current workaround now is to try to delete the dataset and rewrite it
+                    # TODO: Change to `del hdf5_server[key]` once pyiron.base.generic.hdfio is fixed
+                    import posixpath
+                    # hdf5_server.h5_path is relative
+                    del hdf5_server[posixpath.join(hdf5_server.h5_path, key)]
+                    # now we try again
+                    try:
+                        value.to_hdf(hdf5_server, group_name=key)
+                    except AttributeError:
+                        self._generic_to_hdf(value, hdf5_server, group_name=key)
+                    except Exception:
+                        raise
 
     def from_hdf(self, hdf, group_name):
         with hdf.open(group_name) as hdf5_server:
@@ -323,3 +345,69 @@ class InputDictionary(IODictionary):
     def __iter__(self):
         # Make sure all keys get into the ** unpacking also those from the default dictionary
         return self.keys().__iter__()
+
+
+
+class TimelineDict(LoggerMixin, OrderedDict):
+    """
+        Dictionary which acts as timeline
+    """
+
+    def _parse_key(self, k):
+
+        # leftover should contain only a number, try to parse it
+        integer_matches = integer_regex.findall(k)
+        if len(integer_matches) > 1:
+            self.logger.warning('More than one integer was found. I\'ll take the first one')
+            integer_matches = [integer_matches[0]]
+
+        try:
+            result = int(integer_matches[0])
+        except:
+            raise KeyError(k)
+        else:
+            return result
+
+
+    def keys(self):
+        for k in super(TimelineDict, self).keys():
+            yield TIMELINE_DICT_KEY_FORMAT.format(time=k)
+
+    def items(self):
+        for k, v in zip(self.keys(), super(TimelineDict, self).values()):
+            yield k, v
+
+    def _super_getitem(self, k):
+        return super(TimelineDict, self).__getitem__(k)
+
+    def _super_keys(self):
+        return super(TimelineDict, self).keys()
+
+    @property
+    def timeline(self):
+        return np.array(list(self._super_keys()))
+
+    @property
+    def array(self):
+        return np.array([
+            list(self._super_keys()),
+            list(self.values())
+        ])
+
+    def _check_key_type(self, key):
+        if isinstance(key, str):
+            time = self._parse_key(key)
+        elif isinstance(key, int):
+            time = key
+        elif isinstance(key, float):
+            self.logger.warning('Floating points number are not allowed here. They will be converted to an integer')
+            time = int(key)
+        else:
+            raise TypeError('Only strings of format "%s", integers and floats are allowed as keys' % TIMELINE_DICT_KEY_FORMAT)
+        return time
+
+    def __setitem__(self, key, value):
+        super(TimelineDict, self).__setitem__(self._check_key_type(key), value)
+
+    def __getitem__(self, item):
+        return super(TimelineDict, self).__getitem__(self._check_key_type(item))

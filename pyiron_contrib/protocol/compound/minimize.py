@@ -46,6 +46,19 @@ class Minimize(Protocol):
             forces (if any) are not saved.
     """
 
+    DefaultWhitelist = {
+        'calc_static': {
+            'output': {
+                'energy_pot': 1
+            }
+        },
+        'max_force': {
+            'output': {
+                'amax': 1
+            }
+        }
+    }
+
     def __init__(self, project=None, name=None, job_name=None):
         super(Minimize, self).__init__(project=project, name=name, job_name=job_name)
 

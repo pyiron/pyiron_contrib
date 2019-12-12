@@ -26,7 +26,7 @@ __date__ = "December 10, 2019"
 integer_regex = re.compile(r'[-+]?([1-9]\d*|0)')
 
 
-TIMELINE_DICT_KEY_FORMAT ='t_{time}'
+TIMELINE_DICT_KEY_FORMAT = 't_{time}'
 GENERIC_LIST_INDEX_FORMAT = 'i_{index}'
 
 
@@ -78,7 +78,8 @@ class IODictionary(dict, LoggerMixin):
             resolved[key] = self.__getitem__(key)
         return resolved
 
-    def _try_save_key(self, k, v, hdf, exclude=(dict, tuple, list)):
+    @staticmethod
+    def _try_save_key(k, v, hdf, exclude=(dict, tuple, list)):
         """
         Tries to save a simple value
 
@@ -102,7 +103,7 @@ class IODictionary(dict, LoggerMixin):
                 # try to do it the easy way
                 hdf[k] = v
                 result = True
-            except TypeError as e:
+            except TypeError:
                 result = False
         return result
 
@@ -124,24 +125,24 @@ class IODictionary(dict, LoggerMixin):
                     # try to save it
                     if not isinstance(k, str):
                         # it is possible that the keys are not strings, thus we have to enforce this
-                        self.logger.warning('Key "%s" is not a string, it will be converted to %s' %( k, str(k)))
+                        self.logger.warning('Key "%s" is not a string, it will be converted to %s' % (k, str(k)))
                         k = str(k)
                     # try it the easy way first (either call v.to_hdf or directly save it
                     if self._try_save_key(k, v, server):
-                        pass # everything was successful
+                        pass  # everything was successful
                     else:
                         # well pyiron did not manage lets -> more complex object
                         self._generic_to_hdf(v, server, group_name=k)
         elif isinstance(value, (list, tuple)):
             # check if all do have the same type -> then we can make a numpy array out of it
             if len(value) == 0:
-                pass # there is nothing to do, no data to store
+                pass  # there is nothing to do, no data to store
             else:
                 first_type = type(value[0])
                 same = all([type(v) == first_type for v in value])
                 # if all items are of the same type and it is simple
                 if same and issubclass(first_type, (float, complex, int, np.ndarray)):
-                     # that is trivial we do have an array
+                    # that is trivial we do have an array
                     if issubclass(first_type, np.ndarray):
                         # we do not want dtype=object, thus we do make this distinction
                         hdf[group_name] = np.array(value)
@@ -257,7 +258,7 @@ class IODictionary(dict, LoggerMixin):
                     # to_hdf will get called *before* protocols have run, so the pointers in these dictionaries
                     # won't be able to resolve. For now just let it not resolve and don't save it.
                     continue
-                except RuntimeError as e:
+                except RuntimeError:
                     # if a "key" is initialized with a primitive value and the and the graph was already saved
                     # it might happen that the "key" already exists hdf5_server[key] but is of wrong HDF5 type
                     # e.g dataset instead of group. Thus the underlying library will raise an runtime error.
@@ -276,13 +277,11 @@ class IODictionary(dict, LoggerMixin):
 
     def from_hdf(self, hdf, group_name):
         with hdf.open(group_name) as hdf5_server:
-            node_retries = []
             for key in hdf5_server.list_nodes():
                 if key in ('TYPE', 'FULLNAME'):
                     continue
                 # Nodes are leaves, so just save them directly
                 # structures will be listed as nodes
-
                 try:
                     setattr(self, key, hdf5_server[key])
                 except Exception as e:
@@ -309,7 +308,6 @@ class InputDictionary(IODictionary):
         try:
             return super(InputDictionary, self).__getitem__(item)
         except (KeyError, IndexError):
-            #self.logger.warning('Falling back to default values for key "{}"'.format(item))
             return self.default.__getitem__(item)
 
     def __getattr__(self, item):
@@ -342,7 +340,6 @@ class InputDictionary(IODictionary):
     def __iter__(self):
         # Make sure all keys get into the ** unpacking also those from the default dictionary
         return self.keys().__iter__()
-
 
 
 class TimelineDict(LoggerMixin, OrderedDict):
@@ -400,7 +397,8 @@ class TimelineDict(LoggerMixin, OrderedDict):
             self.logger.warning('Floating points number are not allowed here. They will be converted to an integer')
             time = int(key)
         else:
-            raise TypeError('Only strings of format "%s", integers and floats are allowed as keys' % TIMELINE_DICT_KEY_FORMAT)
+            raise TypeError('Only strings of format "%s", integers and floats are allowed as keys'.format(
+                TIMELINE_DICT_KEY_FORMAT))
         return time
 
     def __setitem__(self, key, value):

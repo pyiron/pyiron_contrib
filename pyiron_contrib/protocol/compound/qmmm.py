@@ -97,7 +97,7 @@ class QMMMProtocol(Protocol):
 
         id_.gamma0 = 0.1
         id_.fix_com = True
-        id_.use_adagrad = True
+        id_.use_adagrad = False
 
     def define_vertices(self):
         # Components

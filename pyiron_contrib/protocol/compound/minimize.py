@@ -70,7 +70,6 @@ class Minimize(Protocol):
         id_.fix_com = True
         id_.use_adagrad = False
 
-
     def define_vertices(self):
         # Graph components
         g = self.graph
@@ -86,16 +85,16 @@ class Minimize(Protocol):
         # Execution flow
         g = self.graph
         g.make_pipeline(
-            g.calc_static,
-            g.clock,
             g.check_steps, 'false',
+            g.calc_static,
             g.force_norm,
             g.max_force,
             g.check_force, 'true',
             g.gradient_descent,
+            g.clock,
             g.calc_static
         )
-        g.starting_vertex = self.graph.calc_static
+        g.starting_vertex = self.graph.check_steps
         g.restarting_vertex = self.graph.clock
 
     def define_information_flow(self):

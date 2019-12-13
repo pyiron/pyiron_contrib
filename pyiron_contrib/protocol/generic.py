@@ -248,6 +248,7 @@ class Vertex(LoggerMixin, ABC):
                                 print("Current val", val)
                             if not Comparer(last_val) == val:
                                 print("Updating archive")
+                                self.logger.info('Updating archive')
                                 self.archive.output[key][history_key] = val
                             else:
                                 self.logger.info('Property "%s" did not change in input' % key)
@@ -287,6 +288,7 @@ class Vertex(LoggerMixin, ABC):
             hdf (ProjectHDFio): HDF5 group object
             group_name (str): HDF5 subgroup name
         """
+        print("Sending {} to hdf".format(self.name))
         if group_name is None:
             hdf["TYPE"] = str(type(self))
             hdf["possiblevertexstates"] = self.possible_vertex_states
@@ -295,8 +297,6 @@ class Vertex(LoggerMixin, ABC):
             hdf["nhistory"] = self._n_history
             self.input.to_hdf(hdf=hdf, group_name="input")
             self.output.to_hdf(hdf=hdf, group_name="output")
-            if self.name == 'calc_static':
-                print("Final pre-hdf archive:\n", self.archive)
             self.archive.to_hdf(hdf=hdf, group_name="archive")
         else:
             with hdf.open(group_name) as hdf5_server:
@@ -307,6 +307,8 @@ class Vertex(LoggerMixin, ABC):
                 hdf5_server["nhistory"] = self._n_history
                 self.input.to_hdf(hdf=hdf5_server, group_name="input")
                 self.output.to_hdf(hdf=hdf5_server, group_name="output")
+                if self.name == 'calc_static':
+                    print("Final pre-hdf archive:\n", self.archive)
                 self.archive.to_hdf(hdf=hdf5_server, group_name="archive")
 
     def from_hdf(self, hdf, group_name=None):

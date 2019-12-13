@@ -101,7 +101,7 @@ class MolecularDynamics(Protocol):
             g.check_steps
         )
         g.starting_vertex = g.initial_velocity
-        g.restarting_vertex = g.clock
+        g.restarting_vertex = g.check_steps
 
     def define_information_flow(self):
         # Data flow

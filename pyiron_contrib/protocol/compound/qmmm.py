@@ -156,7 +156,7 @@ class QMMMProtocol(Protocol):
         g.make_edge(g.check_force_qm, g.calc_static_small, 'true')
         g.make_edge(g.check_steps, g.calc_static_small, 'true')
         g.starting_vertex = g.partition
-        g.restarting_vertex = g.clock
+        g.restarting_vertex = g.check_steps
 
     def define_information_flow(self):
         gp = Pointer(self.graph)

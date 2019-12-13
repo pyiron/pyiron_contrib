@@ -95,7 +95,7 @@ class Minimize(Protocol):
             g.check_steps
         )
         g.starting_vertex = self.graph.check_steps
-        g.restarting_vertex = self.graph.clock
+        g.restarting_vertex = self.graph.check_steps
 
     def define_information_flow(self):
         # Data flow

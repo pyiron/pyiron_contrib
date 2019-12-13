@@ -238,9 +238,14 @@ class Vertex(LoggerMixin, ABC):
                         if key not in self.archive.output:
                             self.archive.output[key] = TimelineDict()
                             self.archive.output[key][history_key] = val
+                            if self.name == 'calc_static':
+                                print("Setting archive output with", val)
                         else:
                             # we want to archive it only if there is a change, thus get the last element
                             last_val = ordered_dict_get_last(self.archive.output[key])
+                            if self.name == 'calc_static':
+                                print("Last val", last_val)
+                                print("Current val", val)
                             if not Comparer(last_val) == val:
                                 self.archive.output[key][history_key] = val
                             else:

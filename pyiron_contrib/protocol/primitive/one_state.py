@@ -170,7 +170,7 @@ class ExternalHamiltonian(PrimitiveVertex):
 
     def _initialize(self, ref_job_full_path, structure):
         loc = self.get_graph_location()
-        name = 'job'
+        name = loc + '_job'
         project_path, ref_job_path = split(ref_job_full_path)
         pr = Project(path=project_path)
         sub_pr = pr.create_group(loc)

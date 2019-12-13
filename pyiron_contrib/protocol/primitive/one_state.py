@@ -170,7 +170,7 @@ class ExternalHamiltonian(PrimitiveVertex):
 
     def _initialize(self, ref_job_full_path, structure):
         loc = self.get_graph_location()
-        name = 'job'
+        name = loc + '_job'
         project_path, ref_job_path = split(ref_job_full_path)
         pr = Project(path=project_path)
         sub_pr = pr.create_group(loc)
@@ -195,7 +195,7 @@ class ExternalHamiltonian(PrimitiveVertex):
             # TODO: Running is fine for Lammps, but wasteful for DFT codes! Get the much cheaper interface
             #  initialization working -- right now it throws a (passive) TypeError due to database issues
         else:
-            raise TypeError('Job of class {} is not compatible.'.format(self.ref_job.__class__))
+            raise TypeError('Job of class {} is not compatible.'.format(ref_job.__class__))
         self._job = job
         self._job_name = name
 

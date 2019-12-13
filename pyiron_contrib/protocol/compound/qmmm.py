@@ -79,6 +79,19 @@ class QMMMProtocol(Protocol):
         positions (numpy.ndarray): The per-atom vector of cartesian positions for the entire region I+II superstructure.
     """
 
+    DefaultWhitelist = {
+        'calc_static_mm': {
+            'output': {
+                'energy_pot': 1,
+            },
+        },
+        'calc_static_qm': {
+            'output': {
+                'energy_pot': 1,
+            },
+        },
+    }
+
     def __init__(self, project=None, name=None, job_name=None):
         self.setup = IODictionary()
         super(QMMMProtocol, self).__init__(project=project, name=name, job_name=job_name)
@@ -97,7 +110,7 @@ class QMMMProtocol(Protocol):
 
         id_.gamma0 = 0.1
         id_.fix_com = True
-        id_.use_adagrad = True
+        id_.use_adagrad = False
 
     def define_vertices(self):
         # Components
@@ -161,17 +174,17 @@ class QMMMProtocol(Protocol):
         g.partition.input.seed_species = ip.seed_species
 
         g.calc_static_mm.input.ref_job_full_path = ip.mm_ref_job_full_path
-        g.calc_static_mm.input.structure = gp.partition.output.mm_full_structure[-1].copy
+        g.calc_static_mm.input.structure = gp.partition.output.mm_full_structure[-1]
         g.calc_static_mm.input.default.positions = gp.partition.output.mm_full_structure[-1].positions
         g.calc_static_mm.input.positions = gp.update_core_mm.output.positions[-1]
 
         g.calc_static_small.input.ref_job_full_path = ip.mm_ref_job_full_path
-        g.calc_static_small.input.structure = gp.partition.output.mm_small_structure[-1].copy
+        g.calc_static_small.input.structure = gp.partition.output.mm_small_structure[-1]
         g.calc_static_small.input.default.positions = gp.partition.output.mm_small_structure[-1].positions
         g.calc_static_small.input.positions = gp.update_buffer_qm.output.positions[-1]
 
         g.calc_static_qm.input.ref_job_full_path = ip.qm_ref_job_full_path
-        g.calc_static_qm.input.structure = gp.partition.output.qm_structure[-1].copy
+        g.calc_static_qm.input.structure = gp.partition.output.qm_structure[-1]
         g.calc_static_qm.input.default.positions = gp.partition.output.qm_structure[-1].positions
         g.calc_static_qm.input.positions = gp.update_buffer_qm.output.positions[-1]
 
@@ -232,6 +245,8 @@ class QMMMProtocol(Protocol):
         g.update_buffer_qm.input.displacement = gp.gradient_descent_mm.output.displacements[-1]
         g.update_buffer_qm.input.displacement_mask = gp.partition.output.domain_ids[-1]['buffer']
 
+        self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
+
     def get_output(self):
         gp = Pointer(self.graph)
         e_mm = ~gp.calc_static_mm.output.energy_pot[-1]
@@ -241,13 +256,17 @@ class QMMMProtocol(Protocol):
             max_force = max(~gp.max_force_mm.output.amax[-1], ~gp.max_force_qm.output.amax[-1])
         except KeyError:
             max_force = ~gp.max_force_mm.output.amax[-1]
+        try:  # We might also be converged before ever running a step (e.g. for perfect bulk)
+            positions = ~gp.update_core_mm.output.positions[-1]
+        except KeyError:
+            positions = self.input.structure.positions
         return {
             'energy_mm': e_mm,
             'energy_qm': e_qm,
             'energy_mm_small': e_mm_small,
             'energy_qmmm': e_mm + e_qm - e_mm_small,
             'max_force': max_force,
-            'positions': ~gp.update_core_mm.output.positions[-1],
+            'positions': positions
         }
 
     def show_mm(self):

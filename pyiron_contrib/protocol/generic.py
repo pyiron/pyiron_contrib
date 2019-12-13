@@ -244,7 +244,7 @@ class Vertex(LoggerMixin, ABC):
                             # we want to archive it only if there is a change, thus get the last element
                             last_val = ordered_dict_get_last(self.archive.output[key])
                             if not Comparer(last_val) == val:
-                                self.logger.debug('Updating archive with {}'.format(val))
+                                self.logger.debug('Updating archive with {} of type {}'.format(val, type(val)))
                                 self.archive.output[key][history_key] = val
                             else:
                                 self.logger.info('Property "%s" did not change in input' % key)

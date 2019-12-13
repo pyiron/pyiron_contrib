@@ -195,7 +195,7 @@ class ExternalHamiltonian(PrimitiveVertex):
             # TODO: Running is fine for Lammps, but wasteful for DFT codes! Get the much cheaper interface
             #  initialization working -- right now it throws a (passive) TypeError due to database issues
         else:
-            raise TypeError('Job of class {} is not compatible.'.format(self.ref_job.__class__))
+            raise TypeError('Job of class {} is not compatible.'.format(ref_job.__class__))
         self._job = job
         self._job_name = name
 

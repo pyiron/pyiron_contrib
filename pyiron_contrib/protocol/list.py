@@ -67,7 +67,11 @@ class ListVertex(PrimitiveVertex):
             child.finish()
 
     def _initialize(self, n_children):
-        children = [self.child_type(name=self.name + "_child_{}".format(n)) for n in range(n_children)]
+        children = [self.child_type(name="child_{}".format(n)) for n in range(n_children)]
+
+        # Locate children in graph
+        for child in children:
+            child.graph_parent = self
 
         # Link input to input.direct
         for key in list(self.direct.keys()):
@@ -88,11 +92,6 @@ class ListVertex(PrimitiveVertex):
         for key in list(self.broadcast.default.keys()):
             for n, child in enumerate(children):
                 setattr(child.input.default, key, getattr(Pointer(self.broadcast.default), key)[n])
-
-        # Sync child archive values
-        for child in children:
-            child.archive.period = Pointer(self.archive).period
-            child.archive.clock = Pointer(self.archive).clock
 
         self.children = children
         self._initialized = True

@@ -29,6 +29,7 @@ __date__ = "Aug 16, 2019"
 # defines the name, for which a subclass of Protocol will be searched in order to get a default whitelist configuration
 DEFAULT_WHITE_LIST_ATTRIBUTE_NAME = 'DefaultWhitelist'
 
+
 class Vertex(LoggerMixin, ABC):
     """
     A parent class for objects which are valid vertices of our directed acyclic graph.
@@ -127,23 +128,6 @@ class Vertex(LoggerMixin, ABC):
     def whitelist(self, value):
         self.set_whitelist(value)
 
-    def _update_output(self, output_data):
-        if output_data is None:
-            return
-
-        for key, value in output_data.items():
-            if key not in self.output:
-                self.output[key] = [value]
-            else:
-                history = list(self.output[key])
-                # Roll the list if it is necessary
-                history.append(value)
-                if len(history) > self.n_history:
-                    # Remove the head of the queue
-                    history.pop(0)
-                self.output[key] = history
-
-
     def set_whitelist(self, dictionary):
         """
         Sets whitelist of the current vertex. Argument defines the form:
@@ -181,9 +165,6 @@ class Vertex(LoggerMixin, ABC):
 
         """
         for k, v in kwargs.items():
-            #if k not in dic:
-                # self.logger.warning('The %s of vertex "%s" has no key "%s"! Available keys are: "%s"' % (archive, self.name, k, list(dic.keys())))
-            #else:
             whitelist = getattr(self.archive.whitelist, archive)
             whitelist[k] = v
 
@@ -264,13 +245,29 @@ class Vertex(LoggerMixin, ABC):
                             else:
                                 self.logger.info('Property "%s" did not change in input' % key)
 
+    def _update_output(self, output_data):
+        if output_data is None:
+            return
+
+        for key, value in output_data.items():
+            if key not in self.output:
+                self.output[key] = [value]
+            else:
+                history = list(self.output[key])
+                # Roll the list if it is necessary
+                history.append(value)
+                if len(history) > self.n_history:
+                    # Remove the head of the queue
+                    history.pop(0)
+                self.output[key] = history
+
     def update_and_archive(self, output_data):
         self._update_output(output_data)
         #if self.archive.clock % self.archive.period == 0:
         self._update_archive()
 
     def finish(self):
-        self._update_archive()
+        pass
 
     def parallel_setup(self):
         """How to prepare to execute in parallel when there's a list of these vertices together."""
@@ -336,7 +333,10 @@ class Vertex(LoggerMixin, ABC):
                     for key in archive.keys():
                         history = archive[key]
                         # create an ordered dictionary from it, convert it to integer back again
-                        archive[key] = TimelineDict(sorted(history.items(), key=lambda item: int(item[0].replace('t_', ''))))
+                        archive[key] = TimelineDict(
+                            sorted(history.items(),
+                                   key=lambda item: int(item[0].replace('t_', '')))
+                        )
 
 
 class PrimitiveVertex(Vertex):
@@ -407,7 +407,6 @@ class Protocol(Vertex, GenericJob):
         self.finished = False
 
         self.restore_default_whitelist()
-
 
     @property
     def default_whitelist(self):
@@ -504,7 +503,6 @@ class Protocol(Vertex, GenericJob):
         # Dear Reader: I looked at base/master/list and /parallel where this appears, but it's still not clear to me
         # what I should be using this for. But, I get a NotImplementedError if I leave it out, so here it is. -Liam
         pass
-
 
     def to_hdf(self, hdf=None, group_name=None):
         """
@@ -686,7 +684,6 @@ class Protocol(Vertex, GenericJob):
         elif format == 'tree':
             # print the nice tree
             pptree(self.whitelist, file=file, name='%s.%s' % (self.name, 'whitelist'))
-
 
 
 class Graph(dict, LoggerMixin):

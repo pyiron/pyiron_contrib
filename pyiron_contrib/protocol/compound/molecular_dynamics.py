@@ -47,6 +47,26 @@ class MolecularDynamics(Protocol):
             forces (if any) are not saved.
     """
 
+    DefaultWhitelist = {
+        'verlet_positions': {
+            'output': {
+                'positions': 1000,
+            },
+        },
+        'calc_static': {
+            'output': {
+                'energy_pot': 1,
+                'forces': 1000,
+            },
+        },
+        'verlet_velocities': {
+            'output': {
+                'energy_kin': 1,
+                'velocities': 1000,
+            },
+        },
+    }
+
     def __init__(self, project=None, name=None, job_name=None):
         super(MolecularDynamics, self).__init__(project=project, name=name, job_name=job_name)
 

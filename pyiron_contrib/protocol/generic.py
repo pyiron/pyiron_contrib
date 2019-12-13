@@ -239,16 +239,13 @@ class Vertex(LoggerMixin, ABC):
                             self.archive.output[key] = TimelineDict()
                             self.archive.output[key][history_key] = val
                             if self.name == 'calc_static':
-                                print("Setting archive output with", val)
+                                self.logger.debug('Setting archive output with {}'.format(val))
                         else:
                             # we want to archive it only if there is a change, thus get the last element
                             last_val = ordered_dict_get_last(self.archive.output[key])
                             if self.name == 'calc_static':
-                                print("Last val", last_val)
-                                print("Current val", val)
                             if not Comparer(last_val) == val:
-                                print("Updating archive")
-                                self.logger.info('Updating archive')
+                                self.logger.debug('Updating archive with {}'.format(val))
                                 self.archive.output[key][history_key] = val
                             else:
                                 self.logger.info('Property "%s" did not change in input' % key)
@@ -272,6 +269,8 @@ class Vertex(LoggerMixin, ABC):
     def update_and_archive(self, output_data):
         self._update_output(output_data)
         self._update_archive()
+        if self.name == 'calc_static':
+            self.logger.debug('Archive output energy = {}'.format(self.archive.output.energy_pot))
 
     def finish(self):
         pass
@@ -288,7 +287,6 @@ class Vertex(LoggerMixin, ABC):
             hdf (ProjectHDFio): HDF5 group object
             group_name (str): HDF5 subgroup name
         """
-        print("Sending {} to hdf".format(self.name))
         if group_name is None:
             hdf["TYPE"] = str(type(self))
             hdf["possiblevertexstates"] = self.possible_vertex_states
@@ -308,7 +306,7 @@ class Vertex(LoggerMixin, ABC):
                 self.input.to_hdf(hdf=hdf5_server, group_name="input")
                 self.output.to_hdf(hdf=hdf5_server, group_name="output")
                 if self.name == 'calc_static':
-                    print("Final pre-hdf archive:\n", self.archive)
+                    self.logger.debug("Final pre-save archive: {}".format(self.archive))
                 self.archive.to_hdf(hdf=hdf5_server, group_name="archive")
 
     def from_hdf(self, hdf, group_name=None):

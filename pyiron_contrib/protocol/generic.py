@@ -248,6 +248,11 @@ class Vertex(LoggerMixin, ABC):
                                 self.archive.output[key][history_key] = val
                             else:
                                 self.logger.info('Property "%s" did not change in input' % key)
+                                self.logger.debug('It was "still" {} while last_val was {}, which are of type {}'.format(
+                                    val,
+                                    last_val,
+                                    type(val),
+                                ))
 
     def _update_output(self, output_data):
         if output_data is None:

@@ -206,6 +206,7 @@ class ExternalHamiltonian(PrimitiveVertex):
             val = np.array(self._job.interactive_forces_getter())
         elif key == 'energy_pot':
             val = self._job.interactive_energy_pot_getter()
+            print(val)
         elif key == 'cells':
             val = np.array(self._job.interactive_cells_getter())
         else:

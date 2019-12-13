@@ -92,7 +92,7 @@ class Minimize(Protocol):
             g.check_force, 'true',
             g.gradient_descent,
             g.clock,
-            g.calc_static
+            g.check_steps
         )
         g.starting_vertex = self.graph.check_steps
         g.restarting_vertex = self.graph.clock

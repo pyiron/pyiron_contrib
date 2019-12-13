@@ -166,7 +166,6 @@ class ExternalHamiltonian(PrimitiveVertex):
         else:
             raise TypeError('Job of class {} is not compatible.'.format(self._job.__class__))
 
-        print("Returning output", {key: self.get_interactive_value(key) for key in interesting_keys})
         return {key: self.get_interactive_value(key) for key in interesting_keys}
 
     def _initialize(self, ref_job_full_path, structure):
@@ -207,7 +206,6 @@ class ExternalHamiltonian(PrimitiveVertex):
             val = np.array(self._job.interactive_forces_getter())
         elif key == 'energy_pot':
             val = self._job.interactive_energy_pot_getter()
-            print(val)
         elif key == 'cells':
             val = np.array(self._job.interactive_cells_getter())
         else:

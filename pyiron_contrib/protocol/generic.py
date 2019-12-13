@@ -247,6 +247,7 @@ class Vertex(LoggerMixin, ABC):
                                 print("Last val", last_val)
                                 print("Current val", val)
                             if not Comparer(last_val) == val:
+                                print("Updating archive")
                                 self.archive.output[key][history_key] = val
                             else:
                                 self.logger.info('Property "%s" did not change in input' % key)
@@ -294,6 +295,8 @@ class Vertex(LoggerMixin, ABC):
             hdf["nhistory"] = self._n_history
             self.input.to_hdf(hdf=hdf, group_name="input")
             self.output.to_hdf(hdf=hdf, group_name="output")
+            if self.name == 'calc_static':
+                print("Final pre-hdf archive:\n", self.archive)
             self.archive.to_hdf(hdf=hdf, group_name="archive")
         else:
             with hdf.open(group_name) as hdf5_server:

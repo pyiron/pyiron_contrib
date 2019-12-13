@@ -143,7 +143,7 @@ class NumpyArrayComparer(Comparer):
         ))
         self.logger.debug("Tolerance is {}".format(factor*epsilon))
         if inexact:
-            return self.object.shape == b.shape and np.allclose(self.object, b, atol=factor*epsilon)
+            return self.object.shape == b.shape and np.allclose(self.object, b, atol=factor*epsilon, rtol=0)
         else:
             # it is an exact data type such as int
             return np.array_equal(self.object, b)

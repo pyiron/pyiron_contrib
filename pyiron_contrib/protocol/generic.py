@@ -495,6 +495,13 @@ class Protocol(Vertex, GenericJob):
         self.status.collect = True  # Assume modal for now
         self.run()  # This is an artifact of inheriting from GenericJob, to get all that run functionality
 
+    def run(self, run_again=False, repair=False, debug=False, run_mode=None, continue_run=False):
+        """A wrapper for the run which allows us to simply keep going with a new variable `continue_run`"""
+        if continue_run:
+            self.run_static()
+        else:
+            super(Protocol, self).run(run_again=run_again, repair=repair, debug=debug, run_mode=run_mode)
+
     def collect_output(self):
         # Dear Reader: This feels like a hack, but it works. Sincerely, -Liam
         self.to_hdf()

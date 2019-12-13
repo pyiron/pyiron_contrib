@@ -135,13 +135,6 @@ class NumpyArrayComparer(Comparer):
         epsilon = self.get_machine_epsilon(b)
         # check if the datatype is inexact at all
         inexact = epsilon is not None
-        self.logger.debug("Array comparison {}, {} eval to {} & {}".format(
-            self.object,
-            b,
-            self.object.shape == b.shape,
-            np.allclose(self.object, b, atol=factor*epsilon)
-        ))
-        self.logger.debug("Tolerance is {}".format(factor*epsilon))
         if inexact:
             return self.object.shape == b.shape and np.allclose(self.object, b, atol=factor*epsilon, rtol=0)
         else:

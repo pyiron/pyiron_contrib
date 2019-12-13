@@ -238,22 +238,13 @@ class Vertex(LoggerMixin, ABC):
                         if key not in self.archive.output:
                             self.archive.output[key] = TimelineDict()
                             self.archive.output[key][history_key] = val
-                            if self.name == 'calc_static':
-                                self.logger.debug('Setting archive output with {}'.format(val))
                         else:
                             # we want to archive it only if there is a change, thus get the last element
                             last_val = ordered_dict_get_last(self.archive.output[key])
                             if not Comparer(last_val) == val:
-                                self.logger.debug('Updating archive with {} of type {}'.format(val, type(val)))
                                 self.archive.output[key][history_key] = val
                             else:
                                 self.logger.info('Property "%s" did not change in input' % key)
-                                self.logger.debug('It was "still" {} while last_val was {}, which are of type {} and {}'.format(
-                                    val,
-                                    last_val,
-                                    type(val),
-                                    type(last_val)
-                                ))
 
     def _update_output(self, output_data):
         if output_data is None:
@@ -274,8 +265,6 @@ class Vertex(LoggerMixin, ABC):
     def update_and_archive(self, output_data):
         self._update_output(output_data)
         self._update_archive()
-        if self.name == 'calc_static':
-            self.logger.debug('Archive output energy = {}'.format(self.archive.output.energy_pot))
 
     def finish(self):
         pass
@@ -310,8 +299,6 @@ class Vertex(LoggerMixin, ABC):
                 hdf5_server["nhistory"] = self._n_history
                 self.input.to_hdf(hdf=hdf5_server, group_name="input")
                 self.output.to_hdf(hdf=hdf5_server, group_name="output")
-                if self.name == 'calc_static':
-                    self.logger.debug("Final pre-save archive: {}".format(self.archive))
                 self.archive.to_hdf(hdf=hdf5_server, group_name="archive")
 
     def from_hdf(self, hdf, group_name=None):

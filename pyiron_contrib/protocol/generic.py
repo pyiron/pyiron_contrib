@@ -923,12 +923,20 @@ class Graph(dict, LoggerMixin):
             state (str): The state for the vertex to be in when it points to this particular end. (Default, "next", is
                 the parent-level state for vertices without multiple outbound edges.)
         """
-        assert(start.name in self.vertices.keys())
+        if start.name not in self.vertices.keys():
+            raise ValueError("The vertex {} was not found among graph vertices, {}".format(start.name,
+                                                                                           self.vertices.keys()))
 
-        if state != "next":
-            assert(state in start.possible_vertex_states)
+        if state not in start.possible_vertex_states:
+            raise ValueError("{} not found in possible vertex states for {}, {}".format(
+                state,
+                start.name,
+                start.possible_vertex_states
+            ))
 
         if end is not None:
+            if end not in self.vertices.keys():
+                raise ValueError("{} is not among vertices, {}".format(end, self.vertices.keys()))
             assert(end.name in self.vertices.keys())
             self.edges[start.name][state] = end.name
         else:

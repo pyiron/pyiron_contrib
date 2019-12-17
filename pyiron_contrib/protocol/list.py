@@ -118,7 +118,6 @@ class ListVertex(PrimitiveVertex):
                 output_data[key] = values
         else:
             output_data = None
-        if self.name == 'calc_static':
         return output_data
 
     def to_hdf(self, hdf=None, group_name=None):

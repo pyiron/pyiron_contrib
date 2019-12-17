@@ -128,4 +128,10 @@ def is_iterable(o):
 ensure_iterable = lambda v: v if is_iterable(v) else [v]
 
 
-
+class Registry(type):
+    def __init__(cls, name, bases, nmspc):
+        super(Registry, cls).__init__(name, bases, nmspc)
+        if not hasattr(cls, 'registry'):
+            cls.registry = set()
+        cls.registry.add(cls)
+        cls.registry -= set(bases) # Remove base classes

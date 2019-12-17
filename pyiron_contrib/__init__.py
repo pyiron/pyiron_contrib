@@ -7,6 +7,9 @@ from pyiron_contrib.protocol.compound.finite_temperature_string import StringRel
     Milestoning, VirtualWorkParallel, VirtualWorkSerial, VirtualWorkFullStep
 from pyiron_contrib.protocol.compound.qmmm import QMMMProtocol
 
+# protocol is a magic class after this one we have to Register
+from pyiron_contrib.protocol.utils.types import PyironJobTypeRegistryMetaType
+PyironJobTypeRegistryMetaType.inject_dynamic_types()
 __all__ = [
     'Protocol',
     'Minimize',

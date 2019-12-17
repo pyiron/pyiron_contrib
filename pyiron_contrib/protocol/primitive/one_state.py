@@ -126,12 +126,12 @@ class ExternalHamiltonian(PrimitiveVertex):
 
     Input attributes:
         ref_job_full_path (string): The full path to the hdf5 file of the job to use as a reference template.
-        structure (Atoms): Overwrites the reference job structure when provided. (Default is None, the reference job
-            needs to have its structure set.)
+        structure (Atoms): The structure for initializing the external Hamiltonian. Overwrites the reference job
+            structure when provided. (Default is None, the reference job needs to have its structure set.)
         interesting_keys (list[str]): String codes for output properties of the underlying job to collect. (Default is
             ['forces', 'energy_pot'].)
-        positions (numpy.ndarray): New positions to evaluate. (Not set by default, only necessary if positions are being
-            updated.)
+        positions (numpy.ndarray): New positions to evaluate. Shape must match the shape of the structure. (Not set by
+            default, only necessary if positions are being updated.)
     """
 
     def __init__(self, name=None):

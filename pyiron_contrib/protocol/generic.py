@@ -522,8 +522,11 @@ class Protocol(Vertex, GenericJob):
             hdf = self.project_hdf5
         if self._is_master:
             GenericJob.to_hdf(self, hdf=hdf, group_name=group_name)
+            self.graph.to_hdf(hdf=hdf, group_name="graph")
+        else:
+            with hdf.open(self.name) as graph_hdf:
+                self.graph.to_hdf(hdf=graph_hdf, group_name="graph")
         Vertex.to_hdf(self, hdf=hdf, group_name=group_name)
-        self.graph.to_hdf(hdf=hdf, group_name="graph")
         try:
             hdf[group_name]["ismaster"] = self._is_master
         except AttributeError:
@@ -935,9 +938,8 @@ class Graph(dict, LoggerMixin):
             ))
 
         if end is not None:
-            if end not in self.vertices.keys():
-                raise ValueError("{} is not among vertices, {}".format(end, self.vertices.keys()))
-            assert(end.name in self.vertices.keys())
+            if end.name not in self.vertices.keys():
+                raise ValueError("{} is not among vertices, {}".format(end.name, self.vertices.keys()))
             self.edges[start.name][state] = end.name
         else:
             self.edges[start.name][state] = None
@@ -1017,7 +1019,7 @@ class Vertices(dict):
     def from_hdf(self, hdf, group_name="vertices"):
         with hdf.open(group_name) as hdf5_server:
             for name, vertex in self.items():
-                if isinstance(vertex, Vertex):
+                if isinstance(vertex, (Protocol, Vertex)):
                     vertex.from_hdf(hdf=hdf5_server, group_name=name)
                 else:
                     raise TypeError("Cannot load non-Vertex-like vertices")

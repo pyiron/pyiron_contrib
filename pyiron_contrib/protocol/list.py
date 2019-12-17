@@ -118,6 +118,7 @@ class ListVertex(PrimitiveVertex):
                 output_data[key] = values
         else:
             output_data = None
+        if self.name == 'calc_static':
         return output_data
 
     def to_hdf(self, hdf=None, group_name=None):
@@ -135,7 +136,7 @@ class ListVertex(PrimitiveVertex):
             with hdf.open(group_name + "/children") as hdf5_server:
                 children = []
                 for n in np.arange(self.input.n_children, dtype=int):
-                    child = self.child_type()
+                    child = self.child_type(name="child_{}".format(n))
                     child.from_hdf(hdf=hdf5_server, group_name="child" + str(n))
                     child.graph_parent = self
                     children.append(child)

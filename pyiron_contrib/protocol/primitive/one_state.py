@@ -142,12 +142,15 @@ class ExternalHamiltonian(PrimitiveVertex):
 
         self._fast_lammps_mode = True  # Set to false only to intentionally be slow for comparison purposes
         self._job = None
+        self._job_project_path = None
+        self._job_name = None
 
     def command(self, ref_job_full_path, structure, interesting_keys, positions):
-        if self._job is None:
+        if self._job_project_path is None:
             self._initialize(ref_job_full_path, structure)
-        elif self._job.status == 'finished':
-            # The interactive library needs to be reopened
+        elif self._job is None:
+            self._reload()
+        else:
             self._job.interactive_open()
             self._job.interactive_initialize_interface()
 
@@ -182,6 +185,7 @@ class ExternalHamiltonian(PrimitiveVertex):
 
         if isinstance(job, GenericInteractive):
             job.interactive_open()
+            job.interactive_initialize_interface()
 
             if isinstance(job, LammpsInteractive) and self._fast_lammps_mode:
                 # Note: This might be done by default at some point in LammpsInteractive, and could then be removed here
@@ -191,13 +195,21 @@ class ExternalHamiltonian(PrimitiveVertex):
 
             job.calc_static()
             job.run(run_again=True)
-            # job.interactive_initialize_interface()
             # TODO: Running is fine for Lammps, but wasteful for DFT codes! Get the much cheaper interface
             #  initialization working -- right now it throws a (passive) TypeError due to database issues
         else:
             raise TypeError('Job of class {} is not compatible.'.format(ref_job.__class__))
         self._job = job
         self._job_name = name
+        self._job_project_path = sub_pr.path
+
+    def _reload(self):
+        sub_pr = Project(path=self._job_project_path)
+        self._job = sub_pr.load(self._job_name)
+        self._job.interactive_open()
+        self._job.interactive_initialize_interface()
+        self._job.calc_static()
+        self._job.run(run_again=True)
 
     def get_interactive_value(self, key):
         if key == 'positions':
@@ -217,22 +229,17 @@ class ExternalHamiltonian(PrimitiveVertex):
         if self._job is not None:
             self._job.interactive_close()
 
-    def parallel_setup(self):
-        super(ExternalHamiltonian, self).parallel_setup()
-        if self._job is None:
-            self._initialize(self.input.ref_job_full_path, self.input.structure)
-        elif self._job.status == 'finished':
-            # The interactive library needs to be reopened
-            self._job.interactive_open()
-            self._job.interactive_initialize_interface()
-
     def to_hdf(self, hdf=None, group_name=None):
         super(ExternalHamiltonian, self).to_hdf(hdf=hdf, group_name=group_name)
         hdf[group_name]["fastlammpsmode"] = self._fast_lammps_mode
+        hdf[group_name]["jobname"] = self._job_name
+        hdf[group_name]["jobprojectpath"] = self._job_project_path
 
     def from_hdf(self, hdf=None, group_name=None):
         super(ExternalHamiltonian, self).from_hdf(hdf=hdf, group_name=group_name)
         self._fast_lammps_mode = hdf[group_name]["fastlammpsmode"]
+        self._job_name = hdf[group_name]["jobname"]
+        self._job_project_path = hdf[group_name]["jobprojectpath"]
 
 
 class GradientDescent(PrimitiveVertex):

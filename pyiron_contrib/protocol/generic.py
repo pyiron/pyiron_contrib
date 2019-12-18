@@ -959,7 +959,6 @@ class Graph(dict, LoggerMixin):
             self.make_edge(vertex, next_vertex, state=state)
 
     def to_hdf(self, hdf, group_name="graph"):
-        self.logger.warning('SAVING GRAPH  "%s/%s" %s ' % (hdf.path, group_name, list(self.vertices.keys())))
         with hdf.open(group_name) as hdf5_server:
             hdf5_server["TYPE"] = str(type(self))
             hdf5_server["startingvertexname"] = self.starting_vertex.name

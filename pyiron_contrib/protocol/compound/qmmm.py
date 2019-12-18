@@ -191,7 +191,9 @@ class QMMMProtocol(Protocol):
         g.check_steps.input.target = gp.clock.output.n_counts[-1]
         g.check_steps.input.threshold = ip.n_steps
 
-        g.force_norm_mm.input.x = gp.calc_static_mm.output.forces[-1]
+        g.force_norm_mm.input.x = gp.calc_static_mm.output.forces[-1][
+            gp.partition.output.domain_ids[-1]['except_core']
+        ]
         g.force_norm_mm.input.ord = 2
         g.force_norm_mm.input.axis = -1
 

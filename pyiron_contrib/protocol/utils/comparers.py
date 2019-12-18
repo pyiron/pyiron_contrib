@@ -2,7 +2,7 @@
 # Copyright (c) Max-Planck-Institut für Eisenforschung GmbH - Computational Materials Design (CM) Department
 # Distributed under the terms of "New BSD License", see the LICENSE file.
 
-from pyiron_contrib.protocol.utils.misc import LoggerMixin, ensure_iterable
+from pyiron_contrib.protocol.utils.misc import LoggerMixin, ensure_iterable, Registry
 from pyiron.atomistics.structure.atoms import Atoms
 import numpy as np
 import logging
@@ -31,13 +31,7 @@ except ImportError:
 ensure_iterable_tuple = lambda o: tuple(ensure_iterable)
 
 
-class Registry(type):
-    def __init__(cls, name, bases, nmspc):
-        super(Registry, cls).__init__(name, bases, nmspc)
-        if not hasattr(cls, 'registry'):
-            cls.registry = set()
-        cls.registry.add(cls)
-        cls.registry -= set(bases) # Remove base classes
+
 
 class Comparer(LoggerMixin, metaclass=Registry):
     """

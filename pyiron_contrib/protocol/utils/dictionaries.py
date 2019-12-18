@@ -160,10 +160,17 @@ class IODictionary(dict, LoggerMixin):
                             else:
                                 self._generic_to_hdf(v, server, group_name=index_key)
         else:
+            # so this one is the primitive item case
+            # lets check if it has a to_hdf method
             try:
-                hdf[group_name] = value
-            except:
-                raise
+                value.to_hdf(hdf, group_name=group_name)
+            except AttributeError:
+                # Ok there is no to_hdf method however lets try it again
+                try:
+                    hdf[group_name] = value
+                except:
+                    # now we have no clue any more, we have to raise this error
+                    raise
 
     def _generic_from_hdf(self, hdf, group_name=None):
         """

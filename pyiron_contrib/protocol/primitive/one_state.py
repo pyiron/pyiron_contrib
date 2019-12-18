@@ -150,7 +150,7 @@ class ExternalHamiltonian(PrimitiveVertex):
             self._initialize(ref_job_full_path, structure)
         elif self._job is None:
             self._reload()
-        else:
+        elif not self._job.interactive_is_activated():
             self._job.interactive_open()
             self._job.interactive_initialize_interface()
 
@@ -179,7 +179,12 @@ class ExternalHamiltonian(PrimitiveVertex):
         sub_pr = pr.create_group(loc)
         # sub directory is necessary so jobs don't fight for the same `rewrite_hdf` space
         ref_job = pr.load(ref_job_path)
-        job = ref_job.copy_template(project=sub_pr, new_job_name=name)
+        job = ref_job.copy_to(
+            project=pr,
+            new_job_name=name,
+            input_only=True,
+            new_database_entry=False
+        )
         if structure is not None:
             job.structure = structure
 

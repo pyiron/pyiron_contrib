@@ -62,9 +62,9 @@ class ListVertex(PrimitiveVertex):
         pass
 
     def finish(self):
-        super(ListVertex, self).finish()
         for child in self.children:
             child.finish()
+        super(ListVertex, self).finish()
 
     def _initialize(self, n_children):
         children = [self.child_type(name="child_{}".format(n)) for n in range(n_children)]

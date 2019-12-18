@@ -140,7 +140,7 @@ class ExternalHamiltonian(PrimitiveVertex):
         self.input.default.interesting_keys = ['forces', 'energy_pot']
         self.input.default.positions = None
 
-        self._fast_lammps_mode = True  # Set to false only to intentionally be slow for comparison purposes
+        self._fast_lammps_mode = False  # Set to false only to intentionally be slow for comparison purposes
         self._job = None
         self._job_project_path = None
         self._job_name = None
@@ -151,6 +151,7 @@ class ExternalHamiltonian(PrimitiveVertex):
         elif self._job is None:
             self._reload()
         elif not self._job.interactive_is_activated():
+            self._job.status.running = True
             self._job.interactive_open()
             self._job.interactive_initialize_interface()
 
@@ -158,12 +159,14 @@ class ExternalHamiltonian(PrimitiveVertex):
             # Run Lammps 'efficiently'
             if positions is not None:
                 self._job.interactive_positions_setter(positions)
+
             self._job._interactive_lib_command(self._job._interactive_run_command)
         elif isinstance(self._job, GenericInteractive):
             # DFT codes are slow enough that we can run them the regular way and not care
             # Also we might intentionally run Lammps slowly for comparison purposes
             if positions is not None:
                 self._job.structure.positions = positions
+
             self._job.calc_static()
             self._job.run()
         else:
@@ -176,15 +179,14 @@ class ExternalHamiltonian(PrimitiveVertex):
         name = loc + '_job'
         project_path, ref_job_path = split(ref_job_full_path)
         pr = Project(path=project_path)
-        sub_pr = pr.create_group(loc)
-        # sub directory is necessary so jobs don't fight for the same `rewrite_hdf` space
         ref_job = pr.load(ref_job_path)
         job = ref_job.copy_to(
             project=pr,
             new_job_name=name,
             input_only=True,
-            new_database_entry=False
+            new_database_entry=True
         )
+
         if structure is not None:
             job.structure = structure
 
@@ -206,11 +208,11 @@ class ExternalHamiltonian(PrimitiveVertex):
             raise TypeError('Job of class {} is not compatible.'.format(ref_job.__class__))
         self._job = job
         self._job_name = name
-        self._job_project_path = sub_pr.path
+        self._job_project_path = project_path
 
     def _reload(self):
-        sub_pr = Project(path=self._job_project_path)
-        self._job = sub_pr.load(self._job_name)
+        pr = Project(path=self._job_project_path)
+        self._job = pr.load(self._job_name)
         self._job.interactive_open()
         self._job.interactive_initialize_interface()
         self._job.calc_static()

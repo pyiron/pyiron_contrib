@@ -520,7 +520,6 @@ class Protocol(Vertex, PyironJobTypeRegistry):
             group_name (str): HDF5 subgroup name - optional
         """
 
-        self.logger.warning("%s %s" %(hdf, type(hdf)))
         if hdf is None:
             hdf = self.project_hdf5
         if self._is_master:

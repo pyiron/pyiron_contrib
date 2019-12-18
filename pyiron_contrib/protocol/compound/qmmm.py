@@ -4,7 +4,7 @@
 
 from __future__ import print_function
 
-from pyiron_contrib.protocol.generic import PrimitiveVertex, Protocol
+from pyiron_contrib.protocol.generic import PrimitiveVertex, CompoundVertex
 from pyiron_contrib.protocol.utils import ensure_iterable
 from pyiron_contrib.protocol.primitive.one_state import ExternalHamiltonian, Counter, Norm, Max, GradientDescent
 from pyiron_contrib.protocol.primitive.two_state import IsGEq, IsLEq
@@ -26,7 +26,7 @@ __status__ = "development"
 __date__ = "June 6, 2019"
 
 
-class QMMMProtocol(Protocol):
+class QMMMProtocol(CompoundVertex):
     """
     Relax a QM/MM coupled system.
 

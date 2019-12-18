@@ -3,7 +3,7 @@
 # Distributed under the terms of "New BSD License", see the LICENSE file.
 
 from __future__ import print_function
-from pyiron_contrib.protocol.generic import Vertex, PrimitiveVertex, Protocol
+from pyiron_contrib.protocol.generic import Vertex, PrimitiveVertex, CompoundVertex
 from pyiron_contrib.protocol.utils import InputDictionary, Pointer
 import numpy as np
 from abc import abstractmethod
@@ -220,7 +220,7 @@ class AutoList(ParallelList, SerialList):
         try:
             if isinstance(
                 self.children[0],
-                (VaspInteractive, SphinxInteractive, Protocol)
+                (VaspInteractive, SphinxInteractive, CompoundVertex)
             ):  # Whitelist types that should be treated in parallel
                 return True
             else:  # Everything else is cheap enough to treat in serial

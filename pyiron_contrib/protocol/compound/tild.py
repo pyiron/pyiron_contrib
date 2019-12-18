@@ -4,7 +4,7 @@
 
 from __future__ import print_function
 
-from pyiron_contrib.protocol.generic import Protocol
+from pyiron_contrib.protocol.generic import CompoundVertex
 from pyiron_contrib.protocol.primitive.one_state import Counter, ExternalHamiltonian, WeightedSum, \
     HarmonicHamiltonian, Transpose, RandomVelocity, LangevinThermostat, \
     VerletPositionUpdate, VerletVelocityUpdate, BuildMixingPairs, DeleteAtom, Overwrite, Slice, VoronoiReflection, \
@@ -36,7 +36,7 @@ __status__ = "development"
 __date__ = "24 July, 2019"
 
 
-class TILDParent(Protocol, ABC):
+class TILDParent(CompoundVertex, ABC):
     """
     A parent class for thermodynamic integration by langevin dynamics. Mostly just to avoid duplicate code in
     `HarmonicTILD` and `VacancyTILD`.
@@ -476,7 +476,7 @@ class VacancyTILD(TILDParent):
 
 
 # TODO: Adapt the code to run protocols smoothly as vertices in other protocols
-class HarmonicTILDParallel(Protocol):
+class HarmonicTILDParallel(CompoundVertex):
 
     def define_vertices(self):
         # Graph components
@@ -545,7 +545,7 @@ class HarmonicTILDParallel(Protocol):
         super(HarmonicTILDParallel, self).execute()
 
 
-class HarmonicallyCoupled(Protocol):
+class HarmonicallyCoupled(CompoundVertex):
 
     def define_vertices(self):
         # Graph components

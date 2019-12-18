@@ -5,7 +5,7 @@
 from __future__ import print_function
 
 
-from pyiron_contrib.protocol.generic import Protocol
+from pyiron_contrib.protocol.generic import CompoundVertex
 from pyiron_contrib.protocol.list import SerialList, AutoList, ParallelList
 from pyiron_contrib.protocol.primitive.fts_vertices import StringRecenter, StringReflect, PositionsRunningAverage, \
     CentroidsRunningAverageMix, CentroidsSmoothing, CentroidsReparameterization, MilestoningVertex
@@ -33,7 +33,7 @@ __status__ = "development"
 __date__ = "23 July, 2019"
 
 
-class StringRelaxation(Protocol):
+class StringRelaxation(CompoundVertex):
     """
     Runs Finite Temperature String relaxation
 
@@ -299,7 +299,7 @@ class StringRelaxation(Protocol):
         return energies
 
 
-class VirtualWork(Protocol):
+class VirtualWork(CompoundVertex):
     """
     Calculates the virtual work to follow a transition path by integrating over the average force of MD images
     constrained to stay within the Voronoi domain of their Voronoi centroid along the path.
@@ -663,7 +663,7 @@ class VirtualWorkFullStep(VirtualWork):
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
 
 
-class ConstrainedMD(Protocol):
+class ConstrainedMD(CompoundVertex):
     """For parallelizing virtual work. Work in progress, not yet functioning."""
 
     def __init__(self, project=None, name=None, job_name=None):
@@ -883,7 +883,7 @@ class VirtualWorkSerial(VirtualWorkParallel):
         g.clock = Counter()
 
 
-class Milestoning(Protocol):
+class Milestoning(CompoundVertex):
     """
     Calculates the jump frequencies of each centroid to the final centroid
 

@@ -362,7 +362,7 @@ class PrimitiveVertex(Vertex):
         # Note: The output needs to be explicitly collected and archived later if this is used in place of `execute`
 
 
-class Protocol(Vertex, PyironJobTypeRegistry):
+class CompoundVertex(Vertex, PyironJobTypeRegistry):
     """
     Can either be the parent graph to execute (when given a project and job name at instantiation, e.g. when created as
     a pyiron job), or a vertex which contains its own graph and has its own sub-vertices.
@@ -500,7 +500,7 @@ class Protocol(Vertex, PyironJobTypeRegistry):
         """A wrapper for the run which allows us to simply keep going with a new variable `continue_run`"""
         if continue_run:
             self.status.created = True
-        super(Protocol, self).run(run_again=run_again, repair=repair, debug=debug, run_mode=run_mode)
+        super(CompoundVertex, self).run(run_again=run_again, repair=repair, debug=debug, run_mode=run_mode)
 
     def collect_output(self):
         # Dear Reader: This feels like a hack, but it works. Sincerely, -Liam
@@ -736,7 +736,7 @@ class Graph(dict, LoggerMixin):
             else:
                 raise ValueError("The active, starting, and restarting vertices must inherit `Vertex` or be `None`.")
         elif key == "owner":
-            if not (isinstance(val, Protocol) or val is None):
+            if not (isinstance(val, CompoundVertex) or val is None):
                 raise ValueError("Only protocols can hold graphs, but the assigned owner has type", type(val))
             else:
                 self[key] = val
@@ -780,7 +780,7 @@ class Graph(dict, LoggerMixin):
 
         # Define styles for the individual classes
         class_style_mapping = {
-            Protocol: {'shape': 'box'},
+            CompoundVertex: {'shape': 'box'},
             # CommandBool: {'shape': 'diamond'},
             PrimitiveVertex: {'shape': 'circle'}
         }
@@ -1013,7 +1013,7 @@ class Vertices(dict):
     def from_hdf(self, hdf, group_name="vertices"):
         with hdf.open(group_name) as hdf5_server:
             for name, vertex in self.items():
-                if isinstance(vertex, (Protocol, Vertex)):
+                if isinstance(vertex, (CompoundVertex, Vertex)):
                     vertex.from_hdf(hdf=hdf5_server, group_name=name)
                 else:
                     raise TypeError("Cannot load non-Vertex-like vertices")

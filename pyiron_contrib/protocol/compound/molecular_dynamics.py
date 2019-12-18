@@ -4,7 +4,7 @@
 
 from __future__ import print_function
 
-from pyiron_contrib.protocol.generic import Protocol
+from pyiron_contrib.protocol.generic import CompoundVertex
 from pyiron_contrib.protocol.primitive.one_state import Counter, ExternalHamiltonian, RandomVelocity, Zeros, \
     VerletPositionUpdate, VerletVelocityUpdate
 from pyiron_contrib.protocol.primitive.two_state import IsGEq
@@ -24,7 +24,7 @@ __status__ = "development"
 __date__ = "18 July, 2019"
 
 
-class MolecularDynamics(Protocol):
+class MolecularDynamics(CompoundVertex):
     """
     Runs molecular dynamics. This isn't particularly useful as almost every source code/plain job can do this on its
     own, but rather this is intended for testing and teaching. It also serves as a useful starting point for developing

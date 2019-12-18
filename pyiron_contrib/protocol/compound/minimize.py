@@ -4,7 +4,7 @@
 
 from __future__ import print_function
 
-from pyiron_contrib.protocol.generic import Protocol
+from pyiron_contrib.protocol.generic import CompoundVertex
 from pyiron_contrib.protocol.primitive.one_state import Counter, ExternalHamiltonian, GradientDescent, Max, Norm
 from pyiron_contrib.protocol.primitive.two_state import IsGEq
 from pyiron_contrib.protocol.utils import Pointer
@@ -23,7 +23,7 @@ __status__ = "development"
 __date__ = "May 20, 2019"
 
 
-class Minimize(Protocol):
+class Minimize(CompoundVertex):
     """
     Run minimization with Lammps. This isn't physically useful, since a regular lammps job is faster it's just a dummy
     class for debugging new code and teaching ideas.

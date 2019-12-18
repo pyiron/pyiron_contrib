@@ -7,10 +7,10 @@ import sys
 from pyiron.base.job.generic import GenericJob
 from pyiron_contrib.protocol.utils import IODictionary, InputDictionary, LoggerMixin, Event, EventHandler, \
     Pointer, CrumbType, ordered_dict_get_last, Comparer, TimelineDict
-from abc import ABC, abstractmethod
+from pyiron_contrib.protocol.utils.types import PyironJobTypeRegistry
+from pyiron_contrib.protocol.utils.pptree import print_tree as pptree
+from abc import ABC, abstractmethod, ABCMeta
 from numpy import inf
-
-from collections import OrderedDict
 
 
 """
@@ -264,6 +264,7 @@ class Vertex(LoggerMixin, ABC):
 
     def update_and_archive(self, output_data):
         self._update_output(output_data)
+        #if self.archive.clock % self.archive.period == 0:
         self._update_archive()
 
     def finish(self):
@@ -361,7 +362,7 @@ class PrimitiveVertex(Vertex):
         # Note: The output needs to be explicitly collected and archived later if this is used in place of `execute`
 
 
-class Protocol(Vertex, GenericJob):
+class Protocol(Vertex, PyironJobTypeRegistry):
     """
     Can either be the parent graph to execute (when given a project and job name at instantiation, e.g. when created as
     a pyiron job), or a vertex which contains its own graph and has its own sub-vertices.
@@ -512,12 +513,18 @@ class Protocol(Vertex, GenericJob):
             hdf (ProjectHDFio): HDF5 group object - optional
             group_name (str): HDF5 subgroup name - optional
         """
+
+        self.logger.warning("%s %s" %(hdf, type(hdf)))
         if hdf is None:
             hdf = self.project_hdf5
         if self._is_master:
             GenericJob.to_hdf(self, hdf=hdf, group_name=group_name)
+
+            self.graph.to_hdf(hdf=hdf, group_name="graph")
+        else:
+            with hdf.open(group_name) as sub_server:
+                self.graph.to_hdf(hdf=sub_server, group_name="graph")
         Vertex.to_hdf(self, hdf=hdf, group_name=group_name)
-        self.graph.to_hdf(hdf=hdf, group_name="graph")
         try:
             hdf[group_name]["ismaster"] = self._is_master
         except AttributeError:
@@ -648,7 +655,7 @@ class Protocol(Vertex, GenericJob):
             self.whitelist = self.default_whitelist
             self.logger.debug('Whitelist configured for protocol "%s"' % self.name)
 
-    def format_whitelist(self, format='code', file=sys.stdout):
+    def format_whitelist(self, format='tree', file=sys.stdout):
         if format == 'code':
             start = [self.name, 'graph']
             path_format = '{path} = {value}\n'
@@ -659,18 +666,11 @@ class Protocol(Vertex, GenericJob):
                     for key, value in vertex_conf.items():
                         key_path = archive_path + [key]
                         file.write(path_format.format(path='.'.join(key_path), value=value))
-        elif format == 'tree':
+        elif format == 'simple':
 
-            def count_paths(node):
-                if not isinstance(node, dict):
-                    return 1
-                else:
-                    s = 0
-                    for _, v in node.items():
-                        s += count_paths(v)
-                    return s
+            from pyiron_contrib.protocol.utils.pptree import count_paths
 
-            def tree_print(node, level=0):
+            def print_tree(node, level=0):
                 if not isinstance(node, dict):
                     return '%s\n' % str(node)
                 elif count_paths(node) == 0:
@@ -684,14 +684,13 @@ class Protocol(Vertex, GenericJob):
                             # now lets do the second part of the comma
                             # add an extra \n if val is a dectionary
                             output += '\n' if isinstance(val, dict) else ' '
-                            output += tree_print(val, level=level+1)
+                            output += print_tree(val, level=level+1)
                     return output
-
-            file.write(tree_print(self.whitelist))
-            print('COUNT_PATHS', count_paths(self.whitelist))
-        else:
-            from pprint import pprint
-            pprint(self.whitelist)
+            # print the result
+            file.write(print_tree(self.whitelist))
+        elif format == 'tree':
+            # print the nice tree
+            pptree(self.whitelist, file=file, name='%s.%s' % (self.name, 'whitelist'))
 
 
 class Graph(dict, LoggerMixin):
@@ -948,6 +947,7 @@ class Graph(dict, LoggerMixin):
             self.make_edge(vertex, next_vertex, state=state)
 
     def to_hdf(self, hdf, group_name="graph"):
+        self.logger.warning('SAVING GRAPH  "%s/%s" %s ' % (hdf.path, group_name, list(self.vertices.keys())))
         with hdf.open(group_name) as hdf5_server:
             hdf5_server["TYPE"] = str(type(self))
             hdf5_server["startingvertexname"] = self.starting_vertex.name

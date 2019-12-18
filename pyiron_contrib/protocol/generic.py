@@ -523,14 +523,12 @@ class Protocol(Vertex, PyironJobTypeRegistry):
         self.logger.warning("%s %s" %(hdf, type(hdf)))
         if hdf is None:
             hdf = self.project_hdf5
-
         if self._is_master:
             GenericJob.to_hdf(self, hdf=hdf, group_name=group_name)
             self.graph.to_hdf(hdf=hdf, group_name="graph")
         else:
             with hdf.open(self.name) as graph_hdf:
                 self.graph.to_hdf(hdf=graph_hdf, group_name="graph")
-
         Vertex.to_hdf(self, hdf=hdf, group_name=group_name)
         try:
             hdf[group_name]["ismaster"] = self._is_master

@@ -4,7 +4,7 @@
 
 from __future__ import print_function
 
-from pyiron_contrib.protocol.generic import PrimitiveVertex, CompoundVertex
+from pyiron_contrib.protocol.generic import PrimitiveVertex, CompoundVertex, Protocol
 from pyiron_contrib.protocol.utils import ensure_iterable
 from pyiron_contrib.protocol.primitive.one_state import ExternalHamiltonian, Counter, Norm, Max, GradientDescent
 from pyiron_contrib.protocol.primitive.two_state import IsGEq, IsLEq
@@ -26,7 +26,7 @@ __status__ = "development"
 __date__ = "June 6, 2019"
 
 
-class QMMMProtocol(CompoundVertex):
+class QMMM(CompoundVertex):
     """
     Relax a QM/MM coupled system.
 
@@ -92,9 +92,8 @@ class QMMMProtocol(CompoundVertex):
         },
     }
 
-    def __init__(self, project=None, name=None, job_name=None):
-        self.setup = IODictionary()
-        super(QMMMProtocol, self).__init__(project=project, name=name, job_name=job_name)
+    def __init__(self, name=None):
+        CompoundVertex.__init__(self, name=name)
 
         id_ = self.input.default
         id_.domain_ids = None
@@ -623,3 +622,9 @@ class PartitionStructure(PrimitiveVertex):
     @staticmethod
     def _only_core(domain_ids_qm):
         return np.concatenate([domain_ids_qm['seed'], domain_ids_qm['core']])
+
+
+class ProtocolQMMM(Protocol, QMMM):
+    def __init__(self, project=None, job_name=None):
+        Protocol.__init__(self, project=project, job_name=job_name)
+        QMMM.__init__(self, name=job_name)

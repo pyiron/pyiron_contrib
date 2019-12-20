@@ -4,7 +4,7 @@
 
 from __future__ import print_function
 
-from pyiron_contrib.protocol.generic import CompoundVertex
+from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
 from pyiron_contrib.protocol.primitive.one_state import Counter, ExternalHamiltonian, GradientDescent, Max, Norm
 from pyiron_contrib.protocol.primitive.two_state import IsGEq
 from pyiron_contrib.protocol.utils import Pointer
@@ -59,8 +59,8 @@ class Minimize(CompoundVertex):
         }
     }
 
-    def __init__(self, project=None, name=None, job_name=None):
-        super(Minimize, self).__init__(project=project, name=name, job_name=job_name)
+    def __init__(self, name=None):
+        CompoundVertex.__init__(self, name=name)
 
         # Protocol defaults
         id_ = self.input.default
@@ -137,3 +137,9 @@ class Minimize(CompoundVertex):
             'positions': ~gp.gradient_descent.output.positions[-1],
             'forces': ~gp.calc_static.output.forces[-1]
         }
+
+
+class ProtocolMinimize(Protocol, Minimize):
+    def __init__(self, project=None, job_name=None):
+        Protocol.__init__(self, project=project, job_name=job_name)
+        Minimize.__init__(self, name=job_name)

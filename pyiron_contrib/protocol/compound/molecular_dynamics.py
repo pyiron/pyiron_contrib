@@ -4,7 +4,7 @@
 
 from __future__ import print_function
 
-from pyiron_contrib.protocol.generic import CompoundVertex
+from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
 from pyiron_contrib.protocol.primitive.one_state import Counter, ExternalHamiltonian, RandomVelocity, Zeros, \
     VerletPositionUpdate, VerletVelocityUpdate
 from pyiron_contrib.protocol.primitive.two_state import IsGEq
@@ -67,8 +67,8 @@ class MolecularDynamics(CompoundVertex):
         },
     }
 
-    def __init__(self, project=None, name=None, job_name=None):
-        super(MolecularDynamics, self).__init__(project=project, name=name, job_name=job_name)
+    def __init__(self, name=None):
+        CompoundVertex.__init__(self, name=name)
 
         # Protocol defaults
         id_ = self.input.default
@@ -151,3 +151,10 @@ class MolecularDynamics(CompoundVertex):
             'velocities': ~gp.verlet_velocities.output.velocities[-1],
             'forces': ~gp.calc_static.output.forces[-1]
         }
+
+
+class ProtocolMD(Protocol, MolecularDynamics):
+    def __init__(self, project=None, job_name=None):
+        Protocol.__init__(self, project=project, job_name=job_name)
+        MolecularDynamics.__init__(self, name=job_name)
+

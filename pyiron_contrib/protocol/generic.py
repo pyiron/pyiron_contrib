@@ -362,7 +362,7 @@ class PrimitiveVertex(Vertex):
         # Note: The output needs to be explicitly collected and archived later if this is used in place of `execute`
 
 
-class CompoundVertex(Vertex, PyironJobTypeRegistry):
+class CompoundVertex(Vertex): #, PyironJobTypeRegistry):
     """
     Can either be the parent graph to execute (when given a project and job name at instantiation, e.g. when created as
     a pyiron job), or a vertex which contains its own graph and has its own sub-vertices.
@@ -375,17 +375,7 @@ class CompoundVertex(Vertex, PyironJobTypeRegistry):
         vertex_processed (Event):
         finished (bool):
     """
-    def __init__(self, project=None, name=None, job_name=None):
-        if name is not None and job_name is not None:
-            raise ValueError("Only one of `name` and `job_name` may be set, but `name`={} and `job_name`={}".format(
-                name, job_name
-            ))
-        name = job_name or name
-        # When submitting, instantiating a GenericJob requires a `job_name` variable
-        self._is_master = False
-        if project is not None:
-            self._is_master = True
-            GenericJob.__init__(self, project, name)
+    def __init__(self, name=None):
         Vertex.__init__(self, name=name)
 
         self.graph = Graph()
@@ -473,9 +463,6 @@ class CompoundVertex(Vertex, PyironJobTypeRegistry):
         self.graph.active_vertex = self.graph.restarting_vertex
         self.update_and_archive(self.get_output())
 
-        if self._is_master:
-            self.protocol_finished.fire()
-
     def execute_parallel(self, queue, n, input):
         """How to execute in parallel when there's a list of these vertices together."""
         self.execute()
@@ -489,50 +476,17 @@ class CompoundVertex(Vertex, PyironJobTypeRegistry):
         for _, vertex in self.graph.vertices.items():
             vertex.archive.clock = clock
 
-    def run_static(self):
-        """If this CompoundVertex is the highest level, it can be run as a regular pyiron job."""
-        self.status.running = True
-        self.execute()
-        self.status.collect = True  # Assume modal for now
-        self.run()  # This is an artifact of inheriting from GenericJob, to get all that run functionality
-
-    def run(self, run_again=False, repair=False, debug=False, run_mode=None, continue_run=False):
-        """A wrapper for the run which allows us to simply keep going with a new variable `continue_run`"""
-        if continue_run:
-            self.status.created = True
-        super(CompoundVertex, self).run(run_again=run_again, repair=repair, debug=debug, run_mode=run_mode)
-
-    def collect_output(self):
-        # Dear Reader: This feels like a hack, but it works. Sincerely, -Liam
-        self.to_hdf()
-
-    def write_input(self):
-        # Dear Reader: I looked at base/master/list and /parallel where this appears, but it's still not clear to me
-        # what I should be using this for. But, I get a NotImplementedError if I leave it out, so here it is. -Liam
-        pass
-
-    def to_hdf(self, hdf=None, group_name=None):
+    def to_hdf(self, hdf, group_name=None):
         """
         Store the Protocol in an HDF5 file.
 
         Args:
-            hdf (ProjectHDFio): HDF5 group object - optional
+            hdf (ProjectHDFio): HDF5 group object.
             group_name (str): HDF5 subgroup name - optional
         """
-
-        if hdf is None:
-            hdf = self.project_hdf5
-        if self._is_master:
-            GenericJob.to_hdf(self, hdf=hdf, group_name=group_name)
-            self.graph.to_hdf(hdf=hdf, group_name="graph")
-        else:
-            with hdf.open(self.name) as graph_hdf:
-                self.graph.to_hdf(hdf=graph_hdf, group_name="graph")
-        Vertex.to_hdf(self, hdf=hdf, group_name=group_name)
-        try:
-            hdf[group_name]["ismaster"] = self._is_master
-        except AttributeError:
-            hdf["ismaster"] = self._is_master
+        with hdf.open(self.name) as graph_hdf:
+            self.graph.to_hdf(hdf=graph_hdf, group_name="graph")
+        super(CompoundVertex, self).to_hdf(hdf=hdf, group_name=group_name)
 
     def from_hdf(self, hdf=None, group_name=None):
         """
@@ -542,15 +496,7 @@ class CompoundVertex(Vertex, PyironJobTypeRegistry):
             hdf (ProjectHDFio): HDF5 group object - optional
             group_name (str): HDF5 subgroup name - optional
         """
-        if hdf is None:
-            hdf = self.project_hdf5
-        try:
-            self._is_master = hdf[group_name]["ismaster"]
-        except AttributeError:
-            self._is_master = hdf["ismaster"]
-        if self._is_master:
-            GenericJob.from_hdf(self, hdf=hdf, group_name=group_name)
-        Vertex.from_hdf(self, hdf=hdf, group_name=group_name)
+        super(CompoundVertex, self).from_hdf(hdf=hdf, group_name=group_name)
         self.graph.from_hdf(hdf=hdf, group_name="graph")
         self.define_information_flow()  # Rewire pointers
 
@@ -695,6 +641,69 @@ class CompoundVertex(Vertex, PyironJobTypeRegistry):
         elif format == 'tree':
             # print the nice tree
             pptree(self.whitelist, file=file, name='%s.%s' % (self.name, 'whitelist'))
+
+
+class Protocol(CompoundVertex, GenericJob):
+    """
+
+    """
+
+    def __init__(self, project=None, job_name=None):
+        CompoundVertex.__init__(self, name=job_name)
+        GenericJob.__init__(self, project=project, job_name=job_name)
+        self._is_master = True
+
+    def execute(self):
+        super(Protocol, self).execute()
+        self.protocol_finished.fire()
+
+    def run_static(self):
+        """If this CompoundVertex is the highest level, it can be run as a regular pyiron job."""
+        self.status.running = True
+        self.execute()
+        self.status.collect = True  # Assume modal for now
+        self.run()  # This is an artifact of inheriting from GenericJob, to get all that run functionality
+
+    def run(self, run_again=False, repair=False, debug=False, run_mode=None, continue_run=False):
+        """A wrapper for the run which allows us to simply keep going with a new variable `continue_run`"""
+        if continue_run:
+            self.status.created = True
+        super(CompoundVertex, self).run(run_again=run_again, repair=repair, debug=debug, run_mode=run_mode)
+
+    def collect_output(self):
+        # Dear Reader: This feels like a hack, but it works. Sincerely, -Liam
+        self.to_hdf()
+
+    def write_input(self):
+        # Dear Reader: I looked at base/master/list and /parallel where this appears, but it's still not clear to me
+        # what I should be using this for. But, I get a NotImplementedError if I leave it out, so here it is. -Liam
+        pass
+
+    def to_hdf(self, hdf=None, group_name=None):
+        """
+        Store the Protocol in an HDF5 file.
+
+        Args:
+            hdf (ProjectHDFio): HDF5 group object - optional
+            group_name (str): HDF5 subgroup name - optional
+        """
+
+        if hdf is None:
+            hdf = self.project_hdf5
+        self.graph.to_hdf(hdf=hdf, group_name="graph")
+        super(CompoundVertex, self).to_hdf(hdf=hdf, group_name=group_name)
+
+    def from_hdf(self, hdf=None, group_name=None):
+        """
+        Load the Protocol from an HDF5 file.
+
+        Args:
+            hdf (ProjectHDFio): HDF5 group object - optional
+            group_name (str): HDF5 subgroup name - optional
+        """
+        if hdf is None:
+            hdf = self.project_hdf5
+        super(Protocol, self).from_hdf(hdf=hdf, group_name=group_name)
 
 
 class Graph(dict, LoggerMixin):

@@ -67,8 +67,8 @@ class MolecularDynamics(CompoundVertex):
         },
     }
 
-    def __init__(self, name=None):
-        CompoundVertex.__init__(self, name=name)
+    def __init__(self, **kwargs):
+        super(MolecularDynamics, self).__init__(**kwargs)
 
         # Protocol defaults
         id_ = self.input.default
@@ -155,5 +155,4 @@ class MolecularDynamics(CompoundVertex):
 
 class ProtocolMD(Protocol, MolecularDynamics):
     def __init__(self, project=None, job_name=None):
-        Protocol.__init__(self, project=project, job_name=job_name)
-        MolecularDynamics.__init__(self, name=job_name)
+        super(ProtocolMD, self).__init__(project=project, job_name=job_name)

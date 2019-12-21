@@ -92,8 +92,8 @@ class QMMM(CompoundVertex):
         },
     }
 
-    def __init__(self, name=None):
-        CompoundVertex.__init__(self, name=name)
+    def __init__(self, **kwargs):
+        super(QMMM, self).__init__(**kwargs)
 
         id_ = self.input.default
         id_.domain_ids = None

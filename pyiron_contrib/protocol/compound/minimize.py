@@ -59,8 +59,8 @@ class Minimize(CompoundVertex):
         }
     }
 
-    def __init__(self, name=None):
-        CompoundVertex.__init__(self, name=name)
+    def __init__(self, **kwargs):
+        super(Minimize, self).__init__(**kwargs)
 
         # Protocol defaults
         id_ = self.input.default
@@ -141,5 +141,4 @@ class Minimize(CompoundVertex):
 
 class ProtocolMinimize(Protocol, Minimize):
     def __init__(self, project=None, job_name=None):
-        Protocol.__init__(self, project=project, job_name=job_name)
-        Minimize.__init__(self, name=job_name)
+        super(ProtocolMinimize, self).__init__(project=project, job_name=job_name)

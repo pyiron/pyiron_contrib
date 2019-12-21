@@ -33,7 +33,7 @@ DEFAULT_WHITE_LIST_ATTRIBUTE_NAME = 'DefaultWhitelist'
 
 class Vertex(LoggerMixin, ABC):
     """
-    A parent class for objects which are valid vertices of our directed acyclic graph.
+    A parent class for objects which are valid vertices of a directed acyclic graph.
 
     Attributes:
         input (InputDictionary): A pointer-capable dictionary for inputs, including a sub-dictionary for defaults.
@@ -42,11 +42,14 @@ class Vertex(LoggerMixin, ABC):
         archive (IODictionary): A pointer-capable dictionary for sampling the history of inputs and outputs. (Default
             is a clean dictionary.)
         vertex_state (str): Which edge to follow out of this vertex. (Default is "next".)
-        possible_vertex_states (list[str]): Allowable exiting edge names. (Default is ["next"], one exit only!)
-        name (str): Vertex name.
-        n_history (int): The length of each list stored in the output dictionary.
+        possible_vertex_states (list[str]): Allowable exiting edge names. (Default is ["next"], one edge only!)
+        vertex_name (str): Vertex name. (Default is None, gets set automatically when if the vertex is being added to
+            a graph, or if the vertex is a Protocol being instantiated.)
+        n_history (int): The length of each list stored in the output dictionary. (Default is 1, keep only the most
+            recent output.)
         on (bool): Whether to execute the vertex when it is the active vertex of the graph, or simply skip over it.
             (default is True -- actually execute!)
+        graph_parent (Vertex): The object who owns the graph that this vertex resides in. (Default is None.)
 
     Input attributes:
         default (IODictionary): A dictionary for fall-back values in case a key is requested that isn't in the main
@@ -57,7 +60,11 @@ class Vertex(LoggerMixin, ABC):
         clock (int):
     """
 
-    def __init__(self, name=None):
+    def __init__(self, **kwargs):
+        try:  # Super magic when the inheritance path is just vertices
+            super(Vertex, self).__init__()
+        except TypeError:  # Super magic when the inheritance path includes GenericJob (i.e. for a Protocol)
+            super(Vertex, self).__init__(**kwargs)
         self.input = InputDictionary()
         self.output = IODictionary()
         self.archive = IODictionary()
@@ -70,9 +77,8 @@ class Vertex(LoggerMixin, ABC):
         self.archive.whitelist.output = IODictionary()
         self._vertex_state = "next"
         self.possible_vertex_states = ["next"]
-        self._name = None
-        self.name = name
-        self._n_history = 1
+        self.vertex_name = None
+        self.n_history = 1
         self.on = True
         self.graph_parent = None
 
@@ -80,7 +86,7 @@ class Vertex(LoggerMixin, ABC):
         return self._get_graph_location()[:-1]  # Cut the trailing underscore
 
     def _get_graph_location(self, loc=""):
-        new_loc = self.name + "_" + loc
+        new_loc = self.vertex_name + "_" + loc
         if self.graph_parent is None:
             return new_loc
         else:
@@ -95,23 +101,6 @@ class Vertex(LoggerMixin, ABC):
         if new_state not in self.possible_vertex_states:
             raise ValueError("New state not in list of possible states")
         self._vertex_state = new_state
-
-    @property
-    def name(self):
-        return self._name
-
-    @name.setter
-    def name(self, new_name):
-        self._name = new_name
-    # Pyiron was angry when Vertex set `self.name` in `from_hdf`, so we'll weasel around it
-
-    @property
-    def n_history(self):
-        return self._n_history
-
-    @n_history.setter
-    def n_history(self, n_hist):
-        self._n_history = n_hist
 
     @abstractmethod
     def execute(self):
@@ -264,7 +253,6 @@ class Vertex(LoggerMixin, ABC):
 
     def update_and_archive(self, output_data):
         self._update_output(output_data)
-        #if self.archive.clock % self.archive.period == 0:
         self._update_archive()
 
     def finish(self):
@@ -286,8 +274,8 @@ class Vertex(LoggerMixin, ABC):
             hdf["TYPE"] = str(type(self))
             hdf["possiblevertexstates"] = self.possible_vertex_states
             hdf["vertexstate"] = self.vertex_state
-            hdf["name"] = self.name
-            hdf["nhistory"] = self._n_history
+            hdf["vertexname"] = self.vertex_name
+            hdf["nhistory"] = self.n_history
             self.input.to_hdf(hdf=hdf, group_name="input")
             self.output.to_hdf(hdf=hdf, group_name="output")
             self.archive.to_hdf(hdf=hdf, group_name="archive")
@@ -296,8 +284,8 @@ class Vertex(LoggerMixin, ABC):
                 hdf5_server["TYPE"] = str(type(self))
                 hdf5_server["possiblevertexstates"] = self.possible_vertex_states
                 hdf5_server["vertexstate"] = self.vertex_state
-                hdf5_server["name"] = self.name
-                hdf5_server["nhistory"] = self._n_history
+                hdf5_server["vertexname"] = self.vertex_name
+                hdf5_server["nhistory"] = self.n_history
                 self.input.to_hdf(hdf=hdf5_server, group_name="input")
                 self.output.to_hdf(hdf=hdf5_server, group_name="output")
                 self.archive.to_hdf(hdf=hdf5_server, group_name="archive")
@@ -313,8 +301,8 @@ class Vertex(LoggerMixin, ABC):
         if group_name is None:
             self.possible_vertex_states = hdf["possiblevertexstates"]
             self._vertex_state = hdf["vertexstate"]
-            self._name = hdf["name"]
-            self._n_history = hdf["nhistory"]
+            self.vertex_name = hdf["vertexname"]
+            self.n_history = hdf["nhistory"]
             self.input.from_hdf(hdf=hdf, group_name="input")
             self.output.from_hdf(hdf=hdf, group_name="output")
             self.archive.from_hdf(hdf=hdf, group_name="archive")
@@ -322,8 +310,8 @@ class Vertex(LoggerMixin, ABC):
             with hdf.open(group_name) as hdf5_server:
                 self.possible_vertex_states = hdf5_server["possiblevertexstates"]
                 self._vertex_state = hdf5_server["vertexstate"]
-                self._name = hdf5_server["name"]
-                self._n_history = hdf5_server["nhistory"]
+                self.vertex_name = hdf5_server["vertexname"]
+                self.n_history = hdf5_server["nhistory"]
                 self.input.from_hdf(hdf=hdf5_server, group_name="input")
                 self.output.from_hdf(hdf=hdf5_server, group_name="output")
                 self.archive.from_hdf(hdf=hdf5_server, group_name="archive")
@@ -344,6 +332,9 @@ class PrimitiveVertex(Vertex):
     """
     Vertices which do one thing.
     """
+
+    def __init__(self, **kwargs):
+        super(PrimitiveVertex, self).__init__(**kwargs)
 
     def execute(self):
         """Just parse the input and do your physics, then store the output."""
@@ -375,8 +366,8 @@ class CompoundVertex(Vertex): #, PyironJobTypeRegistry):
         vertex_processed (Event):
         finished (bool):
     """
-    def __init__(self, name=None):
-        Vertex.__init__(self, name=name)
+    def __init__(self, **kwargs):
+        super(CompoundVertex, self).__init__(**kwargs)
 
         self.graph = Graph()
         self.graph.owner = self
@@ -407,16 +398,6 @@ class CompoundVertex(Vertex): #, PyironJobTypeRegistry):
             return getattr(cls, DEFAULT_WHITE_LIST_ATTRIBUTE_NAME)
         else:
             return None
-
-    @property
-    def n_history(self):
-        return self._n_history
-
-    @n_history.setter
-    def n_history(self, n_hist):
-        self._n_history = n_hist
-        for _, vertex in self.graph.vertices.items():
-            vertex.n_history = n_hist
 
     @abstractmethod
     def define_vertices(self):
@@ -451,10 +432,10 @@ class CompoundVertex(Vertex): #, PyironJobTypeRegistry):
             if isinstance(vertex_on, Pointer):
                 vertex_on = ~vertex_on
             if not vertex_on:
-                self.logger.info('Skipping vertex "{}":{}'.format(self.graph.active_vertex.name,
+                self.logger.info('Skipping vertex "{}":{}'.format(self.graph.active_vertex.vertex_name,
                                                                   type(self.graph.active_vertex).__name__))
                 continue
-            self.logger.info('Executing vertex "{}":{}'.format(self.graph.active_vertex.name,
+            self.logger.info('Executing vertex "{}":{}'.format(self.graph.active_vertex.vertex_name,
                                                                type(self.graph.active_vertex).__name__))
             self.vertex_processing.fire(self.graph.active_vertex)
             self.graph.active_vertex.execute()
@@ -484,7 +465,7 @@ class CompoundVertex(Vertex): #, PyironJobTypeRegistry):
             hdf (ProjectHDFio): HDF5 group object.
             group_name (str): HDF5 subgroup name - optional
         """
-        with hdf.open(self.name) as graph_hdf:
+        with hdf.open(self.vertex_name) as graph_hdf:
             self.graph.to_hdf(hdf=graph_hdf, group_name="graph")
         super(CompoundVertex, self).to_hdf(hdf=hdf, group_name=group_name)
 
@@ -543,7 +524,7 @@ class CompoundVertex(Vertex): #, PyironJobTypeRegistry):
         """
         for key, value in kwargs.items():
             if key not in self.graph.vertices:
-                self.logger.warning('Cannot set the whitelist of vertex "%s" since it is no a part of protocol "%s' % (key, self.name))
+                self.logger.warning('Cannot set the whitelist of vertex "%s" since it is no a part of protocol "%s' % (key, self.vertex_name))
                 continue
             vertex = self.graph.vertices[key]
             vertex._set_archive_whitelist(archive, **value)
@@ -578,7 +559,7 @@ class CompoundVertex(Vertex): #, PyironJobTypeRegistry):
         for key, vertex_dict in dictionary.items():
             if key not in self.graph.vertices:
                 self.logger.warning(
-                    'Cannot set the whitelist of vertex "%s" since it is no a part of protocol "%s' % (key, self.name))
+                    'Cannot set the whitelist of vertex "%s" since it is no a part of protocol "%s' % (key, self.vertex_name))
                 continue
             vertex = self.graph.vertices[key]
             # call it for each vertex
@@ -603,11 +584,11 @@ class CompoundVertex(Vertex): #, PyironJobTypeRegistry):
                 vertex.archive.whitelist.input.clear()
                 vertex.archive.whitelist.output.clear()
             self.whitelist = self.default_whitelist
-            self.logger.debug('Whitelist configured for protocol "%s"' % self.name)
+            self.logger.debug('Whitelist configured for protocol "%s"' % self.vertex_name)
 
     def format_whitelist(self, format='tree', file=sys.stdout):
         if format == 'code':
-            start = [self.name, 'graph']
+            start = [self.vertex_name, 'graph']
             path_format = '{path} = {value}\n'
             for vertex_name, conf in self.whitelist.items():
                 vertex_path = start + [vertex_name, 'archive', 'whitelist']
@@ -640,7 +621,7 @@ class CompoundVertex(Vertex): #, PyironJobTypeRegistry):
             file.write(print_tree(self.whitelist))
         elif format == 'tree':
             # print the nice tree
-            pptree(self.whitelist, file=file, name='%s.%s' % (self.name, 'whitelist'))
+            pptree(self.whitelist, file=file, name='%s.%s' % (self.vertex_name, 'whitelist'))
 
 
 class Protocol(CompoundVertex, GenericJob):
@@ -649,9 +630,8 @@ class Protocol(CompoundVertex, GenericJob):
     """
 
     def __init__(self, project=None, job_name=None):
-        CompoundVertex.__init__(self, name=job_name)
-        GenericJob.__init__(self, project=project, job_name=job_name)
-        self._is_master = True
+        super(Protocol, self).__init__(project=project, job_name=job_name)
+        self.vertex_name = job_name
 
     def execute(self):
         super(Protocol, self).execute()
@@ -750,7 +730,7 @@ class Graph(dict, LoggerMixin):
             else:
                 self[key] = val
         elif isinstance(val, Vertex):
-            val.name = key
+            val.vertex_name = key
             val.graph_parent = self.owner
             self.vertices[key] = val
             self.edges.initialize(val)
@@ -848,7 +828,7 @@ class Graph(dict, LoggerMixin):
                         vertex_end = self._edge_from_pointer(key, value)
                         if vertex_end is not None:
                             if isinstance(vertex_end, Vertex):
-                                workflow.edge(vertex_end.name, vertex_name, label=key, **dataflow_edge_style)
+                                workflow.edge(vertex_end.vertex_name, vertex_name, label=key, **dataflow_edge_style)
                             elif isinstance(vertex_end, (IODictionary, Vertex)):
                                 self.logger.warning('vertex_end is IODIctionary() I have to decide what to do')
                                 if protocol_input_node is None:
@@ -912,7 +892,7 @@ class Graph(dict, LoggerMixin):
         vertex = self.active_vertex
         if vertex is not None:
             state = vertex.vertex_state
-            next_vertex_name = self.edges[vertex.name][state]
+            next_vertex_name = self.edges[vertex.vertex_name][state]
 
             if next_vertex_name is None:
                 self.active_vertex = None
@@ -929,23 +909,23 @@ class Graph(dict, LoggerMixin):
             state (str): The state for the vertex to be in when it points to this particular end. (Default, "next", is
                 the parent-level state for vertices without multiple outbound edges.)
         """
-        if start.name not in self.vertices.keys():
-            raise ValueError("The vertex {} was not found among graph vertices, {}".format(start.name,
+        if start.vertex_name not in self.vertices.keys():
+            raise ValueError("The vertex {} was not found among graph vertices, {}".format(start.vertex_name,
                                                                                            self.vertices.keys()))
 
         if state not in start.possible_vertex_states:
             raise ValueError("{} not found in possible vertex states for {}, {}".format(
                 state,
-                start.name,
+                start.vertex_name,
                 start.possible_vertex_states
             ))
 
         if end is not None:
-            if end.name not in self.vertices.keys():
-                raise ValueError("{} is not among vertices, {}".format(end.name, self.vertices.keys()))
-            self.edges[start.name][state] = end.name
+            if end.vertex_name not in self.vertices.keys():
+                raise ValueError("{} is not among vertices, {}".format(end.vertex_name, self.vertices.keys()))
+            self.edges[start.vertex_name][state] = end.vertex_name
         else:
-            self.edges[start.name][state] = None
+            self.edges[start.vertex_name][state] = None
 
     def make_pipeline(self, *args):
         """
@@ -969,15 +949,15 @@ class Graph(dict, LoggerMixin):
     def to_hdf(self, hdf, group_name="graph"):
         with hdf.open(group_name) as hdf5_server:
             hdf5_server["TYPE"] = str(type(self))
-            hdf5_server["startingvertexname"] = self.starting_vertex.name
+            hdf5_server["startingvertexname"] = self.starting_vertex.vertex_name
             if self.active_vertex is not None:
-                hdf5_server["activevertexname"] = self.active_vertex.name
+                hdf5_server["activevertexname"] = self.active_vertex.vertex_name
             else:
                 hdf5_server["activevertexname"] = None
             if self.restarting_vertex is None:
-                hdf5_server["restartingvertexname"] = self.starting_vertex.name
+                hdf5_server["restartingvertexname"] = self.starting_vertex.vertex_name
             else:
-                hdf5_server["restartingvertexname"] = self.restarting_vertex.name
+                hdf5_server["restartingvertexname"] = self.restarting_vertex.vertex_name
             self.vertices.to_hdf(hdf=hdf5_server, group_name="vertices")
             self.edges.to_hdf(hdf=hdf5_server, group_name="edges")
 
@@ -1049,7 +1029,7 @@ class Edges(dict):
         Args:
             vertex (Vertex): The vertex to assign an edge to.
         """
-        name = vertex.name
+        name = vertex.vertex_name
         if isinstance(vertex, Vertex):
             self[name] = {}
             for state in vertex.possible_vertex_states:

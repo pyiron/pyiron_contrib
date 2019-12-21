@@ -66,8 +66,8 @@ class NEB(CompoundVertex):
         },
     }
 
-    def __init__(self, name=None):
-        CompoundVertex.__init__(self, name=name)
+    def __init__(self, **kwargs):
+        super(NEB, self).__init__(**kwargs)
 
         # Protocol defaults
         id_ = self.input.default
@@ -227,5 +227,4 @@ class NEBParallel(NEB):
 
 class ProtocolNEB(Protocol, NEB):
     def __init__(self, project=None, job_name=None):
-        Protocol.__init__(self, project=project, job_name=job_name)
-        NEB.__init__(self, name=job_name)
+        super(ProtocolNEB, self).__init__(project=project, job_name=job_name)

@@ -47,15 +47,17 @@ class ListVertex(PrimitiveVertex):
         n_children (int): How many children to create.
     """
 
-    def __init__(self, child_type, name=None):
-        super(ListVertex, self).__init__(name=name)
+    def __init__(self, child_type):
         if not issubclass(child_type, Vertex):
-            raise TypeError('CommandList children must inherit from Protocol.')
+            raise TypeError('ListVertex children must inherit from Protocol.')
+        self.children = None  # Ahead of super so the n_history call doesn't trigger the setter and find no children
+        super(ListVertex, self).__init__()
         self.child_type = child_type
         self._initialized = False
         self.direct = InputDictionary()
         self.broadcast = InputDictionary()
-        self.children = None
+        self._n_history = None
+        self.n_history = 1
 
     @abstractmethod
     def command(self, n_children):
@@ -70,8 +72,9 @@ class ListVertex(PrimitiveVertex):
         children = [self.child_type(name="child_{}".format(n)) for n in range(n_children)]
 
         # Locate children in graph
-        for child in children:
+        for n, child in enumerate(children):
             child.graph_parent = self
+            child.vertex_name = "child_{}".format(n)
 
         # Link input to input.direct
         for key in list(self.direct.keys()):
@@ -153,8 +156,8 @@ class ParallelList(ListVertex):
         queue (multiprocessing.Queue): The queue used for collecting output from the subprocesses. (Instantiation and
             closing are handled by default in `__init__` and `finish`.)
     """
-    def __init__(self, child_type, name=None):
-        super(ParallelList, self).__init__(child_type, name=name)
+    def __init__(self, child_type):
+        super(ParallelList, self).__init__(child_type)
         self.queue = Queue()
 
     def command(self, n_children):
@@ -198,6 +201,8 @@ class SerialList(ListVertex):
     """
     A list of commands which are run in serial.
     """
+    def __init__(self, child_type):
+        super(SerialList, self).__init__(child_type=child_type)
 
     def command(self, n_children):
         """This controls how the commands are run and is about logistics."""
@@ -215,6 +220,8 @@ class AutoList(ParallelList, SerialList):
     """
     Choose between `SerialList` and `ParallelList` depending on the nature of the children.
     """
+    def __init__(self, child_type):
+        super(AutoList, self).__init__(child_type=child_type)
 
     def _is_expensive(self):
         try:

@@ -157,4 +157,3 @@ class ProtocolMD(Protocol, MolecularDynamics):
     def __init__(self, project=None, job_name=None):
         Protocol.__init__(self, project=project, job_name=job_name)
         MolecularDynamics.__init__(self, name=job_name)
-

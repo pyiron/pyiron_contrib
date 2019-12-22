@@ -226,5 +226,4 @@ class NEBParallel(NEB):
 
 
 class ProtocolNEB(Protocol, NEB):
-    def __init__(self, project=None, job_name=None):
-        super(ProtocolNEB, self).__init__(project=project, job_name=job_name)
+    pass

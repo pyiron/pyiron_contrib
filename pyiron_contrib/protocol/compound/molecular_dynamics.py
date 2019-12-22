@@ -154,5 +154,4 @@ class MolecularDynamics(CompoundVertex):
 
 
 class ProtocolMD(Protocol, MolecularDynamics):
-    def __init__(self, project=None, job_name=None):
-        super(ProtocolMD, self).__init__(project=project, job_name=job_name)
+    pass

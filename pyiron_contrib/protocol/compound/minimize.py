@@ -140,5 +140,4 @@ class Minimize(CompoundVertex):
 
 
 class ProtocolMinimize(Protocol, Minimize):
-    def __init__(self, project=None, job_name=None):
-        super(ProtocolMinimize, self).__init__(project=project, job_name=job_name)
+    pass

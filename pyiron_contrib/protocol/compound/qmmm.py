@@ -625,6 +625,4 @@ class PartitionStructure(PrimitiveVertex):
 
 
 class ProtocolQMMM(Protocol, QMMM):
-    def __init__(self, project=None, job_name=None):
-        Protocol.__init__(self, project=project, job_name=job_name)
-        QMMM.__init__(self, name=job_name)
+    pass

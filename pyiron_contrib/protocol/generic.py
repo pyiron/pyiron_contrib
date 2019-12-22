@@ -324,9 +324,6 @@ class PrimitiveVertex(Vertex):
     Vertices which do not contain their a sub-graph but directly produce output from input.
     """
 
-    def __init__(self, **kwargs):
-        super(PrimitiveVertex, self).__init__(**kwargs)
-
     def execute(self):
         """Just parse the input and do your physics, then store the output."""
         output_data = self.command(**self.input.resolve())

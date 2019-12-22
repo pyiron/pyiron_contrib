@@ -68,7 +68,6 @@ class Vertex(LoggerMixin, ABC):
         self.input = InputDictionary()
         self.output = IODictionary()
         self.archive = IODictionary()
-        self.archive.period = inf
         self.archive.clock = 0
         self.archive.output = IODictionary()
         self.archive.input = IODictionary()
@@ -437,14 +436,13 @@ class CompoundVertex(Vertex): #, PyironJobTypeRegistry):
         """How to execute in parallel when there's a list of these vertices together."""
         self.execute()
         queue.put((n, self.get_output()))
+        queue.put((n, self.get_output()))
 
-    def set_graph_archive_period(self, period):
-        for _, vertex in self.graph.vertices.items():
-            vertex.archive.period = period
-
-    def set_graph_archive_clock(self, clock):
+    def set_graph_archive_clock(self, clock, recursive=False):
         for _, vertex in self.graph.vertices.items():
             vertex.archive.clock = clock
+            if recursive and isinstance(vertex, CompoundVertex):
+                vertex.set_graph_archive_clock(clock, recursive=True)
 
     def to_hdf(self, hdf, group_name=None):
         """

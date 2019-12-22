@@ -270,25 +270,19 @@ class Vertex(LoggerMixin, ABC):
             hdf (ProjectHDFio): HDF5 group object
             group_name (str): HDF5 subgroup name
         """
-        if group_name is None:
-            hdf["TYPE"] = str(type(self))
-            hdf["possiblevertexstates"] = self.possible_vertex_states
-            hdf["vertexstate"] = self.vertex_state
-            hdf["vertexname"] = self.vertex_name
-            hdf["nhistory"] = self.n_history
-            self.input.to_hdf(hdf=hdf, group_name="input")
-            self.output.to_hdf(hdf=hdf, group_name="output")
-            self.archive.to_hdf(hdf=hdf, group_name="archive")
+        if group_name is not None:
+            hdf5_server = hdf.open(group_name)
         else:
-            with hdf.open(group_name) as hdf5_server:
-                hdf5_server["TYPE"] = str(type(self))
-                hdf5_server["possiblevertexstates"] = self.possible_vertex_states
-                hdf5_server["vertexstate"] = self.vertex_state
-                hdf5_server["vertexname"] = self.vertex_name
-                hdf5_server["nhistory"] = self.n_history
-                self.input.to_hdf(hdf=hdf5_server, group_name="input")
-                self.output.to_hdf(hdf=hdf5_server, group_name="output")
-                self.archive.to_hdf(hdf=hdf5_server, group_name="archive")
+            hdf5_server = hdf
+
+        hdf5_server["TYPE"] = str(type(self))
+        hdf5_server["possiblevertexstates"] = self.possible_vertex_states
+        hdf5_server["vertexstate"] = self.vertex_state
+        hdf5_server["vertexname"] = self.vertex_name
+        hdf5_server["nhistory"] = self.n_history
+        self.input.to_hdf(hdf=hdf5_server, group_name="input")
+        self.output.to_hdf(hdf=hdf5_server, group_name="output")
+        self.archive.to_hdf(hdf=hdf5_server, group_name="archive")
 
     def from_hdf(self, hdf, group_name=None):
         """
@@ -298,34 +292,29 @@ class Vertex(LoggerMixin, ABC):
             hdf (ProjectHDFio): HDF5 group object
             group_name (str): HDF5 subgroup name
         """
-        if group_name is None:
-            self.possible_vertex_states = hdf["possiblevertexstates"]
-            self._vertex_state = hdf["vertexstate"]
-            self.vertex_name = hdf["vertexname"]
-            self.n_history = hdf["nhistory"]
-            self.input.from_hdf(hdf=hdf, group_name="input")
-            self.output.from_hdf(hdf=hdf, group_name="output")
-            self.archive.from_hdf(hdf=hdf, group_name="archive")
+        if group_name is not None:
+            hdf5_server = hdf.open(group_name)
         else:
-            with hdf.open(group_name) as hdf5_server:
-                self.possible_vertex_states = hdf5_server["possiblevertexstates"]
-                self._vertex_state = hdf5_server["vertexstate"]
-                self.vertex_name = hdf5_server["vertexname"]
-                self.n_history = hdf5_server["nhistory"]
-                self.input.from_hdf(hdf=hdf5_server, group_name="input")
-                self.output.from_hdf(hdf=hdf5_server, group_name="output")
-                self.archive.from_hdf(hdf=hdf5_server, group_name="archive")
+            hdf5_server = hdf
 
-                # sort the dictionaries after loading, do it for both input and output dictionaries
-                for archive_name in ('input', 'output'):
-                    archive = getattr(self.archive, archive_name)
-                    for key in archive.keys():
-                        history = archive[key]
-                        # create an ordered dictionary from it, convert it to integer back again
-                        archive[key] = TimelineDict(
-                            sorted(history.items(),
-                                   key=lambda item: int(item[0].replace('t_', '')))
-                        )
+        self.possible_vertex_states = hdf5_server["possiblevertexstates"]
+        self._vertex_state = hdf5_server["vertexstate"]
+        self.vertex_name = hdf5_server["vertexname"]
+        self.n_history = hdf5_server["nhistory"]
+        self.input.from_hdf(hdf=hdf5_server, group_name="input")
+        self.output.from_hdf(hdf=hdf5_server, group_name="output")
+        self.archive.from_hdf(hdf=hdf5_server, group_name="archive")
+
+        # sort the dictionaries after loading, do it for both input and output dictionaries
+        for archive_name in ('input', 'output'):
+            archive = getattr(self.archive, archive_name)
+            for key in archive.keys():
+                history = archive[key]
+                # create an ordered dictionary from it, convert it to integer back again
+                archive[key] = TimelineDict(
+                    sorted(history.items(),
+                           key=lambda item: int(item[0].replace('t_', '')))
+                )
 
 
 class PrimitiveVertex(Vertex):

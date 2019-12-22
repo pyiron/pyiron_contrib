@@ -140,7 +140,7 @@ class ExternalHamiltonian(PrimitiveVertex):
         self.input.default.interesting_keys = ['forces', 'energy_pot']
         self.input.default.positions = None
 
-        self._fast_lammps_mode = False  # Set to false only to intentionally be slow for comparison purposes
+        self._fast_lammps_mode = True  # Set to false only to intentionally be slow for comparison purposes
         self._job = None
         self._job_project_path = None
         self._job_name = None

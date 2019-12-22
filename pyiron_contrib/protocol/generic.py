@@ -56,8 +56,9 @@ class Vertex(LoggerMixin, ABC):
             input dictionary.
 
     Archive attributes:
-        period (int): How frequently to store input and output in the archive. Stores when `clock` % `period` = 0.
-        clock (int):
+        whitelist (IODictionary): A nested dictionary of periods for archiving input and output values. Stores on
+            executions where `clock % period = 0`.
+        clock (int): The timer for whether whether or not input/output should be archived to hdf5.
     """
 
     def __init__(self, **kwargs):
@@ -131,7 +132,7 @@ class Vertex(LoggerMixin, ABC):
             # disables the archiveing of input.structure but keeps forces
         ```
         Args:
-            dictionary: (dict) the whitelist specification
+            dictionary (dict): The whitelist specification.
         """
         for k, v in dictionary.items():
             if k not in ('input', 'output'):
@@ -146,11 +147,11 @@ class Vertex(LoggerMixin, ABC):
 
     def _set_archive_whitelist(self, archive, **kwargs):
         """
-        whitelist properties of either "input" or "output" archive and set their dump frequence
+        Whitelist properties of either "input" or "output" archive and set their dump period.
 
         Args:
-            archive: (str) either input or output
-            **kwargs: property names, values should be positive integers, specifies the dump freq, None = inf = < 0
+            archive (str): either 'input' or 'output'.
+            **kwargs: property names, values should be positive integers, specifies the dump freq, None = inf = < 0.
 
         """
         for k, v in kwargs.items():
@@ -163,9 +164,9 @@ class Vertex(LoggerMixin, ABC):
         If keys is a list of property names, "n" will be set a s archiving period only for those
 
         Args:
-            archive: (str) either input or output
-            n: (int) dump at every "n" steps
-            keys: (list of str) the affected keys
+            archive (str): Either 'input' or 'output'.
+            n (int): Dump at every `n` steps
+            keys (list of str): The affected keys
 
         """
         if keys is None:
@@ -210,9 +211,11 @@ class Vertex(LoggerMixin, ABC):
                             last_val = ordered_dict_get_last(self.archive.input[key])
                             if not Comparer(last_val) == value:
                                 self.archive.input[key][history_key] = value
-                                self.logger.info('Property "%s" did change in input (%s -> %s)' % (key, last_val, value))
+                                self.logger.info('Property "{}" did change in input ({} -> {})'.format(
+                                    key, last_val, value
+                                ))
                             else:
-                                self.logger.info('Property "%s" did not change in input' % key)
+                                self.logger.info('Property "{}" did not change in input'.format(key))
 
         # Update output
         for key, value in self.output.items():
@@ -232,7 +235,7 @@ class Vertex(LoggerMixin, ABC):
                             if not Comparer(last_val) == val:
                                 self.archive.output[key][history_key] = val
                             else:
-                                self.logger.info('Property "%s" did not change in input' % key)
+                                self.logger.info('Property "{}" did not change in input'.format(key))
 
     def _update_output(self, output_data):
         if output_data is None:
@@ -266,8 +269,8 @@ class Vertex(LoggerMixin, ABC):
         Store the Vertex in an HDF5 file.
 
         Args:
-            hdf (ProjectHDFio): HDF5 group object
-            group_name (str): HDF5 subgroup name
+            hdf (ProjectHDFio): HDF5 group object.
+            group_name (str): HDF5 subgroup name. (Default is None.)
         """
         if group_name is not None:
             hdf5_server = hdf.open(group_name)
@@ -288,8 +291,8 @@ class Vertex(LoggerMixin, ABC):
         Load the Vertex from an HDF5 file.
 
         Args:
-            hdf (ProjectHDFio): HDF5 group object
-            group_name (str): HDF5 subgroup name
+            hdf (ProjectHDFio): HDF5 group object.
+            group_name (str): HDF5 subgroup name. (Default is None.)
         """
         if group_name is not None:
             hdf5_server = hdf.open(group_name)
@@ -318,7 +321,7 @@ class Vertex(LoggerMixin, ABC):
 
 class PrimitiveVertex(Vertex):
     """
-    Vertices which do one thing.
+    Vertices which do not contain their a sub-graph but directly produce output from input.
     """
 
     def __init__(self, **kwargs):
@@ -343,8 +346,7 @@ class PrimitiveVertex(Vertex):
 
 class CompoundVertex(Vertex): #, PyironJobTypeRegistry):
     """
-    Can either be the parent graph to execute (when given a project and job name at instantiation, e.g. when created as
-    a pyiron job), or a vertex which contains its own graph and has its own sub-vertices.
+    Vertices which contain a graph and produce output only after traversing their graph to its exit point.
 
     Input:
         graph (Graph): The graph of vertices to traverse.
@@ -389,18 +391,26 @@ class CompoundVertex(Vertex): #, PyironJobTypeRegistry):
 
     @abstractmethod
     def define_vertices(self):
+        """Add child vertices to the graph."""
         pass
 
     @abstractmethod
     def define_execution_flow(self):
+        """Wire the logic for traversing the graph edges."""
         pass
 
     @abstractmethod
     def define_information_flow(self):
+        """Connect input and output information inside the graph. Also set the archive clock for all vertices."""
         pass
 
     @abstractmethod
     def get_output(self):
+        """
+        Define the output dictionary to be returned when the graph traversal completes. This synchronizes the
+        behaviour of primitive vertices and compound vertices when they themselves are the child vertex in another
+        graph.
+        """
         pass
 
     def execute(self):
@@ -613,7 +623,16 @@ class CompoundVertex(Vertex): #, PyironJobTypeRegistry):
 
 class Protocol(CompoundVertex, GenericJob):
     """
+    A parent class for compound vertices which are being instantiated as regular pyiron jobs, i.e. the highest level
+    graph in their context.
 
+    Example: if `X` inherits from `CompoundVertex` and performs the desired logic, then
+    ```
+    class ProtocolX(Protocol, X):
+        pass
+    ```
+    can be added to the `pyiron_contrib`-level `__init__` file and jobs performing X-logic can be instantiated with
+    in a project `pr` with the name `job_name` using `pr.create_job(pr.job_type.ProtocolX, job_name)`.
     """
 
     def __init__(self, project=None, job_name=None):

@@ -1,4 +1,3 @@
-from pyiron_contrib.protocol.generic import Protocol
 from pyiron_contrib.protocol.compound.minimize import ProtocolMinimize
 from pyiron_contrib.protocol.compound.molecular_dynamics import ProtocolMD
 from pyiron_contrib.protocol.compound.nudged_elastic_band import ProtocolNEB
@@ -11,7 +10,6 @@ from pyiron_contrib.protocol.compound.qmmm import ProtocolQMMM
 # from pyiron_contrib.protocol.utils.types import PyironJobTypeRegistryMetaType
 # PyironJobTypeRegistryMetaType.inject_dynamic_types()
 __all__ = [
-    'Protocol',
     'ProtocolMinimize',
     'ProtocolMD',
     'ProtocolNEB',

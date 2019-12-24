@@ -885,7 +885,6 @@ class VerletPositionUpdate(VerletParent):
     def command(self, positions, velocities, forces, masses, time_step, temperature, temperature_damping_timescale):
         masses = self.reshape_masses(masses)
         acceleration = self.convert_to_acceleration(forces, masses)
-
         vel_half = velocities + 0.5 * acceleration * time_step
         if temperature_damping_timescale is not None:
             vel_half += self.langevin_delta_v(

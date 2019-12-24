@@ -5,6 +5,7 @@ from pyiron_contrib.protocol.compound.nudged_elastic_band import ProtocolNEB
 # from pyiron_contrib.protocol.compound.finite_temperature_string import StringRelaxation, VirtualWork, \
 #     Milestoning, VirtualWorkParallel, VirtualWorkSerial, VirtualWorkFullStep
 from pyiron_contrib.protocol.compound.qmmm import ProtocolQMMM
+from pyiron_contrib.protocol.compound.tild import ProtocolHarmonicTILD, ProtocolHarmonicTILDParallel
 
 # protocol is a magic class after this one we have to Register
 # from pyiron_contrib.protocol.utils.types import PyironJobTypeRegistryMetaType
@@ -13,5 +14,6 @@ __all__ = [
     'ProtocolMinimize',
     'ProtocolMD',
     'ProtocolNEB',
-    'ProtocolQMMM'
+    'ProtocolQMMM',
+    'ProtocolHarmonicTILD', 'ProtocolHarmonicTILDParallel',
 ]

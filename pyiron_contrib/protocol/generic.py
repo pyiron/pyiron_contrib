@@ -430,10 +430,7 @@ class CompoundVertex(Vertex): #, PyironJobTypeRegistry):
                 self.logger.info('Skipping vertex "{}":{}'.format(self.graph.active_vertex.vertex_name,
                                                                   type(self.graph.active_vertex).__name__))
                 self.graph.step()
-            self.logger.info('Executing vertex "{}":{}'.format(self.graph.active_vertex.vertex_name,
-                                                               type(self.graph.active_vertex).__name__))
             self.vertex_processing.fire(self.graph.active_vertex)
-            self.logger.warning("Executing {} in {}".format(self.graph.active_vertex.vertex_name, self.vertex_name))
             self.graph.active_vertex.execute()
             self.vertex_processed.fire(self.graph.active_vertex)
             self.graph.step()
@@ -443,7 +440,6 @@ class CompoundVertex(Vertex): #, PyironJobTypeRegistry):
     def execute_parallel(self, queue, n, input):
         """How to execute in parallel when there's a list of these vertices together."""
         self.execute()
-        queue.put((n, self.get_output()))
         queue.put((n, self.get_output()))
 
     def set_graph_archive_clock(self, clock, recursive=False):
@@ -671,7 +667,6 @@ class Protocol(CompoundVertex, GenericJob):
             hdf (ProjectHDFio): HDF5 group object - optional
             group_name (str): HDF5 subgroup name - optional
         """
-        self.logger.warning("To hdf")
         if hdf is None:
             hdf = self.project_hdf5
         self.graph.to_hdf(hdf=hdf, group_name="graph")

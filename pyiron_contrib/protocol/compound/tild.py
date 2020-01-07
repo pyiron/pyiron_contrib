@@ -655,8 +655,8 @@ class HarmonicallyCoupled(CompoundVertex):
         g.harmonic.input.pbc = ip.structure.pbc
 
         g.mix.input.vectors = [
-            gp.calc_static.output.energy_pot[-1],
-            gp.harmonic.output.energy_pot[-1]
+            gp.calc_static.output.forces[-1],
+            gp.harmonic.output.forces[-1]
         ]
         g.mix.input.weights = ip.coupling_weights
 
@@ -681,5 +681,4 @@ class HarmonicallyCoupled(CompoundVertex):
         }
 
     def parallel_setup(self):
-        self.logger.warning("Parallel setup for {}".format(self.vertex_name))
         self.graph.calc_static._initialize(self.input.ref_job_full_path, self.input.structure)

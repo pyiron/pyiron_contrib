@@ -178,15 +178,17 @@ class ParallelList(ListVertex):
             jobs.append(job)
             job.start()
 
-        # And then grab their output...in order?
-        for _ in jobs:
-            n, child_output = self.queue.get()
-            self.children[n].update_and_archive(child_output)
-
         # Wait for everything to finish
         for job in jobs:
             job.join()
-        # (I'm not even sure that I need this)
+        # It works fine without this, but I don't fully understand why
+        # Since there's no significant cost to add the join, I thought it's safer to be explicit
+
+        # And then grab their output
+        # (n.b. the queue might be disordered, but we've made sure we have access to child number)
+        for _ in jobs:
+            n, child_output = self.queue.get()
+            self.children[n].update_and_archive(child_output)
 
         # Parse output as usual
         output_data = self._extract_output_data_from_children()

@@ -7,10 +7,9 @@ import sys
 from pyiron.base.job.generic import GenericJob
 from pyiron_contrib.protocol.utils import IODictionary, InputDictionary, LoggerMixin, Event, EventHandler, \
     Pointer, CrumbType, ordered_dict_get_last, Comparer, TimelineDict
-from pyiron_contrib.protocol.utils.types import PyironJobTypeRegistry
+# from pyiron_contrib.protocol.utils.types import PyironJobTypeRegistry
 from pyiron_contrib.protocol.utils.pptree import print_tree as pptree
-from abc import ABC, abstractmethod, ABCMeta
-from numpy import inf
+from abc import ABC, abstractmethod
 
 
 """

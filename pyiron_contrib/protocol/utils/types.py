@@ -80,7 +80,7 @@ class PyironJobTypeRegistryMetaType(ABCMeta):
         class_module = cls.__module__
         key = (class_module, class_name)
         # construct the new class name
-        new_class_name = '%s%s%s' % (class_name, 'Protocol', hex(abs(hash(class_name))))
+        new_class_name = class_name
         # we place a `__artificial__` attribute in the type information to indicate that it is a dynamically created type
         # when calling `type(new_class_name, new_bases, new_spec)` we construct a subclass of cls, thus it is a
         # recsursive call to this method, we have to avoid that

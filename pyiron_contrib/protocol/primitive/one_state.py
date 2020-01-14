@@ -192,7 +192,6 @@ class ExternalHamiltonian(PrimitiveVertex):
 
         if isinstance(job, GenericInteractive):
             job.interactive_open()
-            job.interactive_initialize_interface()
 
             if isinstance(job, LammpsInteractive) and self._fast_lammps_mode:
                 # Note: This might be done by default at some point in LammpsInteractive, and could then be removed here

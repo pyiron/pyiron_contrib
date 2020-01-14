@@ -126,12 +126,12 @@ class ExternalHamiltonian(PrimitiveVertex):
 
     Input attributes:
         ref_job_full_path (string): The full path to the hdf5 file of the job to use as a reference template.
-        structure (Atoms): Overwrites the reference job structure when provided. (Default is None, the reference job
-            needs to have its structure set.)
+        structure (Atoms): The structure for initializing the external Hamiltonian. Overwrites the reference job
+            structure when provided. (Default is None, the reference job needs to have its structure set.)
         interesting_keys (list[str]): String codes for output properties of the underlying job to collect. (Default is
             ['forces', 'energy_pot'].)
-        positions (numpy.ndarray): New positions to evaluate. (Not set by default, only necessary if positions are being
-            updated.)
+        positions (numpy.ndarray): New positions to evaluate. Shape must match the shape of the structure. (Not set by
+            default, only necessary if positions are being updated.)
     """
 
     def __init__(self, name=None):
@@ -142,12 +142,16 @@ class ExternalHamiltonian(PrimitiveVertex):
 
         self._fast_lammps_mode = True  # Set to false only to intentionally be slow for comparison purposes
         self._job = None
+        self._job_project_path = None
+        self._job_name = None
 
     def command(self, ref_job_full_path, structure, interesting_keys, positions):
-        if self._job is None:
+        if self._job_project_path is None:
             self._initialize(ref_job_full_path, structure)
-        elif self._job.status == 'finished':
-            # The interactive library needs to be reopened
+        elif self._job is None:
+            self._reload()
+        elif not self._job.interactive_is_activated():
+            self._job.status.running = True
             self._job.interactive_open()
             self._job.interactive_initialize_interface()
 
@@ -155,12 +159,14 @@ class ExternalHamiltonian(PrimitiveVertex):
             # Run Lammps 'efficiently'
             if positions is not None:
                 self._job.interactive_positions_setter(positions)
+
             self._job._interactive_lib_command(self._job._interactive_run_command)
         elif isinstance(self._job, GenericInteractive):
             # DFT codes are slow enough that we can run them the regular way and not care
             # Also we might intentionally run Lammps slowly for comparison purposes
             if positions is not None:
                 self._job.structure.positions = positions
+
             self._job.calc_static()
             self._job.run()
         else:
@@ -173,15 +179,20 @@ class ExternalHamiltonian(PrimitiveVertex):
         name = loc + '_job'
         project_path, ref_job_path = split(ref_job_full_path)
         pr = Project(path=project_path)
-        sub_pr = pr.create_group(loc)
-        # sub directory is necessary so jobs don't fight for the same `rewrite_hdf` space
         ref_job = pr.load(ref_job_path)
-        job = ref_job.copy_template(project=sub_pr, new_job_name=name)
+        job = ref_job.copy_to(
+            project=pr,
+            new_job_name=name,
+            input_only=True,
+            new_database_entry=True
+        )
+
         if structure is not None:
             job.structure = structure
 
         if isinstance(job, GenericInteractive):
             job.interactive_open()
+            job.interactive_initialize_interface()
 
             if isinstance(job, LammpsInteractive) and self._fast_lammps_mode:
                 # Note: This might be done by default at some point in LammpsInteractive, and could then be removed here
@@ -191,13 +202,21 @@ class ExternalHamiltonian(PrimitiveVertex):
 
             job.calc_static()
             job.run(run_again=True)
-            # job.interactive_initialize_interface()
             # TODO: Running is fine for Lammps, but wasteful for DFT codes! Get the much cheaper interface
             #  initialization working -- right now it throws a (passive) TypeError due to database issues
         else:
             raise TypeError('Job of class {} is not compatible.'.format(ref_job.__class__))
         self._job = job
         self._job_name = name
+        self._job_project_path = project_path
+
+    def _reload(self):
+        pr = Project(path=self._job_project_path)
+        self._job = pr.load(self._job_name)
+        self._job.interactive_open()
+        self._job.interactive_initialize_interface()
+        self._job.calc_static()
+        self._job.run(run_again=True)
 
     def get_interactive_value(self, key):
         if key == 'positions':
@@ -217,22 +236,17 @@ class ExternalHamiltonian(PrimitiveVertex):
         if self._job is not None:
             self._job.interactive_close()
 
-    def parallel_setup(self):
-        super(ExternalHamiltonian, self).parallel_setup()
-        if self._job is None:
-            self._initialize(self.input.ref_job_full_path, self.input.structure)
-        elif self._job.status == 'finished':
-            # The interactive library needs to be reopened
-            self._job.interactive_open()
-            self._job.interactive_initialize_interface()
-
     def to_hdf(self, hdf=None, group_name=None):
         super(ExternalHamiltonian, self).to_hdf(hdf=hdf, group_name=group_name)
         hdf[group_name]["fastlammpsmode"] = self._fast_lammps_mode
+        hdf[group_name]["jobname"] = self._job_name
+        hdf[group_name]["jobprojectpath"] = self._job_project_path
 
     def from_hdf(self, hdf=None, group_name=None):
         super(ExternalHamiltonian, self).from_hdf(hdf=hdf, group_name=group_name)
         self._fast_lammps_mode = hdf[group_name]["fastlammpsmode"]
+        self._job_name = hdf[group_name]["jobname"]
+        self._job_project_path = hdf[group_name]["jobprojectpath"]
 
 
 class GradientDescent(PrimitiveVertex):
@@ -871,7 +885,6 @@ class VerletPositionUpdate(VerletParent):
     def command(self, positions, velocities, forces, masses, time_step, temperature, temperature_damping_timescale):
         masses = self.reshape_masses(masses)
         acceleration = self.convert_to_acceleration(forces, masses)
-
         vel_half = velocities + 0.5 * acceleration * time_step
         if temperature_damping_timescale is not None:
             vel_half += self.langevin_delta_v(

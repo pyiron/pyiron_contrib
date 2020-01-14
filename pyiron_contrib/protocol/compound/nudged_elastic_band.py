@@ -4,7 +4,7 @@
 
 from __future__ import print_function
 
-from pyiron_contrib.protocol.generic import Protocol
+from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
 from pyiron_contrib.protocol.primitive.one_state import Counter, ExternalHamiltonian, GradientDescent, \
     NEBForces, InterpolatePositions
 from pyiron_contrib.protocol.primitive.two_state import IsGEq
@@ -28,7 +28,7 @@ __status__ = "development"
 __date__ = "18 July, 2019"
 
 
-class NEB(Protocol):
+class NEB(CompoundVertex):
     """
     Relaxes a system according to the nudged elastic band method (Jonsson et al).
 
@@ -66,8 +66,8 @@ class NEB(Protocol):
         },
     }
 
-    def __init__(self, project=None, name=None, job_name=None):
-        super(NEB, self).__init__(project=project, name=name, job_name=job_name)
+    def __init__(self, **kwargs):
+        super(NEB, self).__init__(**kwargs)
 
         # Protocol defaults
         id_ = self.input.default
@@ -223,3 +223,7 @@ class NEBParallel(NEB):
         g.neb_forces = NEBForces()
         g.gradient_descent = SerialList(GradientDescent)
         g.clock = Counter()
+
+
+class ProtocolNEB(Protocol, NEB):
+    pass

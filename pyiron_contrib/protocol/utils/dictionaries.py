@@ -369,7 +369,6 @@ class TimelineDict(LoggerMixin, OrderedDict):
         else:
             return result
 
-
     def keys(self):
         for k in super(TimelineDict, self).keys():
             yield TIMELINE_DICT_KEY_FORMAT.format(time=k)
@@ -387,6 +386,10 @@ class TimelineDict(LoggerMixin, OrderedDict):
     @property
     def timeline(self):
         return np.array(list(self._super_keys()))
+
+    @property
+    def data(self):
+        return np.array(list(self.values()))
 
     @property
     def array(self):

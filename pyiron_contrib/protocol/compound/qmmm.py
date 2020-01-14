@@ -4,7 +4,7 @@
 
 from __future__ import print_function
 
-from pyiron_contrib.protocol.generic import PrimitiveVertex, Protocol
+from pyiron_contrib.protocol.generic import PrimitiveVertex, CompoundVertex, Protocol
 from pyiron_contrib.protocol.utils import ensure_iterable
 from pyiron_contrib.protocol.primitive.one_state import ExternalHamiltonian, Counter, Norm, Max, GradientDescent
 from pyiron_contrib.protocol.primitive.two_state import IsGEq, IsLEq
@@ -26,7 +26,7 @@ __status__ = "development"
 __date__ = "June 6, 2019"
 
 
-class QMMMProtocol(Protocol):
+class QMMM(CompoundVertex):
     """
     Relax a QM/MM coupled system.
 
@@ -92,9 +92,8 @@ class QMMMProtocol(Protocol):
         },
     }
 
-    def __init__(self, project=None, name=None, job_name=None):
-        self.setup = IODictionary()
-        super(QMMMProtocol, self).__init__(project=project, name=name, job_name=job_name)
+    def __init__(self, **kwargs):
+        super(QMMM, self).__init__(**kwargs)
 
         id_ = self.input.default
         id_.domain_ids = None
@@ -156,7 +155,7 @@ class QMMMProtocol(Protocol):
         g.make_edge(g.check_force_qm, g.calc_static_small, 'true')
         g.make_edge(g.check_steps, g.calc_static_small, 'true')
         g.starting_vertex = g.partition
-        g.restarting_vertex = g.clock
+        g.restarting_vertex = g.check_steps
 
     def define_information_flow(self):
         gp = Pointer(self.graph)
@@ -623,3 +622,7 @@ class PartitionStructure(PrimitiveVertex):
     @staticmethod
     def _only_core(domain_ids_qm):
         return np.concatenate([domain_ids_qm['seed'], domain_ids_qm['core']])
+
+
+class ProtocolQMMM(Protocol, QMMM):
+    pass

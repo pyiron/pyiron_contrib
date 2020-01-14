@@ -4,7 +4,7 @@
 
 from __future__ import print_function
 
-from pyiron_contrib.protocol.generic import Protocol
+from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
 from pyiron_contrib.protocol.primitive.one_state import Counter, ExternalHamiltonian, RandomVelocity, Zeros, \
     VerletPositionUpdate, VerletVelocityUpdate
 from pyiron_contrib.protocol.primitive.two_state import IsGEq
@@ -24,7 +24,7 @@ __status__ = "development"
 __date__ = "18 July, 2019"
 
 
-class MolecularDynamics(Protocol):
+class MolecularDynamics(CompoundVertex):
     """
     Runs molecular dynamics. This isn't particularly useful as almost every source code/plain job can do this on its
     own, but rather this is intended for testing and teaching. It also serves as a useful starting point for developing
@@ -67,8 +67,8 @@ class MolecularDynamics(Protocol):
         },
     }
 
-    def __init__(self, project=None, name=None, job_name=None):
-        super(MolecularDynamics, self).__init__(project=project, name=name, job_name=job_name)
+    def __init__(self, **kwargs):
+        super(MolecularDynamics, self).__init__(**kwargs)
 
         # Protocol defaults
         id_ = self.input.default
@@ -101,7 +101,7 @@ class MolecularDynamics(Protocol):
             g.check_steps
         )
         g.starting_vertex = g.initial_velocity
-        g.restarting_vertex = g.clock
+        g.restarting_vertex = g.check_steps
 
     def define_information_flow(self):
         # Data flow
@@ -151,3 +151,7 @@ class MolecularDynamics(Protocol):
             'velocities': ~gp.verlet_velocities.output.velocities[-1],
             'forces': ~gp.calc_static.output.forces[-1]
         }
+
+
+class ProtocolMD(Protocol, MolecularDynamics):
+    pass

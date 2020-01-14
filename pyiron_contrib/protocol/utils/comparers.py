@@ -31,8 +31,6 @@ except ImportError:
 ensure_iterable_tuple = lambda o: tuple(ensure_iterable)
 
 
-
-
 class Comparer(LoggerMixin, metaclass=Registry):
     """
     Class is aware of its subclasses. Subclasses must have a "type" attrivute of type "type"
@@ -99,6 +97,7 @@ class Comparer(LoggerMixin, metaclass=Registry):
 # shortcut
 c_ = Comparer
 
+
 class NumpyArrayComparer(Comparer):
 
     """
@@ -161,5 +160,13 @@ class AtomsComparer(Comparer):
         return all(conditions)
 
 
+class ListComparer(Comparer):
 
+    type = list
 
+    def equals(self, b):
+        assert isinstance(b, list)
+        assert isinstance(self.object, list)
+        assert len(self.object) == len(b)
+
+        return all([Comparer(val) == last_val for val, last_val in zip(self.object, b)])

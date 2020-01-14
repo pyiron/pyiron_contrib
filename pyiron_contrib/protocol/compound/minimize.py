@@ -4,7 +4,7 @@
 
 from __future__ import print_function
 
-from pyiron_contrib.protocol.generic import Protocol
+from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
 from pyiron_contrib.protocol.primitive.one_state import Counter, ExternalHamiltonian, GradientDescent, Max, Norm
 from pyiron_contrib.protocol.primitive.two_state import IsGEq
 from pyiron_contrib.protocol.utils import Pointer
@@ -23,7 +23,7 @@ __status__ = "development"
 __date__ = "May 20, 2019"
 
 
-class Minimize(Protocol):
+class Minimize(CompoundVertex):
     """
     Run minimization with Lammps. This isn't physically useful, since a regular lammps job is faster it's just a dummy
     class for debugging new code and teaching ideas.
@@ -59,8 +59,8 @@ class Minimize(Protocol):
         }
     }
 
-    def __init__(self, project=None, name=None, job_name=None):
-        super(Minimize, self).__init__(project=project, name=name, job_name=job_name)
+    def __init__(self, **kwargs):
+        super(Minimize, self).__init__(**kwargs)
 
         # Protocol defaults
         id_ = self.input.default
@@ -95,7 +95,7 @@ class Minimize(Protocol):
             g.check_steps
         )
         g.starting_vertex = self.graph.check_steps
-        g.restarting_vertex = self.graph.clock
+        g.restarting_vertex = self.graph.check_steps
 
     def define_information_flow(self):
         # Data flow
@@ -137,3 +137,7 @@ class Minimize(Protocol):
             'positions': ~gp.gradient_descent.output.positions[-1],
             'forces': ~gp.calc_static.output.forces[-1]
         }
+
+
+class ProtocolMinimize(Protocol, Minimize):
+    pass

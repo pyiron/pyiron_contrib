@@ -3,7 +3,7 @@
 # Distributed under the terms of "New BSD License", see the LICENSE file.
 
 from __future__ import print_function
-from pyiron_contrib.protocol.generic import Vertex, PrimitiveVertex, Protocol
+from pyiron_contrib.protocol.generic import Vertex, PrimitiveVertex, CompoundVertex
 from pyiron_contrib.protocol.utils import InputDictionary, Pointer
 import numpy as np
 from abc import abstractmethod
@@ -47,31 +47,34 @@ class ListVertex(PrimitiveVertex):
         n_children (int): How many children to create.
     """
 
-    def __init__(self, child_type, name=None):
-        super(ListVertex, self).__init__(name=name)
+    def __init__(self, child_type):
         if not issubclass(child_type, Vertex):
-            raise TypeError('CommandList children must inherit from Protocol.')
+            raise TypeError('ListVertex children must inherit from Protocol.')
+        self.children = None  # Ahead of super so the n_history call doesn't trigger the setter and find no children
+        super(ListVertex, self).__init__()
         self.child_type = child_type
         self._initialized = False
         self.direct = InputDictionary()
         self.broadcast = InputDictionary()
-        self.children = None
+        self._n_history = None
+        self.n_history = 1
 
     @abstractmethod
     def command(self, n_children):
         pass
 
     def finish(self):
-        super(ListVertex, self).finish()
         for child in self.children:
             child.finish()
+        super(ListVertex, self).finish()
 
     def _initialize(self, n_children):
         children = [self.child_type(name="child_{}".format(n)) for n in range(n_children)]
 
         # Locate children in graph
-        for child in children:
+        for n, child in enumerate(children):
             child.graph_parent = self
+            child.vertex_name = "child_{}".format(n)
 
         # Link input to input.direct
         for key in list(self.direct.keys()):
@@ -135,8 +138,9 @@ class ListVertex(PrimitiveVertex):
             with hdf.open(group_name + "/children") as hdf5_server:
                 children = []
                 for n in np.arange(self.input.n_children, dtype=int):
-                    child = self.child_type()
+                    child = self.child_type(name="child_{}".format(n))
                     child.from_hdf(hdf=hdf5_server, group_name="child" + str(n))
+                    child.graph_parent = self
                     children.append(child)
             self.children = children
 
@@ -152,8 +156,8 @@ class ParallelList(ListVertex):
         queue (multiprocessing.Queue): The queue used for collecting output from the subprocesses. (Instantiation and
             closing are handled by default in `__init__` and `finish`.)
     """
-    def __init__(self, child_type, name=None):
-        super(ParallelList, self).__init__(child_type, name=name)
+    def __init__(self, child_type):
+        super(ParallelList, self).__init__(child_type)
         self.queue = Queue()
 
     def command(self, n_children):
@@ -174,15 +178,17 @@ class ParallelList(ListVertex):
             jobs.append(job)
             job.start()
 
-        # And then grab their output...in order?
-        for _ in jobs:
-            n, child_output = self.queue.get()
-            self.children[n].update_and_archive(child_output)
-
         # Wait for everything to finish
         for job in jobs:
             job.join()
-        # (I'm not even sure that I need this)
+        # It works fine without this, but I don't fully understand why
+        # Since there's no significant cost to add the join, I thought it's safer to be explicit
+
+        # And then grab their output
+        # (n.b. the queue might be disordered, but we've made sure we have access to child number)
+        for _ in jobs:
+            n, child_output = self.queue.get()
+            self.children[n].update_and_archive(child_output)
 
         # Parse output as usual
         output_data = self._extract_output_data_from_children()
@@ -197,6 +203,8 @@ class SerialList(ListVertex):
     """
     A list of commands which are run in serial.
     """
+    def __init__(self, child_type):
+        super(SerialList, self).__init__(child_type=child_type)
 
     def command(self, n_children):
         """This controls how the commands are run and is about logistics."""
@@ -214,12 +222,14 @@ class AutoList(ParallelList, SerialList):
     """
     Choose between `SerialList` and `ParallelList` depending on the nature of the children.
     """
+    def __init__(self, child_type):
+        super(AutoList, self).__init__(child_type=child_type)
 
     def _is_expensive(self):
         try:
             if isinstance(
                 self.children[0],
-                (VaspInteractive, SphinxInteractive, Protocol)
+                (VaspInteractive, SphinxInteractive, CompoundVertex)
             ):  # Whitelist types that should be treated in parallel
                 return True
             else:  # Everything else is cheap enough to treat in serial

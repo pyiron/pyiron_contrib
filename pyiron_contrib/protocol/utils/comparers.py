@@ -58,7 +58,9 @@ class Comparer(LoggerMixin, metaclass=Registry):
             else:
                 b = b._object
         elif type(b) != self._cls:
-            # TODO: Maybe throw a warning here
+            self.logger.warning("Comparer failed due to type difference between {} and {}".format(
+                type(b).__name__, type(self._cls).__name__
+            ))
             return False
         else:
             comparer = self._get_comparer()

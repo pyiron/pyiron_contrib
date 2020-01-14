@@ -167,6 +167,8 @@ class NEB(CompoundVertex):
         if ax is None:
             _, ax = plt.subplots()
         if plot_kwargs is None:
+            plot_kwargs = {}
+        if 'marker' not in plot_kwargs.keys():
             plot_kwargs = {'marker': 'o'}
         energies = np.array(self._get_energies(frame=frame))
         ax.plot(energies - energies[0], **plot_kwargs)

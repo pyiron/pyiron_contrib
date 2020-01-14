@@ -92,9 +92,9 @@ class TestComparer(unittest.TestCase):
         self.assertFalse(Comparer(a) == [2, 'a', array_a, atoms_a])
         self.assertFalse(Comparer(a) == [1, 'b', array_a, atoms_a])
         self.assertFalse(Comparer(a) == [1, 'a', array_b, atoms_b])
-        # self.assertFalse(Comparer(a) == [1, 'a', array_a, atoms_a, 1])  # Raises assertion error
+        self.assertFalse(Comparer(a) == [1, 'a', array_a, atoms_a, 1])  # Raises assertion error
 
         self.assertFalse(Comparer(b) == [[atoms_a, atoms_b], [atoms_a, atoms_b]])
-        # self.assertFalse(Comparer(b) == [[atoms_a, atoms_b], [atoms_c, atoms_d], [atoms_a, atoms_b]])  # Raises AE
-        # self.assertFalse(Comparer(b) == [b])  # Raises assertion error
+        self.assertFalse(Comparer(b) == [[atoms_a, atoms_b], [atoms_c, atoms_d], [atoms_a, atoms_b]])  # Raises AE
+        self.assertFalse(Comparer(b) == [b])  # Raises assertion error
         self.assertFalse(Comparer(b) == [[1, 2], ['a', 'b']])

@@ -166,6 +166,10 @@ class ListComparer(Comparer):
     def equals(self, b):
         assert isinstance(b, list)
         assert isinstance(self.object, list)
-        assert len(self.object) == len(b)
 
-        return all([Comparer(val) == last_val for val, last_val in zip(self.object, b)])
+        conditions = [
+            len(self.object) == len(b),
+            all([Comparer(val) == last_val for val, last_val in zip(self.object, b)])
+        ]
+
+        return all(conditions)

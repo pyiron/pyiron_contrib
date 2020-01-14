@@ -69,8 +69,6 @@ class TestComparer(unittest.TestCase):
         self.assertFalse(Comparer(a) == c)
         self.assertFalse(Comparer(a) == 'a')
 
-
-
     def test_atoms(self):
         a, b, c, d = self.create_atoms()
 

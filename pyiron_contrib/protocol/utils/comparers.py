@@ -33,15 +33,15 @@ ensure_iterable_tuple = lambda o: tuple(ensure_iterable)
 
 class Comparer(LoggerMixin, metaclass=Registry):
     """
-    Class is aware of its subclasses. Subclasses must have a "type" attrivute of type "type"
-    Compare two object, where the behaviour can be overriden, automatically determines the type
+    Class is aware of its subclasses. Subclasses must have a `type` attribute of type `type`.
+    Compares two objects, where the behaviour can be overridden, and automatically determines the type.
     """
 
     def __init__(self, obj):
         super(Comparer, self).__init__()
         self._object = obj
         self._cls = type(obj)
-        # this is a private object, one cannot access is
+        # this is a private object, one ought not access it
         self.__registry_cache = {}
 
         if not isinstance(self._object, self._cls):
@@ -58,7 +58,7 @@ class Comparer(LoggerMixin, metaclass=Registry):
             else:
                 b = b._object
         elif type(b) != self._cls:
-            # TODO: Maybe throw a arning here
+            # TODO: Maybe throw a warning here
             return False
         else:
             comparer = self._get_comparer()
@@ -72,7 +72,7 @@ class Comparer(LoggerMixin, metaclass=Registry):
         if len(self.__registry_cache) != len(self.registry):
             for cls in self.registry:
                 if not hasattr(cls, 'type'):
-                    raise TypeError('The subclass "%s" must have a "type" attribute' % cls.__name__)
+                    raise TypeError('The subclass "{}" must have a "type" attribute'.format(cls.__name__))
                 self.__registry_cache[cls.type] = cls
 
         # registry is updated
@@ -94,51 +94,45 @@ class Comparer(LoggerMixin, metaclass=Registry):
         return self._equals(other)
 
 
-# shortcut
-c_ = Comparer
-
-
 class NumpyArrayComparer(Comparer):
-
     """
-    Used to compare numpy arrays
+    Used to compare numpy arrays.
     """
 
     type = np.ndarray
 
-
-    def get_machine_epsilon(self, A):
+    @staticmethod
+    def get_machine_epsilon(a):
         """
-        Returns the machine inaccuracy for the datatype of a
+        Returns the machine inaccuracy for the datatype of `a`.
 
         Args:
-            A: (np.ndarray) the array
+            a: (np.ndarray) the array
 
         Returns: (float or None) the machine epsilon or None if it is an exact datatype
 
         """
         try:
-            epsilon = np.finfo(A.dtype).eps
+            epsilon = np.finfo(a.dtype).eps
         except ValueError:
             epsilon = None
         return epsilon
 
     def equals(self, b):
-        factor = 10
+        fudge_factor = 10
         epsilon = self.get_machine_epsilon(b)
         # check if the datatype is inexact at all
         inexact = epsilon is not None
         if inexact:
-            return self.object.shape == b.shape and np.allclose(self.object, b, atol=factor*epsilon, rtol=0)
+            return self.object.shape == b.shape and np.allclose(self.object, b, atol=fudge_factor*epsilon, rtol=0)
         else:
             # it is an exact data type such as int
             return np.array_equal(self.object, b)
 
 
 class AtomsComparer(Comparer):
-
     """
-    Used to compare pyiron Atoms objects
+    Used to compare pyiron Atoms objects.
     """
 
     type = Atoms
@@ -152,15 +146,18 @@ class AtomsComparer(Comparer):
         # https://github.com/pyiron/pyiron/blob/c447ffb4f1e003d0ebaced50a12def46beefab4f/pyiron/atomistics/job/interactive.py
         conditions = [
             len(self.object) == len(b),
-            c_(self.object.cell) == b.cell,
-            c_(self.object.get_scaled_positions()) == b.get_scaled_positions(),
-            c_(self.object.get_initial_magnetic_moments()) == b.get_initial_magnetic_moments(),
+            Comparer(self.object.cell) == b.cell,
+            Comparer(self.object.get_scaled_positions()) == b.get_scaled_positions(),
+            Comparer(self.object.get_initial_magnetic_moments()) == b.get_initial_magnetic_moments(),
             index_spec_mapping(self.object) == index_spec_mapping(b)
         ]
         return all(conditions)
 
 
 class ListComparer(Comparer):
+    """
+    Used to compare lists.
+    """
 
     type = list
 

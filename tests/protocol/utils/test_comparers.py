@@ -57,9 +57,10 @@ class TestComparer(unittest.TestCase):
         self.assertTrue(Comparer('a') == 'a')
         self.assertFalse(Comparer('a') == 'b')
 
-        self.assertTrue(Comparer(4) == 4.)  # Raises assertion error
+        self.assertTrue(Comparer(4) == 4.)
         self.assertFalse(Comparer(4) == 'a')
 
+        # Check that comparing comparers works too
         self.assertTrue(Comparer(4) == Comparer(4))
         self.assertTrue(Comparer(4) == Comparer(4.))
         self.assertFalse(Comparer(4) == Comparer(4.4))

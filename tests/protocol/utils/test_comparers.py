@@ -60,6 +60,11 @@ class TestComparer(unittest.TestCase):
         # self.assertTrue(Comparer(4) == 4.)  # Raises assertion error
         self.assertFalse(Comparer(4) == 'a')
 
+        self.assertTrue(Comparer(4) == Comparer(4))
+        # self.assertTrue(Comparer(4) == Comparer(4.))
+        self.assertFalse(Comparer(4) == Comparer(4.4))
+        self.assertFalse(Comparer(4) == Comparer('a'))
+
     def test_array(self):
         a, b, c = self.create_arrays()
 

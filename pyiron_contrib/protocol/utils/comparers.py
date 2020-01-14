@@ -51,21 +51,42 @@ class Comparer(LoggerMixin, metaclass=Registry):
     def object(self):
         return self._object
 
+    def compatible_types(self, a, b):
+        """
+        Tests whether an equality comparison can be made between objects of type `a` and `b` by checking that these are
+        the same type, or both either int or float.
+
+        Args:
+            a (type): The first type to be tested.
+            b (type): The second type to be tested.
+
+        Returns:
+            (bool): True when the two types are the same or both belong to int and float.
+        """
+        if a != b and not self.both_are_int_or_float(a, b):
+            return False
+        else:
+            return True
+
+    @staticmethod
+    def both_are_int_or_float(a, b):
+        valid_list = [int, float]
+        return a in valid_list and b in valid_list
+
     def _equals(self, b):
         if isinstance(b, Comparer):
-            if b._cls != self._cls:
+            if not self.compatible_types(b._cls, self._cls):
                 return False
             else:
                 b = b._object
-
-        if type(b) != self._cls:
+        elif not self.compatible_types(type(b), self._cls):
             self.logger.warning("Comparer failed due to type difference between {} and {}".format(
                 type(b).__name__, type(self._cls).__name__
             ))
             return False
-        else:
-            comparer = self._get_comparer()
-            return self.default(b) if comparer is None else comparer(self.object).equals(b)
+
+        comparer = self._get_comparer()
+        return self.default(b) if comparer is None else comparer(self.object).equals(b)
 
     def default(self, b):
         return self._object == b

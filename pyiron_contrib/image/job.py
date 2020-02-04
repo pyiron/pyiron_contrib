@@ -5,13 +5,15 @@ from __future__ import print_function
 
 from pyiron.base.job.generic import GenericJob
 import numpy as np
-from types import FunctionType
 import skimage as ski
+from skimage import io, filters, exposure
 import matplotlib.pyplot as plt
 import inspect
+from pyiron_contrib.image.utils import ModuleScraper
 
 """
-Store and process image data within the pyiron framework.
+Store and process image data within the pyiron framework. Functionality of the `skimage` library is automatically 
+scraped, along with some convenience decorators to switch their function-based library to a class-method-based library.
 """
 
 __author__ = "Liam Huber"
@@ -23,12 +25,94 @@ __email__ = "huber@mpie.de"
 __status__ = "development"
 __date__ = "Jan 30, 2020"
 
+# Some decorators look at the signature of skimage methods to see if they take an image
+# (presumed to be in numpy.ndarray format).
+# This is done by searching the signature for the variable name below:
+_IMAGE_VARIABLE = 'image'
+
 
 class Images(GenericJob):
     pass
 
 
+def pass_image_data(image):
+    """
+    Decorator to see if the signature of the function starts with a particular variable (`_IMAGE_VARIABLE`). If so,
+    automatically passes an attribute of the argument (`image.data`) as the first argument.
+
+    Args:
+        image (Image): The image whose data to use.
+
+    Returns:
+        (fnc): Decorated function.
+    """
+    def decorator(function):
+        takes_image_data = list(inspect.signature(function).parameters.keys())[0] == _IMAGE_VARIABLE
+
+        def wrapper(*args, **kwargs):
+            if takes_image_data:
+                return function(image.data, *args, **kwargs)
+            else:
+                return function(*args, **kwargs)
+
+        wrapper.__doc__ = ""
+        if takes_image_data:
+            wrapper.__doc__ += "This function has been wrapped to automatically supply the image argument. \n" \
+                               "Remaining arguments can be passed as normal.\n"
+        wrapper.__doc__ += "The original docstring follows:\n\n"
+        wrapper.__doc__ += function.__doc__ or ""
+        return wrapper
+
+    return decorator
+
+
+def set_image_data(image):
+    """
+    Decorator which checks the returned value of the function. If that value is of type `numpy.ndarray`, uses it to set
+    an attribute of the argument (`image.data`) instead of returning it.
+
+    Args:
+        image (Image): The image whose data to set.
+
+    Returns:
+        (fnc): Decorated function.
+    """
+    def decorator(function):
+        def wrapper(*args, **kwargs):
+            output = function(*args, **kwargs)
+            if isinstance(output, np.ndarray):
+                image.set_data(output, image.is_greyscale)
+            else:
+                return output
+
+        wrapper.__doc__ = "This function has been wrapped; if it outputs a numpy array, it will be " \
+                          "automatically passed to the image's data field.\n" + function.__doc__
+        return wrapper
+
+    return decorator
+
+
+def pass_and_set_image_data(image):
+    """
+    Decorator which connects function input and output to `image.data`.
+
+    Args:
+        image (Image): The image whose data to set.
+
+    Returns:
+        (fnc): Decorated function.
+    """
+    def decorator(function):
+        return set_image_data(image)(pass_image_data(image)(function))
+    return decorator
+
+
 class Image:
+    """
+    A base class for storing image data in the form of numpy arrays. Functionality of the skimage library can be
+    leveraged using the sub-module name and an `activate` method.
+    """
+
     def __init__(self, data=None, metadata=None, as_grey=False):
         # Set data
         self._source = None
@@ -47,10 +131,19 @@ class Image:
             'filters',
             'exposure'
         ]:
+            # setattr(
+            #     self,
+            #     module_name,
+            #     self._ModuleScraper(self, getattr(ski, module_name))
+            # )
             setattr(
                 self,
                 module_name,
-                self._ModuleScraper(self, getattr(ski, module_name))
+                ModuleScraper(
+                    'skimage.' + module_name,
+                    decorator=pass_and_set_image_data,
+                    decorator_args=(self,)
+                )
             )
 
     @property
@@ -91,74 +184,6 @@ class Image:
         fig, ax = plt.subplots(**subplots_kwargs)
         ax.imshow(self.data, **ax_kwargs)
         return fig, ax
-
-    class _ModuleScraper:
-        """
-        Scrapes all the methods and attributes from a module. Methods are wrapped to automatically pass and collect
-        image data if the signature/output type indicates this is reasonable. Sub-modules are collected using by
-        recursively instantiating this class. A limited subset of 'primitive' datatypes are also captured.
-
-        Warning:
-            There is currently no automated check that the signatures from these functions are compatible with this
-            behaviour.
-        """
-
-        # Variable name from the skimage library. Assumed to be the first positional argument when it occurs.
-        _IMAGE_VARIABLE = 'image'
-
-        def __init__(self, image, module, scrape_submodules=False):
-            """
-            Args:
-                image (Image): The image to apply modifying functions to.
-                module (module): The module from which to scrape.
-            """
-            for name, obj in inspect.getmembers(module):
-                if name[0] == '_':
-                    continue
-
-                primitives = (int, float, bool, np.ndarray)
-                if isinstance(obj, FunctionType):
-                    setattr(self, name, self.set_image_data(image)(self.pass_image_data(image)(obj)))
-                elif isinstance(obj, type(module)) and scrape_submodules and obj.__package__ == module.__package__:
-                    print("Scraping subclass {}".format(name))
-                    setattr(self, name, self.__class__(image, obj))
-                elif isinstance(obj, primitives):
-                    setattr(self, name, obj)
-
-        def pass_image_data(self, image):
-            def decorator(function):
-                takes_image_data = list(inspect.signature(function).parameters.keys())[0] == self._IMAGE_VARIABLE
-
-                def wrapper(*args, **kwargs):
-                    if takes_image_data:
-                        return function(image.data, *args, **kwargs)
-                    else:
-                        return function(image.data, *args, **kwargs)
-
-                wrapper.__doc__ = ""
-                if takes_image_data:
-                    wrapper.__doc__ += "This function has been wrapped to automatically supply the image argument. \n" \
-                                       "Remaining arguments can be passed as normal.\n"
-                wrapper.__doc__ += "The original docstring follows:\n\n"
-                wrapper.__doc__ += function.__doc__ or ""
-                return wrapper
-            return decorator
-
-        def set_image_data(self, image):
-            def decorator(function):
-                def wrapper(*args, **kwargs):
-                    output = function(*args, **kwargs)
-                    if isinstance(output, np.ndarray):
-                        image.set_data(output, image.is_greyscale)
-                    else:
-                        return output
-                wrapper.__doc__ = "This function has been wrapped; if it outputs a numpy array, it will be " \
-                                  "automatically passed to the image's data field.\n" + function.__doc__
-                return wrapper
-            return decorator
-
-        # [Alegedly](https://hynek.me/articles/decorators/) , the wrapt library will let me preserve docstrings *and*
-        # signatures, but I can't figure it out
 
 
 class Metadata:

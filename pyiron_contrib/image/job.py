@@ -81,7 +81,7 @@ def set_image_data(image):
         def wrapper(*args, **kwargs):
             output = function(*args, **kwargs)
             if isinstance(output, np.ndarray):
-                image.set_data(output, image.is_greyscale)
+                image._data = output
             else:
                 return output
 
@@ -113,12 +113,11 @@ class Image:
     leveraged using the sub-module name and an `activate` method.
     """
 
-    def __init__(self, data=None, metadata=None, as_grey=False):
+    def __init__(self, source=None, metadata=None, as_grey=False):
         # Set data
-        self._source = None
+        self._source = source
         self._data = None
-        self.is_greyscale = None
-        self.set_data(data, as_grey=as_grey)
+        self.as_grey = as_grey
 
         # Set metadata
         self.metadata = metadata  # TODO
@@ -147,36 +146,45 @@ class Image:
             )
 
     @property
+    def source(self):
+        return self._source
+
+    def overwrite_source(self, new_source, new_metadata=None, as_grey=False):
+        self._source = new_source
+        self._data = None
+        self.as_grey = as_grey
+        self.metadata = new_metadata
+
+    @property
     def data(self):
+        if self._data is None:
+            self._load_data_from_source()
         return self._data
 
-    def set_data(self, new_data, as_grey=False):
-        self.is_greyscale = as_grey
-
-        if isinstance(new_data, np.ndarray):
-            self._data = new_data
-            if self._source is None:
-                self._source = new_data.copy()
-        elif isinstance(new_data, str):
-            self._data = ski.io.imread(new_data, as_grey=as_grey)
-            self._source = new_data
-        elif new_data is None:
-            pass
+    def _load_data_from_source(self):
+        if isinstance(self.source, np.ndarray):
+            self._data = self.source.copy()
+        elif isinstance(self.source, str):
+            self._data = ski.io.imread(self.source, as_grey=self.as_grey)
         else:
-            raise ValueError("Data type not understood, should be numpy.ndarray or string pointing to image file.")
+            raise ValueError("Data source not understood, should be numpy.ndarray or string pointing to image file.")
 
-    def reset_data(self):
+    def reload_data(self):
         """
-        Reverts the `data` attribute to the most recently read file (if set by reading data), or the originally
-        assigned array (if set by direct array assignment).
+        Reverts the `data` attribute to the source, i.e. the most recently read file (if set by reading data), or the
+        originally assigned array (if set by direct array assignment).
         """
-        self.set_data(self._source, self.is_greyscale)
+        self._load_data_from_source()
 
     def convert_to_greyscale(self):
-        if self.data is not None and len(self.data.shape) == 3 and self.data.shape[-1] == 3:
-            self.set_data(self.data, as_grey=True)
+        if self._data is not None:
+            if len(self.data.shape) == 3 and self.data.shape[-1] == 3:
+                self._data = np.mean(self._data, axis=-1)
+                self.as_grey = True
+            else:
+                raise ValueError("Can only convert data with shape NxMx3 to greyscale")
         else:
-            raise ValueError("Can only convert data with shape NxMx3 to greyscale")
+            self.as_grey = True
 
     def imshow(self, subplots_kwargs=None, ax_kwargs=None):
         subplots_kwargs = subplots_kwargs or {}

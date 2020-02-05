@@ -126,16 +126,6 @@ class ModuleScraper:
         self.scrape_primitives = scrape_primitives
         self.primitives_list = primitives_list or (int, float, bool, np.ndarray)
 
-    class _Decorators:
-        @classmethod
-        def locked_after_activate(cls, fnc):
-            def wrapper(self, val):
-                if self._activated:
-                    self.logger.warning("The attribute '{}' cannot be modified after activation".format(fnc.__name__))
-                else:
-                    fnc(self, val)
-            return wrapper
-
     def activate(self):
         """
         Parse the module assigned at instantiation, using decorator information assigned at instantiation.

@@ -119,8 +119,10 @@ class ModuleScraper:
                     fnc = obj
                 setattr(self, name, fnc)
             elif self.scrape_classes and inspect.isclass(obj):
+                # Grab classes
                 setattr(self, name, obj)
             elif self.scrape_primitives and isinstance(obj, self.primitives_list):
+                # Grab primitives
                 setattr(self, name, obj)
 
     def __getattr__(self, item):

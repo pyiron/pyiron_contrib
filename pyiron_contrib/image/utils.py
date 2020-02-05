@@ -171,15 +171,12 @@ class ModuleScraper:
         self._activated = True
 
     def __getattr__(self, item):
-        try:
-            super(self.__class__, self).__getattribute__(item)
-        except AttributeError:
-            if inspect.ismodule(self._module):
-                name = self._module.__name__.split('.')[-1]
-            else:
-                name = self._module.split('.')[-1]
-            raise AttributeError(
-                "'{0}' has no attribute '{1}'. Try running '....{0}.activate()' first.".format(name, item))
+        if inspect.ismodule(self._module):
+            name = self._module.__name__.split('.')[-1]
+        else:
+            name = self._module.split('.')[-1]
+        raise AttributeError(
+            "'{0}' has no attribute '{1}'. Try running '....{0}.activate()' first.".format(name, item))
 
     def to_hdf(self):
         pass

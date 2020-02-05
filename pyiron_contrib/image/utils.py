@@ -39,7 +39,7 @@ class ModuleScraper:
         Doesn't do anything with classes that are found.
     """
 
-    def __init__(self, module, decorator=None, decorator_args=None):
+    def __init__(self, module, decorator=None, decorator_args=None, scrape_methods=True):
         """
         Args:
             module (module/str): The module from which to scrape, or the name of the module from which to escape, e.g.
@@ -51,6 +51,7 @@ class ModuleScraper:
         self._decorator = decorator
         self._decorator_args = decorator_args or ()
         self._activated = False
+        self._scrape_methods = scrape_methods
 
     def activate(self, safe=True, recursive=False):
         """
@@ -72,7 +73,7 @@ class ModuleScraper:
                 continue
 
             primitives = (int, float, bool, np.ndarray)
-            if inspect.isfunction(obj):
+            if self._scrape_methods and inspect.isfunction(obj):
                 # Set all module functions as methods
                 if self._decorator is not None:
                     fnc = self._decorator(*self._decorator_args)(obj)

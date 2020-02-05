@@ -5,11 +5,12 @@ from __future__ import print_function
 
 from pyiron.base.job.generic import GenericJob
 import numpy as np
-import skimage as ski
-from skimage import io, filters, exposure
+import skimage
+from skimage import io
 import matplotlib.pyplot as plt
 import inspect
 from pyiron_contrib.image.utils import ModuleScraper
+from pkgutil import iter_modules
 
 """
 Store and process image data within the pyiron framework. Functionality of the `skimage` library is automatically 
@@ -126,20 +127,21 @@ class Image:
         # TODO:
         #  Set up some sort of metaclass so that the scraping and wrapping is done at import. It will be too expensive
         #  to do this every time we instantiate...
-        for module_name in [
-            'filters',
-            'exposure'
-        ]:
-            # setattr(
-            #     self,
-            #     module_name,
-            #     self._ModuleScraper(self, getattr(ski, module_name))
-            # )
+        submodule_blacklist = [
+            'data',
+            'scripts',
+            'future',
+            'registration',
+
+        ]
+        for module in iter_modules(skimage.__path__):
+            if module.name[0] == '_' or module.name in submodule_blacklist:
+                continue
             setattr(
                 self,
-                module_name,
+                module.name,
                 ModuleScraper(
-                    'skimage.' + module_name,
+                    'skimage.' + module.name,
                     decorator=pass_and_set_image_data,
                     decorator_args=(self,)
                 )
@@ -165,7 +167,7 @@ class Image:
         if isinstance(self.source, np.ndarray):
             self._data = self.source.copy()
         elif isinstance(self.source, str):
-            self._data = ski.io.imread(self.source, as_grey=self.as_grey)
+            self._data = io.imread(self.source, as_grey=self.as_grey)
         else:
             raise ValueError("Data source not understood, should be numpy.ndarray or string pointing to image file.")
 

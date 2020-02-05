@@ -6,6 +6,8 @@ from __future__ import print_function
 import numpy as np
 import inspect
 from importlib import import_module
+from pyiron_contrib.protocol.generic import LoggerMixin
+from weakref import WeakKeyDictionary
 
 """
 Code used by the image library which isn't specific to the task of images, but which doesn't have a home anywhere else
@@ -20,6 +22,39 @@ __maintainer__ = "Liam Huber"
 __email__ = "huber@mpie.de"
 __status__ = "development"
 __date__ = "Feb 3, 2020"
+
+
+class LockedIfAttributeTrue(LoggerMixin):
+    """
+    A descriptor which prevents modification when the provided attribute of the owning instance is True. 
+    
+    Educational credit goes to:
+    https://nbviewer.jupyter.org/urls/gist.github.com/ChrisBeaumont/5758381/raw/descriptor_writeup.ipynb
+    
+    Attributes:
+        default: The default value for the descriptor.
+        attribute_name (str): The name of the attribute to look for in the owner instance when determining lock state.
+        data (weakref.WeakKeyDictionary): A container to track instances.
+        name (str): The name of the attribute the descriptor is being assigned to.
+    """
+    def __init__(self, default, attribute_name):
+        self.default = default
+        self.attribute_name = attribute_name
+        self.data = WeakKeyDictionary()
+        self.name = None
+
+    def __set_name__(self, owner, name):
+        self.name = name
+
+    def __get__(self, instance, owner):
+        return self.data.get(instance, self.default)
+
+    def __set__(self, instance, value):
+        if getattr(instance, self.attribute_name):
+            self.logger.warning("The attribute '{}' cannot be modified while '{}' is True".format(self.name,
+                                                                                                  self.attribute_name))
+        else:
+            self.data[instance] = value
 
 
 class ModuleScraper:
@@ -43,6 +78,13 @@ class ModuleScraper:
         primitives_list (tuple/list): A list of which types count as primitive. (Default is None, which uses `(int,
             float, bool, numpy.ndarray)`.)
     """
+
+    safe = LockedIfAttributeTrue(True, '_activated')
+    recursive = LockedIfAttributeTrue(True, '_activated')
+    scrape_functions = LockedIfAttributeTrue(True, '_activated')
+    scrape_classes = LockedIfAttributeTrue(True, '_activated')
+    scrape_primitives = LockedIfAttributeTrue(True, '_activated')
+    primitives_list = LockedIfAttributeTrue((int, float, bool, np.ndarray), '_activated')
 
     def __init__(
             self,
@@ -76,12 +118,23 @@ class ModuleScraper:
         self._decorator = decorator
         self._decorator_args = decorator_args or ()
         self._activated = False
+
         self.safe = safe
         self.recursive = recursive
         self.scrape_functions = scrape_functions
         self.scrape_classes = scrape_classes
         self.scrape_primitives = scrape_primitives
         self.primitives_list = primitives_list or (int, float, bool, np.ndarray)
+
+    class _Decorators:
+        @classmethod
+        def locked_after_activate(cls, fnc):
+            def wrapper(self, val):
+                if self._activated:
+                    self.logger.warning("The attribute '{}' cannot be modified after activation".format(fnc.__name__))
+                else:
+                    fnc(self, val)
+            return wrapper
 
     def activate(self):
         """
@@ -124,6 +177,8 @@ class ModuleScraper:
             elif self.scrape_primitives and isinstance(obj, self.primitives_list):
                 # Grab primitives
                 setattr(self, name, obj)
+
+        self._activated = True
 
     def __getattr__(self, item):
         try:

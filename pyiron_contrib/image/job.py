@@ -32,8 +32,78 @@ __date__ = "Jan 30, 2020"
 _IMAGE_VARIABLE = 'image'
 
 
-class Images(GenericJob):
-    pass
+class ImageJob(GenericJob):
+    """
+    A basic job type for storing image data.
+    """
+
+    def __init__(self, project, job_name):
+        super(ImageJob, self).__init__(project, job_name)
+        self.__name__ = "ImageJob"
+        self.images = []
+
+    @staticmethod
+    def get_factors(n):
+        i = int(n**0.5 + 0.5)
+        while n % i != 0:
+            i -= 1
+        return i, int(n/i)
+
+    def plot(self, subplots_kwargs=None, imshow_kwargs=None):
+        subplots_kwargs = subplots_kwargs or {}
+        imshow_kwargs = imshow_kwargs or {}
+        nrows, ncols = self.get_factors(len(self.images))
+        fig, axes = plt.subplots(nrows=nrows, ncols=ncols, **subplots_kwargs)
+        axes = np.atleast_2d(axes)
+        for n, img in enumerate(self.images):
+            i = int(np.floor(n / ncols))
+            j = n % ncols
+            ax = axes[i, j]
+            img.plot(ax=ax, imshow_kwargs=imshow_kwargs)
+
+        fig.tight_layout()
+        return fig, axes
+
+    def run(self, run_again=False, repair=False, debug=False, run_mode=None):
+        # This is just a place holder to stop the job from even *starting* to run until run_static is implemented
+        raise NotImplementedError
+
+    def run_static(self):
+        # TODO: Take a modifier chain as input and apply all modifiers on run
+        raise NotImplementedError
+
+    def to_hdf(self, hdf=None, group_name=None):
+        """
+        Store the job in an HDF5 file.
+
+        Args:
+            hdf (ProjectHDFio): HDF5 group object - optional
+            group_name (str): HDF5 subgroup name - optional
+        """
+        super(ImageJob, self).to_hdf(hdf=hdf, group_name=group_name)
+        if hdf is None:
+            hdf = self.project_hdf5
+        with hdf.open("images") as hdf5_server:
+            for n, image in enumerate(self.images):
+                image.to_hdf(hdf=hdf5_server, group_name="img{}".format(n))
+        hdf["n_images"] = n + 1
+
+    def from_hdf(self, hdf=None, group_name=None):
+        """
+        Load the Protocol from an HDF5 file.
+
+        Args:
+            hdf (ProjectHDFio): HDF5 group object - optional
+            group_name (str): HDF5 subgroup name - optional
+        """
+        super(ImageJob, self).to_hdf(hdf=hdf, group_name=group_name)
+        if hdf is None:
+            hdf = self.project_hdf5
+        with hdf.open("images") as hdf5_server:
+            for n in np.arange(hdf["n_images"], dtype=int):
+                img = Image()
+                img.from_hdf(hdf=hdf5_server, group_name="img{}".format(n))
+                self.images.append(img)
 
 
 def pass_image_data(image):
@@ -121,12 +191,9 @@ class Image:
         self.as_grey = as_grey
 
         # Set metadata
-        self.metadata = metadata  # TODO
+        self.metadata = metadata or Metadata()
 
         # Apply wrappers
-        # TODO:
-        #  Set up some sort of metaclass so that the scraping and wrapping is done at import. It will be too expensive
-        #  to do this every time we instantiate...
         submodule_blacklist = [
             'data',
             'scripts',
@@ -155,13 +222,20 @@ class Image:
         self._source = new_source
         self._data = None
         self.as_grey = as_grey
-        self.metadata = new_metadata
+        self.metadata = new_metadata or Metadata()
 
     @property
     def data(self):
         if self._data is None:
             self._load_data_from_source()
         return self._data
+
+    @property
+    def shape(self):
+        return self.data.shape
+
+    def __len__(self):
+        return self.data.__len__()
 
     def _load_data_from_source(self):
         if isinstance(self.source, np.ndarray):
@@ -188,19 +262,48 @@ class Image:
         else:
             self.as_grey = True
 
-    def imshow(self, subplots_kwargs=None, ax_kwargs=None):
+    def plot(self, ax=None, subplots_kwargs=None, imshow_kwargs=None, hide_axes=True):
         subplots_kwargs = subplots_kwargs or {}
-        ax_kwargs = ax_kwargs or {}
-        fig, ax = plt.subplots(**subplots_kwargs)
-        ax.imshow(self.data, **ax_kwargs)
+        imshow_kwargs = imshow_kwargs or {}
+
+        if ax is None:
+            fig, ax = plt.subplots(**subplots_kwargs)
+        else:
+            fig = ax.figure
+
+        ax.imshow(self.data, **imshow_kwargs)
+
+        if hide_axes:
+            ax.get_xaxis().set_visible(False)
+            ax.get_yaxis().set_visible(False)
+
         return fig, ax
+
+    def to_hdf(self, hdf, group_name=None):
+        with hdf.open(group_name) as hdf5_server:
+            hdf5_server["TYPE"] = str(type(self))
+            hdf5_server["source"] = self.source
+            hdf5_server["as_grey"] = self.as_grey
+            self.metadata.to_hdf(hdf=hdf5_server, group_name="metadata")
+
+    def from_hdf(self, hdf, group_name=None):
+        with hdf.open(group_name) as hdf5_server:
+            source = hdf5_server["source"]
+            as_grey = hdf5_server["as_grey"]
+            metadata = Metadata()
+            metadata.from_hdf(hdf=hdf5_server, group_name="metadata")
+        self.overwrite_source(source, new_metadata=metadata, as_grey=as_grey)
 
 
 class Metadata:
-    def __init__(self, data=None, note=None):
-        self._data = data
-        self.note = note
+    def __init__(self, text=None):
+        self.text = text
 
-    @property
-    def shape(self):
-        return self._data.shape
+    def to_hdf(self, hdf, group_name=None):
+        with hdf.open(group_name) as hdf5_server:
+            hdf5_server["TYPE"] = str(type(self))
+            hdf5_server["text"] = self.text
+
+    def from_hdf(self, hdf, group_name=None):
+        with hdf.open(group_name) as hdf5_server:
+            self.text = hdf5_server["text"]

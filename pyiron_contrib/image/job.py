@@ -9,7 +9,7 @@ import skimage
 from skimage import io
 import matplotlib.pyplot as plt
 import inspect
-from pyiron_contrib.image.utils import ModuleScraper
+from pyiron_contrib.image.utils import ModuleScraper, DistributingList
 from pkgutil import iter_modules
 
 """
@@ -40,7 +40,20 @@ class ImageJob(GenericJob):
     def __init__(self, project, job_name):
         super(ImageJob, self).__init__(project, job_name)
         self.__name__ = "ImageJob"
-        self.images = []
+        self._images = DistributingList()
+
+    @property
+    def images(self):
+        return self._images
+
+    @images.setter
+    def images(self, val):
+        if isinstance(val, DistributingList):
+            self._images = val
+        elif isinstance(val, (tuple, list, np.ndarray)):
+            self._images = DistributingList(val)
+        else:
+            raise ValueError("Images was expecting a list-like object, but got {}".format(type(val)))
 
     @staticmethod
     def get_factors(n):

@@ -8,6 +8,7 @@ import inspect
 from importlib import import_module
 from pyiron_contrib.protocol.generic import LoggerMixin
 from weakref import WeakKeyDictionary
+from collections import UserList
 
 """
 Code used by the image library which isn't specific to the task of images, but which doesn't have a home anywhere else
@@ -22,6 +23,18 @@ __maintainer__ = "Liam Huber"
 __email__ = "huber@mpie.de"
 __status__ = "development"
 __date__ = "Feb 3, 2020"
+
+
+class DistributingList(UserList):
+    def __getattr__(self, item):
+        return DistributingList([getattr(obj, item) for obj in self])
+
+    def __call__(self, *args, **kwargs):
+        ret = [obj.__call__(*args, **kwargs) for obj in self]
+        if all(x is None for x in ret):
+            return None
+        else:
+            return ret
 
 
 class LockedIfAttributeTrue(LoggerMixin):
@@ -62,7 +75,7 @@ class ModuleScraper:
     A class which scrapes through a module and applies classes and primitives found as attributes of itself, functions
     found as methods of itself, and sub-modules found recursively as new `ModuleScraper` attributes of itself.
 
-    A decorator can optionally be applied to all functions found.
+    A decorator can optionally be applied to all functions found. This is the real strength, since
 
     Note:
         Doesn't do anything until its `activate` method is called.

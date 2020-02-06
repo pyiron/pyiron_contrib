@@ -43,6 +43,7 @@ def pass_image_data(image):
     Returns:
         (fnc): Decorated function.
     """
+
     def decorator(function):
         takes_image_data = list(inspect.signature(function).parameters.keys())[0] == _IMAGE_VARIABLE
 
@@ -74,6 +75,7 @@ def set_image_data(image):
     Returns:
         (fnc): Decorated function.
     """
+
     def decorator(function):
         def wrapper(*args, **kwargs):
             output = function(*args, **kwargs)
@@ -99,6 +101,7 @@ def pass_and_set_image_data(image):
     Returns:
         (fnc): Decorated function.
     """
+
     def decorator(function):
         return set_image_data(image)(pass_image_data(image)(function))
     return decorator
@@ -108,9 +111,22 @@ class Image:
     """
     A base class for storing image data in the form of numpy arrays. Functionality of the skimage library can be
     leveraged using the sub-module name and an `activate` method.
+
+    Attributes:
+        source (str/numpy.ndarray): The raw data source.
+        data (numpy.ndarray): The image data. Not loaded until called, so first call may be slow. Modifications are
+            made to this field, leaving the source untouched. NOT saved to hdf.
+        as_grey (bool): Whether to interpret the image as greyscale.
+        metadata (Metadata): Metadata associated with the source.
     """
 
-    def __init__(self, source=None, metadata=None, as_grey=False):
+    def __init__(self, source, metadata=None, as_grey=False):
+        """
+        source (str/numpy.ndarray): The raw data source.
+        as_grey (bool): Whether to interpret the image as greyscale. (Default is False)
+        metadata (Metadata): Metadata associated with the source. (Default is None.)
+        """
+
         # Set data
         self._source = source
         self._data = None
@@ -145,6 +161,15 @@ class Image:
         return self._source
 
     def overwrite_source(self, new_source, new_metadata=None, as_grey=False):
+        """
+        Apply a new source of image data to the image object.
+
+        Args:
+            new_source (str/numpy.ndarray): The filepath to the data, or the raw array of data itself.
+            new_metadata (Metadata): The metadata associated with the new source. (Default is None.)
+            as_grey (bool): Whether to interpret the new data as greyscale. (Default is False.)
+        """
+
         self._source = new_source
         self._data = None
         self.as_grey = as_grey
@@ -166,6 +191,8 @@ class Image:
     def _load_data_from_source(self):
         if isinstance(self.source, np.ndarray):
             self._data = self.source.copy()
+            if len(self._data.shape) == 3:
+                self.convert_to_greyscale()
         elif isinstance(self.source, str):
             self._data = io.imread(self.source, as_grey=self.as_grey)
         else:
@@ -176,9 +203,13 @@ class Image:
         Reverts the `data` attribute to the source, i.e. the most recently read file (if set by reading data), or the
         originally assigned array (if set by direct array assignment).
         """
+
         self._load_data_from_source()
 
     def convert_to_greyscale(self):
+        """
+        Flattens (NxMx3) data into (NxM) greyscale data.
+        """
         if self._data is not None:
             if len(self.data.shape) == 3 and self.data.shape[-1] == 3:
                 self._data = np.mean(self._data, axis=-1)
@@ -189,6 +220,21 @@ class Image:
             self.as_grey = True
 
     def plot(self, ax=None, subplots_kwargs=None, imshow_kwargs=None, hide_axes=True):
+        """
+        Make a simple matplotlib `imshow` plot of the data.
+
+        Args:
+            ax (matplotlib.axes.Axes): The axis to plot on. (Default is None, make a new figure.)
+            subplots_kwargs (dict): Keyword arguments to pass to the figure generation. Only used if no axis is
+                provided. (Default is None.)
+            imshow_kwargs (dict): Keyword arguments to pass to the `imshow` plotting command. (Default is None.)
+            hide_axes (bool): Whether to hide axis ticks and labels. (Default is True.)
+
+        Returns:
+            (matplotlib.figure.Figure): The figure the plot is in.
+            (matplotlib.axes.Axes): The axis the plot is on.
+        """
+
         subplots_kwargs = subplots_kwargs or {}
         imshow_kwargs = imshow_kwargs or {}
 

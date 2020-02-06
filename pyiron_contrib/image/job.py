@@ -29,7 +29,12 @@ __date__ = "Jan 30, 2020"
 
 class ImageJob(GenericJob):
     """
-    A basic job type for storing image data.
+    A job type for storing and processing image data.
+
+    TODO: Consider allowing the `data` field of each image to be saved to hdf5...
+
+    Attributes:
+        images (DistributingList): A list of `Image` objects.
     """
 
     def __init__(self, project, job_name):
@@ -53,13 +58,27 @@ class ImageJob(GenericJob):
             raise ValueError("Images was expecting a list-like object, but got {}".format(type(val)))
 
     @staticmethod
-    def get_factors(n):
+    def _get_factors(n):
         i = int(n**0.5 + 0.5)
         while n % i != 0:
             i -= 1
         return i, int(n/i)
 
-    def plot(self, mask=None, subplots_kwargs=None, imshow_kwargs=None):
+    def plot(self, mask=None, subplots_kwargs=None, imshow_kwargs=None, hide_axes=True):
+        """
+        Make a simple matplotlib `imshow` plot for each of the images on a grid.
+
+        Args:
+            mask (list/numpy.ndarray): An integer index mask for selecting a subset of the images to plot.
+            subplots_kwargs (dict): Keyword arguments to pass to the figure generation. (Default is None.)
+            imshow_kwargs (dict): Keyword arguments to pass to the `imshow` plotting command. (Default is None.)
+            hide_axes (bool): Whether to hide axis ticks and labels. (Default is True.)
+
+        Returns:
+            (matplotlib.figure.Figure): The figure the plots are in.
+            (list): The axes the plot is on.
+        """
+
         if mask is not None:
             images = self.images[mask]
         else:
@@ -67,24 +86,43 @@ class ImageJob(GenericJob):
 
         subplots_kwargs = subplots_kwargs or {}
         imshow_kwargs = imshow_kwargs or {}
-        nrows, ncols = self.get_factors(len(images))
+        nrows, ncols = self._get_factors(len(images))
         fig, axes = plt.subplots(nrows=nrows, ncols=ncols, **subplots_kwargs)
         axes = np.atleast_2d(axes)
         for n, img in enumerate(images):
             i = int(np.floor(n / ncols))
             j = n % ncols
             ax = axes[i, j]
-            img.plot(ax=ax, imshow_kwargs=imshow_kwargs)
+            img.plot(ax=ax, imshow_kwargs=imshow_kwargs, hide_axes=hide_axes)
 
         fig.tight_layout()
         return fig, axes
 
     def add_image(self, source, metadata=None, as_grey=False):
+        """
+        Add an image to the job.
+
+        Args:
+            source (str/numpy.ndarray): The filepath to the data, or the raw array of data itself.
+            metadata (Metadata): The metadata associated with the source. (Default is None.)
+            as_grey (bool): Whether to interpret the new data as greyscale. (Default is False.)
+        """
+
         if not isfile(source):
             raise ValueError("Could not find a file at {}".format(source))
         self.images.append(Image(source=source, metadata=metadata, as_grey=as_grey))
 
     def add_images(self, sources, metadata=None, as_grey=False):
+        """
+        Add multiple images to the job.
+
+        Args:
+            sources (str/list/tuple/numpy.ndarray): When a string, uses the `glob` module to look for matching files.
+                When list-like, iteratively uses each element as a new source.
+            metadata (Metadata): The metadata associated with all these sources. (Default is None.)
+            as_grey (bool): Whether to interpret all this data as greyscale. (Default is False.)
+        """
+
         if isinstance(sources, str):
             for match in iglob(sources):
                 self.add_image(match, metadata=metadata, as_grey=as_grey)

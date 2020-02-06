@@ -26,6 +26,11 @@ __date__ = "Feb 3, 2020"
 
 
 class DistributingList(UserList):
+    """
+    A list-like class which resolves attribute and function calls by returning a list-like class of the corresponding
+    call on each child object.
+    """
+
     def __getattr__(self, item):
         return DistributingList([getattr(obj, item) for obj in self])
 
@@ -79,6 +84,11 @@ class ModuleScraper:
 
     Note:
         Doesn't do anything until its `activate` method is called.
+
+    TODO:
+        - Allow decorators also for classes
+        - Perhaps some sort of more complex mapping so that the decorators aren't just uniformly applied to every
+          function/class that's found, but can be selectively applied.
 
     Attributes:
         safe (bool): Whether to skip values beginning with an underscore. (Default is True, do skip.)

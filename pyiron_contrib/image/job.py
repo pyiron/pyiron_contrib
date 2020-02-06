@@ -46,6 +46,8 @@ class ImageJob(GenericJob):
         if isinstance(val, DistributingList):
             self._images = val
         elif isinstance(val, (tuple, list, np.ndarray)):
+            if not all([isinstance(obj, Image) for obj in val]):
+                raise ValueError("Only `Image`-type objects can be set to the `images` attribute.")
             self._images = DistributingList(val)
         else:
             raise ValueError("Images was expecting a list-like object, but got {}".format(type(val)))
@@ -57,13 +59,18 @@ class ImageJob(GenericJob):
             i -= 1
         return i, int(n/i)
 
-    def plot(self, subplots_kwargs=None, imshow_kwargs=None):
+    def plot(self, mask=None, subplots_kwargs=None, imshow_kwargs=None):
+        if mask is not None:
+            images = self.images[mask]
+        else:
+            images = self.images
+
         subplots_kwargs = subplots_kwargs or {}
         imshow_kwargs = imshow_kwargs or {}
-        nrows, ncols = self.get_factors(len(self.images))
+        nrows, ncols = self.get_factors(len(images))
         fig, axes = plt.subplots(nrows=nrows, ncols=ncols, **subplots_kwargs)
         axes = np.atleast_2d(axes)
-        for n, img in enumerate(self.images):
+        for n, img in enumerate(images):
             i = int(np.floor(n / ncols))
             j = n % ncols
             ax = axes[i, j]

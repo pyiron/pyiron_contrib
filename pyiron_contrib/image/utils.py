@@ -9,6 +9,7 @@ from importlib import import_module
 from pyiron_contrib.protocol.generic import LoggerMixin
 from weakref import WeakKeyDictionary
 from collections import UserList
+from operator import itemgetter
 
 """
 Code used by the image library which isn't specific to the task of images, but which doesn't have a home anywhere else
@@ -40,6 +41,14 @@ class DistributingList(UserList):
             return None
         else:
             return ret
+
+    def __getitem__(self, item):
+        if isinstance(item, slice):
+            return DistributingList(super(DistributingList, self).__getitem__(item))
+        elif isinstance(item, (list, tuple, np.ndarray)):
+            return DistributingList(itemgetter(*item)(self))
+        else:
+            return super(DistributingList, self).__getitem__(item)
 
 
 class LockedIfAttributeTrue(LoggerMixin):

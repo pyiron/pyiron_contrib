@@ -10,6 +10,7 @@ import numpy as np
 import skimage
 from matplotlib import pyplot as plt
 from skimage import io
+from collections import UserDict
 
 from pyiron_contrib.image.utils import ModuleScraper
 
@@ -133,6 +134,7 @@ class Image:
         self.as_grey = as_grey
 
         # Set metadata
+        self._metadata = None
         self.metadata = metadata or Metadata()
 
         # Apply wrappers
@@ -184,6 +186,21 @@ class Image:
     @property
     def shape(self):
         return self.data.shape
+
+    @property
+    def metadata(self):
+        return self._metadata
+
+    @metadata.setter
+    def metadata(self, new_metadata):
+        if new_metadata is None or isinstance(new_metadata, Metadata):
+            self._metadata = new_metadata
+        elif isinstance(new_metadata, dict):
+            self._metadata = Metadata(new_metadata)
+        else:
+            raise ValueError("Metadata field expected a `dict`, `Metadata`, or `None`, but got {}".format(
+                type(new_metadata))
+            )
 
     def __len__(self):
         return self.data.__len__()
@@ -267,15 +284,30 @@ class Image:
         self.overwrite_source(source, new_metadata=metadata, as_grey=as_grey)
 
 
-class Metadata:
-    def __init__(self, text=None):
-        self.text = text
+class Metadata(UserDict):
+    """
+    TODO: Leverage the generic to and from hdf functions written by Dominik over in pyiron_contrib/protocol
+    """
+
+    def __getattr__(self, item):
+        return self.data[item]
+        # return super(Metadata, self).__getitem__(item)
+
+    def __setattr__(self, key, value):
+        if key == "data":
+            self.__dict__[key] = value
+        else:
+            self.__dict__['data'][key] = value
 
     def to_hdf(self, hdf, group_name=None):
         with hdf.open(group_name) as hdf5_server:
             hdf5_server["TYPE"] = str(type(self))
-            hdf5_server["text"] = self.text
+            hdf5_server["KEYS"] = list(self.keys())
+            for k, v in self.items():
+                hdf5_server[k] = v
 
     def from_hdf(self, hdf, group_name=None):
         with hdf.open(group_name) as hdf5_server:
-            self.text = hdf5_server["text"]
+            keys = hdf5_server["KEYS"]
+            for k in keys:
+                self[k] = hdf5_server[k]

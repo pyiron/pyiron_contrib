@@ -61,6 +61,12 @@ class DistributingList(UserList):
     """
     A list-like class which resolves attribute and function calls by returning a list-like class of the corresponding
     call on each child object.
+
+    TODO:
+        - __dir__ for autocomplete?
+        - Elementwise decoration for in-place magic methods
+        - Setattr stuff
+        - Why do strings not have an __iadd__ method?! They clearly work with +=, so what is it calling?
     """
 
     def __getattr__(self, item):

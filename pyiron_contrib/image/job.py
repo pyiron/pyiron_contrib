@@ -167,6 +167,6 @@ class ImageJob(GenericJob):
             hdf = self.project_hdf5
         with hdf.open("images") as hdf5_server:
             for n in np.arange(hdf["n_images"], dtype=int):
-                img = Image()
+                img = Image(source=None)
                 img.from_hdf(hdf=hdf5_server, group_name="img{}".format(n))
                 self.images.append(img)

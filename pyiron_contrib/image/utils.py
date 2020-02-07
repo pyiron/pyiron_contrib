@@ -26,6 +26,37 @@ __status__ = "development"
 __date__ = "Feb 3, 2020"
 
 
+def _elementwise_other(function):
+    def wrapper(self, other):
+        if hasattr(other, '__len__') and len(other) == len(self):
+            return DistributingList(getattr(obj, function.__name__)(oth) for obj, oth in zip(self, other))
+        else:
+            return DistributingList(getattr(obj, function.__name__)(other) for obj in self)
+    return wrapper
+
+
+def _decorate_by_name(decorator, names):
+    def decorate(cls):
+        for name in names:
+            if hasattr(cls, name):
+                setattr(cls, name, decorator(getattr(cls, name)))
+        return cls
+    return decorate
+
+
+@_decorate_by_name(decorator=_elementwise_other,
+                   names=[
+                       '__eq__', '__ne__', '__lt__', '__gt__', '__le__', '__ge__',
+                       '__add__', '__sub__', '__mul__', '__floordiv__', '__div__',
+                       '__mod__', '__divmod__', '__pow__',
+                       '__lshift__', '__rshift__', '__and__', '__or__', '__xor__',
+                       '__radd__', '__rsub__', '__rmul__', '__rfloordiv__', '__rdiv__',
+                       '__rmod__', '__rdivmod__', '__rpow__',
+                       '__rlshift__', '__rrshift__', '__rand__', '__ror__', '__rxor__',
+                       '__iadd__', '__isub__', '__imul__', '__ifloordiv__', '__idiv__',
+                       '__imod__', '__idivmod__', '__ipow__',
+                       '__ilshift__', '__irshift__', '__iand__', '__ior__', '__ixor__',
+                   ])
 class DistributingList(UserList):
     """
     A list-like class which resolves attribute and function calls by returning a list-like class of the corresponding
@@ -46,7 +77,10 @@ class DistributingList(UserList):
         if isinstance(item, slice):
             return DistributingList(super(DistributingList, self).__getitem__(item))
         elif isinstance(item, (list, tuple, np.ndarray)):
-            return DistributingList(itemgetter(*item)(self))
+            if len(self) == len(item) and all(isinstance(i, bool) for i in item):
+                return DistributingList(obj for obj, i in zip(self, item) if i)
+            else:
+                return DistributingList(itemgetter(*item)(self))
         else:
             return super(DistributingList, self).__getitem__(item)
 
@@ -203,12 +237,16 @@ class ModuleScraper:
         self._activated = True
 
     def __getattr__(self, item):
-        if inspect.ismodule(self._module):
-            name = self._module.__name__.split('.')[-1]
+        if not self._activated:
+            self.activate()
+            return getattr(self, item)
         else:
-            name = self._module.split('.')[-1]
-        raise AttributeError(
-            "'{0}' has no attribute '{1}'. Try running '....{0}.activate()' first.".format(name, item))
+            if inspect.ismodule(self._module):
+                name = self._module.__name__.split('.')[-1]
+            else:
+                name = self._module.split('.')[-1]
+            raise AttributeError(
+                "'{0}' has no attribute '{1}' first.".format(name, item))
 
     def to_hdf(self):
         pass

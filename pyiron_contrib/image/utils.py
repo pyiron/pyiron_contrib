@@ -40,7 +40,7 @@ class DistributingList(UserList):
         if all(x is None for x in ret):
             return None
         else:
-            return ret
+            return DistributingList(ret)
 
     def __getitem__(self, item):
         if isinstance(item, slice):

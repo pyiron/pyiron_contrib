@@ -11,6 +11,7 @@ from glob import iglob
 
 from pyiron_contrib.image.image import Image
 from pyiron_contrib.image.utils import DistributingList
+from pyiron_contrib.image.custom_filters import brightness_filter
 
 """
 Store and process image data within the pyiron framework. Functionality of the `skimage` library is automatically 
@@ -41,6 +42,8 @@ class ImageJob(GenericJob):
         super(ImageJob, self).__init__(project, job_name)
         self.__name__ = "ImageJob"
         self._images = DistributingList()
+        self.input = DotDict()
+        self.output = DotDict()
 
     @property
     def images(self):
@@ -131,12 +134,36 @@ class ImageJob(GenericJob):
                 self.add_image(source, metadata=metadata, as_grey=as_grey)
 
     def run(self, run_again=False, repair=False, debug=False, run_mode=None):
-        # This is just a place holder to stop the job from even *starting* to run until run_static is implemented
-        raise NotImplementedError
+        super(ImageJob, self).run(run_again=run_again, repair=repair, debug=debug, run_mode=run_mode)
 
     def run_static(self):
-        # TODO: Take a modifier chain as input and apply all modifiers on run
-        raise NotImplementedError
+        """This is just a toy example right now."""
+        self.status.running = True
+        if hasattr(self.input, 'filter') and self.input.filter == 'brightness_filter':
+            fractions = []
+            cutoffs = []
+            masks = []
+            for img in self.images:
+                frac, cut, mask = brightness_filter(img)
+                fractions.append(frac)
+                cutoffs.append(cut)
+                masks.append(mask)
+            self.output.fractions = np.array(fractions)
+            self.output.cutoffs = np.array(cutoffs)
+            self.output.masks = np.array(masks)
+
+        else:
+            self.logger.warning("Didn't run anything. Check input.")
+        self.status.collect = True
+        self.run()
+
+    def write_input(self):
+        """Must define abstract method"""
+        pass
+
+    def collect_output(self):
+        """Must define abstract method"""
+        self.to_hdf()
 
     def to_hdf(self, hdf=None, group_name=None):
         """
@@ -152,6 +179,12 @@ class ImageJob(GenericJob):
         with hdf.open("images") as hdf5_server:
             for n, image in enumerate(self.images):
                 image.to_hdf(hdf=hdf5_server, group_name="img{}".format(n))
+        with hdf.open("input") as hdf5_server:
+            for k, v in self.input.items():
+                hdf5_server[k] = v
+        with hdf.open("output") as hdf5_server:
+            for k, v in self.output.items():
+                hdf5_server[k] = v
         hdf["n_images"] = n + 1
 
     def from_hdf(self, hdf=None, group_name=None):
@@ -170,3 +203,19 @@ class ImageJob(GenericJob):
                 img = Image(source=None)
                 img.from_hdf(hdf=hdf5_server, group_name="img{}".format(n))
                 self.images.append(img)
+        with hdf.open("input") as hdf5_server:
+            for k in hdf5_server.list_nodes():
+                self.input[k] = hdf5_server[k]
+        with hdf.open("output") as hdf5_server:
+            for k in hdf5_server.list_nodes():
+                self.output[k] = hdf5_server[k]
+
+
+class DotDict(dict):
+    """A dictionary which allows `.` setting and getting for items."""
+
+    def __setattr__(self, key, value):
+        self.__setitem__(key, value)
+
+    def __getattr__(self, item):
+        return self.__getitem__(item)

@@ -8,6 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from os.path import isfile
 from glob import iglob
+from os.path import abspath
 
 from pyiron_contrib.image.image import Image
 from pyiron_contrib.image.utils import DistributingList
@@ -101,7 +102,7 @@ class ImageJob(GenericJob):
         fig.tight_layout()
         return fig, axes
 
-    def add_image(self, source, metadata=None, as_grey=False):
+    def add_image(self, source, metadata=None, as_grey=False, relative_path=True):
         """
         Add an image to the job.
 
@@ -109,10 +110,14 @@ class ImageJob(GenericJob):
             source (str/numpy.ndarray): The filepath to the data, or the raw array of data itself.
             metadata (Metadata): The metadata associated with the source. (Default is None.)
             as_grey (bool): Whether to interpret the new data as greyscale. (Default is False.)
+            relative_path (bool): Whether the path provided is relative. (Default is True, automatically converts to an
+                absolute path before setting the `source` value of the image.)
         """
 
-        if not isfile(source):
-            raise ValueError("Could not find a file at {}".format(source))
+        if not isfile(source) and not isinstance(source, np.ndarray):
+            raise ValueError("Could not find a file at {}, nor is source an array.".format(source))
+        if isinstance(source, str) and relative_path:
+            source = abspath(source)
         self.images.append(Image(source=source, metadata=metadata, as_grey=as_grey))
 
     def add_images(self, sources, metadata=None, as_grey=False):
@@ -124,6 +129,8 @@ class ImageJob(GenericJob):
                 When list-like, iteratively uses each element as a new source.
             metadata (Metadata): The metadata associated with all these sources. (Default is None.)
             as_grey (bool): Whether to interpret all this data as greyscale. (Default is False.)
+            relative_path (bool): Whether the path provided is relative. (Default is True, automatically converts to an
+                absolute path before setting the `source` value of the image.)
         """
 
         if isinstance(sources, str):

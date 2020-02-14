@@ -4,16 +4,17 @@
 
 from __future__ import print_function
 
-
-from pyiron_contrib.protocol.generic import CompoundVertex
-from pyiron_contrib.protocol.list import SerialList, AutoList, ParallelList
-from pyiron_contrib.protocol.primitive.fts_vertices import StringRecenter, StringReflect, PositionsRunningAverage, \
-    CentroidsRunningAverageMix, CentroidsSmoothing, CentroidsReparameterization, MilestoningVertex
+from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
 from pyiron_contrib.protocol.primitive.one_state import InterpolatePositions, RandomVelocity, \
-    ExternalHamiltonian, VerletPositionUpdate, VerletVelocityUpdate, \
-    Counter, Zeros, WelfordOnline, SphereReflection
+    ExternalHamiltonian, VerletPositionUpdate, VerletVelocityUpdate, Counter, Zeros, WelfordOnline, \
+    SphereReflection
 from pyiron_contrib.protocol.primitive.two_state import IsGEq, ModIsZero
+from pyiron_contrib.protocol.primitive.fts_vertices import StringRecenter, StringReflect, \
+    PositionsRunningAverage, CentroidsRunningAverageMix, CentroidsSmoothing, CentroidsReparameterization, \
+    MilestoningVertex
+from pyiron_contrib.protocol.list import SerialList, AutoList, ParallelList
 from pyiron_contrib.protocol.utils import Pointer
+
 import numpy as np
 import matplotlib.pyplot as plt
 from ase.geometry import find_mic
@@ -33,7 +34,7 @@ __status__ = "development"
 __date__ = "23 July, 2019"
 
 
-class StringRelaxation(CompoundVertex):
+class StringEvolution(CompoundVertex):
     """
     Runs Finite Temperature String relaxation
 
@@ -66,15 +67,36 @@ class StringRelaxation(CompoundVertex):
     TODO: Wire it so sphere reflection is optional
     """
 
-    def __init__(self, project=None, name=None, job_name=None):
-        super(StringRelaxation, self).__init__(project=project, name=name, job_name=job_name)
+    DefaultWhitelist = {
+        'calc_static_centroids': {
+            'output': {
+                'energy_pot': 1,
+            },
+        },
+
+        'reparameterize': {
+            'output': {
+                'centroids_pos_list': 1,
+            },
+        },
+
+        'verlet_velocities': {
+            'output': {
+                'energy_kin': 1,
+            },
+        },
+    }
+
+    def __init__(self, **kwargs):
+        super(StringEvolution, self).__init__(**kwargs)
 
         # Protocol defaults
         id_ = self.input.default
+        id_.n_steps = 100
 
         id_.relax_endpoints = False
         id_.mixing_fraction = 0.1
-        id_.nominal_smoothing = 0.1
+        id_.nominal_smoothing = 0.01
         id_.temperature_damping_timescale = 100.
         id_.overheat_fraction = 2.
         id_.time_step = 1.
@@ -297,6 +319,10 @@ class StringRelaxation(CompoundVertex):
         plt.xlabel('Image')
         plt.ylabel('Energy [eV]')
         return energies
+
+
+class ProtocolStringEvolution(Protocol, StringEvolution):
+    pass
 
 
 class VirtualWork(CompoundVertex):

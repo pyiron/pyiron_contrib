@@ -345,12 +345,13 @@ class HarmonicHamiltonian(PrimitiveVertex):
         }
 
 
-class InterpolatePositions(PrimitiveVertex):
+class InitialPositions(PrimitiveVertex):
     """
-    Creates interpolated positions between the positions of an initial and final structure.
-    Returns only interpolated positions and not structures.
+    Assigns initial positions. If no initial positions are specified, interpolates between the positions of the
+    initial and the final structures.
 
     Input attributes:
+        initial positions (list/numpy.ndarray): The initial positions
         structure_initial (Atoms): The initial structure
         structure_initial (Atoms): The final structure
         n_images (int): Number of structures to interpolate
@@ -361,21 +362,28 @@ class InterpolatePositions(PrimitiveVertex):
     """
 
     def __init__(self, name=None):
-        super(InterpolatePositions, self).__init__(name=name)
+        super(InitialPositions, self).__init__(name=name)
+        self.input.default.initial_positions = None
 
-    def command(self, structure_initial, structure_final, n_images):
-        pos_i = structure_initial.positions
-        pos_f = structure_final.positions
-        cell = structure_initial.cell
-        pbc = structure_initial.pbc
-        displacement = find_mic(pos_f - pos_i, cell, pbc)[0]
+    def command(self, initial_positions, structure_initial, structure_final, n_images):
 
-        interpolated_positions = []
-        for n, mix in enumerate(np.linspace(0, 1, n_images)):
-            interpolated_positions += [pos_i + (mix * displacement)]
+        if initial_positions is None:
+            pos_i = structure_initial.positions
+            pos_f = structure_final.positions
+            cell = structure_initial.cell
+            pbc = structure_initial.pbc
+            displacement = find_mic(pos_f - pos_i, cell, pbc)[0]
+
+            initial_positions = []
+            for n, mix in enumerate(np.linspace(0, 1, n_images)):
+                initial_positions += [pos_i + (mix * displacement)]
+
+        else:
+            if len(initial_positions) != n_images:
+                raise TypeError("Length of positions is not the same as n_images!")
 
         return {
-            'interpolated_positions': interpolated_positions
+            'initial_positions': initial_positions
         }
 
 
@@ -721,14 +729,15 @@ class SphereReflection(PrimitiveVertex):
         super(SphereReflection, self).__init__(name=name)
         self.input.default.forces = None
         self.input.default.previous_forces = None
+        self.input.default.atom_reflect_switch = True
         # self.input.default.previous_velocities = Pointer(self.input.velocities)
 
     def command(self, reference_positions, cutoff_distance, positions, velocities, previous_positions,
-                previous_velocities, pbc, cell, forces, previous_forces):
+                previous_velocities, pbc, cell, forces, previous_forces, atom_reflect_switch):
         distance = np.linalg.norm(find_mic(reference_positions - positions, cell=cell, pbc=pbc)[0], axis=-1)
         is_at_home = (distance < cutoff_distance)[:, np.newaxis]
 
-        if np.all(is_at_home):
+        if np.all(is_at_home) or atom_reflect_switch is False:
             return {
                 'positions': positions,
                 'velocities': velocities,
@@ -736,6 +745,7 @@ class SphereReflection(PrimitiveVertex):
                 'reflected': False
             }
         else:
+            print('sphere_reflected')
             return {
                 'positions': previous_positions,
                 'velocities': -previous_velocities,
@@ -772,7 +782,7 @@ class SphereReflectionPeratom(PrimitiveVertex):
         # self.input.default.previous_velocities = Pointer(self.input.velocities)
 
     def command(self, reference_positions, cutoff_distance, positions, velocities, previous_positions,
-                previous_velocities, pbc, cell):
+                previous_velocities, forces, previous_forces, pbc, cell):
         distance = np.linalg.norm(find_mic(reference_positions - positions, cell=cell, pbc=pbc)[0], axis=-1)
         is_at_home = (distance < cutoff_distance)[:, np.newaxis]
         is_away = 1 - is_at_home
@@ -780,6 +790,7 @@ class SphereReflectionPeratom(PrimitiveVertex):
         return {
             'positions': is_at_home * positions + is_away * previous_positions,
             'velocities': is_at_home * velocities + is_away * -previous_velocities,
+            'forces': is_at_home * forces + is_away * previous_forces,
             'reflected': is_away.astype(bool).flatten()
         }
 

@@ -5,9 +5,9 @@
 from __future__ import print_function
 
 from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
-from pyiron_contrib.protocol.primitive.one_state import InterpolatePositions, RandomVelocity, \
+from pyiron_contrib.protocol.primitive.one_state import InitialPositions, RandomVelocity, \
     ExternalHamiltonian, VerletPositionUpdate, VerletVelocityUpdate, Counter, Zeros, WelfordOnline, \
-    SphereReflection
+    SphereReflection, SphereReflectionPeratom
 from pyiron_contrib.protocol.primitive.two_state import IsGEq, ModIsZero
 from pyiron_contrib.protocol.primitive.fts_vertices import StringRecenter, StringReflect, \
     PositionsRunningAverage, CentroidsRunningAverageMix, CentroidsSmoothing, CentroidsReparameterization, \
@@ -17,6 +17,7 @@ from pyiron_contrib.protocol.utils import Pointer
 
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
 from ase.geometry import find_mic
 from scipy.constants import femto as FS
 
@@ -40,6 +41,8 @@ class StringEvolution(CompoundVertex):
 
     Input attributes:
         ref_job_full_path (string): The path to the saved reference job to use for calculating forces and energies.
+        initial_positions (list/np.ndarray): The initial positions of the images (preferably from NEB).
+            Default is None)
         structure_initial (Atoms): The initial structure.
         structure_initial (Atoms): The final structure.
         n_images (int): Number of centroids/images.
@@ -71,20 +74,8 @@ class StringEvolution(CompoundVertex):
         'calc_static_centroids': {
             'output': {
                 'energy_pot': 1,
-            },
-        },
-
-        'reparameterize': {
-            'output': {
-                'centroids_pos_list': 1,
-            },
-        },
-
-        'verlet_velocities': {
-            'output': {
-                'energy_kin': 1,
-            },
-        },
+            }
+        }
     }
 
     def __init__(self, **kwargs):
@@ -92,19 +83,24 @@ class StringEvolution(CompoundVertex):
 
         # Protocol defaults
         id_ = self.input.default
+        id_.initial_positions = None
         id_.n_steps = 100
+        id_.thermalization_steps = 10
 
         id_.relax_endpoints = False
+        id_.reset = False
         id_.mixing_fraction = 0.1
         id_.nominal_smoothing = 0.01
         id_.temperature_damping_timescale = 100.
         id_.overheat_fraction = 2.
         id_.time_step = 1.
+        id_.sampling_period = 1.
+        id_.atom_reflect_switch = True
 
     def define_vertices(self):
         # Graph components
         g = self.graph
-        g.interpolate_positions = InterpolatePositions()
+        g.initial_positions = InitialPositions()
         g.initial_velocities = SerialList(RandomVelocity)
         g.initial_forces = Zeros()
         g.check_steps = IsGEq()
@@ -114,8 +110,8 @@ class StringEvolution(CompoundVertex):
         g.reflect_string = SerialList(StringReflect)
         g.reflect_atoms = SerialList(SphereReflection)
         g.check_thermalized = IsGEq()
-        g.check_sampling_period = ModIsZero()
         g.running_average = PositionsRunningAverage()
+        g.check_sampling_period = ModIsZero()
         g.mix = CentroidsRunningAverageMix()
         g.smooth = CentroidsSmoothing()
         g.reparameterize = CentroidsReparameterization()
@@ -127,18 +123,18 @@ class StringEvolution(CompoundVertex):
         # Execution flow
         g = self.graph
         g.make_pipeline(
-            g.interpolate_positions,
+            g.initial_positions,
             g.initial_velocities,
             g.initial_forces,
             g.check_steps, 'false',
             g.verlet_positions,
-            g.reflect_string,  # Comes before atomic reflecting so we can actually trigger a full string reflection!
-            g.reflect_atoms,  # Comes after, since even if the string doesn't reflect, on atom might have migrated
             g.calc_static_images,
             g.verlet_velocities,
+            g.reflect_string,  # Comes before atomic reflecting so we can actually trigger a full string reflection!
+            g.reflect_atoms,  # Comes after, since even if the string doesn't reflect, on atom might have migrated
             g.check_thermalized, 'true',
-            g.check_sampling_period, 'true',
             g.running_average,
+            g.check_sampling_period, 'true',
             g.mix,
             g.smooth,
             g.reparameterize,
@@ -149,7 +145,7 @@ class StringEvolution(CompoundVertex):
         )
         g.make_edge(g.check_thermalized, g.recenter, 'false')
         g.make_edge(g.check_sampling_period, g.recenter, 'false')
-        g.starting_vertex = g.interpolate_positions
+        g.starting_vertex = g.initial_positions
         g.restarting_vertex = g.check_steps
 
     def define_information_flow(self):
@@ -158,10 +154,11 @@ class StringEvolution(CompoundVertex):
         gp = Pointer(self.graph)
         ip = Pointer(self.input)
 
-        # interpolate_positions
-        g.interpolate_positions.input.structure_initial = ip.structure_initial
-        g.interpolate_positions.input.structure_final = ip.structure_final
-        g.interpolate_positions.input.n_images = ip.n_images
+        # initial_positions
+        g.initial_positions.input.structure_initial = ip.structure_initial
+        g.initial_positions.input.structure_final = ip.structure_final
+        g.initial_positions.input.initial_positions = ip.initial_positions
+        g.initial_positions.input.n_images = ip.n_images
 
         # initial_velocities
         g.initial_velocities.input.n_children = ip.n_images
@@ -183,57 +180,19 @@ class StringEvolution(CompoundVertex):
         g.verlet_positions.direct.temperature = ip.temperature
         g.verlet_positions.direct.temperature_damping_timescale = ip.temperature_damping_timescale
 
-        g.verlet_positions.broadcast.default.positions = gp.interpolate_positions.output.interpolated_positions[-1]
+        g.verlet_positions.broadcast.default.positions = gp.initial_positions.output.initial_positions[-1]
         g.verlet_positions.broadcast.default.velocities = gp.initial_velocities.output.velocities[-1]
         g.verlet_positions.direct.default.forces = gp.initial_forces.output.zeros[-1]
 
         g.verlet_positions.broadcast.positions = gp.recenter.output.positions[-1]
-        g.verlet_positions.broadcast.velocities = gp.verlet_velocities.output.velocities[-1]
+        g.verlet_positions.broadcast.velocities = gp.reflect_atoms.output.velocities[-1]
         g.verlet_positions.broadcast.forces = gp.recenter.output.forces[-1]
-
-        # reflect string
-        g.reflect_string.input.n_children = ip.n_images
-        g.reflect_string.direct.cell = ip.structure_initial.cell
-        g.reflect_string.direct.pbc = ip.structure_initial.pbc
-
-        g.reflect_string.direct.default.all_centroid_positions = \
-            gp.interpolate_positions.output.interpolated_positions[-1]
-        g.reflect_string.broadcast.default.centroid_positions = \
-            gp.interpolate_positions.output.interpolated_positions[-1]
-        g.reflect_string.broadcast.default.previous_positions = \
-            gp.interpolate_positions.output.interpolated_positions[-1]
-        g.reflect_string.broadcast.default.previous_velocities = gp.initial_velocities.output.velocities[-1]
-
-        g.reflect_string.direct.all_centroid_positions = gp.reparameterize.output.centroids_pos_list[-1]
-        g.reflect_string.broadcast.centroid_positions = gp.reparameterize.output.centroids_pos_list[-1]
-        g.reflect_string.broadcast.previous_positions = gp.recenter.output.positions[-1]
-        g.reflect_string.broadcast.previous_velocities = gp.verlet_velocities.output.velocities[-1]
-
-        g.reflect_string.broadcast.positions = gp.verlet_positions.output.positions[-1]
-        g.reflect_string.broadcast.velocities = gp.verlet_positions.output.velocities[-1]
-
-        # reflect individual atoms which stray too far
-        g.reflect_atoms.input.n_children = ip.n_images
-        g.reflect_atoms.broadcast.default.reference_positions = \
-            gp.interpolate_positions.output.interpolated_positions[-1]
-        g.reflect_atoms.broadcast.default.previous_positions = \
-            gp.interpolate_positions.output.interpolated_positions[-1]
-        g.reflect_atoms.broadcast.default.previous_velocities = gp.initial_velocities.output.velocities[-1]
-
-        g.reflect_atoms.broadcast.reference_positions = gp.reparameterize.output.centroids_pos_list[-1]
-        g.reflect_atoms.broadcast.positions = gp.reflect_string.output.positions[-1]
-        g.reflect_atoms.broadcast.velocities = gp.reflect_string.output.velocities[-1]
-        g.reflect_atoms.broadcast.previous_positions = gp.recenter.output.positions[-1]
-        g.reflect_atoms.broadcast.previous_velocities = gp.verlet_velocities.output.velocities[-1]
-        g.reflect_atoms.direct.cutoff_distance = ip.reflection_cutoff_distance
-        g.reflect_atoms.direct.cell = ip.structure_initial.cell
-        g.reflect_atoms.direct.pbc = ip.structure_initial.pbc
 
         # calc_static_images
         g.calc_static_images.input.n_children = ip.n_images
         g.calc_static_images.direct.ref_job_full_path = ip.ref_job_full_path
         g.calc_static_images.direct.structure = ip.structure_initial
-        g.calc_static_images.broadcast.positions = gp.reflect_atoms.output.positions[-1]
+        g.calc_static_images.broadcast.positions = gp.verlet_positions.output.positions[-1]
 
         # verlet_velocities
         g.verlet_velocities.input.n_children = ip.n_images
@@ -242,29 +201,76 @@ class StringEvolution(CompoundVertex):
         g.verlet_velocities.direct.temperature = ip.temperature
         g.verlet_velocities.direct.temperature_damping_timescale = ip.temperature_damping_timescale
 
-        g.verlet_velocities.broadcast.velocities = gp.reflect_atoms.output.velocities[-1]
+        g.verlet_velocities.broadcast.velocities = gp.verlet_positions.output.velocities[-1]
         g.verlet_velocities.broadcast.forces = gp.calc_static_images.output.forces[-1]
+
+        # reflect string
+        g.reflect_string.input.n_children = ip.n_images
+        g.reflect_string.direct.cell = ip.structure_initial.cell
+        g.reflect_string.direct.pbc = ip.structure_initial.pbc
+
+        g.reflect_string.direct.default.all_centroid_positions = \
+            gp.initial_positions.output.initial_positions[-1]
+        g.reflect_string.broadcast.default.centroid_positions = \
+            gp.initial_positions.output.initial_positions[-1]
+        g.reflect_string.broadcast.default.previous_positions = \
+            gp.initial_positions.output.initial_positions[-1]
+        g.reflect_string.broadcast.default.previous_velocities = gp.initial_velocities.output.velocities[-1]
+        g.reflect_string.broadcast.default.previous_forces = gp.initial_forces.output.zeros[-1]
+
+        g.reflect_string.direct.all_centroid_positions = gp.reparameterize.output.centroids_pos_list[-1]
+        g.reflect_string.broadcast.centroid_positions = gp.reparameterize.output.centroids_pos_list[-1]
+        g.reflect_string.broadcast.previous_positions = gp.recenter.output.positions[-1]
+        g.reflect_string.broadcast.previous_velocities = gp.verlet_velocities.output.velocities[-1]
+        g.reflect_string.broadcast.previous_forces = gp.recenter.output.forces[-1]
+
+        g.reflect_string.broadcast.positions = gp.verlet_positions.output.positions[-1]
+        g.reflect_string.broadcast.velocities = gp.verlet_velocities.output.velocities[-1]
+        g.reflect_string.broadcast.forces = gp.calc_static_images.output.forces[-1]
+
+        # reflect individual atoms which stray too far
+        g.reflect_atoms.input.n_children = ip.n_images
+        g.reflect_atoms.broadcast.default.reference_positions = \
+            gp.initial_positions.output.initial_positions[-1]
+        g.reflect_atoms.broadcast.default.previous_positions = \
+            gp.initial_positions.output.initial_positions[-1]
+        g.reflect_atoms.broadcast.default.previous_velocities = gp.initial_velocities.output.velocities[-1]
+        g.reflect_atoms.broadcast.default.previous_forces = gp.initial_forces.output.zeros[-1]
+
+        g.reflect_atoms.broadcast.reference_positions = gp.reparameterize.output.centroids_pos_list[-1]
+        # g.reflect_atoms.broadcast.reference_positions = gp.initial_positions.output.initial_positions[-1]
+        g.reflect_atoms.broadcast.positions = gp.reflect_string.output.positions[-1]
+        g.reflect_atoms.broadcast.velocities = gp.reflect_string.output.velocities[-1]
+        g.reflect_atoms.broadcast.forces = gp.reflect_string.output.forces[-1]
+        g.reflect_atoms.broadcast.previous_positions = gp.recenter.output.positions[-1]
+        g.reflect_atoms.broadcast.previous_velocities = gp.reflect_string.output.velocities[-1]
+        g.reflect_atoms.broadcast.previous_forces = gp.recenter.output.forces[-1]
+        g.reflect_atoms.direct.cutoff_distance = ip.reflection_cutoff_distance
+        g.reflect_atoms.direct.cell = ip.structure_initial.cell
+        g.reflect_atoms.direct.pbc = ip.structure_initial.pbc
+        g.reflect_atoms.direct.atom_reflect_switch = ip.atom_reflect_switch
 
         # check_thermalized
         g.check_thermalized.input.target = gp.clock.output.n_counts[-1]
-        g.check_thermalized.input.threshold = ip.thermalization_steps
+        g.check_thermalized.input.default.threshold = ip.thermalization_steps
 
         # check_sampling_period
         g.check_sampling_period.input.target = gp.clock.output.n_counts[-1]
-        g.check_sampling_period.input.default.mod = Pointer(self.archive.period)
-        g.check_sampling_period.input.mod = ip.sampling_period
+        g.check_sampling_period.input.default.mod = ip.sampling_period
 
         # running_average
         g.running_average.input.default.running_average_list = \
-            gp.interpolate_positions.output.interpolated_positions[-1]
+            gp.initial_positions.output.initial_positions[-1]
         g.running_average.input.running_average_list = gp.running_average.output.running_average_list[-1]
         g.running_average.input.positions_list = gp.reflect_atoms.output.positions[-1]
+        g.running_average.input.sampling_period = ip.sampling_period
+        g.running_average.input.reset = ip.reset
         g.running_average.input.relax_endpoints = ip.relax_endpoints
         g.running_average.input.cell = ip.structure_initial.cell
         g.running_average.input.pbc = ip.structure_initial.pbc
 
         # mix
-        g.mix.input.default.centroids_pos_list = gp.interpolate_positions.output.interpolated_positions[-1]
+        g.mix.input.default.centroids_pos_list = gp.initial_positions.output.initial_positions[-1]
         g.mix.input.centroids_pos_list = gp.reparameterize.output.centroids_pos_list[-1]
         g.mix.input.mixing_fraction = ip.mixing_fraction
         g.mix.input.running_average_list = gp.running_average.output.running_average_list[-1]
@@ -292,15 +298,15 @@ class StringEvolution(CompoundVertex):
         g.recenter.direct.cell = ip.structure_initial.cell
         g.recenter.direct.pbc = ip.structure_initial.pbc
 
-        g.recenter.direct.default.all_centroid_positions = gp.interpolate_positions.output.interpolated_positions[-1]
-        g.recenter.broadcast.default.centroid_positions = gp.interpolate_positions.output.interpolated_positions[-1]
+        g.recenter.direct.default.all_centroid_positions = gp.initial_positions.output.initial_positions[-1]
+        g.recenter.broadcast.default.centroid_positions = gp.initial_positions.output.initial_positions[-1]
         g.recenter.direct.default.centroid_forces = gp.initial_forces.output.zeros[-1]
 
         g.recenter.direct.all_centroid_positions = gp.reparameterize.output.centroids_pos_list[-1]
         g.recenter.broadcast.centroid_positions = gp.reparameterize.output.centroids_pos_list[-1]
         g.recenter.broadcast.centroid_forces = gp.calc_static_centroids.output.forces[-1]
         g.recenter.broadcast.positions = gp.reflect_atoms.output.positions[-1]
-        g.recenter.broadcast.forces = gp.calc_static_images.output.forces[-1]
+        g.recenter.broadcast.forces = gp.reflect_atoms.output.forces[-1]
 
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
 
@@ -312,13 +318,42 @@ class StringEvolution(CompoundVertex):
             'forces': ~gp.calc_static_centroids.output.forces[-1]
         }
 
-    def plot_potential_energy(self, frame=-1):
-        energies = self.graph.calc_static_centroids.archive.output.energy_pot[frame]
-        energies -= np.amin(energies)
-        plt.plot(energies, marker='o')
-        plt.xlabel('Image')
-        plt.ylabel('Energy [eV]')
-        return energies
+    def _get_energies(self, frame=None):
+        if frame is None:
+            return self.graph.calc_static_centroids.output.energy_pot[-1]
+        else:
+            return self.graph.calc_static_centroids.archive.output.energy_pot.data[frame]
+
+    def plot_string(self, ax=None, frame=None, plot_kwargs=None):
+        if ax is None:
+            _, ax = plt.subplots()
+        if plot_kwargs is None:
+            plot_kwargs = {}
+        if 'marker' not in plot_kwargs.keys():
+            plot_kwargs = {'marker': 'o'}
+        energies = np.array(self._get_energies(frame=frame))
+        ax.plot(energies - energies[0], **plot_kwargs)
+        ax.set_ylabel("Energy")
+        ax.set_xlabel("Centroid")
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+        return ax
+
+    def get_forward_barrier(self, frame=None):
+        """
+        Get the energy barrier from the 0th image to the highest energy (saddle state).
+        """
+        energies = self._get_energies(frame=frame)
+        return np.amax(energies) - energies[0]
+
+    def get_reverse_barrier(self, frame=None):
+        """
+        Get the energy barrier from the final image to the highest energy (saddle state).
+        """
+        energies = self._get_energies(frame=frame)
+        return np.amax(energies) - energies[-1]
+
+    def get_barrier(self, frame=None):
+        return self.get_forward_barrier(frame=frame)
 
 
 class ProtocolStringEvolution(Protocol, StringEvolution):

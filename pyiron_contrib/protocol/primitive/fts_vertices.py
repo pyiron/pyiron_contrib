@@ -98,6 +98,7 @@ class StringRecenter(StringDistances):
                 'recentered': False,
             }
         else:
+            print('recenter')
             return {
                 'positions': centroid_positions,
                 'forces': centroid_forces,
@@ -145,6 +146,7 @@ class StringReflect(StringDistances):
                 'reflected': False
             }
         else:
+            print('string_reflect')
             return {
                 'positions': previous_positions,
                 'velocities': -previous_velocities,
@@ -174,8 +176,19 @@ class PositionsRunningAverage(PrimitiveVertex):
     def __init__(self, name=None):
         super(PositionsRunningAverage, self).__init__(name=name)
         self._divisor = 1
+        self.input.default.reset = False
 
-    def command(self, positions_list, running_average_list, relax_endpoints, cell, pbc):
+    def command(self, positions_list, running_average_list, relax_endpoints, cell, pbc, sampling_period, reset):
+
+        if self._divisor > sampling_period and reset is True:
+            print('running_average_reset')
+            for i, pos in enumerate(positions_list):
+                if (i == 0 or i == len(positions_list) - 1) and not relax_endpoints:
+                    continue
+                else:
+                    running_average_list[i] = pos
+            self._divisor = 1
+
         # On the first step, divide by 2 to average two positions
         self._divisor += 1
         # How much of the current step to mix into the average

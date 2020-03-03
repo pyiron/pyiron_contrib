@@ -6,7 +6,7 @@ from __future__ import print_function
 
 from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
 from pyiron_contrib.protocol.primitive.one_state import Counter, ExternalHamiltonian, GradientDescent, \
-    NEBForces, InterpolatePositions
+    NEBForces, InitialPositions
 from pyiron_contrib.protocol.primitive.two_state import IsGEq
 from pyiron_contrib.protocol.list import SerialList, ParallelList, AutoList
 from pyiron_contrib.protocol.utils import Pointer
@@ -86,7 +86,7 @@ class NEB(CompoundVertex):
     def define_vertices(self):
         # Graph components
         g = self.graph
-        g.interpolate_images = InterpolatePositions()
+        g.interpolate_images = InitialPositions()
         g.check_steps = IsGEq()
         g.calc_static = AutoList(ExternalHamiltonian)
         g.neb_forces = NEBForces()
@@ -124,10 +124,10 @@ class NEB(CompoundVertex):
         g.calc_static.input.n_children = ip.n_images
         g.calc_static.direct.ref_job_full_path = ip.ref_job_full_path
         g.calc_static.direct.structure = ip.structure_initial
-        g.calc_static.broadcast.default.positions = gp.interpolate_images.output.interpolated_positions[-1]
+        g.calc_static.broadcast.default.positions = gp.interpolate_images.output.initial_positions[-1]
         g.calc_static.broadcast.positions = gp.gradient_descent.output.positions[-1]
 
-        g.neb_forces.input.default.positions_list = gp.interpolate_images.output.interpolated_positions[-1]
+        g.neb_forces.input.default.positions_list = gp.interpolate_images.output.initial_positions[-1]
         g.neb_forces.input.positions_list = gp.gradient_descent.output.positions[-1]
         g.neb_forces.input.energies = gp.calc_static.output.energy_pot[-1]
         g.neb_forces.input.forces_list = gp.calc_static.output.forces[-1]
@@ -139,7 +139,7 @@ class NEB(CompoundVertex):
         g.neb_forces.input.smoothing = ip.smoothing
 
         g.gradient_descent.input.n_children = ip.n_images
-        g.gradient_descent.broadcast.default.positions = gp.interpolate_images.output.interpolated_positions[-1]
+        g.gradient_descent.broadcast.default.positions = gp.interpolate_images.output.initial_positions[-1]
         g.gradient_descent.broadcast.positions = gp.gradient_descent.output.positions[-1]
         g.gradient_descent.broadcast.forces = gp.neb_forces.output.forces_list[-1]
         g.gradient_descent.direct.masses = ip.structure_initial.get_masses
@@ -161,7 +161,7 @@ class NEB(CompoundVertex):
         if frame is None:
             return self.graph.calc_static.output.energy_pot[-1]
         else:
-            return self.graph.calc_static.archive.output.energy_pot[frame]
+            return self.graph.calc_static.archive.output.energy_pot.data[frame]
 
     def plot_elastic_band(self, ax=None, frame=None, plot_kwargs=None):
         if ax is None:

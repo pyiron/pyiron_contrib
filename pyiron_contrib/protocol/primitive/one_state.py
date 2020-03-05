@@ -727,13 +727,13 @@ class SphereReflection(PrimitiveVertex):
 
     def __init__(self, name=None):
         super(SphereReflection, self).__init__(name=name)
-        self.input.default.forces = None
-        self.input.default.previous_forces = None
+        # self.input.default.forces = None
+        # self.input.default.previous_forces = None
         self.input.default.atom_reflect_switch = True
         # self.input.default.previous_velocities = Pointer(self.input.velocities)
 
     def command(self, reference_positions, cutoff_distance, positions, velocities, previous_positions,
-                previous_velocities, pbc, cell, forces, previous_forces, atom_reflect_switch):
+                previous_velocities, pbc, cell, atom_reflect_switch):
         distance = np.linalg.norm(find_mic(reference_positions - positions, cell=cell, pbc=pbc)[0], axis=-1)
         is_at_home = (distance < cutoff_distance)[:, np.newaxis]
 
@@ -741,7 +741,6 @@ class SphereReflection(PrimitiveVertex):
             return {
                 'positions': positions,
                 'velocities': velocities,
-                'forces': forces,
                 'reflected': False
             }
         else:
@@ -749,7 +748,6 @@ class SphereReflection(PrimitiveVertex):
             return {
                 'positions': previous_positions,
                 'velocities': -previous_velocities,
-                'forces': previous_forces,
                 'reflected': True
             }
 
@@ -782,7 +780,7 @@ class SphereReflectionPeratom(PrimitiveVertex):
         # self.input.default.previous_velocities = Pointer(self.input.velocities)
 
     def command(self, reference_positions, cutoff_distance, positions, velocities, previous_positions,
-                previous_velocities, forces, previous_forces, pbc, cell):
+                previous_velocities, pbc, cell):
         distance = np.linalg.norm(find_mic(reference_positions - positions, cell=cell, pbc=pbc)[0], axis=-1)
         is_at_home = (distance < cutoff_distance)[:, np.newaxis]
         is_away = 1 - is_at_home
@@ -790,7 +788,6 @@ class SphereReflectionPeratom(PrimitiveVertex):
         return {
             'positions': is_at_home * positions + is_away * previous_positions,
             'velocities': is_at_home * velocities + is_away * -previous_velocities,
-            'forces': is_at_home * forces + is_away * previous_forces,
             'reflected': is_away.astype(bool).flatten()
         }
 

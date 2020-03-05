@@ -133,16 +133,15 @@ class StringReflect(StringDistances):
     """
     def __init__(self, name=None):
         super(StringReflect, self).__init__(name=name)
-        self.input.default.forces = None
-        self.input.default.previous_forces = None
+        # self.input.default.forces = None
+        # self.input.default.previous_forces = None
 
     def command(self, positions, velocities, previous_positions, previous_velocities, centroid_positions,
-                all_centroid_positions, cell, pbc, eps, forces, previous_forces):
+                all_centroid_positions, cell, pbc, eps):
         if self.check_closest_to_parent(positions, centroid_positions, all_centroid_positions, cell, pbc, eps):
             return {
                 'positions': positions,
                 'velocities': velocities,
-                'forces': forces,
                 'reflected': False
             }
         else:
@@ -150,7 +149,6 @@ class StringReflect(StringDistances):
             return {
                 'positions': previous_positions,
                 'velocities': -previous_velocities,
-                'forces': previous_forces,
                 'reflected': True
             }
 
@@ -263,7 +261,7 @@ class CentroidsSmoothing(PrimitiveVertex):
         smoothed_centroid_positions = np.tensordot(smoothing_matrix, np.array(all_centroid_positions), axes=1)
 
         return {
-            'all_centroid_positions': smoothed_centroid_positions
+            'centroids_pos_list': smoothed_centroid_positions
         }
 
     @staticmethod

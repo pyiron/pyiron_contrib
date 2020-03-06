@@ -110,7 +110,8 @@ class StringEvolution(CompoundVertex):
         g.calc_static_images = AutoList(ExternalHamiltonian)
         g.verlet_velocities = SerialList(VerletVelocityUpdate)
         g.check_thermalized = IsGEq()
-        g.running_average = PositionsRunningAverage()
+        g.running_average_positions = PositionsRunningAverage()
+        g.running_average_forces = SerialList(WelfordOnline)
         g.check_sampling_period = ModIsZero()
         g.mix = CentroidsRunningAverageMix()
         g.smooth = CentroidsSmoothing()
@@ -133,7 +134,8 @@ class StringEvolution(CompoundVertex):
             g.calc_static_images,
             g.verlet_velocities,
             g.check_thermalized, 'true',
-            g.running_average,
+            g.running_average_positions,
+            g.running_average_forces,
             g.check_sampling_period, 'true',
             g.mix,
             g.smooth,
@@ -248,26 +250,32 @@ class StringEvolution(CompoundVertex):
         g.check_thermalized.input.target = gp.clock.output.n_counts[-1]
         g.check_thermalized.input.default.threshold = ip.thermalization_steps
 
+        # running_average_positions
+        g.running_average_positions.input.default.running_average_list = \
+            gp.initial_positions.output.initial_positions[-1]
+        g.running_average_positions.input.running_average_list = \
+            gp.running_average_positions.output.running_average_list[-1]
+        g.running_average_positions.input.positions_list = gp.reflect_atoms.output.positions[-1]
+        g.running_average_positions.input.sampling_period = ip.sampling_period
+        g.running_average_positions.input.reset = ip.reset
+        g.running_average_positions.input.relax_endpoints = ip.relax_endpoints
+        g.running_average_positions.input.cell = ip.structure_initial.cell
+        g.running_average_positions.input.pbc = ip.structure_initial.pbc
+
+        # running_average_forces
+        g.running_average_forces.input.n_children = ip.n_images
+        g.running_average_forces.direct.default.sample = gp.initial_forces.output.zeros[-1]
+        g.running_average_forces.broadcast.sample = gp.calc_static_images.output.forces[-1]
+
         # check_sampling_period
         g.check_sampling_period.input.target = gp.clock.output.n_counts[-1]
         g.check_sampling_period.input.default.mod = ip.sampling_period
-
-        # running_average
-        g.running_average.input.default.running_average_list = \
-            gp.initial_positions.output.initial_positions[-1]
-        g.running_average.input.running_average_list = gp.running_average.output.running_average_list[-1]
-        g.running_average.input.positions_list = gp.reflect_atoms.output.positions[-1]
-        g.running_average.input.sampling_period = ip.sampling_period
-        g.running_average.input.reset = ip.reset
-        g.running_average.input.relax_endpoints = ip.relax_endpoints
-        g.running_average.input.cell = ip.structure_initial.cell
-        g.running_average.input.pbc = ip.structure_initial.pbc
 
         # mix
         g.mix.input.default.centroids_pos_list = gp.initial_positions.output.initial_positions[-1]
         g.mix.input.centroids_pos_list = gp.reparameterize.output.centroids_pos_list[-1]
         g.mix.input.mixing_fraction = ip.mixing_fraction
-        g.mix.input.running_average_list = gp.running_average.output.running_average_list[-1]
+        g.mix.input.running_average_list = gp.running_average_positions.output.running_average_list[-1]
         g.mix.input.cell = ip.structure_initial.cell
         g.mix.input.pbc = ip.structure_initial.pbc
 

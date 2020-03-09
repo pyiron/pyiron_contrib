@@ -206,7 +206,7 @@ class StringEvolution(CompoundVertex):
         g.reflect_string.direct.all_centroid_positions = gp.reparameterize.output.centroids_pos_list[-1]
         g.reflect_string.broadcast.centroid_positions = gp.reparameterize.output.centroids_pos_list[-1]
         g.reflect_string.broadcast.previous_positions = gp.recenter.output.positions[-1]
-        g.reflect_string.broadcast.previous_velocities = gp.verlet_velocities.output.velocities[-1]
+        g.reflect_string.broadcast.previous_velocities = gp.verlet_positions.output.velocities[-1]
 
         g.reflect_string.broadcast.positions = gp.verlet_positions.output.positions[-1]
         g.reflect_string.broadcast.velocities = gp.verlet_positions.output.velocities[-1]

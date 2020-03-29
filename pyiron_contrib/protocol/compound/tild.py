@@ -75,7 +75,7 @@ class HarmonicTILD(TILDParent):
     DefaultWhitelist = {
         'reflect': {
             'output': {
-                'positions': 1000,
+                'positions': 50000,
             },
         },
         'calc_static': {
@@ -96,7 +96,7 @@ class HarmonicTILD(TILDParent):
         'verlet_velocities': {
             'output': {
                 'energy_kin': 1,
-                'velocities': 1000,
+                'velocities': 50000,
             },
         },
     }
@@ -106,9 +106,9 @@ class HarmonicTILD(TILDParent):
 
         id_ = self.input.default
         id_.n_steps = 100
-        id_.time_step = 1.
-        id_.temperature_damping_timescale = None
+        id_.temperature_damping_timescale = 100.
         id_.overheat_fraction = 2.
+        id_.time_step = 1.
         id_.fix_com = True
         id_.use_reflection = True
         # TODO: Need more than input and default, but rather access order, to work without reflection...
@@ -280,14 +280,61 @@ class VacancyTILD(TILDParent):
     """
 
     """
+    DefaultWhitelist = {
+        'reflect': {
+            'output': {
+                'positions': 50000,
+            },
+        },
+        'calc_full': {
+            'output': {
+                'energy_pot': 1,
+            },
+        },
+        'calc_vac': {
+            'output': {
+                'energy_pot': 1,
+            },
+        },
+        'harmonic': {
+            'output': {
+                'energy_pot': 1,
+            },
+        },
+        'mix': {
+            'output': {
+                'weighted_sum': 1,
+            }
+        },
+        'verlet_velocities': {
+            'output': {
+                'energy_kin': 1,
+                'velocities': 50000,
+            },
+        },
+        'average': {
+            'output': {
+                'mean': 1,
+                'std': 1,
+            },
+        },
+    }
 
-    def __init__(self, project=None, name=None, job_name=None):
-        super(VacancyTILD, self).__init__(project=project, name=name, job_name=job_name)
+    def __init__(self, **kwargs):
+        super(VacancyTILD, self).__init__(**kwargs)
 
-        self.input.default.n_steps = 100
-        self.input.default.vacancy_id = 0
-        self._vacancy_structure_init = None
-        self.input.temperature_damping_timescale = 10.
+        id_ = self.input.default
+        id_.n_steps = 100
+        id_.vacancy_id = 0
+        id_.temperature_damping_timescale = 100.
+        id_.overheat_fraction = 2.
+        id_.time_step = 1.
+        id_.sampling_period = 1
+        id_.fix_com = True
+        id_.use_reflection = True
+        # TODO: Need more than input and default, but rather access order, to work without reflection...
+        id_.custom_lambdas = None
+        id_.thermalization_steps = 5
 
     def define_vertices(self):
         # Graph components
@@ -464,8 +511,7 @@ class VacancyTILD(TILDParent):
         g.check_thermalized.input.threshold = ip.thermalization_steps
 
         g.check_sampling_period.input.target = gp.clock.output.n_counts[-1]
-        g.check_sampling_period.input.default.mod = Pointer(self.archive.period)
-        g.check_sampling_period.input.mod = ip.sampling_period
+        g.check_sampling_period.input.default.mod = ip.sampling_period
 
         g.transpose_energies.input.matrix = [
             gp.calc_vac.output.energy_pot[-1],
@@ -481,6 +527,19 @@ class VacancyTILD(TILDParent):
         g.average.broadcast.sample = gp.addition.output.weighted_sum[-1]
 
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
+
+    def get_output(self):
+        gp = Pointer(self.graph)
+        return {
+            'energy_kin': ~gp.verlet_velocities.output.energy_kin[-1],
+            'positions': ~gp.reflect.output.positions[-1],
+            'velocities': ~gp.verlet_velocities.output.velocities[-1],
+            'forces': ~gp.mix.output.weighted_sum[-1],
+        }
+
+
+class ProtocolVacancyTILD(Protocol, VacancyTILD):
+    pass
 
 
 class HarmonicTILDParallel(HarmonicTILD):

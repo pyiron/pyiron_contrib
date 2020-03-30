@@ -202,7 +202,7 @@ class HarmonicTILD(TILDParent):
         g.harmonic.direct.pbc = ip.structure.pbc
 
         g.average.input.n_children = ip.n_lambdas
-        g.average.broadcast.sample = gp.harmonic.output.energy_pot[-1]
+        g.average.broadcast.sample = gp.calc_static.output.energy_pot[-1]
 
         g.transpose_forces.input.matrix = [
             gp.calc_static.output.forces[-1],

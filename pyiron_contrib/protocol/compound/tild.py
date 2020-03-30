@@ -8,7 +8,7 @@ from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
 from pyiron_contrib.protocol.primitive.one_state import Counter, ExternalHamiltonian, WeightedSum, \
     HarmonicHamiltonian, Transpose, RandomVelocity, LangevinThermostat, \
     VerletPositionUpdate, VerletVelocityUpdate, BuildMixingPairs, DeleteAtom, Overwrite, Slice, VoronoiReflection, \
-    WelfordOnline, Zeros
+    WelfordOnline, Zeros, TILDPostProcess
 from pyiron_contrib.protocol.primitive.two_state import IsGEq, ModIsZero
 from pyiron_contrib.protocol.list import SerialList, ParallelList, AutoList
 from pyiron_contrib.protocol.utils import Pointer
@@ -45,6 +45,11 @@ class TILDParent(CompoundVertex, ABC):
     (to keep each atom closest to its own lattice site), and `mix` (to combine the forces from different
     representations).
 
+    WARNING: The methods in this parent class require loading of the finished interactive jobs that run within the
+    child protocol. Since reloading jobs is (at times) time consuming, a TILDPostProcessing node is added at the end
+    of the child protocol. This makes the methods defined in this parent class redundant. BUT, they will be important
+    if we wish to see the integrand plots, as I leave the default flag for plotting as False.
+
     # TODO: Make reflection optional; it makes sense for crystals, but maybe not for molecules
     """
 
@@ -73,32 +78,6 @@ class HarmonicTILD(TILDParent):
     """
     """
     DefaultWhitelist = {
-        'reflect': {
-            'output': {
-                'positions': 50000,
-            },
-        },
-        'calc_static': {
-            'output': {
-                'energy_pot': 1,
-            },
-        },
-        'harmonic': {
-            'output': {
-                'energy_pot': 1,
-            },
-        },
-        'mix': {
-            'output': {
-                'weighted_sum': 1,
-            }
-        },
-        'verlet_velocities': {
-            'output': {
-                'energy_kin': 1,
-                'velocities': 50000,
-            },
-        },
     }
 
     def __init__(self, **kwargs):
@@ -109,10 +88,13 @@ class HarmonicTILD(TILDParent):
         id_.temperature_damping_timescale = 100.
         id_.overheat_fraction = 2.
         id_.time_step = 1.
+        id_.sampling_period = 1
         id_.fix_com = True
         id_.use_reflection = True
         # TODO: Need more than input and default, but rather access order, to work without reflection...
         id_.custom_lambdas = None
+        id_.thermalization_steps = 10
+        id_.plot = False
 
     def define_vertices(self):
         # Graph components
@@ -128,7 +110,11 @@ class HarmonicTILD(TILDParent):
         g.transpose_forces = Transpose()
         g.mix = SerialList(WeightedSum)
         g.verlet_velocities = SerialList(VerletVelocityUpdate)
+        g.check_thermalized = IsGEq()
+        g.check_sampling_period = ModIsZero()
+        g.average = SerialList(WelfordOnline)
         g.clock = Counter()
+        g.post = TILDPostProcess()
 
     def define_execution_flow(self):
         # Execution flow
@@ -138,6 +124,7 @@ class HarmonicTILD(TILDParent):
             g.initial_forces,
             g.initial_velocity,
             g.check_steps, 'false',
+            g.clock,
             g.verlet_positions,
             g.reflect,
             g.calc_static,
@@ -145,9 +132,14 @@ class HarmonicTILD(TILDParent):
             g.transpose_forces,
             g.mix,
             g.verlet_velocities,
-            g.clock,
-            g.check_steps,
+            g.check_thermalized, 'true',
+            g.check_sampling_period, 'true',
+            g.average,
+            g.check_steps, 'true',
+            g.post
         )
+        g.make_edge(g.check_thermalized, g.check_steps, 'false')
+        g.make_edge(g.check_sampling_period, g.check_steps, 'false')
         g.starting_vertex = g.build_lambdas
         g.restarting_vertex = g.check_steps
 
@@ -169,6 +161,8 @@ class HarmonicTILD(TILDParent):
 
         g.check_steps.input.target = gp.clock.output.n_counts[-1]
         g.check_steps.input.threshold = ip.n_steps
+
+        self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
 
         g.verlet_positions.input.n_children = ip.n_lambdas
         g.verlet_positions.direct.default.positions = ip.structure.positions
@@ -207,6 +201,9 @@ class HarmonicTILD(TILDParent):
         g.harmonic.direct.cell = ip.structure.cell
         g.harmonic.direct.pbc = ip.structure.pbc
 
+        g.average.input.n_children = ip.n_lambdas
+        g.average.broadcast.sample = gp.harmonic.output.energy_pot[-1]
+
         g.transpose_forces.input.matrix = [
             gp.calc_static.output.forces[-1],
             gp.harmonic.output.forces[-1]
@@ -225,7 +222,17 @@ class HarmonicTILD(TILDParent):
         g.verlet_velocities.direct.temperature_damping_timescale = ip.temperature_damping_timescale
         g.verlet_velocities.direct.time_step = ip.time_step
 
-        self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
+        g.check_thermalized.input.target = gp.clock.output.n_counts[-1]
+        g.check_thermalized.input.threshold = ip.thermalization_steps
+
+        g.check_sampling_period.input.target = gp.clock.output.n_counts[-1]
+        g.check_sampling_period.input.default.mod = ip.sampling_period
+
+        g.post.input.lambda_pairs = gp.build_lambdas.output.lambda_pairs[-1]
+        g.post.input.n_samples = gp.average.output.n_samples[-1]
+        g.post.input.mean = gp.average.output.mean[-1]
+        g.post.input.std = gp.average.output.std[-1]
+        g.post.input.plot = ip.plot
 
     def get_output(self):
         gp = Pointer(self.graph)
@@ -236,6 +243,7 @@ class HarmonicTILD(TILDParent):
             'positions': ~gp.reflect.output.positions[-1],
             'velocities': ~gp.verlet_velocities.output.velocities[-1],
             'forces': ~gp.mix.output.weighted_sum[-1],
+            'free_energy_change': ~gp.post.output.free_energy_change[-1]
         }
 
     def get_classical_harmonic_free_energy(self, temperatures=None):
@@ -281,43 +289,6 @@ class VacancyTILD(TILDParent):
 
     """
     DefaultWhitelist = {
-        'reflect': {
-            'output': {
-                'positions': 50000,
-            },
-        },
-        'calc_full': {
-            'output': {
-                'energy_pot': 1,
-            },
-        },
-        'calc_vac': {
-            'output': {
-                'energy_pot': 1,
-            },
-        },
-        'harmonic': {
-            'output': {
-                'energy_pot': 1,
-            },
-        },
-        'mix': {
-            'output': {
-                'weighted_sum': 1,
-            }
-        },
-        'verlet_velocities': {
-            'output': {
-                'energy_kin': 1,
-                'velocities': 50000,
-            },
-        },
-        'average': {
-            'output': {
-                'mean': 1,
-                'std': 1,
-            },
-        },
     }
 
     def __init__(self, **kwargs):
@@ -334,7 +305,8 @@ class VacancyTILD(TILDParent):
         id_.use_reflection = True
         # TODO: Need more than input and default, but rather access order, to work without reflection...
         id_.custom_lambdas = None
-        id_.thermalization_steps = 5
+        id_.thermalization_steps = 10
+        id_.plot = False
 
     def define_vertices(self):
         # Graph components
@@ -345,6 +317,7 @@ class VacancyTILD(TILDParent):
         g.initial_forces = Zeros()
         g.slice_structure = Slice()
         g.check_steps = IsGEq()
+        g.clock = Counter()
         g.verlet_positions = SerialList(VerletPositionUpdate)
         g.reflect = SerialList(VoronoiReflection)
         g.calc_full = SerialList(ExternalHamiltonian)
@@ -362,7 +335,7 @@ class VacancyTILD(TILDParent):
         g.transpose_energies = Transpose()
         g.addition = SerialList(WeightedSum)
         g.average = SerialList(WelfordOnline)
-        g.clock = Counter()
+        g.post = TILDPostProcess()
 
     def define_execution_flow(self):
         # Execution flow
@@ -374,6 +347,7 @@ class VacancyTILD(TILDParent):
             g.initial_forces,
             g.slice_structure,
             g.check_steps, 'false',
+            g.clock,
             g.verlet_positions,
             g.reflect,
             g.calc_full,
@@ -391,11 +365,11 @@ class VacancyTILD(TILDParent):
             g.transpose_energies,
             g.addition,
             g.average,
-            g.clock,
-            g.check_steps,
+            g.check_steps, 'true',
+            g.post
         )
-        g.make_edge(g.check_thermalized, g.clock, 'false')
-        g.make_edge(g.check_sampling_period, g.clock, 'false')
+        g.make_edge(g.check_thermalized, g.check_steps, 'false')
+        g.make_edge(g.check_sampling_period, g.check_steps, 'false')
         g.starting_vertex = self.graph.delete_vacancy
         g.restarting_vertex = self.graph.check_steps
 
@@ -427,6 +401,8 @@ class VacancyTILD(TILDParent):
 
         g.check_steps.input.target = gp.clock.output.n_counts[-1]
         g.check_steps.input.threshold = ip.n_steps
+
+        self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
 
         g.verlet_positions.input.n_children = ip.n_lambdas
         g.verlet_positions.direct.default.positions = ip.structure.positions
@@ -526,7 +502,11 @@ class VacancyTILD(TILDParent):
         g.average.input.n_children = ip.n_lambdas
         g.average.broadcast.sample = gp.addition.output.weighted_sum[-1]
 
-        self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
+        g.post.input.lambda_pairs = gp.build_lambdas.output.lambda_pairs[-1]
+        g.post.input.n_samples = gp.average.output.n_samples[-1]
+        g.post.input.mean = gp.average.output.mean[-1]
+        g.post.input.std = gp.average.output.std[-1]
+        g.post.input.plot = ip.plot
 
     def get_output(self):
         gp = Pointer(self.graph)
@@ -535,6 +515,8 @@ class VacancyTILD(TILDParent):
             'positions': ~gp.reflect.output.positions[-1],
             'velocities': ~gp.verlet_velocities.output.velocities[-1],
             'forces': ~gp.mix.output.weighted_sum[-1],
+            'average': ~gp.average.output.mean[-1],
+            'free_energy_change': ~gp.post.output.free_energy_change[-1]
         }
 
 

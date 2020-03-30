@@ -15,6 +15,7 @@ from pyiron_contrib.protocol.utils import ensure_iterable
 from os.path import split
 from abc import ABC, abstractmethod
 from pyiron_contrib.protocol.math import welford_online
+import matplotlib.pylab as plt
 
 KB = physical_constants['Boltzmann constant in eV/K'][0]
 EV_TO_U_ANGSQ_PER_FSSQ = 0.00964853322  # https://www.wolframalpha.com/input/?i=1+eV+in+u+*+%28angstrom%2Ffs%29%5E2
@@ -1086,3 +1087,37 @@ class Zeros(PrimitiveVertex):
         return {
             'zeros': np.zeros(shape)
         }
+
+
+class TILDPostProcess(PrimitiveVertex):
+    """
+    Post processing for the Harmonic and Vacancy TILD protocols, to remove the necessity to load interactive
+    jobs after they have been closed, once the protocol has been executed
+    """
+
+    def __init__(self, name=None):
+        super(TILDPostProcess, self).__init__(name=name)
+        self.input.default.plot = True
+
+    def command(self, lambda_pairs, n_samples, mean, std, plot=True):
+        if plot is True:
+            self.plot_integrand(lambda_pairs, n_samples, mean, std)
+
+        return {
+            'free_energy_change': self.get_free_energy_change(lambda_pairs, mean)
+        }
+
+    @staticmethod
+    def plot_integrand(lambda_pairs, n_samples, mean, std):
+        fig, ax = plt.subplots()
+        lambdas = lambda_pairs[:, 0]
+        thermal_average, standard_error = mean, std / np.sqrt(n_samples)
+        ax.plot(lambdas, thermal_average, marker='o')
+        ax.fill_between(lambdas, thermal_average - standard_error, thermal_average + standard_error, alpha=0.3)
+        ax.set_xlabel("Lambda")
+        ax.set_ylabel("dF/dLambda")
+        return fig, ax
+
+    @staticmethod
+    def get_free_energy_change(lambda_pairs, mean):
+        return np.trapz(x=lambda_pairs[:, 0], y=mean)

@@ -734,8 +734,8 @@ class VirtualWorkFullStep(VirtualWork):
 class ConstrainedMD(CompoundVertex):
     """For parallelizing virtual work. Work in progress, not yet functioning."""
 
-    def __init__(self, project=None, name=None, job_name=None):
-        super(ConstrainedMD, self).__init__(project=project, name=name, job_name=job_name)
+    def __init__(self, **kwargs):
+        super(ConstrainedMD, self).__init__(**kwargs)
 
         # Protocol defaults
         id_ = self.input.default

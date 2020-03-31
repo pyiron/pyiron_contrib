@@ -1,6 +1,6 @@
 # from pyiron_contrib.protocol.generic import Protocol
 from pyiron_contrib.protocol.compound.minimize import ProtocolMinimize
-from pyiron_contrib.protocol.compound.molecular_dynamics import ProtocolMD
+from pyiron_contrib.protocol.compound.molecular_dynamics import ProtocolMD, ProtocolConfinedMD
 from pyiron_contrib.protocol.compound.nudged_elastic_band import ProtocolNEB
 # from pyiron_contrib.protocol.compound.tild import HarmonicTILD, VacancyTILD
 from pyiron_contrib.protocol.compound.finite_temperature_string import ProtocolStringEvolution, ProtocolVirtualWork
@@ -12,7 +12,7 @@ from pyiron_contrib.protocol.compound.tild import ProtocolHarmonicTILD, Protocol
 # PyironJobTypeRegistryMetaType.inject_dynamic_types()
 __all__ = [
     'ProtocolMinimize',
-    'ProtocolMD',
+    'ProtocolMD', 'ProtocolConfinedMD',
     'ProtocolNEB',
     'ProtocolQMMM',
     'ProtocolHarmonicTILD', 'ProtocolVacancyTILD', 'ProtocolHarmonicTILDParallel',

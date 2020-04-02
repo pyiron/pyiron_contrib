@@ -311,7 +311,7 @@ class ConfinedMD(CompoundVertex):
         g.nn.input.structure = ip.structure
         g.nn.input.crystal_structure = ip.crystal_structure
         g.nn.input.lattice_site = ip.lattice_site
-        g.nn.input.atoms_positions = gp.reflect_atoms.output.positions[-1]
+        g.nn.input.atoms_positions = gp.running_average.output.running_average_list[-1]
 
         # average_nearest_neighbor_distances
         g.average_distance.input.sample = gp.nn.output.NN_distance[-1]
@@ -487,7 +487,7 @@ class ConfinedHarmonicMD(CompoundVertex):
         g.nn.input.structure = ip.structure
         g.nn.input.crystal_structure = ip.crystal_structure
         g.nn.input.lattice_site = ip.lattice_site
-        g.nn.input.atoms_positions = gp.reflect_atoms.output.positions[-1]
+        g.nn.input.atoms_positions = gp.running_average.output.running_average_list[-1]
 
         # average_nearest_neighbor_distances
         g.average_distance.input.sample = gp.nn.output.NN_distance[-1]

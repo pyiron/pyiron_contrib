@@ -6,7 +6,7 @@ from __future__ import print_function
 
 from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
 from pyiron_contrib.protocol.primitive.one_state import Counter, ExternalHamiltonian, RandomVelocity, Zeros, \
-    VerletPositionUpdate, VerletVelocityUpdate, SphereReflection, WelfordOnline, NearestNeighbors
+    VerletPositionUpdate, VerletVelocityUpdate, SphereReflection, WelfordOnline, NearestNeighbors, HarmonicHamiltonian
 from pyiron_contrib.protocol.primitive.two_state import IsGEq, ModIsZero
 from pyiron_contrib.protocol.primitive.fts_vertices import PositionsRunningAverage
 from pyiron_contrib.protocol.utils import Pointer
@@ -329,4 +329,180 @@ class ConfinedMD(CompoundVertex):
 
 
 class ProtocolConfinedMD(Protocol, ConfinedMD):
+    pass
+
+
+class ConfinedHarmonicMD(CompoundVertex):
+    """
+    Similar to MolecularDynamics protocol, ConfinedHarmonicMD performs harmonic MD on a structure. The difference,
+    is that the atoms are confined to their lattice sites. This is especially helpful when vacancies are present in the
+    structure, and atoms diffuse via the vacancies. This protocol prevents this diffusion from happening.
+    """
+
+    DefaultWhitelist = {
+    }
+
+    def __init__(self, **kwargs):
+        super(ConfinedHarmonicMD, self).__init__(**kwargs)
+
+        # Protocol defaults
+        id_ = self.input.default
+        id_.time_step = 1.
+        id_.overheat_fraction = 2.
+        id_.damping_timescale = 100.
+        id_.sampling_period = 1
+        id_.thermalization_steps = 10
+        id_.relax_endpoints = True
+        id_.reset = False
+        id_.crystal_structure = 'fcc'
+        id_.lattice_site = [0., 0., 0]
+        id_.spring_constant = 1.
+
+    def define_vertices(self):
+        # Graph components
+        g = self.graph
+        g.initial_velocities = RandomVelocity()
+        g.initial_forces = Zeros()
+        g.check_steps = IsGEq()
+        g.verlet_positions = VerletPositionUpdate()
+        g.reflect_atoms = SphereReflection()
+        g.harmonic = HarmonicHamiltonian()
+        g.verlet_velocities = VerletVelocityUpdate()
+        g.check_thermalized = IsGEq()
+        g.check_sampling_period = ModIsZero()
+        g.running_average = PositionsRunningAverage()
+        g.nn = NearestNeighbors()
+        g.average_distance = WelfordOnline()
+        g.clock = Counter()
+
+    def define_execution_flow(self):
+        # Execution flow
+        g = self.graph
+        g.make_pipeline(
+            g.initial_velocities,
+            g.initial_forces,
+            g.check_steps, 'false',
+            g.clock,
+            g.verlet_positions,
+            g.reflect_atoms,
+            g.harmonic,
+            g.verlet_velocities,
+            g.check_thermalized, 'true',
+            g.check_sampling_period, 'true',
+            g.running_average,
+            g.nn,
+            g.average_distance,
+            g.check_steps
+        )
+        g.make_edge(g.check_thermalized, g.check_steps, 'false')
+        g.make_edge(g.check_sampling_period, g.check_steps, 'false')
+        g.starting_vertex = g.initial_velocities
+        g.restarting_vertex = g.check_steps
+
+    def define_information_flow(self):
+        # Data flow
+        g = self.graph
+        gp = Pointer(self.graph)
+        ip = Pointer(self.input)
+
+        # initial_velocities
+        g.initial_velocities.input.temperature = ip.temperature
+        g.initial_velocities.input.masses = ip.structure.get_masses
+        g.initial_velocities.input.overheat_fraction = ip.overheat_fraction
+
+        # initial_forces
+        g.initial_forces.input.shape = ip.structure.positions.shape
+
+        # check_steps
+        g.check_steps.input.target = gp.clock.output.n_counts[-1]
+        g.check_steps.input.threshold = ip.n_steps
+
+        self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
+
+        # verlet_positions
+        g.verlet_positions.input.time_step = ip.time_step
+        g.verlet_positions.input.masses = ip.structure.get_masses
+        g.verlet_positions.input.temperature = ip.temperature
+        g.verlet_positions.input.temperature_damping_timescale = ip.temperature_damping_timescale
+
+        g.verlet_positions.input.default.positions = ip.structure.positions
+        g.verlet_positions.input.default.velocities = gp.initial_velocities.output.velocities[-1]
+        g.verlet_positions.input.default.forces = gp.initial_forces.output.zeros[-1]
+
+        g.verlet_positions.input.positions = gp.reflect_atoms.output.positions[-1]
+        g.verlet_positions.input.velocities = gp.verlet_velocities.output.velocities[-1]
+        g.verlet_positions.input.forces = gp.harmonic.output.forces[-1]
+
+        # reflect individual atoms which stray too far
+        g.reflect_atoms.input.cutoff_distance = ip.reflection_cutoff_distance
+        g.reflect_atoms.input.cell = ip.structure.cell
+        g.reflect_atoms.input.pbc = ip.structure.pbc
+
+        g.reflect_atoms.input.reference_positions = ip.structure.positions
+
+        g.reflect_atoms.input.default.previous_positions = ip.structure.positions
+        g.reflect_atoms.input.default.previous_velocities = gp.initial_velocities.output.velocities[-1]
+
+        g.reflect_atoms.input.previous_positions = gp.reflect_atoms.output.positions[-1]
+        g.reflect_atoms.input.previous_velocities = gp.reflect_atoms.output.velocities[-1]
+
+        g.reflect_atoms.input.positions = gp.verlet_positions.output.positions[-1]
+        g.reflect_atoms.input.velocities = gp.verlet_positions.output.velocities[-1]
+
+        # calc_harmonic
+        g.harmonic.input.spring_constant = ip.spring_constant
+        g.harmonic.input.home_positions = ip.structure.positions
+        g.harmonic.input.positions = gp.reflect_atoms.output.positions[-1]
+        g.harmonic.input.cell = ip.structure.cell
+        g.harmonic.input.pbc = ip.structure.pbc
+
+        # verlet_velocities
+        g.verlet_velocities.input.time_step = ip.time_step
+        g.verlet_velocities.input.masses = ip.structure.get_masses
+        g.verlet_velocities.input.temperature = ip.temperature
+        g.verlet_velocities.input.temperature_damping_timescale = ip.temperature_damping_timescale
+
+        g.verlet_velocities.input.velocities = gp.reflect_atoms.output.velocities[-1]
+        g.verlet_velocities.input.forces = gp.harmonic.output.forces[-1]
+
+        # check_thermalized
+        g.check_thermalized.input.target = gp.clock.output.n_counts[-1]
+        g.check_thermalized.input.threshold = ip.thermalization_steps
+
+        # check_sampling_period
+        g.check_sampling_period.input.target = gp.clock.output.n_counts[-1]
+        g.check_sampling_period.input.default.mod = ip.sampling_period
+
+        # running_average_positions
+        g.running_average.input.default.running_average_list = gp.reflect_atoms.output.positions[-1]
+        g.running_average.input.running_average_list = gp.running_average.output.running_average_list[-1]
+        g.running_average.input.positions_list = gp.reflect_atoms.output.positions[-1]
+        g.running_average.input.sampling_period = ip.sampling_period
+        g.running_average.input.reset = ip.reset
+        g.running_average.input.relax_endpoints = ip.relax_endpoints
+        g.running_average.input.cell = ip.structure.cell
+        g.running_average.input.pbc = ip.structure.pbc
+
+        # nearest_neighbor_distances
+        g.nn.input.structure = ip.structure
+        g.nn.input.crystal_structure = ip.crystal_structure
+        g.nn.input.lattice_site = ip.lattice_site
+        g.nn.input.atoms_positions = gp.reflect_atoms.output.positions[-1]
+
+        # average_nearest_neighbor_distances
+        g.average_distance.input.sample = gp.nn.output.NN_distance[-1]
+
+    def get_output(self):
+        gp = Pointer(self.graph)
+        return {
+            'positions': ~gp.reflect_atoms.output.positions[-1],
+            'velocities': ~gp.verlet_velocities.output.velocities[-1],
+            'forces': ~gp.harmonic.output.forces[-1],
+            'running_average_positions': ~gp.running_average.output.running_average_list[-1],
+            'nn_distance_mean': ~gp.average_distance.output.mean[-1],
+            'nn_distance_std': ~gp.average_distance.output.std[-1]
+        }
+
+
+class ProtocolConfinedHarmonicMD(Protocol, ConfinedHarmonicMD):
     pass

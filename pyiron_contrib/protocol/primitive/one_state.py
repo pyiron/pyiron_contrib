@@ -1089,6 +1089,32 @@ class Zeros(PrimitiveVertex):
         }
 
 
+class NearestNeighbors(PrimitiveVertex):
+    """
+    Gives the mean first nearest neighbor distances. Used specifically in the ConfinedMD and ConfinedHarmonicMD.
+    """
+
+    def __init__(self, name=None):
+        super(NearestNeighbors, self).__init__(name=name)
+        self.input.default.crystal_structure = 'fcc'
+        self.input.default.lattice_site = [0., 0., 0.]
+
+    def command(self, structure, atoms_positions, crystal_structure, lattice_site):
+        new_struct = structure.copy()
+        new_struct.positions = atoms_positions
+
+        if crystal_structure == 'fcc' or crystal_structure == 'hcp':
+            nn = 12
+        elif crystal_structure == 'bcc':
+            nn = 8
+        else:
+            raise TypeError("Not a valid crystal structure")
+
+        return {
+            'NN_distance': np.mean(new_struct.get_neighborhood(position=lattice_site, num_neighbors=nn).distances)
+        }
+
+
 class TILDPostProcess(PrimitiveVertex):
     """
     Post processing for the Harmonic and Vacancy TILD protocols, to remove the necessity to load interactive

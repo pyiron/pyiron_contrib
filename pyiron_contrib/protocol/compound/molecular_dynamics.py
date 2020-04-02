@@ -6,7 +6,7 @@ from __future__ import print_function
 
 from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
 from pyiron_contrib.protocol.primitive.one_state import Counter, ExternalHamiltonian, RandomVelocity, Zeros, \
-    VerletPositionUpdate, VerletVelocityUpdate, SphereReflection, WelfordOnline
+    VerletPositionUpdate, VerletVelocityUpdate, SphereReflection, WelfordOnline, NearestNeighbors
 from pyiron_contrib.protocol.primitive.two_state import IsGEq, ModIsZero
 from pyiron_contrib.protocol.primitive.fts_vertices import PositionsRunningAverage
 from pyiron_contrib.protocol.utils import Pointer
@@ -180,6 +180,8 @@ class ConfinedMD(CompoundVertex):
         id_.thermalization_steps = 10
         id_.relax_endpoints = True
         id_.reset = False
+        id_.crystal_structure = 'fcc'
+        id_.lattice_site = [0., 0., 0]
 
     def define_vertices(self):
         # Graph components
@@ -194,6 +196,8 @@ class ConfinedMD(CompoundVertex):
         g.check_thermalized = IsGEq()
         g.check_sampling_period = ModIsZero()
         g.running_average = PositionsRunningAverage()
+        g.nn = NearestNeighbors()
+        g.average_distance = WelfordOnline()
         g.clock = Counter()
 
     def define_execution_flow(self):
@@ -211,6 +215,8 @@ class ConfinedMD(CompoundVertex):
             g.check_thermalized, 'true',
             g.check_sampling_period, 'true',
             g.running_average,
+            g.nn,
+            g.average_distance,
             g.check_steps
         )
         g.make_edge(g.check_thermalized, g.check_steps, 'false')
@@ -283,9 +289,11 @@ class ConfinedMD(CompoundVertex):
         g.verlet_velocities.input.velocities = gp.reflect_atoms.output.velocities[-1]
         g.verlet_velocities.input.forces = gp.calc_static.output.forces[-1]
 
+        # check_thermalized
         g.check_thermalized.input.target = gp.clock.output.n_counts[-1]
         g.check_thermalized.input.threshold = ip.thermalization_steps
 
+        # check_sampling_period
         g.check_sampling_period.input.target = gp.clock.output.n_counts[-1]
         g.check_sampling_period.input.default.mod = ip.sampling_period
 
@@ -299,13 +307,24 @@ class ConfinedMD(CompoundVertex):
         g.running_average.input.cell = ip.structure.cell
         g.running_average.input.pbc = ip.structure.pbc
 
+        # nearest_neighbor_distances
+        g.nn.input.structure = ip.structure
+        g.nn.input.crystal_structure = ip.crystal_structure
+        g.nn.input.lattice_site = ip.lattice_site
+        g.nn.input.atoms_positions = gp.reflect_atoms.output.positions[-1]
+
+        # average_nearest_neighbor_distances
+        g.average_distance.input.sample = gp.nn.output.NN_distance[-1]
+
     def get_output(self):
         gp = Pointer(self.graph)
         return {
             'positions': ~gp.reflect_atoms.output.positions[-1],
             'velocities': ~gp.verlet_velocities.output.velocities[-1],
             'forces': ~gp.calc_static.output.forces[-1],
-            'running_average_positions': ~gp.running_average.output.running_average_list[-1]
+            'running_average_positions': ~gp.running_average.output.running_average_list[-1],
+            'nn_distance_mean': ~gp.average_distance.output.mean[-1],
+            'nn_distance_std': ~gp.average_distance.output.std[-1]
         }
 
 

@@ -8,7 +8,7 @@ from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
 from pyiron_contrib.protocol.primitive.one_state import Counter, ExternalHamiltonian, WeightedSum, \
     HarmonicHamiltonian, Transpose, RandomVelocity, LangevinThermostat, \
     VerletPositionUpdate, VerletVelocityUpdate, BuildMixingPairs, DeleteAtom, Overwrite, Slice, VoronoiReflection, \
-    WelfordOnline, Zeros, TILDPostProcess
+    WelfordOnline, Zeros, TILDPostProcess, SphereReflection
 from pyiron_contrib.protocol.primitive.two_state import IsGEq, ModIsZero
 from pyiron_contrib.protocol.list import SerialList, ParallelList, AutoList
 from pyiron_contrib.protocol.utils import Pointer
@@ -104,7 +104,7 @@ class HarmonicTILD(TILDParent):
         g.initial_velocity = SerialList(RandomVelocity)
         g.check_steps = IsGEq()
         g.verlet_positions = SerialList(VerletPositionUpdate)
-        g.reflect = SerialList(VoronoiReflection)
+        g.reflect = SerialList(SphereReflection)
         g.calc_static = AutoList(ExternalHamiltonian)
         g.harmonic = SerialList(HarmonicHamiltonian)
         g.transpose_forces = Transpose()
@@ -319,7 +319,7 @@ class VacancyTILD(TILDParent):
         g.check_steps = IsGEq()
         g.clock = Counter()
         g.verlet_positions = SerialList(VerletPositionUpdate)
-        g.reflect = SerialList(VoronoiReflection)
+        g.reflect = SerialList(SphereReflection)
         g.calc_full = SerialList(ExternalHamiltonian)
         g.slice_positions = SerialList(Slice)
         g.calc_vac = SerialList(ExternalHamiltonian)

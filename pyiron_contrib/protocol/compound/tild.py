@@ -112,6 +112,8 @@ class HarmonicTILD(TILDParent):
         g.verlet_velocities = SerialList(VerletVelocityUpdate)
         g.check_thermalized = IsGEq()
         g.check_sampling_period = ModIsZero()
+        g.transpose_energies = Transpose()
+        g.addition = SerialList(WeightedSum)
         g.average = SerialList(WelfordOnline)
         g.clock = Counter()
         g.post = TILDPostProcess()
@@ -134,6 +136,8 @@ class HarmonicTILD(TILDParent):
             g.verlet_velocities,
             g.check_thermalized, 'true',
             g.check_sampling_period, 'true',
+            g.transpose_energies,
+            g.addition,
             g.average,
             g.check_steps, 'true',
             g.post
@@ -202,9 +206,6 @@ class HarmonicTILD(TILDParent):
         g.harmonic.direct.cell = ip.structure.cell
         g.harmonic.direct.pbc = ip.structure.pbc
 
-        g.average.input.n_children = ip.n_lambdas
-        g.average.broadcast.sample = gp.calc_static.output.energy_pot[-1]
-
         g.transpose_forces.input.matrix = [
             gp.calc_static.output.forces[-1],
             gp.harmonic.output.forces[-1]
@@ -228,6 +229,18 @@ class HarmonicTILD(TILDParent):
 
         g.check_sampling_period.input.target = gp.clock.output.n_counts[-1]
         g.check_sampling_period.input.default.mod = ip.sampling_period
+
+        g.transpose_energies.input.matrix = [
+            gp.calc_static.output.energy_pot[-1],
+            gp.harmonic.output.energy_pot[-1]
+        ]
+
+        g.addition.input.n_children = ip.n_lambdas
+        g.addition.broadcast.vectors = gp.transpose_energies.output.matrix_transpose[-1]
+        g.addition.direct.weights = [1, 1]
+
+        g.average.input.n_children = ip.n_lambdas
+        g.average.broadcast.sample = gp.addition.output.weighted_sum[-1]
 
         g.post.input.lambda_pairs = gp.build_lambdas.output.lambda_pairs[-1]
         g.post.input.n_samples = gp.average.output.n_samples[-1]

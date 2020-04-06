@@ -467,6 +467,7 @@ class VacancyTILD(TILDParent):
 
         g.harmonic.input.n_children = ip.n_lambdas
         g.harmonic.direct.spring_constant = ip.spring_constant
+        g.harmonic.direct.zero_k_energy = ip.zero_k_energy
         g.harmonic.direct.home_positions = gp.slice_structure.output.sliced[-1]
         g.harmonic.broadcast.positions = gp.slice_harmonic.output.sliced[-1]
         g.harmonic.direct.cell = ip.structure.cell

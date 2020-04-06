@@ -336,10 +336,10 @@ class HarmonicHamiltonian(PrimitiveVertex):
 
     """
 
-    def command(self, positions, home_positions, cell, pbc, spring_constant):
+    def command(self, positions, home_positions, cell, pbc, spring_constant, zero_k_energy):
         dr = find_mic(positions - home_positions, cell, pbc)[0]
         force = -spring_constant * dr
-        energy = 0.5 * np.sum(spring_constant * dr * dr)
+        energy = zero_k_energy + (0.5 * np.sum(spring_constant * dr * dr))
         return {
             'forces': force,
             'energy_pot': energy

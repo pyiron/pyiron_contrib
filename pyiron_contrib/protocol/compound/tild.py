@@ -201,6 +201,7 @@ class HarmonicTILD(TILDParent):
 
         g.harmonic.input.n_children = ip.n_lambdas
         g.harmonic.direct.spring_constant = ip.spring_constant
+        g.harmonic.direct.zero_k_energy = ip.zero_k_energy
         g.harmonic.direct.home_positions = ip.structure.positions
         g.harmonic.broadcast.positions = gp.reflect.output.positions[-1]
         g.harmonic.direct.cell = ip.structure.cell

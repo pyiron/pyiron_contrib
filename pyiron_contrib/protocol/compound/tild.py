@@ -237,7 +237,7 @@ class HarmonicTILD(TILDParent):
 
         g.addition.input.n_children = ip.n_lambdas
         g.addition.broadcast.vectors = gp.transpose_energies.output.matrix_transpose[-1]
-        g.addition.direct.weights = [1, 1]
+        g.addition.direct.weights = [1, -1]
 
         g.average.input.n_children = ip.n_lambdas
         g.average.broadcast.sample = gp.addition.output.weighted_sum[-1]

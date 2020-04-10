@@ -261,9 +261,9 @@ class HarmonicTILD(TILDParent):
             'velocities': ~gp.verlet_velocities.output.velocities[-1],
             'forces': ~gp.mix.output.weighted_sum[-1],
             'free_energy_change': ~gp.post.output.free_energy_change[-1],
-            'integrands': ~gp.post.input.mean[-1],
-            'integrands_std': ~gp.post.input.std[-1],
-            'integrands_n_samples': ~gp.post.input.n_samples[-1]
+            'integrands': ~gp.post.input.mean,
+            'integrands_std': ~gp.post.input.std,
+            'integrands_n_samples': ~gp.post.input.n_samples,
         }
 
     def get_classical_harmonic_free_energy(self, temperatures=None):

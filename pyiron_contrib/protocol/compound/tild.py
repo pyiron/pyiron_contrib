@@ -261,9 +261,9 @@ class HarmonicTILD(TILDParent):
             'velocities': ~gp.verlet_velocities.output.velocities[-1],
             'forces': ~gp.mix.output.weighted_sum[-1],
             'free_energy_change': ~gp.post.output.free_energy_change[-1],
-            'integrands': ~gp.post.input.mean,
-            'integrands_std': ~gp.post.input.std,
-            'integrands_n_samples': ~gp.post.input.n_samples,
+            'integrands': ~gp.average.output.mean[-1],
+            'integrands_std': ~gp.average.output.std[-1],
+            'integrands_n_samples': ~gp.average.output.n_samples[-1],
         }
 
     def get_classical_harmonic_free_energy(self, temperatures=None):
@@ -541,7 +541,7 @@ class VacancyTILD(TILDParent):
             'free_energy_change': ~gp.post.output.free_energy_change[-1],
             'integrands': ~gp.average.output.mean[-1],
             'integrands_std': ~gp.average.output.std[-1],
-            'integrands_n_samples': ~gp.average.output.n_samples[-1]
+            'integrands_n_samples': ~gp.average.output.n_samples[-1],
         }
 
 

@@ -167,8 +167,6 @@ class HarmonicTILD(TILDParent):
         g.check_steps.input.target = gp.clock.output.n_counts[-1]
         g.check_steps.input.threshold = ip.n_steps
 
-        self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
-
         g.verlet_positions.input.n_children = ip.n_lambdas
         g.verlet_positions.direct.default.positions = ip.structure.positions
         g.verlet_positions.broadcast.default.velocities = gp.initial_velocity.output.velocities[-1]
@@ -251,6 +249,8 @@ class HarmonicTILD(TILDParent):
         g.post.input.std = gp.average.output.std[-1]
         g.post.input.plot = ip.plot
 
+        self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
+
     def get_output(self):
         gp = Pointer(self.graph)
         return {
@@ -261,9 +261,9 @@ class HarmonicTILD(TILDParent):
             'velocities': ~gp.verlet_velocities.output.velocities[-1],
             'forces': ~gp.mix.output.weighted_sum[-1],
             'free_energy_change': ~gp.post.output.free_energy_change[-1],
-            'integrands': ~gp.average.output.mean[-1],
-            'integrands_std': ~gp.average.output.std[-1],
-            'integrands_n_samples': ~gp.average.output.n_samples[-1]
+            'integrands': ~gp.post.input.mean[-1],
+            'integrands_std': ~gp.post.input.std[-1],
+            'integrands_n_samples': ~gp.post.input.n_samples[-1]
         }
 
     def get_classical_harmonic_free_energy(self, temperatures=None):

@@ -95,6 +95,7 @@ class HarmonicTILD(TILDParent):
         id_.custom_lambdas = None
         id_.thermalization_steps = 10
         id_.plot = False
+        id_.zero_k_energy = 0.0
 
     def define_vertices(self):
         # Graph components
@@ -201,6 +202,7 @@ class HarmonicTILD(TILDParent):
 
         g.harmonic.input.n_children = ip.n_lambdas
         g.harmonic.direct.spring_constant = ip.spring_constant
+        g.harmonic.direct.force_constants = ip.force_constants
         g.harmonic.direct.zero_k_energy = ip.zero_k_energy
         g.harmonic.direct.home_positions = ip.structure.positions
         g.harmonic.broadcast.positions = gp.reflect.output.positions[-1]

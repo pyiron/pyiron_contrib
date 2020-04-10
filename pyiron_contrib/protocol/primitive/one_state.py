@@ -336,14 +336,43 @@ class HarmonicHamiltonian(PrimitiveVertex):
 
     """
 
-    def command(self, positions, home_positions, cell, pbc, spring_constant, zero_k_energy):
+    def command(self, positions, home_positions, cell, pbc, spring_constant=None, force_constants=None,
+                zero_k_energy=0.0):
+
         dr = find_mic(positions - home_positions, cell, pbc)[0]
-        force = -spring_constant * dr
-        energy = zero_k_energy + (0.5 * np.sum(spring_constant * dr * dr))
+
+        if spring_constant is not None and force_constants is None:
+            forces = -spring_constant * dr
+            energy = zero_k_energy - 0.5 * np.dot(dr, forces)
+
+        elif force_constants is not None and spring_constant is None:
+            transformed_force_constants = self.transform_force_constants(force_constants)
+            transformed_displacements = self.transform_displacements(dr)
+            transformed_forces = -np.dot(transformed_force_constants, transformed_displacements)
+            forces = self.retransform_forces(transformed_forces, dr)
+            energy = zero_k_energy - 0.5 * np.dot(transformed_displacements, transformed_forces)
+
+        else:
+            raise TypeError('Please specify either a spring constant or the force constant matrix')
+
         return {
-            'forces': force,
+            'forces': forces,
             'energy_pot': energy
         }
+
+    @staticmethod
+    def transform_force_constants(force_constants):
+        force_shape = np.shape(force_constants)
+        force_reshape = force_shape[0] * force_shape[2]
+        return np.transpose(force_constants, (0, 2, 1, 3)).reshape((force_reshape, force_reshape))
+
+    @staticmethod
+    def transform_displacements(displacements):
+        return displacements.reshape(displacements.shape[0] * displacements.shape[1])
+
+    @staticmethod
+    def retransform_forces(transformed_forces, displacements):
+        return transformed_forces.reshape(displacements.shape)
 
 
 class InitialPositions(PrimitiveVertex):

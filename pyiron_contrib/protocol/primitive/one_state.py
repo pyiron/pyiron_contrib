@@ -343,7 +343,7 @@ class HarmonicHamiltonian(PrimitiveVertex):
 
         if spring_constant is not None and force_constants is None:
             forces = -spring_constant * dr
-            energy = zero_k_energy - 0.5 * np.dot(dr, forces)
+            energy = zero_k_energy - 0.5 * np.tensordot(dr, forces)
 
         elif force_constants is not None and spring_constant is None:
             transformed_force_constants = self.transform_force_constants(force_constants)

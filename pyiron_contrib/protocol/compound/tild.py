@@ -96,6 +96,8 @@ class HarmonicTILD(TILDParent):
         id_.thermalization_steps = 10
         id_.plot = False
         id_.zero_k_energy = 0.0
+        id_.force_constants = None
+        id_.spring_constant = None
 
     def define_vertices(self):
         # Graph components
@@ -327,6 +329,8 @@ class VacancyTILD(TILDParent):
         id_.custom_lambdas = None
         id_.thermalization_steps = 10
         id_.plot = False
+        id_.force_constants = None
+        id_.spring_constant = None
 
     def define_vertices(self):
         # Graph components

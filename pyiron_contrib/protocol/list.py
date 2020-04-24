@@ -35,8 +35,8 @@ class ListVertex(PrimitiveVertex):
     Attributes:
         child_type (Command): A class inheriting from ``Command`` with which to create child instances. (Passed as an
             argument at instantiation.)
-        children (list): The instances of the child command to execute. These are created automatically (at run-time if
-            they don't exist already).
+        children (list): The instances of the child command to execute. These are created automatically (at run-time
+        if they don't exist already).
         broadcast (InputDictionary): Input data to be split element-wise across all the child commands. (Entries here
             should always have the same number of entries as there are children, i.e. each child can have its own
             value.)
@@ -147,10 +147,10 @@ class ListVertex(PrimitiveVertex):
 
 class ParallelList(ListVertex):
     """
-    A list of commands which are executed in in parallel. The current implementation uses multiprocessing, which creates
-    a new python instance and uses pickle to communicate data to it. (That means objects modified in the new processes
-    don't also modify the instance we have in the parent python instance!) This all creates some overhead, and so
-    parallel is not likely to be worth calling on most
+    A list of commands which are executed in in parallel. The current implementation uses multiprocessing, which
+    creates a new python instance and uses pickle to communicate data to it. (That means objects modified in the
+    new processes don't also modify the instance we have in the parent python instance!) This all creates some
+    overhead, and so parallel is not likely to be worth calling on most
 
     Attributes:
         queue (multiprocessing.Queue): The queue used for collecting output from the subprocesses. (Instantiation and

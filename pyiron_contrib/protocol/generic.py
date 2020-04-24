@@ -641,7 +641,7 @@ class Protocol(CompoundVertex, GenericJob):
         self.status.running = True
         self.execute()
         self.status.collect = True  # Assume modal for now
-        self.run()  # This is an artifact of inheriting from GenericJob, to get all that run functionality
+        self.run()  # This is an artifact of inheriting from GenericJob, to get all that functionality
 
     def run(self, run_again=False, repair=False, debug=False, run_mode=None, continue_run=False):
         """A wrapper for the run which allows us to simply keep going with a new variable `continue_run`"""

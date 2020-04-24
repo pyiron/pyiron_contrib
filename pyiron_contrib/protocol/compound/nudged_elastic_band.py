@@ -195,6 +195,10 @@ class NEB(CompoundVertex):
         return self.get_forward_barrier(frame=frame)
 
 
+class ProtocolNEB(Protocol, NEB):
+    pass
+
+
 class NEBSerial(NEB):
     """
     The same as the NEB protocol, but ensures that the force/energy calls are treated in series.
@@ -219,13 +223,17 @@ class NEBParallel(NEB):
     def define_vertices(self):
         # Graph components
         g = self.graph
-        g.interpolate_images = InterpolatePositions()
+        g.interpolate_images = InitialPositions()
         g.check_steps = IsGEq()
         g.calc_static = ParallelList(ExternalHamiltonian)  # Enforce parallel
         g.neb_forces = NEBForces()
         g.gradient_descent = SerialList(GradientDescent)
         g.clock = Counter()
 
+    def parallel_setup(self):
+        super(NEBParallel, self).parallel_setup()
+        self.graph.calc_static.parallel_setup()
 
-class ProtocolNEB(Protocol, NEB):
+
+class ProtocolNEBParallel(Protocol, NEBParallel):
     pass

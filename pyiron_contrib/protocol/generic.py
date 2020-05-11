@@ -7,7 +7,6 @@ import sys
 from pyiron.base.job.generic import GenericJob
 from pyiron_contrib.protocol.utils import IODictionary, InputDictionary, LoggerMixin, Event, EventHandler, \
     Pointer, CrumbType, ordered_dict_get_last, Comparer, TimelineDict
-# from pyiron_contrib.protocol.utils.types import PyironJobTypeRegistry
 from pyiron_contrib.protocol.utils.pptree import print_tree as pptree
 from abc import ABC, abstractmethod
 
@@ -46,6 +45,8 @@ class Vertex(LoggerMixin, ABC):
             a graph, or if the vertex is a Protocol being instantiated.)
         n_history (int): The length of each list stored in the output dictionary. (Default is 1, keep only the most
             recent output.)
+        n_cores (int): Number of cores that will be utilized to perform computations using Parallel list. (Default is 1,
+            use only a single core.)
         on (bool): Whether to execute the vertex when it is the active vertex of the graph, or simply skip over it.
             (default is True -- actually execute!)
         graph_parent (Vertex): The object who owns the graph that this vertex resides in. (Default is None.)
@@ -57,7 +58,7 @@ class Vertex(LoggerMixin, ABC):
     Archive attributes:
         whitelist (IODictionary): A nested dictionary of periods for archiving input and output values. Stores on
             executions where `clock % period = 0`.
-        clock (int): The timer for whether whether or not input/output should be archived to hdf5.
+        clock (int): The timer for whether or not input/output should be archived to hdf5.
     """
 
     def __init__(self, **kwargs):
@@ -78,6 +79,7 @@ class Vertex(LoggerMixin, ABC):
         self.possible_vertex_states = ["next"]
         self.vertex_name = None
         self.n_history = 1
+        self.n_cores = 1
         self.on = True
         self.graph_parent = None
 
@@ -128,7 +130,7 @@ class Vertex(LoggerMixin, ABC):
             {'input': {'structure': None,
                         'forces': 5}
             }
-            # disables the archiveing of input.structure but keeps forces
+            # disables the archiving of input.structure but keeps forces
         ```
         Args:
             dictionary (dict): The whitelist specification.
@@ -281,6 +283,7 @@ class Vertex(LoggerMixin, ABC):
         hdf5_server["vertexstate"] = self.vertex_state
         hdf5_server["vertexname"] = self.vertex_name
         hdf5_server["nhistory"] = self.n_history
+        hdf5_server["ncores"] = self.n_cores
         self.input.to_hdf(hdf=hdf5_server, group_name="input")
         self.output.to_hdf(hdf=hdf5_server, group_name="output")
         self.archive.to_hdf(hdf=hdf5_server, group_name="archive")
@@ -302,6 +305,7 @@ class Vertex(LoggerMixin, ABC):
         self._vertex_state = hdf5_server["vertexstate"]
         self.vertex_name = hdf5_server["vertexname"]
         self.n_history = hdf5_server["nhistory"]
+        self.n_cores = hdf5_server["ncores"]
         self.input.from_hdf(hdf=hdf5_server, group_name="input")
         self.output.from_hdf(hdf=hdf5_server, group_name="output")
         self.archive.from_hdf(hdf=hdf5_server, group_name="archive")
@@ -337,7 +341,8 @@ class PrimitiveVertex(Vertex):
         """How to execute in parallel when there's a list of these vertices together."""
         output_data = self.command(**input_dict)
         queue.put((n, output_data))
-        # Note: The output needs to be explicitly collected and archived later if this is used in place of `execute`
+        # Note: The output needs to be explicitly collected and archived later if this is used in place
+        # of `execute`
 
 
 class CompoundVertex(Vertex): #, PyironJobTypeRegistry):
@@ -410,6 +415,7 @@ class CompoundVertex(Vertex): #, PyironJobTypeRegistry):
         pass
 
     def execute(self):
+        print('func1: starting')
         """Traverse graph until the active vertex is None."""
         # Subscribe graph vertices to the protocol_finished Event
         for vertex_name, vertex in self.graph.vertices.items():
@@ -435,11 +441,12 @@ class CompoundVertex(Vertex): #, PyironJobTypeRegistry):
             self.graph.step()
         self.graph.active_vertex = self.graph.restarting_vertex
         self.update_and_archive(self.get_output())
+        print('func1: finishing')
 
-    def execute_parallel(self, queue, n, input):
+    def execute_parallel(self, n, return_dict):
         """How to execute in parallel when there's a list of these vertices together."""
         self.execute()
-        queue.put((n, self.get_output()))
+        return_dict[n] = self.get_output()
 
     def set_graph_archive_clock(self, clock, recursive=False):
         for _, vertex in self.graph.vertices.items():
@@ -614,7 +621,7 @@ class CompoundVertex(Vertex): #, PyironJobTypeRegistry):
             pptree(self.whitelist, file=file, name='%s.%s' % (self.vertex_name, 'whitelist'))
 
 
-class Protocol(CompoundVertex, GenericJob):
+class Protocol(CompoundVertex, GenericJob, ABC):
     """
     A parent class for compound vertices which are being instantiated as regular pyiron jobs, i.e. the highest level
     graph in their context.

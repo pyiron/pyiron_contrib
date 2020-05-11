@@ -6,7 +6,7 @@ from __future__ import print_function
 
 from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
 from pyiron_contrib.protocol.primitive.one_state import Counter, ExternalHamiltonian, GradientDescent, \
-    NEBForces, InitialPositions
+    NEBForces, InitialPositions, InitializeJob
 from pyiron_contrib.protocol.primitive.two_state import IsGEq
 from pyiron_contrib.protocol.list import SerialList, ParallelList, AutoList
 from pyiron_contrib.protocol.utils import Pointer
@@ -71,6 +71,7 @@ class NEB(CompoundVertex):
 
         # Protocol defaults
         id_ = self.input.default
+        id_.new_count = None
         id_.n_steps = 100
         id_.f_tol = 1e-4
 
@@ -86,6 +87,7 @@ class NEB(CompoundVertex):
     def define_vertices(self):
         # Graph components
         g = self.graph
+        g.initialize_jobs = InitializeJob()
         g.interpolate_images = InitialPositions()
         g.check_steps = IsGEq()
         g.calc_static = AutoList(ExternalHamiltonian)
@@ -97,6 +99,7 @@ class NEB(CompoundVertex):
         # Execution flow
         g = self.graph
         g.make_pipeline(
+            g.initialize_jobs,
             g.interpolate_images,
             g.check_steps, 'false',
             g.calc_static,
@@ -105,7 +108,7 @@ class NEB(CompoundVertex):
             g.clock,
             g.check_steps
         )
-        g.starting_vertex = self.graph.interpolate_images
+        g.starting_vertex = self.graph.initialize_jobs
         g.restarting_vertex = self.graph.check_steps
 
     def define_information_flow(self):
@@ -113,6 +116,9 @@ class NEB(CompoundVertex):
         g = self.graph
         gp = Pointer(self.graph)
         ip = Pointer(self.input)
+
+        g.initialize_jobs.input.n_images = ip.n_images
+        g.initialize_jobs.input.ref_job_full_path = ip.ref_job_full_path
 
         g.interpolate_images.input.structure_initial = ip.structure_initial
         g.interpolate_images.input.structure_final = ip.structure_final
@@ -124,6 +130,7 @@ class NEB(CompoundVertex):
         g.calc_static.input.n_children = ip.n_images
         g.calc_static.direct.ref_job_full_path = ip.ref_job_full_path
         g.calc_static.direct.structure = ip.structure_initial
+        g.calc_static.broadcast.ref_job = gp.initialize_jobs.output.ref_jobs[-1]
         g.calc_static.broadcast.default.positions = gp.interpolate_images.output.initial_positions[-1]
         g.calc_static.broadcast.positions = gp.gradient_descent.output.positions[-1]
 
@@ -146,6 +153,9 @@ class NEB(CompoundVertex):
         g.gradient_descent.direct.gamma0 = ip.gamma0
         g.gradient_descent.direct.fix_com = ip.fix_com
         g.gradient_descent.direct.use_adagrad = ip.use_adagrad
+
+        g.clock.input.default.new_count = ip.new_count
+        g.clock.input.default.max_count = ip.n_steps
 
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
 
@@ -223,6 +233,7 @@ class NEBParallel(NEB):
     def define_vertices(self):
         # Graph components
         g = self.graph
+        g.initialize_jobs = InitializeJob()
         g.interpolate_images = InitialPositions()
         g.check_steps = IsGEq()
         g.calc_static = ParallelList(ExternalHamiltonian)  # Enforce parallel
@@ -230,9 +241,9 @@ class NEBParallel(NEB):
         g.gradient_descent = SerialList(GradientDescent)
         g.clock = Counter()
 
-    def parallel_setup(self):
-        super(NEBParallel, self).parallel_setup()
-        self.graph.calc_static.parallel_setup()
+    # def parallel_setup(self):
+    #     super(NEBParallel, self).parallel_setup()
+    #     self.graph.calc_static.parallel_setup()
 
 
 class ProtocolNEBParallel(Protocol, NEBParallel):

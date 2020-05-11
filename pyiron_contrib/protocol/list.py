@@ -7,7 +7,7 @@ from pyiron_contrib.protocol.generic import Vertex, PrimitiveVertex, CompoundVer
 from pyiron_contrib.protocol.utils import InputDictionary, Pointer
 import numpy as np
 from abc import abstractmethod
-from multiprocessing import Process, Queue
+from multiprocessing import Process, Manager
 from pyiron.vasp.interactive import VaspInteractive
 from pyiron.sphinx.interactive import SphinxInteractive
 
@@ -58,6 +58,8 @@ class ListVertex(PrimitiveVertex):
         self.broadcast = InputDictionary()
         self._n_history = None
         self.n_history = 1
+        self._n_cores = None
+        self.n_cores = 1
 
     @abstractmethod
     def command(self, n_children):
@@ -110,6 +112,14 @@ class ListVertex(PrimitiveVertex):
             for child in self.children:
                 child.n_history = n_hist
 
+    @property
+    def n_cores(self):
+        return self._n_cores
+
+    @n_cores.setter
+    def n_cores(self, n_cor):
+        self._n_cores = n_cor
+
     def _extract_output_data_from_children(self):
         output_keys = list(self.children[0].output.keys())  # Assumes that all the children are the same...
         if len(output_keys) > 0:
@@ -147,62 +157,66 @@ class ListVertex(PrimitiveVertex):
 
 class ParallelList(ListVertex):
     """
-    A list of commands which are executed in in parallel. The current implementation uses multiprocessing, which
-    creates a new python instance and uses pickle to communicate data to it. (That means objects modified in the
-    new processes don't also modify the instance we have in the parent python instance!) This all creates some
-    overhead, and so parallel is not likely to be worth calling on most
+    A list of commands which are executed in in parallel. The current implementation uses multiprocessing.Pool.
 
     Attributes:
-        queue (multiprocessing.Queue): The queue used for collecting output from the subprocesses. (Instantiation and
-            closing are handled by default in `__init__` and `finish`.)
+        pool (multiprocessing.Pool): Define the number of workers that will be utilized to run the child jobs.
+            Instantiation and closing are handled by default in `__init__` and `finish`.
+
+        Note: It is best to set the number of workers to the number of cores so as to prevent larger computation
+            times due to subprocess communication between the large number of workers in a single core.
     """
+
     def __init__(self, child_type):
         super(ParallelList, self).__init__(child_type)
-        self.queue = Queue()
 
     def command(self, n_children):
         """This controls how the commands are run and is about logistics."""
         if self.children is None:
             self._initialize(n_children)
 
-        for child in self.children:
-            child.parallel_setup()
+        manager = Manager()
+        return_dict = manager.dict()
 
-        self.queue = Queue()
-        # TODO: Instead, check if the queue is open, if not open it (I know how to close, but need to look up opening)
-
-        # Get all the commands running at once
         jobs = []
-        for n, child in enumerate(self.children):
-            job = Process(target=child.execute_parallel, args=(self.queue, n, child.input.resolve()))
-            jobs.append(job)
+        for i, child in enumerate(self.children):
+            job = Process(target=child.execute_parallel, args=(i, return_dict))
+            # job = Process(target=child.execute())
             job.start()
+            jobs.append(job)
 
-        # Wait for everything to finish
         for job in jobs:
             job.join()
-        # It works fine without this, but I don't fully understand why
-        # Since there's no significant cost to add the join, I thought it's safer to be explicit
 
-        # And then grab their output
-        # (n.b. the queue might be disordered, but we've made sure we have access to child number)
-        for _ in jobs:
-            n, child_output = self.queue.get()
-            self.children[n].update_and_archive(child_output)
+        rearranged_dict = dict.fromkeys(range(len(return_dict)))
+        for i in range(len(return_dict)):
+            rearranged_dict[i] = return_dict[i]
 
-        # Parse output as usual
-        output_data = self._extract_output_data_from_children()
+        output_keys = list(rearranged_dict[0].keys())  # Assumes that all the children are the same...
+        if len(output_keys) > 0:
+            output_data = {}
+            for key in output_keys:
+                values = []
+                for child in rearranged_dict.values():
+                    values.append(child[key])
+                output_data[key] = values
+        else:
+            output_data = None
+
+        # output_data = self._extract_output_data_from_children()
         return output_data
 
-    def finish(self):
-        super(ParallelList, self).finish()
-        self.queue.close()
+    # def finish(self):
+    #     super(ParallelList, self).finish()
+    #     self.pool.close()
+    #     self.pool.join()
 
 
 class SerialList(ListVertex):
     """
     A list of commands which are run in serial.
     """
+
     def __init__(self, child_type):
         super(SerialList, self).__init__(child_type=child_type)
 
@@ -222,14 +236,15 @@ class AutoList(ParallelList, SerialList):
     """
     Choose between `SerialList` and `ParallelList` depending on the nature of the children.
     """
+
     def __init__(self, child_type):
         super(AutoList, self).__init__(child_type=child_type)
 
     def _is_expensive(self):
         try:
             if isinstance(
-                self.children[0],
-                (VaspInteractive, SphinxInteractive, CompoundVertex)
+                    self.children[0],
+                    (VaspInteractive, SphinxInteractive, CompoundVertex)
             ):  # Whitelist types that should be treated in parallel
                 return True
             else:  # Everything else is cheap enough to treat in serial

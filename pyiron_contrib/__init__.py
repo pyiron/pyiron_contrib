@@ -4,7 +4,8 @@ from pyiron_contrib.protocol.compound.molecular_dynamics import ProtocolMD, Prot
     ProtocolConfinedHarmonicMD
 from pyiron_contrib.protocol.compound.nudged_elastic_band import ProtocolNEB, ProtocolNEBParallel
 # from pyiron_contrib.protocol.compound.tild import HarmonicTILD, VacancyTILD
-from pyiron_contrib.protocol.compound.finite_temperature_string import ProtocolStringEvolution, ProtocolVirtualWork
+from pyiron_contrib.protocol.compound.finite_temperature_string import ProtocolStringEvolution, \
+    ProtocolVirtualWork, ProtocolVirtualWorkParallel, ProtocolStringEvolutionParallel
 from pyiron_contrib.protocol.compound.qmmm import ProtocolQMMM
 from pyiron_contrib.protocol.compound.tild import ProtocolHarmonicTILD, ProtocolVacancyTILD, \
     ProtocolHarmonicTILDParallel
@@ -18,5 +19,6 @@ __all__ = [
     'ProtocolNEB', 'ProtocolNEBParallel',
     'ProtocolQMMM',
     'ProtocolHarmonicTILD', 'ProtocolVacancyTILD', 'ProtocolHarmonicTILDParallel',
-    'ProtocolStringEvolution', 'ProtocolVirtualWork'
+    'ProtocolStringEvolution', 'ProtocolVirtualWork', 'ProtocolVirtualWorkParallel',
+    'ProtocolStringEvolutionParallel'
 ]

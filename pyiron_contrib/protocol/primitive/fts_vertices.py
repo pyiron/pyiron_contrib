@@ -133,8 +133,6 @@ class StringReflect(StringDistances):
     """
     def __init__(self, name=None):
         super(StringReflect, self).__init__(name=name)
-        # self.input.default.forces = None
-        # self.input.default.previous_forces = None
 
     def command(self, positions, velocities, previous_positions, previous_velocities, centroid_positions,
                 all_centroid_positions, cell, pbc, eps):
@@ -145,7 +143,6 @@ class StringReflect(StringDistances):
                 'reflected': False
             }
         else:
-            print('string_reflect')
             return {
                 'positions': previous_positions,
                 'velocities': -previous_velocities,
@@ -158,13 +155,13 @@ class PositionsRunningAverage(PrimitiveVertex):
     Calculates the running average of input positions at each call.
 
     Input attributes:
-        positions_list (list/numpy.ndarray): The instantaneous position, which will be updated to the running average
-        running_average_list (list/numpy.ndarray): List of existing running averages
+        positions (list/numpy.ndarray): The instantaneous position, which will be updated to the running average
+        running_average_positions (list/numpy.ndarray): The running average of positions
         cell (numpy.ndarray): The cell of the structure
         pbc (numpy.ndarray): Periodic boundary condition of the structure
 
     Output attributes:
-        running_average_list (list/numpy.ndarray): The updated running average list
+        running_average_positions (list/numpy.ndarray): The updated running average list
 
     TODO:
         Handle non-static cells, or at least catch them.
@@ -173,35 +170,18 @@ class PositionsRunningAverage(PrimitiveVertex):
 
     def __init__(self, name=None):
         super(PositionsRunningAverage, self).__init__(name=name)
-        self._divisor = 1
-        self.input.default.reset = False
+        self._divisor = 0
 
-    def command(self, positions_list, running_average_list, relax_endpoints, cell, pbc, sampling_period, reset):
-
-        if self._divisor > sampling_period and reset is True:
-            print('running_average_reset')
-            for i, pos in enumerate(positions_list):
-                if (i == 0 or i == len(positions_list) - 1) and not relax_endpoints:
-                    continue
-                else:
-                    running_average_list[i] = pos
-            self._divisor = 1
-
+    def command(self, positions, running_average_positions, cell, pbc):
         # On the first step, divide by 2 to average two positions
         self._divisor += 1
         # How much of the current step to mix into the average
         weight = 1. / self._divisor
-        running_average_list = np.array(running_average_list)  # Don't modify this input in place
-
-        for i, pos in enumerate(positions_list):
-            if (i == 0 or i == len(positions_list) - 1) and not relax_endpoints:
-                continue
-            else:
-                disp = find_mic(pos - running_average_list[i], cell, pbc)[0]
-                running_average_list[i] += weight * disp
+        displacement = find_mic(positions - running_average_positions, cell, pbc)[0]
+        running_average_positions += weight * displacement
 
         return {
-            'running_average_list': running_average_list
+            'running_average_positions': running_average_positions
         }
 
 
@@ -227,13 +207,16 @@ class CentroidsRunningAverageMix(PrimitiveVertex):
     def __init__(self, name=None):
         super(CentroidsRunningAverageMix, self).__init__(name=name)
         self.input.default.mixing_fraction = 0.1
+        self.input.default.relax_endpoints = False
 
-    def command(self, mixing_fraction, centroids_pos_list, running_average_list, cell, pbc):
-        centroids_pos_list = np.array(centroids_pos_list)
+    def command(self, mixing_fraction, centroids_pos_list, running_average_list, cell, pbc, relax_endpoints):
         for i, cent in enumerate(centroids_pos_list):
-            disp = find_mic(running_average_list[i] - cent, cell, pbc)[0]
-            update = mixing_fraction * disp
-            centroids_pos_list[i] += update
+            if (i == 0 or i == len(centroids_pos_list) - 1) and not relax_endpoints:
+                continue
+            else:
+                displacement = find_mic(running_average_list[i] - cent, cell, pbc)[0]
+                update = mixing_fraction * displacement
+                centroids_pos_list[i] = cent + update
 
         return {
             'centroids_pos_list': centroids_pos_list
@@ -253,15 +236,14 @@ class CentroidsSmoothing(PrimitiveVertex):
     Output Attributes:
         all_centroid_positions (list/numpy.ndarray): List of smoothed centroid positions.
     """
-    def command(self, kappa, dtau, all_centroid_positions):
+    def command(self, kappa, dtau, centroids_pos_list):
         # Get the smoothing matrix
-        n_images = len(all_centroid_positions)
+        n_images = len(centroids_pos_list)
         smoothing_strength = kappa * n_images * dtau
         smoothing_matrix = self._get_smoothing_matrix(n_images, smoothing_strength)
-        smoothed_centroid_positions = np.tensordot(smoothing_matrix, np.array(all_centroid_positions), axes=1)
-
+        smoothed_centroid_positions = np.tensordot(smoothing_matrix, np.array(centroids_pos_list), axes=1)
         return {
-            'centroids_pos_list': smoothed_centroid_positions
+            'centroids_pos_list': smoothed_centroid_positions,
         }
 
     @staticmethod

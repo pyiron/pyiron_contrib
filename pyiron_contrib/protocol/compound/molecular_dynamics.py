@@ -6,7 +6,8 @@ from __future__ import print_function
 
 from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
 from pyiron_contrib.protocol.primitive.one_state import Counter, ExternalHamiltonian, RandomVelocity, Zeros, \
-    VerletPositionUpdate, VerletVelocityUpdate, SphereReflection, WelfordOnline, NearestNeighbors, HarmonicHamiltonian
+    VerletPositionUpdate, VerletVelocityUpdate, SphereReflection, WelfordOnline, NearestNeighbors, \
+    HarmonicHamiltonian, BerendsenBarostat
 from pyiron_contrib.protocol.primitive.two_state import IsGEq, ModIsZero
 from pyiron_contrib.protocol.primitive.fts_vertices import PositionsRunningAverage
 from pyiron_contrib.protocol.utils import Pointer
@@ -73,18 +74,27 @@ class MolecularDynamics(CompoundVertex):
 
         # Protocol defaults
         id_ = self.input.default
+        id_.temperature = None
+        id_.pressure = None
+        id_.volume = None
+        id_.energy_kin = None
         id_.n_steps = 100
         id_.time_step = 1.
-        id_.temperature_damping_timescale = None
+        id_.temperature_damping_timescale = 100.
+        id_.overheat_fraction = 2
+        id_.pressure_damping_timescale = 1000.
+        id_.compressibility = 4.57e-5  # bar^-1
 
     def define_vertices(self):
         # Graph components
         g = self.graph
         g.initial_velocity = RandomVelocity()
         g.initial_forces = Zeros()
+        g.initial_pressures = Zeros()
         g.check_steps = IsGEq()
         g.clock = Counter()
         g.calc_static = ExternalHamiltonian()
+        g.barostat = BerendsenBarostat()
         g.verlet_positions = VerletPositionUpdate()
         g.verlet_velocities = VerletVelocityUpdate()
 
@@ -94,7 +104,9 @@ class MolecularDynamics(CompoundVertex):
         g.make_pipeline(
             g.initial_velocity,
             g.initial_forces,
+            g.initial_pressures,
             g.check_steps, 'false',
+            g.barostat,
             g.verlet_positions,
             g.calc_static,
             g.verlet_velocities,
@@ -116,10 +128,27 @@ class MolecularDynamics(CompoundVertex):
 
         g.initial_forces.input.shape = ip.structure.positions.shape
 
-        g.verlet_positions.input.default.positions = ip.structure.positions
+        g.initial_pressures.input.shape = ip.structure.cell.shape
+
+        g.barostat.input.default.box_pressures = gp.initial_pressures.output.zeros[-1]
+        g.barostat.input.default.structure = ip.structure
+        g.barostat.input.default.positions = ip.structure.positions
+        g.barostat.input.default.energy_kin = ip.energy_kin
+        g.barostat.input.default.volume = ip.volume
+        g.barostat.input.box_pressures = gp.calc_static.output.pressures[-1]
+        g.barostat.input.structure = gp.barostat.output.structure[-1]
+        g.barostat.input.positions = gp.verlet_positions.output.positions[-1]
+        g.barostat.input.energy_kin = gp.verlet_velocities.output.energy_kin[-1]
+        g.barostat.input.volume = gp.calc_static.output.volume[-1]
+        g.barostat.input.pressure = ip.pressure
+        g.barostat.input.temperature = ip.temperature
+        g.barostat.input.time_step = ip.time_step
+        g.barostat.input.pressure_damping_timescale = ip.pressure_damping_timescale
+        g.barostat.input.compressibility = ip.compressibility
+
+        g.verlet_positions.input.default.positions = gp.barostat.output.positions[-1]
         g.verlet_positions.input.default.velocities = gp.initial_velocity.output.velocities[-1]
         g.verlet_positions.input.default.forces = gp.initial_forces.output.zeros[-1]
-        g.verlet_positions.input.positions = gp.verlet_positions.output.positions[-1]
         g.verlet_positions.input.velocities = gp.verlet_velocities.output.velocities[-1]
         g.verlet_positions.input.forces = gp.calc_static.output.forces[-1]
         g.verlet_positions.input.masses = ip.structure.get_masses
@@ -128,8 +157,9 @@ class MolecularDynamics(CompoundVertex):
         g.verlet_positions.input.temperature_damping_timescale = ip.temperature_damping_timescale
 
         g.calc_static.input.ref_job_full_path = ip.ref_job_full_path
-        g.calc_static.input.structure = ip.structure
+        g.calc_static.input.structure = gp.barostat.output.structure[-1]
         g.calc_static.input.positions = gp.verlet_positions.output.positions[-1]
+        g.calc_static.input.cell = gp.barostat.output.structure[-1].cell
 
         g.verlet_velocities.input.velocities = gp.verlet_positions.output.velocities[-1]
         g.verlet_velocities.input.forces = gp.calc_static.output.forces[-1]
@@ -150,7 +180,9 @@ class MolecularDynamics(CompoundVertex):
             'energy_kin': ~gp.verlet_velocities.output.energy_kin[-1],
             'positions': ~gp.verlet_positions.output.positions[-1],
             'velocities': ~gp.verlet_velocities.output.velocities[-1],
-            'forces': ~gp.calc_static.output.forces[-1]
+            'forces': ~gp.calc_static.output.forces[-1],
+            'pressure': ~gp.barostat.output.pressure[-1],
+            'volume': ~gp.barostat.output.volume[-1]
         }
 
 

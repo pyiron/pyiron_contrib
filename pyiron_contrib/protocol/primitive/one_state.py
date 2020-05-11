@@ -18,8 +18,11 @@ from pyiron_contrib.protocol.math import welford_online
 import matplotlib.pylab as plt
 
 KB = physical_constants['Boltzmann constant in eV/K'][0]
-EV_TO_U_ANGSQ_PER_FSSQ = 0.00964853322  # https://www.wolframalpha.com/input/?i=1+eV+in+u+*+%28angstrom%2Ffs%29%5E2
+EV_TO_U_ANGSQ_PER_FSSQ = 0.00964853322
+# https://www.wolframalpha.com/input/?i=1+eV+in+u+*+%28angstrom%2Ffs%29%5E2
 U_ANGSQ_PER_FSSQ_TO_EV = 1. / EV_TO_U_ANGSQ_PER_FSSQ
+EV_PER_ANGCUB_TO_GPA = 160.21766208  # eV/A^3 to GPa
+GPA_TO_BAR = 1e4
 
 """
 Primitive vertices which have only one outbound execution edge.
@@ -51,6 +54,7 @@ class BuildMixingPairs(PrimitiveVertex):
     Output attributes:
         lambda_pairs (numpy.ndarray): The (`n_lambdas`, 2)-shaped array of mixing pairs.
     """
+
     def __init__(self, name=None):
         super(BuildMixingPairs, self).__init__(name=name)
         self.input.default.n_lambdas = None
@@ -73,14 +77,42 @@ class Counter(PrimitiveVertex):
     Output attributes:
         n_counts (int): How many executions have passed. (Default is 0.)
     """
+
     def __init__(self, name=None):
         super(Counter, self).__init__(name=name)
         self.output.n_counts = [0]
+        self.new_count = None
 
-    def command(self):
+    def command(self, new_count, max_count):
+        if new_count is None:
+            count = self.output.n_counts[-1] + 1
+        elif max_count >= new_count != 0:
+            count = new_count
+            self.output.n_counts[-1] = new_count
+        else:
+            count = self.output.n_counts[-1] + 1
+
         return {
-             'n_counts': self.output.n_counts[-1] + 1
-         }
+            'n_counts': count
+        }
+
+
+class ResetSamplingPeriod(PrimitiveVertex):
+    """
+    
+    """
+
+    def __init__(self, name=None):
+        super(ResetSamplingPeriod, self).__init__(name=name)
+        self.new_sampling_period = 0
+
+    def command(self, base_sampling_period, max_steps):
+        if self.new_sampling_period < max_steps:
+            self.new_sampling_period += base_sampling_period
+        print(self.new_sampling_period)
+        return {
+            'sampling_period': self.new_sampling_period
+        }
 
 
 class Compute(PrimitiveVertex):
@@ -105,6 +137,7 @@ class DeleteAtom(PrimitiveVertex):
         structure (Atoms): The new, modified structure.
         mask (numpy.ndarray): The integer ids shared by both the old and new structure.
     """
+
     def command(self, structure, id):
         vacancy_structure = structure.copy()
         vacancy_structure.pop(id)
@@ -118,38 +151,43 @@ class DeleteAtom(PrimitiveVertex):
 
 class ExternalHamiltonian(PrimitiveVertex):
     """
-    Manages calls to an external interpreter (e.g. Lammps, Vasp, Sphinx...) to produce energies, forces, and possibly
-    other properties.
+    Manages calls to an external interpreter (e.g. Lammps, Vasp, Sphinx...) to produce energies, forces,
+    and possibly other properties.
 
-    The collected output can be expanded beyond forces and energies (e.g. to magnetic properties or whatever else the
-    interpreting code produces) by modifying the `interesting_keys` in the input. The property must have a corresponding
-    interactive getter for this property.
+    The collected output can be expanded beyond forces and energies (e.g. to magnetic properties or whatever
+    else the interpreting code produces) by modifying the `interesting_keys` in the input. The property must
+    have a corresponding interactive getter for this property.
 
     Input attributes:
         ref_job_full_path (string): The full path to the hdf5 file of the job to use as a reference template.
-        structure (Atoms): The structure for initializing the external Hamiltonian. Overwrites the reference job
-            structure when provided. (Default is None, the reference job needs to have its structure set.)
-        interesting_keys (list[str]): String codes for output properties of the underlying job to collect. (Default is
-            ['forces', 'energy_pot'].)
-        positions (numpy.ndarray): New positions to evaluate. Shape must match the shape of the structure. (Not set by
-            default, only necessary if positions are being updated.)
+        structure (Atoms): The structure for initializing the external Hamiltonian. Overwrites the reference
+        job structure when provided. (Default is None, the reference job needs to have its structure set.)
+        interesting_keys (list[str]): String codes for output properties of the underlying job to collect. (
+        Default is ['forces', 'energy_pot'].)
+        positions (numpy.ndarray): New positions to evaluate. Shape must match the shape of the structure.
+        (Not set by default, only necessary if positions are being updated.)
     """
 
     def __init__(self, name=None):
         super(ExternalHamiltonian, self).__init__(name=name)
+        self.input.default.ref_job = None
         self.input.default.structure = None
-        self.input.default.interesting_keys = ['forces', 'energy_pot']
+        self.input.default.interesting_keys = ['forces', 'energy_pot', 'pressures', 'volume']
         self.input.default.positions = None
-
+        self.input.default.cell = None
         self._fast_lammps_mode = True  # Set to false only to intentionally be slow for comparison purposes
-        self._job = None
         self._job_project_path = None
+        self._job = None
         self._job_name = None
 
-    def command(self, ref_job_full_path, structure, interesting_keys, positions):
+    def command(self, job_path, ref_job, ref_job_full_path, structure, interesting_keys, positions, cell):
+
+        self._job_project_path = job_path
         if self._job_project_path is None:
-            self._initialize(ref_job_full_path, structure)
+            print('this')
+            self._initialize(ref_job, ref_job_full_path, structure)
         elif self._job is None:
+            print('that')
             self._reload()
         elif not self._job.interactive_is_activated():
             self._job.status.running = True
@@ -160,13 +198,17 @@ class ExternalHamiltonian(PrimitiveVertex):
             # Run Lammps 'efficiently'
             if positions is not None:
                 self._job.interactive_positions_setter(positions)
-
+            if cell is not None:
+                self._job.interactive_cells_setter(cell)
             self._job._interactive_lib_command(self._job._interactive_run_command)
+
         elif isinstance(self._job, GenericInteractive):
             # DFT codes are slow enough that we can run them the regular way and not care
             # Also we might intentionally run Lammps slowly for comparison purposes
             if positions is not None:
                 self._job.structure.positions = positions
+            if cell is not None:
+                self._job.structure.cell = cell
 
             self._job.calc_static()
             self._job.run()
@@ -175,18 +217,21 @@ class ExternalHamiltonian(PrimitiveVertex):
 
         return {key: self.get_interactive_value(key) for key in interesting_keys}
 
-    def _initialize(self, ref_job_full_path, structure):
-        loc = self.get_graph_location()
-        name = loc + '_job'
-        project_path, ref_job_path = split(ref_job_full_path)
-        pr = Project(path=project_path)
-        ref_job = pr.load(ref_job_path)
-        job = ref_job.copy_to(
-            project=pr,
-            new_job_name=name,
-            input_only=True,
-            new_database_entry=True
-        )
+    def _initialize(self, ref_job, ref_job_full_path, structure):
+        if ref_job is not None:
+            job = ref_job
+        else:
+            loc = self.get_graph_location()
+            name = loc + '_job'
+            project_path, ref_job_path = split(ref_job_full_path)
+            pr = Project(path=project_path)
+            ref_job = pr.load(ref_job_path)
+            job = ref_job.copy_to(
+                project=pr,
+                new_job_name=name,
+                input_only=True,
+                new_database_entry=True
+            )
 
         if structure is not None:
             job.structure = structure
@@ -194,21 +239,23 @@ class ExternalHamiltonian(PrimitiveVertex):
         if isinstance(job, GenericInteractive):
             job.interactive_open()
 
-            if isinstance(job, LammpsInteractive) and self._fast_lammps_mode:
-                # Note: This might be done by default at some point in LammpsInteractive, and could then be removed here
-                job.interactive_flush_frequency = 10**10
-                job.interactive_write_frequency = 10**10
-                self._disable_lmp_output = True
-
-            job.calc_static()
-            job.run(run_again=True)
-            # TODO: Running is fine for Lammps, but wasteful for DFT codes! Get the much cheaper interface
-            #  initialization working -- right now it throws a (passive) TypeError due to database issues
+        if isinstance(job, LammpsInteractive) and self._fast_lammps_mode:
+            # Note: This might be done by default at some point in LammpsInteractive,
+            # and could then be removed here
+            job.interactive_flush_frequency = 10 ** 10
+            job.interactive_write_frequency = 10 ** 10
+            self._disable_lmp_output = True
         else:
             raise TypeError('Job of class {} is not compatible.'.format(ref_job.__class__))
+
+        job.calc_static()
+        job.run(run_again=True)
+        # TODO: Running is fine for Lammps, but wasteful for DFT codes! Get the much cheaper interface
+        #  initialization working -- right now it throws a (passive) TypeError due to database issues
+
         self._job = job
-        self._job_name = name
-        self._job_project_path = project_path
+        self._job_name = job.job_name
+        self._job_project_path = job.project.path
 
     def _reload(self):
         pr = Project(path=self._job_project_path)
@@ -225,8 +272,14 @@ class ExternalHamiltonian(PrimitiveVertex):
             val = np.array(self._job.interactive_forces_getter())
         elif key == 'energy_pot':
             val = self._job.interactive_energy_pot_getter()
+        elif key == 'pressures':
+            val = np.array(self._job.interactive_pressures_getter())
+        elif key == 'volume':
+            val = self._job.interactive_volume_getter()
         elif key == 'cells':
             val = np.array(self._job.interactive_cells_getter())
+        elif key == 'job_path':
+            val = self._job_project_path
         else:
             raise NotImplementedError
         return val
@@ -247,6 +300,35 @@ class ExternalHamiltonian(PrimitiveVertex):
         self._fast_lammps_mode = hdf[group_name]["fastlammpsmode"]
         self._job_name = hdf[group_name]["jobname"]
         self._job_project_path = hdf[group_name]["jobprojectpath"]
+
+
+class InitializeJob(PrimitiveVertex):
+    """
+
+    """
+
+    def __init__(self, name=None):
+        super(InitializeJob, self).__init__(name=name)
+
+    def command(self, ref_job_full_path, n_images):
+        ref_jobs = []
+        for i in np.arange(n_images):
+            loc = self.get_graph_location()
+            name = loc + '_image_' + str(i)
+            project_path, ref_job_path = split(ref_job_full_path)
+            pr = Project(path=project_path)
+            ref_job = pr.load(ref_job_path)
+            job = ref_job.copy_to(
+                project=pr,
+                new_job_name=name,
+                input_only=True,
+                new_database_entry=True
+            )
+            ref_jobs.append(job)
+
+        return {
+            'ref_jobs': ref_jobs
+        }
 
 
 class GradientDescent(PrimitiveVertex):
@@ -443,9 +525,7 @@ class LangevinThermostat(PrimitiveVertex):
         id.time_step = 1.
         id.fix_com = True
 
-    def command(self, velocities, masses,
-                temperature, damping_timescale, time_step, fix_com):
-
+    def command(self, velocities, masses, temperature, damping_timescale, time_step, fix_com):
         # Ensure that masses are a commensurate shape
         masses = np.array(masses)[:, np.newaxis]
         gamma = masses / damping_timescale
@@ -488,6 +568,7 @@ class Max(PrimitiveVertex):
 
     Note: This misses the new argument ``initial`` in the latest version of Numpy.
     """
+
     def __init__(self, name=None):
         super(Max, self).__init__(name=name)
         self.input.default.axis = None
@@ -669,6 +750,7 @@ class Norm(PrimitiveVertex):
     Output attributes:
         n (float/numpy.ndarray): Norm of the matrix or vector(s).
     """
+
     def __init__(self, name=None):
         super(Norm, self).__init__(name=name)
         self.input.default.ord = 2
@@ -685,6 +767,7 @@ class Overwrite(PrimitiveVertex):
     """
     Overwrite particular entries of an array with new values
     """
+
     def command(self, target, mask, new_values):
         overwritten = np.array(target)
         overwritten[mask] = new_values
@@ -716,7 +799,6 @@ class RandomVelocity(PrimitiveVertex):
         self.input.default.overheat_fraction = 2.
 
     def command(self, temperature, masses, overheat_fraction):
-
         masses = np.array(masses)[:, np.newaxis]
         vel_scale = np.sqrt(EV_TO_U_ANGSQ_PER_FSSQ * KB * temperature / masses) * np.sqrt(overheat_fraction)
         vel_dir = np.random.randn(len(masses), 3)
@@ -747,6 +829,7 @@ class SphereReflection(PrimitiveVertex):
         cell (numpy.ndarray): The 3x3 cell vectors for pbcs.
         forces (numpy.ndarray): The forces corresponding to the positions at this time. (Default is None.)
         previous_forces (numpy.ndarray): The forces at the `previous_positions` to revert to. (Default is None.)
+        atom_reflect_switch (boolean): Turn on or off Sphere Reflection
 
     Output attributes:
         positions (numpy.ndarray): The (possibly reverted) positions.
@@ -757,10 +840,7 @@ class SphereReflection(PrimitiveVertex):
 
     def __init__(self, name=None):
         super(SphereReflection, self).__init__(name=name)
-        # self.input.default.forces = None
-        # self.input.default.previous_forces = None
         self.input.default.atom_reflect_switch = True
-        # self.input.default.previous_velocities = Pointer(self.input.velocities)
 
     def command(self, reference_positions, cutoff_distance, positions, velocities, previous_positions,
                 previous_velocities, pbc, cell, atom_reflect_switch):
@@ -774,7 +854,6 @@ class SphereReflection(PrimitiveVertex):
                 'reflected': False
             }
         else:
-            print('sphere_reflected')
             return {
                 'positions': previous_positions,
                 'velocities': -previous_velocities,
@@ -896,7 +975,7 @@ class VerletParent(PrimitiveVertex, ABC):
         """
         drag = -0.5 * time_step * velocities / damping_timescale
         noise = np.sqrt(EV_TO_U_ANGSQ_PER_FSSQ * KB * temperature * time_step / (masses * damping_timescale)) \
-            * np.random.randn(*velocities.shape)
+                * np.random.randn(*velocities.shape)
         noise -= np.mean(noise, axis=0)
         return drag + noise
 
@@ -1176,3 +1255,74 @@ class TILDPostProcess(PrimitiveVertex):
     @staticmethod
     def get_free_energy_change(lambda_pairs, mean):
         return np.trapz(x=lambda_pairs[:, 0], y=mean)
+
+
+class BerendsenBarostat(PrimitiveVertex):
+    """
+    The Berendsen barostat which can be used for pressure control as elaborated in
+    https://doi.org/10.1063/1.448118
+
+    NOTE: Always use in conjunction with a thermostat, otherwise time integration will not be performed.
+    The barostat only modifies the cell of the input structure, and scales the positions. Positions
+    and velocities will only be updated by the thermostat.
+
+    Input dictionary:
+        pressure (float): The pressure in GPa to be simulated (Default is None GPa)
+        #TODO: Simulate a pressure tensor, and not just an isotropic pressure
+        temperature (float): The temperature in K (Default is 0. K)
+        box_pressures (numpy.ndarray): The pressure tensor in GPa generated per step by Lammps
+        energy_kin (float): The kinetic energy of the system in eV (Default is None)
+        time_step (float): MD time step in fs. (Default is 1 fs.)
+        pressure_damping_timescale (float): Damping timescale in fs. (Default is None, no barostat is used.)
+        compressibility (float): The compressibility of water in bar-1 (Default is 4.57e-5 bar-1)
+        structure (Atoms): The structure whose cell and positions are to be scaled.
+        positions (numpy.ndarray): The updated positions from `VerletPositionUpdate`.
+        volume (float): The volume of the cell in Ang3 (Default is None)
+
+    Output dictionary:
+        pressure (float): The isotropic pressure in GPa
+        volume (float): The volume of the cell in Ang3
+        structure (Atoms): The scaled structure, corresponding to the simulated volume
+        positions (numpy.ndarray): The scaled positions
+    """
+
+    def __init__(self, name=None):
+        super(BerendsenBarostat, self).__init__(name=name)
+        id = self.input.default
+        id.pressure = None
+        id.temperature = 0.
+        id.pressure_damping_timescale = 1000.
+        id.time_step = 1.
+        id.compressibility = 4.57e-5  # compressibility of water in bar^-1
+
+    def command(self, pressure, temperature, box_pressures, energy_kin, time_step,
+                pressure_damping_timescale, compressibility, structure, positions, volume):
+
+        structure.positions = positions
+        n_atoms = len(positions)
+        isotropic_pressure = np.trace(box_pressures) / 3  # pyiron stores pressure in GPa
+        if volume is None:
+            volume = structure.cell.diagonal().prod()
+
+        if energy_kin is None:
+            energy_kin = (3 / 2) * n_atoms * KB * temperature
+
+        if pressure is None:
+            scaled_structure = structure
+            total_pressure = isotropic_pressure
+        else:
+            first_term = ((2 * energy_kin) / (3 * volume)) * EV_PER_ANGCUB_TO_GPA
+            total_pressure = first_term + isotropic_pressure  # GPa
+            eta = 1 - ((time_step / pressure_damping_timescale) * (compressibility / 3) *
+                       (pressure - total_pressure) * GPA_TO_BAR)
+
+            scaled_structure = structure.copy()
+            scaled_structure.cell = structure.cell * eta
+            scaled_structure.positions = structure.positions * eta
+
+        return {
+            'pressure': total_pressure,
+            'volume': volume,
+            'structure': scaled_structure,
+            'positions': scaled_structure.positions
+        }

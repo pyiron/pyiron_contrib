@@ -180,9 +180,8 @@ class ExternalHamiltonian(PrimitiveVertex):
         self._job = None
         self._job_name = None
 
-    def command(self, job_path, ref_job, ref_job_full_path, structure, interesting_keys, positions, cell):
+    def command(self, ref_job, ref_job_full_path, structure, interesting_keys, positions, cell):
 
-        self._job_project_path = job_path
         if self._job_project_path is None:
             print('this')
             self._initialize(ref_job, ref_job_full_path, structure)
@@ -278,8 +277,6 @@ class ExternalHamiltonian(PrimitiveVertex):
             val = self._job.interactive_volume_getter()
         elif key == 'cells':
             val = np.array(self._job.interactive_cells_getter())
-        elif key == 'job_path':
-            val = self._job_project_path
         else:
             raise NotImplementedError
         return val

@@ -183,10 +183,8 @@ class ExternalHamiltonian(PrimitiveVertex):
     def command(self, ref_job, ref_job_full_path, structure, interesting_keys, positions, cell):
 
         if self._job_project_path is None:
-            print('this')
             self._initialize(ref_job, ref_job_full_path, structure)
         elif self._job is None:
-            print('that')
             self._reload()
         elif not self._job.interactive_is_activated():
             self._job.status.running = True

@@ -84,6 +84,7 @@ class MolecularDynamics(CompoundVertex):
         id_.overheat_fraction = 2
         id_.pressure_damping_timescale = 1000.
         id_.compressibility = 4.57e-5  # bar^-1
+        id_.new_count = None
 
     def define_vertices(self):
         # Graph components
@@ -170,6 +171,9 @@ class MolecularDynamics(CompoundVertex):
 
         g.check_steps.input.target = gp.clock.output.n_counts[-1]
         g.check_steps.input.threshold = ip.n_steps
+
+        g.clock.input.default.new_count = ip.new_count
+        g.clock.input.default.max_count = ip.n_steps
 
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
 

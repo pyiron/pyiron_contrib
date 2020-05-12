@@ -81,7 +81,8 @@ class Counter(PrimitiveVertex):
     def __init__(self, name=None):
         super(Counter, self).__init__(name=name)
         self.output.n_counts = [0]
-        self.new_count = None
+        self.input.default.new_count = None
+        self.input.default.max_count = None
 
     def command(self, new_count, max_count):
         if new_count is None:
@@ -170,17 +171,27 @@ class ExternalHamiltonian(PrimitiveVertex):
 
     def __init__(self, name=None):
         super(ExternalHamiltonian, self).__init__(name=name)
-        self.input.default.ref_job = None
-        self.input.default.structure = None
-        self.input.default.interesting_keys = ['forces', 'energy_pot', 'pressures', 'volume']
-        self.input.default.positions = None
-        self.input.default.cell = None
         self._fast_lammps_mode = True  # Set to false only to intentionally be slow for comparison purposes
+
         self._job_project_path = None
         self._job = None
         self._job_name = None
 
-    def command(self, ref_job, ref_job_full_path, structure, interesting_keys, positions, cell):
+        self.input.default.ref_job = None
+        self.input.default.structure = None
+        self.input.default.interesting_keys = ['forces', 'energy_pot', 'pressures', 'volume', 'job_path',
+                                               'job_name']
+        self.input.default.positions = None
+        self.input.default.cell = None
+        self.input.default.job_path = None
+        self.input.default.job_name = None
+
+    def command(self, job_name, job_path, ref_job, ref_job_full_path, structure,
+                interesting_keys, positions, cell):
+
+        if self._job_project_path is None:
+            self._job_project_path = job_path
+            self._job_name = job_name
 
         if self._job_project_path is None:
             self._initialize(ref_job, ref_job_full_path, structure)
@@ -275,6 +286,10 @@ class ExternalHamiltonian(PrimitiveVertex):
             val = self._job.interactive_volume_getter()
         elif key == 'cells':
             val = np.array(self._job.interactive_cells_getter())
+        elif key == 'job_path':
+            val = self._job_project_path
+        elif key == 'job_name':
+            val = self._job_name
         else:
             raise NotImplementedError
         return val
@@ -1312,8 +1327,8 @@ class BerendsenBarostat(PrimitiveVertex):
                        (pressure - total_pressure) * GPA_TO_BAR)
 
             scaled_structure = structure.copy()
-            scaled_structure.cell = structure.cell * eta
-            scaled_structure.positions = structure.positions * eta
+            new_cell = structure.cell * eta
+            scaled_structure.set_cell(new_cell, scale_atoms=True)
 
         return {
             'pressure': total_pressure,

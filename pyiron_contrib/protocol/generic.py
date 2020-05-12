@@ -45,8 +45,6 @@ class Vertex(LoggerMixin, ABC):
             a graph, or if the vertex is a Protocol being instantiated.)
         n_history (int): The length of each list stored in the output dictionary. (Default is 1, keep only the most
             recent output.)
-        n_cores (int): Number of cores that will be utilized to perform computations using Parallel list. (Default is 1,
-            use only a single core.)
         on (bool): Whether to execute the vertex when it is the active vertex of the graph, or simply skip over it.
             (default is True -- actually execute!)
         graph_parent (Vertex): The object who owns the graph that this vertex resides in. (Default is None.)
@@ -79,7 +77,6 @@ class Vertex(LoggerMixin, ABC):
         self.possible_vertex_states = ["next"]
         self.vertex_name = None
         self.n_history = 1
-        self.n_cores = 1
         self.on = True
         self.graph_parent = None
 
@@ -283,7 +280,6 @@ class Vertex(LoggerMixin, ABC):
         hdf5_server["vertexstate"] = self.vertex_state
         hdf5_server["vertexname"] = self.vertex_name
         hdf5_server["nhistory"] = self.n_history
-        hdf5_server["ncores"] = self.n_cores
         self.input.to_hdf(hdf=hdf5_server, group_name="input")
         self.output.to_hdf(hdf=hdf5_server, group_name="output")
         self.archive.to_hdf(hdf=hdf5_server, group_name="archive")
@@ -305,7 +301,6 @@ class Vertex(LoggerMixin, ABC):
         self._vertex_state = hdf5_server["vertexstate"]
         self.vertex_name = hdf5_server["vertexname"]
         self.n_history = hdf5_server["nhistory"]
-        self.n_cores = hdf5_server["ncores"]
         self.input.from_hdf(hdf=hdf5_server, group_name="input")
         self.output.from_hdf(hdf=hdf5_server, group_name="output")
         self.archive.from_hdf(hdf=hdf5_server, group_name="archive")

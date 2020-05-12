@@ -169,6 +169,8 @@ class HarmonicTILD(TILDParent):
         g.check_steps.input.target = gp.clock.output.n_counts[-1]
         g.check_steps.input.threshold = ip.n_steps
 
+        g.clock.input.default.max_count = ip.n_steps
+
         g.verlet_positions.input.n_children = ip.n_lambdas
         g.verlet_positions.direct.default.positions = ip.structure.positions
         g.verlet_positions.broadcast.default.velocities = gp.initial_velocity.output.velocities[-1]
@@ -425,6 +427,8 @@ class VacancyTILD(TILDParent):
 
         g.check_steps.input.target = gp.clock.output.n_counts[-1]
         g.check_steps.input.threshold = ip.n_steps
+
+        g.clock.input.default.max_count = ip.n_steps
 
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
 

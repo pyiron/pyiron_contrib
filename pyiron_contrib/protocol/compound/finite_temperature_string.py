@@ -497,7 +497,9 @@ class ConstrainedMD(CompoundVertex):
         g.calc_static.input.structure = ip.structure
         g.calc_static.input.positions = gp.reflect_atoms.output.positions[-1]
         g.calc_static.input.default.job_path = ip.job_path
-        g.calc_sttic.input.job_path = ip.job_path
+        g.calc_static.input.job_path = gp.calc_static.output.job_path[-1]
+        g.calc_static.input.default.job_name = ip.job_name
+        g.calc_static.input.job_name = gp.calc_static.output.job_name[-1]
 
         # verlet_velocities
         g.verlet_velocities.input.time_step = ip.time_step
@@ -537,6 +539,7 @@ class ConstrainedMD(CompoundVertex):
             'running_average_positions': ~gp.running_av_positions.output.running_average_positions[-1],
             'running_average_forces': ~gp.running_av_forces.output.mean[-1],
             'job_path': ~gp.calc_static.output.job_path[-1],
+            'job_name': ~gp.calc_static.output.job_name[-1],
             'clock': ~gp.clock.output.n_counts[-1]
         }
 
@@ -556,6 +559,7 @@ class StringEvolutionParallel(StringEvolution):
         # Protocol defaults
         id_ = self.input.default
         id_.job_path = [None, None, None, None, None, None, None, None, None]
+        id_.job_name = [None, None, None, None, None, None, None, None, None]
         id_.initial_positions = None
         id_.time_step = 1.
         id_.temperature_damping_timescale = 100.
@@ -647,11 +651,13 @@ class StringEvolutionParallel(StringEvolution):
         g.constrained_evolution.broadcast.default.centroid_positions = \
             gp.initial_positions.output.initial_positions[-1]
         g.constrained_evolution.broadcast.default.job_path = ip.job_path
+        g.constrained_evolution.broadcast.default.job_name = ip.job_name
 
         g.constrained_evolution.direct.all_centroid_positions = gp.reparameterize.output.centroids_pos_list[-1]
         g.constrained_evolution.broadcast.centroid_positions = gp.reparameterize.output.centroids_pos_list[-1]
         g.constrained_evolution.broadcast.ref_job = gp.initialize_images.output.ref_jobs[-1]
         g.constrained_evolution.broadcast.job_path = gp.constrained_evolution.output.job_path[-1]
+        g.constrained_evolution.broadcast.job_name = gp.constrained_evolution.output.job_name[-1]
 
         g.constrained_evolution.direct.structure = ip.structure_initial
         g.constrained_evolution.direct.temperature = ip.temperature
@@ -686,6 +692,10 @@ class StringEvolutionParallel(StringEvolution):
         g.calc_static_centroids.direct.structure = ip.structure_initial
         g.calc_static_centroids.broadcast.ref_job = gp.initialize_centroids.output.ref_jobs[-1]
         g.calc_static_centroids.broadcast.positions = gp.reparameterize.output.centroids_pos_list[-1]
+        g.calc_static_centroids.broadcast.default.job_path = ip.job_path
+        g.calc_static_centroids.broadcast.job_path = gp.calc_static_centroids.output.job_path[-1]
+        g.calc_static_centroids.broadcast.default.job_name = ip.job_name
+        g.calc_static_centroids.broadcast.job_name = gp.calc_static_centroids.output.job_name[-1]
 
         # recenter
         g.recenter.input.n_children = ip.n_images

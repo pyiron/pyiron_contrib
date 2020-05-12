@@ -71,7 +71,6 @@ class NEB(CompoundVertex):
 
         # Protocol defaults
         id_ = self.input.default
-        id_.new_count = None
         id_.n_steps = 100
         id_.f_tol = 1e-4
 
@@ -154,7 +153,6 @@ class NEB(CompoundVertex):
         g.gradient_descent.direct.fix_com = ip.fix_com
         g.gradient_descent.direct.use_adagrad = ip.use_adagrad
 
-        g.clock.input.default.new_count = ip.new_count
         g.clock.input.default.max_count = ip.n_steps
 
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])

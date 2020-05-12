@@ -10,6 +10,7 @@ from abc import abstractmethod
 from multiprocessing import Process, Manager
 from pyiron.vasp.interactive import VaspInteractive
 from pyiron.sphinx.interactive import SphinxInteractive
+from time import sleep
 
 """
 A command class for running multiple of the same node
@@ -183,10 +184,14 @@ class ParallelList(ListVertex):
             job = Process(target=child.execute_parallel, args=(i, return_dict))
             # job = Process(target=child.execute())
             job.start()
+            sleep(1)
             jobs.append(job)
 
         for job in jobs:
             job.join()
+            sleep(1)
+
+        print(return_dict.keys())
 
         rearranged_dict = dict.fromkeys(range(len(return_dict)))
         for i in range(len(return_dict)):

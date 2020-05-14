@@ -170,18 +170,19 @@ class PositionsRunningAverage(PrimitiveVertex):
 
     def __init__(self, name=None):
         super(PositionsRunningAverage, self).__init__(name=name)
-        self._divisor = 0
+        self.input.default.divisor = 0
 
-    def command(self, positions, running_average_positions, cell, pbc):
+    def command(self, positions, running_average_positions, cell, pbc, divisor):
         # On the first step, divide by 2 to average two positions
-        self._divisor += 1
+        divisor += 1
         # How much of the current step to mix into the average
-        weight = 1. / self._divisor
+        weight = 1. / divisor
         displacement = find_mic(positions - running_average_positions, cell, pbc)[0]
         running_average_positions += weight * displacement
 
         return {
-            'running_average_positions': running_average_positions
+            'running_average_positions': running_average_positions,
+            'divisor': divisor
         }
 
 

@@ -81,15 +81,12 @@ class Counter(PrimitiveVertex):
     def __init__(self, name=None):
         super(Counter, self).__init__(name=name)
         self.output.n_counts = [0]
-        self.input.default.new_count = None
-        self.input.default.max_count = None
+        self.input.default.new_count = 0
+        self.input.default.max_count = 0
 
     def command(self, new_count, max_count):
-        if new_count is None:
-            count = self.output.n_counts[-1] + 1
-        elif max_count >= new_count != 0:
-            count = new_count
-            self.output.n_counts[-1] = new_count
+        if max_count >= new_count != 0:
+            count = self.output.n_counts[-1] + new_count
         else:
             count = self.output.n_counts[-1] + 1
 
@@ -112,7 +109,7 @@ class ResetSamplingPeriod(PrimitiveVertex):
             self.new_sampling_period += base_sampling_period
         print(self.new_sampling_period)
         return {
-            'sampling_period': self.new_sampling_period
+            'sampling_period': base_sampling_period
         }
 
 
@@ -1177,7 +1174,7 @@ class WelfordOnline(PrimitiveVertex):
         self.input.n_samples = op.n_samples[-1]
 
     def command(self, sample, mean, std, n_samples):
-        if mean is None:
+        if n_samples is None:
             new_mean = sample
             new_std = 0
             n_samples = 0
@@ -1204,6 +1201,34 @@ class Zeros(PrimitiveVertex):
     def command(self, shape):
         return {
             'zeros': np.zeros(shape)
+        }
+
+
+class Nones(PrimitiveVertex):
+    """
+    A list of 'None's that is pointer-compatible.
+
+    Input attributes:
+        shape (int/tuple): The shape of the array.
+
+    Output attributes:
+        nones (list): A list of 'None's.
+    """
+
+    def command(self, shape):
+        return {
+            'nones': [None] * shape
+        }
+
+
+class Replace(PrimitiveVertex):
+    """
+
+    """
+
+    def command(self, new_value):
+        return {
+            'new_value': new_value
         }
 
 
@@ -1310,7 +1335,10 @@ class BerendsenBarostat(PrimitiveVertex):
 
         structure.positions = positions
         n_atoms = len(positions)
+
+        # convert the pressure tensor to a scalar pressure
         isotropic_pressure = np.trace(box_pressures) / 3  # pyiron stores pressure in GPa
+
         if volume is None:
             volume = structure.cell.diagonal().prod()
 

@@ -6,11 +6,12 @@ from __future__ import print_function
 from pyiron_contrib.protocol.generic import Vertex, PrimitiveVertex, CompoundVertex
 from pyiron_contrib.protocol.utils import InputDictionary, Pointer
 import numpy as np
+import time
 from abc import abstractmethod
 from multiprocessing import Process, Manager
 from pyiron.vasp.interactive import VaspInteractive
 from pyiron.sphinx.interactive import SphinxInteractive
-from time import sleep
+
 
 """
 A command class for running multiple of the same node
@@ -176,6 +177,11 @@ class ParallelList(ListVertex):
         if self.children is None:
             self._initialize(n_children)
 
+        for child in self.children:
+            child.parallel_setup()
+
+        start_time = time.time()
+
         manager = Manager()
         return_dict = manager.dict()
 
@@ -184,12 +190,12 @@ class ParallelList(ListVertex):
             job = Process(target=child.execute_parallel, args=(i, return_dict))
             # job = Process(target=child.execute())
             job.start()
-            sleep(1)
+            time.sleep(1)
             jobs.append(job)
 
         for job in jobs:
             job.join()
-            sleep(1)
+            time.sleep(1)
 
         print(return_dict.keys())
 
@@ -207,6 +213,9 @@ class ParallelList(ListVertex):
                 output_data[key] = values
         else:
             output_data = None
+
+        stop_time = time.time()
+        print('Time elapsed :', stop_time - start_time)
 
         # output_data = self._extract_output_data_from_children()
         return output_data

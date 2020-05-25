@@ -188,7 +188,6 @@ class ParallelList(ListVertex):
         jobs = []
         for i, child in enumerate(self.children):
             job = Process(target=child.execute_parallel, args=(i, return_dict))
-            # job = Process(target=child.execute())
             job.start()
             time.sleep(1)
             jobs.append(job)
@@ -217,13 +216,7 @@ class ParallelList(ListVertex):
         stop_time = time.time()
         print('Time elapsed :', stop_time - start_time)
 
-        # output_data = self._extract_output_data_from_children()
         return output_data
-
-    # def finish(self):
-    #     super(ParallelList, self).finish()
-    #     self.pool.close()
-    #     self.pool.join()
 
 
 class SerialList(ListVertex):

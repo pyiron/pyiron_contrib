@@ -143,6 +143,7 @@ class StringReflect(StringDistances):
                 'reflected': False
             }
         else:
+            print('string reflect')
             return {
                 'positions': previous_positions,
                 'velocities': -previous_velocities,
@@ -170,7 +171,7 @@ class PositionsRunningAverage(PrimitiveVertex):
 
     def __init__(self, name=None):
         super(PositionsRunningAverage, self).__init__(name=name)
-        self.input.default.divisor = 0
+        self.input.default.divisor = 1
 
     def command(self, positions, running_average_positions, cell, pbc, divisor):
         # On the first step, divide by 2 to average two positions

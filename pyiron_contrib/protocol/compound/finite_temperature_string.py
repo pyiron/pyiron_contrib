@@ -134,7 +134,7 @@ class StringEvolution(CompoundVertex):
             g.reflect_string,  # Comes before atomic reflecting so we can actually trigger a full string reflection!
             g.reflect_atoms,  # Comes after, since even if the string doesn't reflect, on atom might have migrated
             g.calc_static_images,
-            g.verlet_velocities,
+            g.verlet_velocities,    
             g.check_thermalized, 'true',
             g.running_average_positions,
             g.running_average_forces,
@@ -550,7 +550,7 @@ class StringEvolutionParallel(StringEvolution):
         id_.relax_endpoints = False
         id_.nominal_smoothing = 0.01
 
-        id_.divisor = 0
+        id_.divisor = 1
         id_.initial_thermal_switch = True
         id_.final_thermal_switch = False
 

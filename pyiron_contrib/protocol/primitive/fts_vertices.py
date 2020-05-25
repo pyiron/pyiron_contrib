@@ -98,7 +98,6 @@ class StringRecenter(StringDistances):
                 'recentered': False,
             }
         else:
-            print('recenter')
             return {
                 'positions': centroid_positions,
                 'forces': centroid_forces,
@@ -143,7 +142,6 @@ class StringReflect(StringDistances):
                 'reflected': False
             }
         else:
-            print('string reflect')
             return {
                 'positions': previous_positions,
                 'velocities': -previous_velocities,
@@ -174,6 +172,10 @@ class PositionsRunningAverage(PrimitiveVertex):
         self.input.default.divisor = 1
 
     def command(self, positions, running_average_positions, cell, pbc, divisor):
+
+        if running_average_positions is None:
+            running_average_positions = positions
+
         # On the first step, divide by 2 to average two positions
         divisor += 1
         # How much of the current step to mix into the average
@@ -213,7 +215,7 @@ class CentroidsRunningAverageMix(PrimitiveVertex):
 
     def command(self, mixing_fraction, centroids_pos_list, running_average_list, cell, pbc, relax_endpoints):
         for i, cent in enumerate(centroids_pos_list):
-            if (i == 0 or i == len(centroids_pos_list) - 1) and not relax_endpoints:
+            if (i == 0 or i == len(centroids_pos_list) - 1) and relax_endpoints is False:
                 continue
             else:
                 displacement = find_mic(running_average_list[i] - cent, cell, pbc)[0]

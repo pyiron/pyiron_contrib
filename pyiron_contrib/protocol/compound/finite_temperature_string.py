@@ -109,7 +109,7 @@ class StringEvolution(CompoundVertex):
         g.verlet_positions = SerialList(VerletPositionUpdate)
         g.reflect_string = SerialList(StringReflect)
         g.reflect_atoms = SerialList(SphereReflection)
-        g.calc_static_images = AutoList(ExternalHamiltonian)
+        g.calc_static_images = SerialList(ExternalHamiltonian)
         g.verlet_velocities = SerialList(VerletVelocityUpdate)
         g.check_thermalized = IsGEq()
         g.running_average_positions = SerialList(PositionsRunningAverage)
@@ -449,7 +449,7 @@ class ConstrainedMD(CompoundVertex):
         g.reflect_string.input.default.previous_positions = ip.positions
         g.reflect_string.input.default.previous_velocities = ip.velocities
         g.reflect_string.input.previous_positions = gp.reflect_atoms.output.positions[-1]
-        g.reflect_string.input.previous_velocities = gp.reflect_atoms.output.velocities[-1]
+        g.reflect_string.input.previous_velocities = gp.verlet_velocities.output.velocities[-1]
 
         g.reflect_string.input.positions = gp.verlet_positions.output.positions[-1]
         g.reflect_string.input.velocities = gp.verlet_positions.output.velocities[-1]
@@ -465,7 +465,7 @@ class ConstrainedMD(CompoundVertex):
         g.reflect_atoms.input.default.previous_positions = ip.positions
         g.reflect_atoms.input.default.previous_velocities = ip.velocities
         g.reflect_atoms.input.previous_positions = gp.reflect_atoms.output.positions[-1]
-        g.reflect_atoms.input.previous_velocities = gp.reflect_atoms.output.velocities[-1]
+        g.reflect_atoms.input.previous_velocities = gp.verlet_velocities.output.velocities[-1]
 
         g.reflect_atoms.input.positions = gp.reflect_string.output.positions[-1]
         g.reflect_atoms.input.velocities = gp.reflect_string.output.velocities[-1]
@@ -492,7 +492,7 @@ class ConstrainedMD(CompoundVertex):
         g.verlet_velocities.input.forces = gp.calc_static.output.forces[-1]
 
         # check_thermalized
-        g.check_thermalized.input.switch = ip.thermal_switch
+        g.check_thermalized.input.short = ip.thermalized
         g.check_thermalized.input.target = gp.clock.output.n_counts[-1]
         g.check_thermalized.input.default.threshold = ip.thermalization_steps
 
@@ -550,9 +550,10 @@ class StringEvolutionParallel(StringEvolution):
         id_.relax_endpoints = False
         id_.nominal_smoothing = 0.01
 
+        id_.initial_running_average_positions = None
         id_.divisor = 1
-        id_.initial_thermal_switch = True
-        id_.final_thermal_switch = False
+        id_.initial_thermalized = False
+        id_.final_thermalized = True
 
     def define_vertices(self):
         # Graph components
@@ -645,8 +646,8 @@ class StringEvolutionParallel(StringEvolution):
         g.constrained_evo.broadcast.default.centroid_positions = gp.initial_positions.output.initial_positions[-1]
         g.constrained_evo.broadcast.default.positions = gp.initial_positions.output.initial_positions[-1]
         g.constrained_evo.broadcast.default.velocities = gp.initial_velocities.output.velocities[-1]
-        g.constrained_evo.broadcast.default.forces = gp.initial_forces.output.zeros[-1]
-        g.constrained_evo.broadcast.default.running_average_positions = gp.initial_positions.output.initial_positions[-1]
+        g.constrained_evo.direct.default.forces = gp.initial_forces.output.zeros[-1]
+        g.constrained_evo.direct.default.running_average_positions = ip.initial_running_average_positions
         g.constrained_evo.broadcast.default.job_path = gp.nones.output.nones[-1]
         g.constrained_evo.broadcast.default.job_name = gp.nones.output.nones[-1]
 
@@ -661,6 +662,7 @@ class StringEvolutionParallel(StringEvolution):
 
         g.constrained_evo.direct.structure = ip.structure_initial
         g.constrained_evo.direct.temperature = ip.temperature
+        g.constrained_evo.direct.time_step = ip.time_step
         g.constrained_evo.direct.temperature_damping_timescale = ip.temperature_damping_timescale
         g.constrained_evo.direct.reflection_cutoff_distance = ip.reflection_cutoff_distance
         g.constrained_evo.direct.ref_job_full_path = ip.ref_job_full_path
@@ -668,12 +670,12 @@ class StringEvolutionParallel(StringEvolution):
         g.constrained_evo.direct.thermalization_steps = ip.thermalization_steps
 
         g.constrained_evo.direct.default.divisor = ip.divisor
-        g.constrained_evo.direct.default.thermal_switch = ip.initial_thermal_switch
+        g.constrained_evo.direct.default.thermalized = ip.initial_thermalized
         g.constrained_evo.direct.divisor = gp.constrained_evo.output.divisor[-1][-1]
-        g.constrained_evo.direct.thermal_switch = gp.replace.output.new_value[-1]
+        g.constrained_evo.direct.thermalized = gp.replace.output.new_value[-1]
 
         # replace
-        g.replace.input.new_value = ip.final_thermal_switch
+        g.replace.input.new_value = ip.final_thermalized
 
         # mix
         g.mix.input.default.centroids_pos_list = gp.initial_positions.output.initial_positions[-1]

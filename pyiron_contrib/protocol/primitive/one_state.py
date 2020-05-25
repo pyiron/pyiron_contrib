@@ -470,14 +470,14 @@ class InitialPositions(PrimitiveVertex):
     initial and the final structures.
 
     Input attributes:
-        initial positions (list/numpy.ndarray): The initial positions
+        initial_positions (list/numpy.ndarray): The initial positions (Default is None)
         structure_initial (Atoms): The initial structure
-        structure_initial (Atoms): The final structure
+        structure_final (Atoms): The final structure
         n_images (int): Number of structures to interpolate
 
     Output attributes:
-        interpolated_positions (list/numpy.ndarray): A list of (n_images) positions interpolated between
-            the positions of the initial and final structures.
+        initial_positions (list/numpy.ndarray): if initial_positions is None, a list of (n_images) positions
+            interpolated between the positions of the initial and final structures. Else, initial_positions
     """
 
     def __init__(self, name=None):
@@ -861,7 +861,6 @@ class SphereReflection(PrimitiveVertex):
                 'reflected': False
             }
         else:
-            print('sphere reflect')
             return {
                 'positions': previous_positions,
                 'velocities': -previous_velocities,

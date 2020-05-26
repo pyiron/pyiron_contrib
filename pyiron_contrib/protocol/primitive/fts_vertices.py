@@ -220,7 +220,7 @@ class CentroidsRunningAverageMix(PrimitiveVertex):
             else:
                 displacement = find_mic(running_average_list[i] - cent, cell, pbc)[0]
                 update = mixing_fraction * displacement
-                centroids_pos_list[i] = cent + update
+                centroids_pos_list[i] += update
 
         return {
             'centroids_pos_list': centroids_pos_list

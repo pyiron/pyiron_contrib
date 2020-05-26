@@ -647,7 +647,7 @@ class StringEvolutionParallel(StringEvolution):
         g.constrained_evo.broadcast.default.positions = gp.initial_positions.output.initial_positions[-1]
         g.constrained_evo.broadcast.default.velocities = gp.initial_velocities.output.velocities[-1]
         g.constrained_evo.direct.default.forces = gp.initial_forces.output.zeros[-1]
-        g.constrained_evo.direct.default.running_average_positions = ip.initial_running_average_positions
+        g.constrained_evo.broadcast.default.running_average_positions = gp.initial_positions.output.initial_positions[-1]
         g.constrained_evo.broadcast.default.job_path = gp.nones.output.nones[-1]
         g.constrained_evo.broadcast.default.job_name = gp.nones.output.nones[-1]
 

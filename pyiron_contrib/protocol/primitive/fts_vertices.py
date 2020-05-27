@@ -49,7 +49,6 @@ class StringDistances(PrimitiveVertex):
         """
         Checks which centroid the image is closest too, then measures whether or not that closest centroid is sufficiently
         close to the image's parent centroid.
-
         Args:
             positions (numpy.ndarray): Atomic positions of this image.
             centroid_positions (numpy.ndarray): The positions of the image's centroid.
@@ -59,7 +58,6 @@ class StringDistances(PrimitiveVertex):
                 the minimum distance convention.
             eps (float): The maximum distance between the closest centroid and the parent centroid to be considered a match
                 (i.e. no recentering necessary).
-
         Returns:
             (bool): Whether the image is closest to its own parent centroid.
         """
@@ -180,6 +178,10 @@ class PositionsRunningAverage(PrimitiveVertex):
         divisor += 1
         # How much of the current step to mix into the average
         weight = 1. / divisor
+
+        running_average_positions = np.array(running_average_positions)
+        positions = np.array(positions)
+
         displacement = find_mic(positions - running_average_positions, cell, pbc)[0]
         running_average_positions += weight * displacement
 
@@ -214,8 +216,12 @@ class CentroidsRunningAverageMix(PrimitiveVertex):
         self.input.default.relax_endpoints = False
 
     def command(self, mixing_fraction, centroids_pos_list, running_average_list, cell, pbc, relax_endpoints):
+
+        centroids_pos_list = np.array(centroids_pos_list)
+        running_average_list = np.array(running_average_list)
+
         for i, cent in enumerate(centroids_pos_list):
-            if (i == 0 or i == len(centroids_pos_list) - 1) and relax_endpoints is False:
+            if i == 0 or i == len(centroids_pos_list) - 1:
                 continue
             else:
                 displacement = find_mic(running_average_list[i] - cent, cell, pbc)[0]

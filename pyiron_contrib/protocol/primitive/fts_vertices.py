@@ -253,7 +253,7 @@ class CentroidsSmoothing(PrimitiveVertex):
         smoothing_matrix = self._get_smoothing_matrix(n_images, smoothing_strength)
         smoothed_centroid_positions = np.tensordot(smoothing_matrix, np.array(centroids_pos_list), axes=1)
         return {
-            'centroids_pos_list': smoothed_centroid_positions,
+            'centroids_pos_list': np.array(smoothed_centroid_positions)
         }
 
     @staticmethod
@@ -330,7 +330,7 @@ class CentroidsReparameterization(PrimitiveVertex):
         centroids_pos_list = new_positions
 
         return {
-            'centroids_pos_list': centroids_pos_list
+            'centroids_pos_list': np.array(centroids_pos_list)
         }
 
     @staticmethod

@@ -9,7 +9,7 @@ from abc import ABC
 from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
 from pyiron_contrib.protocol.primitive.one_state import InitializeJob, InitialPositions, RandomVelocity, \
     ExternalHamiltonian, VerletPositionUpdate, VerletVelocityUpdate, Counter, Zeros, WelfordOnline, \
-    SphereReflection, Nones, Replace, PositionsRunningAverage2, CentroidsRunningAverageMix2
+    SphereReflection, Replace, StepEnergies
 from pyiron_contrib.protocol.primitive.two_state import IsGEq, ModIsZero
 from pyiron_contrib.protocol.primitive.fts_vertices import StringRecenter, StringReflect, \
     PositionsRunningAverage, CentroidsRunningAverageMix, CentroidsSmoothing, CentroidsReparameterization, \
@@ -253,15 +253,6 @@ class StringEvolution(CompoundVertex):
         g.check_thermalized.input.target = gp.clock.output.n_counts[-1]
         g.check_thermalized.input.default.threshold = ip.thermalization_steps
 
-        # # running_average
-        # g.running_average_pos.input.default.running_average_list = \
-        #     gp.initial_positions.output.initial_positions[-1]
-        # g.running_average_pos.input.running_average_list = gp.running_average_pos.output.running_average_list[-1]
-        # g.running_average_pos.input.positions_list = gp.reflect_atoms.output.positions[-1]
-        # g.running_average_pos.input.relax_endpoints = ip.relax_endpoints
-        # g.running_average_pos.input.cell = ip.structure_initial.cell
-        # g.running_average_pos.input.pbc = ip.structure_initial.pbc
-
         # running_average_positions
         g.running_average_pos.input.n_children = ip.n_images
         g.running_average_pos.broadcast.default.running_average_positions = \
@@ -284,20 +275,11 @@ class StringEvolution(CompoundVertex):
         g.check_sampling_period.input.target = gp.clock.output.n_counts[-1]
         g.check_sampling_period.input.default.mod = ip.sampling_period
 
-        # # mix
-        # g.mix.input.default.centroids_pos_list = gp.initial_positions.output.initial_positions[-1]
-        # g.mix.input.centroids_pos_list = gp.reparameterize.output.centroids_pos_list[-1]
-        # g.mix.input.mixing_fraction = ip.mixing_fraction
-        # g.mix.input.running_average_list = gp.running_average_pos.output.running_average_list[-1]
-        # g.mix.input.cell = ip.structure_initial.cell
-        # g.mix.input.pbc = ip.structure_initial.pbc
-
         # mix
         g.mix.input.default.centroids_pos_list = gp.initial_positions.output.initial_positions[-1]
         g.mix.input.centroids_pos_list = gp.reparameterize.output.centroids_pos_list[-1]
         g.mix.input.mixing_fraction = ip.mixing_fraction
         g.mix.input.running_average_list = gp.running_average_pos.output.running_average_positions[-1]
-        # g.mix.input.relax_endpoints = ip.relax_endpoints
         g.mix.input.cell = ip.structure_initial.cell
         g.mix.input.pbc = ip.structure_initial.pbc
 
@@ -399,6 +381,15 @@ class ConstrainedMD(CompoundVertex):
     WARNING: Presently for use only with Finite Temperature String (FTS) related Protocols
     """
 
+    DefaultWhitelist = {
+        'calc_static': {
+            'output': {'energy_pot': 1}
+        },
+        'verlet_velocities': {
+            'output': {'energy_kin': 1}
+        },
+    }
+
     def __init__(self, **kwargs):
         super(ConstrainedMD, self).__init__(**kwargs)
 
@@ -419,6 +410,7 @@ class ConstrainedMD(CompoundVertex):
         g.verlet_velocities = VerletVelocityUpdate()
         g.check_thermalized = IsGEq()
         g.running_av_positions = PositionsRunningAverage()
+        g.step_energies = StepEnergies()
         g.clock = Counter()
 
     def define_execution_flow(self):
@@ -433,6 +425,7 @@ class ConstrainedMD(CompoundVertex):
             g.verlet_velocities,
             g.check_thermalized, 'true',
             g.running_av_positions,
+            g.step_energies,
             g.clock,
             g.check_steps,
         )
@@ -448,9 +441,6 @@ class ConstrainedMD(CompoundVertex):
         # check_steps
         g.check_steps.input.target = gp.clock.output.n_counts[-1]
         g.check_steps.input.threshold = ip.n_steps
-
-        # clock
-        g.clock.input.max_count = ip.n_steps
 
         # verlet_positions
         g.verlet_positions.input.time_step = ip.time_step
@@ -531,7 +521,17 @@ class ConstrainedMD(CompoundVertex):
         g.running_av_positions.input.pbc = ip.structure.pbc
         g.running_av_positions.input.divisor = gp.running_av_positions.output.divisor[-1]
 
+        # step_energies
+        g.step_energies.input.energy_pot = gp.calc_static.output.energy_pot[-1]
+        g.step_energies.input.energy_kin = gp.verlet_velocities.output.energy_kin[-1]
+        g.step_energies.input.default.energy_pots = ip.energy_pots
+        g.step_energies.input.default.energy_kins = ip.energy_kins
+        g.step_energies.input.energy_pots = gp.step_energies.output.energy_pots[-1]
+        g.step_energies.input.energy_kins = gp.step_energies.output.energy_kins[-1]
+
         # clock
+        g.clock.input.max_count = ip.n_steps
+
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
 
     def get_output(self):
@@ -540,6 +540,8 @@ class ConstrainedMD(CompoundVertex):
             'positions': ~gp.reflect_atoms.output.positions[-1],
             'velocities': ~gp.verlet_velocities.output.velocities[-1],
             'forces': ~gp.calc_static.output.forces[-1],
+            'energy_kins': ~gp.step_energies.output.energy_kins[-1],
+            'energy_pots': ~gp.step_energies.output.energy_pots[-1],
             'running_average_positions': ~gp.running_av_positions.output.running_average_positions[-1],
             'divisor': ~gp.running_av_positions.output.divisor[-1],
             'job_path': ~gp.calc_static.output.job_path[-1],
@@ -557,27 +559,34 @@ class StringEvolutionParallel(StringEvolution):
 
     """
 
+    DefaultWhitelist = {
+        'constrained_evo': {
+            'output': {'positions': 1, 'velocities': 1, 'forces': 1}
+        }
+    }
+
     def __init__(self, **kwargs):
         super(StringEvolutionParallel, self).__init__(**kwargs)
 
         # Protocol defaults
         id_ = self.input.default
         id_.initial_positions = None
+        id_.job_path = None
+        id_.job_name = None
+        id_.sampling_period = 1
+        id_.thermalization_steps = 0
+        id_.n_steps = 10
         id_.time_step = 1.
         id_.temperature_damping_timescale = 100.
         id_.overheat_fraction = 2.
-        id_.thermalization_steps = 1
-        id_.sampling_period = 1
-        id_.n_steps = 100
-
-        id_.mixing_fraction = 0.1
-        id_.relax_endpoints = False
-        id_.nominal_smoothing = 0.01
-
+        id_.energy_pots = []
+        id_.energy_kins = []
         id_.initial_running_average_positions = None
         id_.divisor = 1
         id_.initial_thermalized = False
         id_.final_thermalized = True
+        id_.mixing_fraction = 0.1
+        id_.nominal_smoothing = 0.1
 
     def define_vertices(self):
         # Graph components
@@ -585,9 +594,8 @@ class StringEvolutionParallel(StringEvolution):
         g.initialize_images = InitializeJob()
         g.initialize_centroids = InitializeJob()
         g.initial_positions = InitialPositions()
-        g.initial_velocities = AutoList(RandomVelocity)
+        g.initial_velocities = SerialList(RandomVelocity)
         g.initial_forces = Zeros()
-        g.nones = Nones()
         g.check_steps = IsGEq()
         g.clock = Counter()
         g.constrained_evo = ParallelList(ConstrainedMD)
@@ -595,8 +603,8 @@ class StringEvolutionParallel(StringEvolution):
         g.mix = CentroidsRunningAverageMix()
         g.smooth = CentroidsSmoothing()
         g.reparameterize = CentroidsReparameterization()
-        g.calc_static_centroids = AutoList(ExternalHamiltonian)
-        g.recenter = AutoList(StringRecenter)
+        g.calc_static_centroids = SerialList(ExternalHamiltonian)
+        g.recenter = SerialList(StringRecenter)
 
     def define_execution_flow(self):
         # Execution flow
@@ -607,7 +615,6 @@ class StringEvolutionParallel(StringEvolution):
             g.initial_positions,
             g.initial_velocities,
             g.initial_forces,
-            g.nones,
             g.check_steps, 'false',
             g.constrained_evo,
             g.replace,
@@ -651,52 +658,71 @@ class StringEvolutionParallel(StringEvolution):
         # initial_forces
         g.initial_forces.input.shape = ip.structure_initial.positions.shape
 
-        # nones
-        g.nones.input.shape = ip.n_images
-
         # check_steps
         g.check_steps.input.default.target = gp.clock.output.n_counts[-1]
         g.check_steps.input.threshold = ip.n_steps
 
-        # clock
-        g.clock.input.default.max_count = ip.n_steps
-        g.clock.input.new_count = gp.constrained_evo.output.clock[-1][-1]
-
-        # constrained_evolution
+        # constrained_evolution - initialze
         g.constrained_evo.input.n_children = ip.n_images
-        g.constrained_evo.broadcast.ref_job = gp.initialize_images.output.ref_jobs[-1]
 
-        g.constrained_evo.direct.default.all_centroid_positions = gp.initial_positions.output.initial_positions[-1]
-        g.constrained_evo.broadcast.default.centroid_positions = gp.initial_positions.output.initial_positions[-1]
+        # constrained_evolution - verlet_positions
+        g.constrained_evo.direct.time_step = ip.time_step
+        g.constrained_evo.direct.structure = ip.structure_initial
+        g.constrained_evo.direct.temperature = ip.temperature
+        g.constrained_evo.direct.temperature_damping_timescale = ip.temperature_damping_timescale
+
         g.constrained_evo.broadcast.default.positions = gp.initial_positions.output.initial_positions[-1]
         g.constrained_evo.broadcast.default.velocities = gp.initial_velocities.output.velocities[-1]
         g.constrained_evo.direct.default.forces = gp.initial_forces.output.zeros[-1]
-        g.constrained_evo.broadcast.default.running_average_positions = gp.initial_positions.output.initial_positions[-1]
-        g.constrained_evo.broadcast.default.job_path = gp.nones.output.nones[-1]
-        g.constrained_evo.broadcast.default.job_name = gp.nones.output.nones[-1]
 
-        g.constrained_evo.direct.all_centroid_positions = gp.reparameterize.output.centroids_pos_list[-1]
-        g.constrained_evo.broadcast.centroid_positions = gp.reparameterize.output.centroids_pos_list[-1]
         g.constrained_evo.broadcast.positions = gp.recenter.output.positions[-1]
         g.constrained_evo.broadcast.velocities = gp.constrained_evo.output.velocities[-1]
         g.constrained_evo.broadcast.forces = gp.recenter.output.forces[-1]
-        g.constrained_evo.broadcast.running_average_positions = gp.constrained_evo.output.running_average_positions[-1]
+
+        # constrained_evolution - reflect_string
+        g.constrained_evo.direct.default.all_centroid_positions = gp.initial_positions.output.initial_positions[-1]
+        g.constrained_evo.broadcast.default.centroid_positions = gp.initial_positions.output.initial_positions[-1]
+
+        g.constrained_evo.direct.all_centroid_positions = gp.reparameterize.output.centroids_pos_list[-1]
+        g.constrained_evo.broadcast.centroid_positions = gp.reparameterize.output.centroids_pos_list[-1]
+
+        # constrained_evolution - reflect_atoms
+        g.constrained_evo.direct.reflection_cutoff_distance = ip.reflection_cutoff_distance
+
+        # constrained_evolution - calc_static
+        g.constrained_evo.direct.ref_job_full_path = ip.ref_job_full_path
+        g.constrained_evo.broadcast.ref_job = gp.initialize_images.output.ref_jobs[-1]
+
+        g.constrained_evo.direct.default.job_path = ip.job_path
+        g.constrained_evo.direct.default.job_name = ip.job_name
+
         g.constrained_evo.broadcast.job_path = gp.constrained_evo.output.job_path[-1]
         g.constrained_evo.broadcast.job_name = gp.constrained_evo.output.job_name[-1]
 
-        g.constrained_evo.direct.structure = ip.structure_initial
-        g.constrained_evo.direct.temperature = ip.temperature
-        g.constrained_evo.direct.time_step = ip.time_step
-        g.constrained_evo.direct.temperature_damping_timescale = ip.temperature_damping_timescale
-        g.constrained_evo.direct.reflection_cutoff_distance = ip.reflection_cutoff_distance
-        g.constrained_evo.direct.ref_job_full_path = ip.ref_job_full_path
-        g.constrained_evo.direct.n_steps = ip.sampling_period
-        g.constrained_evo.direct.thermalization_steps = ip.thermalization_steps
+        # constrained_evolution - verlet_velocities
+        # takes inputs already specified in verlet_positions
 
-        g.constrained_evo.direct.default.divisor = ip.divisor
+        # constrained_evolution - check_thermalized
+        g.constrained_evo.direct.thermalization_steps = ip.thermalization_steps
         g.constrained_evo.direct.default.thermalized = ip.initial_thermalized
-        g.constrained_evo.broadcast.divisor = gp.constrained_evo.output.divisor[-1]
         g.constrained_evo.direct.thermalized = gp.replace.output.new_value[-1]
+
+        # constrained_evolution - running_average_positions
+        g.constrained_evo.broadcast.default.running_average_positions = gp.initial_positions.output.initial_positions[-1]
+        g.constrained_evo.direct.default.divisor = ip.divisor
+
+        g.constrained_evo.broadcast.running_average_positions = gp.constrained_evo.output.running_average_positions[-1]
+        g.constrained_evo.broadcast.divisor = gp.constrained_evo.output.divisor[-1]
+
+        # constrained_evolution - step_energies
+        g.constrained_evo.direct.default.energy_pots = ip.energy_pots
+        g.constrained_evo.direct.default.energy_kins = ip.energy_kins
+
+        g.constrained_evo.broadcast.energy_pots = gp.constrained_evo.output.energy_pots[-1]
+        g.constrained_evo.broadcast.energy_kins = gp.constrained_evo.output.energy_kins[-1]
+
+        # constrained_evolution - clock
+        g.constrained_evo.direct.n_steps = ip.sampling_period
 
         # replace
         g.replace.input.new_value = ip.final_thermalized
@@ -706,7 +732,6 @@ class StringEvolutionParallel(StringEvolution):
         g.mix.input.centroids_pos_list = gp.reparameterize.output.centroids_pos_list[-1]
         g.mix.input.mixing_fraction = ip.mixing_fraction
         g.mix.input.running_average_list = gp.constrained_evo.output.running_average_positions[-1]
-        g.mix.input.relax_endpoints = ip.relax_endpoints
         g.mix.input.cell = ip.structure_initial.cell
         g.mix.input.pbc = ip.structure_initial.pbc
 
@@ -723,12 +748,14 @@ class StringEvolutionParallel(StringEvolution):
         # calc_static_centroids
         g.calc_static_centroids.input.n_children = ip.n_images
         g.calc_static_centroids.direct.ref_job_full_path = ip.ref_job_full_path
-        g.calc_static_centroids.direct.structure = ip.structure_initial
         g.calc_static_centroids.broadcast.ref_job = gp.initialize_centroids.output.ref_jobs[-1]
+        g.calc_static_centroids.direct.structure = ip.structure_initial
         g.calc_static_centroids.broadcast.positions = gp.reparameterize.output.centroids_pos_list[-1]
-        g.calc_static_centroids.broadcast.default.job_path = gp.nones.output.nones[-1]
+
+        g.calc_static_centroids.direct.default.job_path = ip.job_path
+        g.calc_static_centroids.direct.default.job_name = ip.job_name
+
         g.calc_static_centroids.broadcast.job_path = gp.calc_static_centroids.output.job_path[-1]
-        g.calc_static_centroids.broadcast.default.job_name = gp.nones.output.nones[-1]
         g.calc_static_centroids.broadcast.job_name = gp.calc_static_centroids.output.job_name[-1]
 
         # recenter
@@ -741,6 +768,10 @@ class StringEvolutionParallel(StringEvolution):
         g.recenter.broadcast.centroid_forces = gp.calc_static_centroids.output.forces[-1]
         g.recenter.broadcast.positions = gp.constrained_evo.output.positions[-1]
         g.recenter.broadcast.forces = gp.constrained_evo.output.forces[-1]
+
+        # clock
+        g.clock.input.default.max_count = ip.n_steps
+        g.clock.input.new_count = gp.constrained_evo.output.clock[-1][-1]
 
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
 

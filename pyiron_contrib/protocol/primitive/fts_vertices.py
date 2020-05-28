@@ -186,7 +186,7 @@ class PositionsRunningAverage(PrimitiveVertex):
         running_average_positions += weight * displacement
 
         return {
-            'running_average_positions': running_average_positions,
+            'running_average_positions': np.array(running_average_positions),
             'divisor': divisor
         }
 
@@ -229,7 +229,7 @@ class CentroidsRunningAverageMix(PrimitiveVertex):
                 centroids_pos_list[i] += update
 
         return {
-            'centroids_pos_list': centroids_pos_list
+            'centroids_pos_list': np.array(centroids_pos_list)
         }
 
 

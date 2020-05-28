@@ -321,7 +321,7 @@ class InitializeJob(PrimitiveVertex):
         ref_jobs = []
         for i in np.arange(n_images):
             loc = self.get_graph_location()
-            name = loc + '_image_' + str(i)
+            name = loc + '_' + str(i)
             project_path, ref_job_path = split(ref_job_full_path)
             pr = Project(path=project_path)
             ref_job = pr.load(ref_job_path)
@@ -1366,71 +1366,21 @@ class BerendsenBarostat(PrimitiveVertex):
         }
 
 
-class PositionsRunningAverage2(PrimitiveVertex):
+class StepEnergies(PrimitiveVertex):
     """
-    Calculates the running average of input positions at each call.
-    Input attributes:
-        positions_list (list/numpy.ndarray): The instantaneous position, which will be updated to the running average
-        running_average_list (list/numpy.ndarray): List of existing running averages
-        cell (numpy.ndarray): The cell of the structure
-        pbc (numpy.ndarray): Periodic boundary condition of the structure
-    Output attributes:
-        running_average_list (list/numpy.ndarray): The updated running average list
-    TODO:
-        Handle non-static cells, or at least catch them.
-        Refactor this so there are list and serial versions equally available
+
     """
 
     def __init__(self, name=None):
-        super(PositionsRunningAverage2, self).__init__(name=name)
-        self._divisor = 1
+        super(StepEnergies, self).__init__(name=name)
+        self.input.default.energy_pots = []
+        self.input.default.energy_kins = []
 
-    def command(self, positions_list, running_average_list, relax_endpoints, cell, pbc):
-        # On the first step, divide by 2 to average two positions
-        self._divisor += 1
-        # How much of the current step to mix into the average
-        weight = 1. / self._divisor
-        running_average_list = np.array(running_average_list)  # Don't modify this input in place
-
-        for i, pos in enumerate(positions_list):
-            if (i == 0 or i == len(positions_list) - 1) and not relax_endpoints:
-                continue
-            else:
-                disp = find_mic(pos - running_average_list[i], cell, pbc)[0]
-                running_average_list[i] += weight * disp
+    def command(self, energy_pots, energy_kins, energy_pot, energy_kin):
+        energy_pots.append(energy_pot)
+        energy_kins.append(energy_kin)
 
         return {
-            'running_average_list': running_average_list
-        }
-
-
-class CentroidsRunningAverageMix2(PrimitiveVertex):
-    """
-    Mix in the running average of the positions to the centroid, moving the centroid towards that
-    running average by a fraction.
-    Input attributes:
-        mixing_fraction (float): The fraction of the running average to mix into centroid (Default is 0.1)
-        centroids_pos_list (list/numpy.ndarray): List of all the centroids along the string
-        running_average_list (list/numpy.ndarray): List of running averages
-        cell (numpy.ndarray): The cell of the structure
-        pbc (numpy.ndarray): Periodic boundary condition of the structure
-    Output attributes:
-        centroids_pos_list (list/numpy.ndarray): List centroids updated towards the running average
-    TODO:
-        Re-write Command base class(es) to better handle serial/list/parallel.
-    """
-
-    def __init__(self, name=None):
-        super(CentroidsRunningAverageMix2, self).__init__(name=name)
-        self.input.default.mixing_fraction = 0.1
-
-    def command(self, mixing_fraction, centroids_pos_list, running_average_list, cell, pbc):
-        centroids_pos_list = np.array(centroids_pos_list)
-        for i, cent in enumerate(centroids_pos_list):
-            disp = find_mic(running_average_list[i] - cent, cell, pbc)[0]
-            update = mixing_fraction * disp
-            centroids_pos_list[i] += update
-
-        return {
-            'centroids_pos_list': centroids_pos_list
+            'energy_pots': energy_pots,
+            'energy_kins': energy_kins
         }

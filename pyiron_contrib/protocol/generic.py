@@ -7,6 +7,7 @@ import sys
 from pyiron.base.job.generic import GenericJob
 from pyiron_contrib.protocol.utils import IODictionary, InputDictionary, LoggerMixin, Event, EventHandler, \
     Pointer, CrumbType, ordered_dict_get_last, Comparer, TimelineDict
+# from pyiron_contrib.protocol.utils.types import PyironJobTypeRegistry
 from pyiron_contrib.protocol.utils.pptree import print_tree as pptree
 from abc import ABC, abstractmethod
 
@@ -56,7 +57,7 @@ class Vertex(LoggerMixin, ABC):
     Archive attributes:
         whitelist (IODictionary): A nested dictionary of periods for archiving input and output values. Stores on
             executions where `clock % period = 0`.
-        clock (int): The timer for whether or not input/output should be archived to hdf5.
+        clock (int): The timer for whether whether or not input/output should be archived to hdf5.
     """
 
     def __init__(self, **kwargs):
@@ -127,7 +128,7 @@ class Vertex(LoggerMixin, ABC):
             {'input': {'structure': None,
                         'forces': 5}
             }
-            # disables the archiving of input.structure but keeps forces
+            # disables the archiveing of input.structure but keeps forces
         ```
         Args:
             dictionary (dict): The whitelist specification.
@@ -336,8 +337,7 @@ class PrimitiveVertex(Vertex):
         """How to execute in parallel when there's a list of these vertices together."""
         output_data = self.command(**input_dict)
         queue.put((n, output_data))
-        # Note: The output needs to be explicitly collected and archived later if this is used in place
-        # of `execute`
+        # Note: The output needs to be explicitly collected and archived later if this is used in place of `execute`
 
 
 class CompoundVertex(Vertex): #, PyironJobTypeRegistry):
@@ -614,7 +614,7 @@ class CompoundVertex(Vertex): #, PyironJobTypeRegistry):
             pptree(self.whitelist, file=file, name='%s.%s' % (self.vertex_name, 'whitelist'))
 
 
-class Protocol(CompoundVertex, GenericJob, ABC):
+class Protocol(CompoundVertex, GenericJob):
     """
     A parent class for compound vertices which are being instantiated as regular pyiron jobs, i.e. the highest level
     graph in their context.
@@ -641,7 +641,7 @@ class Protocol(CompoundVertex, GenericJob, ABC):
         self.status.running = True
         self.execute()
         self.status.collect = True  # Assume modal for now
-        self.run()  # This is an artifact of inheriting from GenericJob, to get all that functionality
+        self.run()  # This is an artifact of inheriting from GenericJob, to get all that run functionality
 
     def run(self, run_again=False, repair=False, debug=False, run_mode=None, continue_run=False):
         """A wrapper for the run which allows us to simply keep going with a new variable `continue_run`"""

@@ -147,198 +147,51 @@ class DeleteAtom(PrimitiveVertex):
         }
 
 
-# class ExternalHamiltonian(PrimitiveVertex):
-#     """
-#     Manages calls to an external interpreter (e.g. Lammps, Vasp, Sphinx...) to produce energies, forces,
-#     and possibly other properties.
-#
-#     The collected output can be expanded beyond forces and energies (e.g. to magnetic properties or whatever
-#     else the interpreting code produces) by modifying the `interesting_keys` in the input. The property must
-#     have a corresponding interactive getter for this property.
-#
-#     Input attributes:
-#         ref_job_full_path (string): The full path to the hdf5 file of the job to use as a reference template.
-#         structure (Atoms): The structure for initializing the external Hamiltonian. Overwrites the reference
-#         job structure when provided. (Default is None, the reference job needs to have its structure set.)
-#         interesting_keys (list[str]): String codes for output properties of the underlying job to collect. (
-#         Default is ['forces', 'energy_pot'].)
-#         positions (numpy.ndarray): New positions to evaluate. Shape must match the shape of the structure.
-#         (Not set by default, only necessary if positions are being updated.)
-#     """
-#
-#     def __init__(self, name=None):
-#         super(ExternalHamiltonian, self).__init__(name=name)
-#         self._fast_lammps_mode = True  # Set to false only to intentionally be slow for comparison purposes
-#
-#         self._job_project_path = None
-#         self._job = None
-#         self._job_name = None
-#
-#         self.input.default.ref_job = None
-#         self.input.default.structure = None
-#         self.input.default.interesting_keys = ['forces', 'energy_pot', 'pressures', 'volume', 'job_path',
-#                                                'job_name']
-#         self.input.default.positions = None
-#         self.input.default.cell = None
-#         self.input.default.job_path = None
-#         self.input.default.job_name = None
-#
-#     def command(self, job_name, job_path, ref_job, ref_job_full_path, structure,
-#                 interesting_keys, positions, cell):
-#
-#         if self._job_project_path is None:
-#             self._job_project_path = job_path
-#             self._job_name = job_name
-#
-#         if self._job_project_path is None:
-#             self._initialize(ref_job, ref_job_full_path, structure)
-#         elif self._job is None:
-#             self._reload()
-#         elif not self._job.interactive_is_activated():
-#             self._job.status.running = True
-#             self._job.interactive_open()
-#             self._job.interactive_initialize_interface()
-#
-#         if isinstance(self._job, LammpsInteractive) and self._fast_lammps_mode:
-#             # Run Lammps 'efficiently'
-#             if positions is not None:
-#                 self._job.interactive_positions_setter(positions)
-#             if cell is not None:
-#                 self._job.interactive_cells_setter(cell)
-#             self._job._interactive_lib_command(self._job._interactive_run_command)
-#
-#         elif isinstance(self._job, GenericInteractive):
-#             # DFT codes are slow enough that we can run them the regular way and not care
-#             # Also we might intentionally run Lammps slowly for comparison purposes
-#             if positions is not None:
-#                 self._job.structure.positions = positions
-#             if cell is not None:
-#                 self._job.structure.cell = cell
-#
-#             self._job.calc_static()
-#             self._job.run()
-#         else:
-#             raise TypeError('Job of class {} is not compatible.'.format(self._job.__class__))
-#
-#         return {key: self.get_interactive_value(key) for key in interesting_keys}
-#
-#     def _initialize(self, ref_job, ref_job_full_path, structure):
-#         if ref_job is not None:
-#             job = ref_job
-#         else:
-#             loc = self.get_graph_location()
-#             name = loc + '_job'
-#             project_path, ref_job_path = split(ref_job_full_path)
-#             pr = Project(path=project_path)
-#             ref_job = pr.load(ref_job_path)
-#             job = ref_job.copy_to(
-#                 project=pr,
-#                 new_job_name=name,
-#                 input_only=True,
-#                 new_database_entry=True
-#             )
-#
-#         if structure is not None:
-#             job.structure = structure
-#
-#         if isinstance(job, GenericInteractive):
-#             job.interactive_open()
-#
-#             if isinstance(job, LammpsInteractive) and self._fast_lammps_mode:
-#                 # Note: This might be done by default at some point in LammpsInteractive,
-#                 # and could then be removed here
-#                 job.interactive_flush_frequency = 10 ** 10
-#                 job.interactive_write_frequency = 10 ** 10
-#                 self._disable_lmp_output = True
-#
-#             job.calc_static()
-#             job.run(run_again=True)
-#             # TODO: Running is fine for Lammps, but wasteful for DFT codes! Get the much cheaper interface
-#             #  initialization working -- right now it throws a (passive) TypeError due to database issues
-#         else:
-#             raise TypeError('Job of class {} is not compatible.'.format(ref_job.__class__))
-#
-#         self._job = job
-#         self._job_name = job.job_name
-#         self._job_project_path = job.project.path
-#
-#     def _reload(self):
-#         pr = Project(path=self._job_project_path)
-#         self._job = pr.load(self._job_name)
-#         self._job.interactive_open()
-#         self._job.interactive_initialize_interface()
-#         self._job.calc_static()
-#         self._job.run(run_again=True)
-#
-#     def get_interactive_value(self, key):
-#         if key == 'positions':
-#             val = np.array(self._job.interactive_positions_getter())
-#         elif key == 'forces':
-#             val = np.array(self._job.interactive_forces_getter())
-#         elif key == 'energy_pot':
-#             val = self._job.interactive_energy_pot_getter()
-#         elif key == 'pressures':
-#             val = np.array(self._job.interactive_pressures_getter())
-#         elif key == 'volume':
-#             val = self._job.interactive_volume_getter()
-#         elif key == 'cells':
-#             val = np.array(self._job.interactive_cells_getter())
-#         elif key == 'job_path':
-#             val = self._job_project_path
-#         elif key == 'job_name':
-#             val = self._job_name
-#         else:
-#             raise NotImplementedError
-#         return val
-#
-#     def finish(self):
-#         super(ExternalHamiltonian, self).finish()
-#         if self._job is not None:
-#             self._job.interactive_close()
-#
-#     def to_hdf(self, hdf=None, group_name=None):
-#         super(ExternalHamiltonian, self).to_hdf(hdf=hdf, group_name=group_name)
-#         hdf[group_name]["fastlammpsmode"] = self._fast_lammps_mode
-#         hdf[group_name]["jobname"] = self._job_name
-#         hdf[group_name]["jobprojectpath"] = self._job_project_path
-#
-#     def from_hdf(self, hdf=None, group_name=None):
-#         super(ExternalHamiltonian, self).from_hdf(hdf=hdf, group_name=group_name)
-#         self._fast_lammps_mode = hdf[group_name]["fastlammpsmode"]
-#         self._job_name = hdf[group_name]["jobname"]
-#         self._job_project_path = hdf[group_name]["jobprojectpath"]
-
 class ExternalHamiltonian(PrimitiveVertex):
     """
-    Manages calls to an external interpreter (e.g. Lammps, Vasp, Sphinx...) to produce energies, forces, and possibly
-    other properties.
-    The collected output can be expanded beyond forces and energies (e.g. to magnetic properties or whatever else the
-    interpreting code produces) by modifying the `interesting_keys` in the input. The property must have a corresponding
-    interactive getter for this property.
+    Manages calls to an external interpreter (e.g. Lammps, Vasp, Sphinx...) to produce energies, forces,
+    and possibly other properties.
+
+    The collected output can be expanded beyond forces and energies (e.g. to magnetic properties or whatever
+    else the interpreting code produces) by modifying the `interesting_keys` in the input. The property must
+    have a corresponding interactive getter for this property.
+
     Input attributes:
         ref_job_full_path (string): The full path to the hdf5 file of the job to use as a reference template.
-        structure (Atoms): The structure for initializing the external Hamiltonian. Overwrites the reference job
-            structure when provided. (Default is None, the reference job needs to have its structure set.)
-        interesting_keys (list[str]): String codes for output properties of the underlying job to collect. (Default is
-            ['forces', 'energy_pot'].)
-        positions (numpy.ndarray): New positions to evaluate. Shape must match the shape of the structure. (Not set by
-            default, only necessary if positions are being updated.)
+        structure (Atoms): The structure for initializing the external Hamiltonian. Overwrites the reference
+        job structure when provided. (Default is None, the reference job needs to have its structure set.)
+        interesting_keys (list[str]): String codes for output properties of the underlying job to collect. (
+        Default is ['forces', 'energy_pot'].)
+        positions (numpy.ndarray): New positions to evaluate. Shape must match the shape of the structure.
+        (Not set by default, only necessary if positions are being updated.)
     """
 
     def __init__(self, name=None):
         super(ExternalHamiltonian, self).__init__(name=name)
-        self.input.default.structure = None
-        self.input.default.interesting_keys = ['forces', 'energy_pot']
-        self.input.default.positions = None
-
         self._fast_lammps_mode = True  # Set to false only to intentionally be slow for comparison purposes
-        self._job = None
+
         self._job_project_path = None
+        self._job = None
         self._job_name = None
 
-    def command(self, ref_job_full_path, structure, interesting_keys, positions):
+        self.input.default.ref_job = None
+        self.input.default.structure = None
+        self.input.default.interesting_keys = ['forces', 'energy_pot', 'pressures', 'volume', 'job_path',
+                                               'job_name']
+        self.input.default.positions = None
+        self.input.default.cell = None
+        self.input.default.job_path = None
+        self.input.default.job_name = None
+
+    def command(self, job_name, job_path, ref_job, ref_job_full_path, structure,
+                interesting_keys, positions, cell):
+
         if self._job_project_path is None:
-            self._initialize(ref_job_full_path, structure)
+            self._job_project_path = job_path
+            self._job_name = job_name
+
+        if self._job_project_path is None:
+            self._initialize(ref_job, ref_job_full_path, structure)
         elif self._job is None:
             self._reload()
         elif not self._job.interactive_is_activated():
@@ -350,13 +203,17 @@ class ExternalHamiltonian(PrimitiveVertex):
             # Run Lammps 'efficiently'
             if positions is not None:
                 self._job.interactive_positions_setter(positions)
-
+            if cell is not None:
+                self._job.interactive_cells_setter(cell)
             self._job._interactive_lib_command(self._job._interactive_run_command)
+
         elif isinstance(self._job, GenericInteractive):
             # DFT codes are slow enough that we can run them the regular way and not care
             # Also we might intentionally run Lammps slowly for comparison purposes
             if positions is not None:
                 self._job.structure.positions = positions
+            if cell is not None:
+                self._job.structure.cell = cell
 
             self._job.calc_static()
             self._job.run()
@@ -365,18 +222,21 @@ class ExternalHamiltonian(PrimitiveVertex):
 
         return {key: self.get_interactive_value(key) for key in interesting_keys}
 
-    def _initialize(self, ref_job_full_path, structure):
-        loc = self.get_graph_location()
-        name = loc + '_job'
-        project_path, ref_job_path = split(ref_job_full_path)
-        pr = Project(path=project_path)
-        ref_job = pr.load(ref_job_path)
-        job = ref_job.copy_to(
-            project=pr,
-            new_job_name=name,
-            input_only=True,
-            new_database_entry=True
-        )
+    def _initialize(self, ref_job, ref_job_full_path, structure):
+        if ref_job is not None:
+            job = ref_job
+        else:
+            loc = self.get_graph_location()
+            name = loc + '_job'
+            project_path, ref_job_path = split(ref_job_full_path)
+            pr = Project(path=project_path)
+            ref_job = pr.load(ref_job_path)
+            job = ref_job.copy_to(
+                project=pr,
+                new_job_name=name,
+                input_only=True,
+                new_database_entry=True
+            )
 
         if structure is not None:
             job.structure = structure
@@ -385,9 +245,10 @@ class ExternalHamiltonian(PrimitiveVertex):
             job.interactive_open()
 
             if isinstance(job, LammpsInteractive) and self._fast_lammps_mode:
-                # Note: This might be done by default at some point in LammpsInteractive, and could then be removed here
-                job.interactive_flush_frequency = 10**10
-                job.interactive_write_frequency = 10**10
+                # Note: This might be done by default at some point in LammpsInteractive,
+                # and could then be removed here
+                job.interactive_flush_frequency = 10 ** 10
+                job.interactive_write_frequency = 10 ** 10
                 self._disable_lmp_output = True
 
             job.calc_static()
@@ -396,9 +257,10 @@ class ExternalHamiltonian(PrimitiveVertex):
             #  initialization working -- right now it throws a (passive) TypeError due to database issues
         else:
             raise TypeError('Job of class {} is not compatible.'.format(ref_job.__class__))
+
         self._job = job
-        self._job_name = name
-        self._job_project_path = project_path
+        self._job_name = job.job_name
+        self._job_project_path = job.project.path
 
     def _reload(self):
         pr = Project(path=self._job_project_path)
@@ -415,8 +277,16 @@ class ExternalHamiltonian(PrimitiveVertex):
             val = np.array(self._job.interactive_forces_getter())
         elif key == 'energy_pot':
             val = self._job.interactive_energy_pot_getter()
+        elif key == 'pressures':
+            val = np.array(self._job.interactive_pressures_getter())
+        elif key == 'volume':
+            val = self._job.interactive_volume_getter()
         elif key == 'cells':
             val = np.array(self._job.interactive_cells_getter())
+        elif key == 'job_path':
+            val = self._job_project_path
+        elif key == 'job_name':
+            val = self._job_name
         else:
             raise NotImplementedError
         return val

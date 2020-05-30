@@ -301,14 +301,12 @@ class ExternalHamiltonian(PrimitiveVertex):
         hdf[group_name]["fastlammpsmode"] = self._fast_lammps_mode
         hdf[group_name]["jobname"] = self._job_name
         hdf[group_name]["jobprojectpath"] = self._job_project_path
-        hdf[group_name]["energypot"] = self._job.interactive_energy_pot_getter()
 
     def from_hdf(self, hdf=None, group_name=None):
         super(ExternalHamiltonian, self).from_hdf(hdf=hdf, group_name=group_name)
         self._fast_lammps_mode = hdf[group_name]["fastlammpsmode"]
         self._job_name = hdf[group_name]["jobname"]
         self._job_project_path = hdf[group_name]["jobprojectpath"]
-        self._job.interactive_energy_pot_setter(hdf[group_name]["energypot"])
 
 
 class InitializeJob(PrimitiveVertex):
@@ -333,8 +331,6 @@ class InitializeJob(PrimitiveVertex):
                 input_only=True,
                 new_database_entry=True
             )
-            job.calc_static()
-            job.run()
             ref_jobs.append(job)
 
         return {

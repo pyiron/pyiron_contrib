@@ -1,24 +1,30 @@
-# from pyiron_contrib.protocol.generic import Protocol
-from pyiron_contrib.protocol.compound.minimize import ProtocolMinimize
-from pyiron_contrib.protocol.compound.molecular_dynamics import ProtocolMD, ProtocolConfinedMD, \
-    ProtocolConfinedHarmonicMD
-from pyiron_contrib.protocol.compound.nudged_elastic_band import ProtocolNEB, ProtocolNEBParallel
-# from pyiron_contrib.protocol.compound.tild import HarmonicTILD, VacancyTILD
-from pyiron_contrib.protocol.compound.finite_temperature_string import ProtocolStringEvolution, \
-    ProtocolVirtualWork, ProtocolVirtualWorkParallel, ProtocolStringEvolutionParallel
-from pyiron_contrib.protocol.compound.qmmm import ProtocolQMMM
-from pyiron_contrib.protocol.compound.tild import ProtocolHarmonicTILD, ProtocolVacancyTILD, \
-    ProtocolHarmonicTILDParallel
+from pyiron import Project
+from pyiron.base.job.jobtype import JOB_CLASS_DICT
 
-# protocol is a magic class after this one we have to Register
-# from pyiron_contrib.protocol.utils.types import PyironJobTypeRegistryMetaType
-# PyironJobTypeRegistryMetaType.inject_dynamic_types()
-__all__ = [
-    'ProtocolMinimize',
-    'ProtocolMD', 'ProtocolConfinedMD', 'ProtocolConfinedHarmonicMD',
-    'ProtocolNEB', 'ProtocolNEBParallel',
-    'ProtocolQMMM',
-    'ProtocolHarmonicTILD', 'ProtocolVacancyTILD', 'ProtocolHarmonicTILDParallel',
-    'ProtocolStringEvolution', 'ProtocolVirtualWork', 'ProtocolVirtualWorkParallel',
-    'ProtocolStringEvolutionParallel'
-]
+# Make classes available for new pyiron version
+JOB_CLASS_DICT['ProtoMinimize'] = 'pyiron_contrib.protocol.compound.minimize'
+JOB_CLASS_DICT['ProtoMD'] = 'pyiron_contrib.protocol.compound.md'
+JOB_CLASS_DICT['ProtoConfinedMD'] = 'pyiron_contrib.protocol.compound.md'
+JOB_CLASS_DICT['ProtoConfinedHarmonicMD'] = 'pyiron_contrib.protocol.compound.md'
+JOB_CLASS_DICT['ProtoNEB'] = 'pyiron_contrib.protocol.compound.neb'
+JOB_CLASS_DICT['ProtoNEBParallel'] = 'pyiron_contrib.protocol.compound.neb'
+JOB_CLASS_DICT['ProtoQMMM'] = 'pyiron_contrib.protocol.compound.qmmm'
+JOB_CLASS_DICT['ProtoHarmonicTILD'] = 'pyiron_contrib.protocol.compound.tild'
+JOB_CLASS_DICT['ProtoVacancyTILD'] = 'pyiron_contrib.protocol.compound.tild'
+JOB_CLASS_DICT['ProtoStringEvolution'] = 'pyiron_contrib.protocol.compound.fts'
+JOB_CLASS_DICT['ProtoStringEvolutionParallel'] = 'pyiron_contrib.protocol.compound.fts'
+
+# Backwards compatibility
+JOB_CLASS_DICT['GenericMaster'] = 'pyiron.base.master.generic'
+JOB_CLASS_DICT['ListMaster'] = 'pyiron.base.master.list'
+JOB_CLASS_DICT['ParallelMaster'] = 'pyiron.base.master.parallel'
+JOB_CLASS_DICT['VaspInt'] = 'pyiron_mpie.backwards.back'
+JOB_CLASS_DICT['VaspInt2'] = 'pyiron_mpie.backwards.back'
+JOB_CLASS_DICT['LammpsInt'] = 'pyiron_mpie.backwards.back'
+JOB_CLASS_DICT['LammpsInt2'] = 'pyiron_mpie.backwards.back'
+JOB_CLASS_DICT['PhonopyMaster'] = 'pyiron_mpie.backwards.back'
+JOB_CLASS_DICT['PhonopyMaster2'] = 'pyiron_mpie.backwards.back'
+JOB_CLASS_DICT['MurnaghanInt'] = 'pyiron_mpie.backwards.back'
+JOB_CLASS_DICT['SphinxEx'] = 'pyiron_mpie.backwards.back'
+JOB_CLASS_DICT['SphinxInt'] = 'pyiron_mpie.backwards.back'
+JOB_CLASS_DICT['SphinxInt2'] = 'pyiron_mpie.backwards.back'

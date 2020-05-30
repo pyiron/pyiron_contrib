@@ -203,7 +203,7 @@ class NEB(CompoundVertex):
         return self.get_forward_barrier(frame=frame)
 
 
-class ProtocolNEB(Protocol, NEB):
+class ProtoNEB(Protocol, NEB):
     pass
 
 
@@ -244,5 +244,5 @@ class NEBParallel(NEB):
     #     self.graph.calc_static.parallel_setup()
 
 
-class ProtocolNEBParallel(Protocol, NEBParallel):
+class ProtoNEBParallel(Protocol, NEBParallel):
     pass

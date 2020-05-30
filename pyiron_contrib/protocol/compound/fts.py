@@ -369,7 +369,7 @@ class StringEvolution(CompoundVertex):
         return self.get_forward_barrier(frame=frame)
 
 
-class ProtocolStringEvolution(Protocol, StringEvolution):
+class ProtoStringEvolution(Protocol, StringEvolution):
     pass
 
 
@@ -776,7 +776,7 @@ class StringEvolutionParallel(StringEvolution):
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
 
 
-class ProtocolStringEvolutionParallel(Protocol, StringEvolutionParallel):
+class ProtoStringEvolutionParallel(Protocol, StringEvolutionParallel):
     pass
 
 

@@ -304,7 +304,7 @@ class HarmonicTILD(TILDParent):
         return f
 
 
-class ProtocolHarmonicTILD(Protocol, HarmonicTILD):
+class ProtoHarmonicTILD(Protocol, HarmonicTILD):
     pass
 
 
@@ -553,7 +553,7 @@ class VacancyTILD(TILDParent):
         }
 
 
-class ProtocolVacancyTILD(Protocol, VacancyTILD):
+class ProtoVacancyTILD(Protocol, VacancyTILD):
     pass
 
 

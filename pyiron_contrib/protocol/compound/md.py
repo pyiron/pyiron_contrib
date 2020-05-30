@@ -188,7 +188,7 @@ class MolecularDynamics(CompoundVertex):
         }
 
 
-class ProtocolMD(Protocol, MolecularDynamics):
+class ProtoMD(Protocol, MolecularDynamics):
     pass
 
 
@@ -362,7 +362,7 @@ class ConfinedMD(CompoundVertex):
         }
 
 
-class ProtocolConfinedMD(Protocol, ConfinedMD):
+class ProtoConfinedMD(Protocol, ConfinedMD):
     pass
 
 
@@ -538,5 +538,5 @@ class ConfinedHarmonicMD(CompoundVertex):
         }
 
 
-class ProtocolConfinedHarmonicMD(Protocol, ConfinedHarmonicMD):
+class ProtoConfinedHarmonicMD(Protocol, ConfinedHarmonicMD):
     pass

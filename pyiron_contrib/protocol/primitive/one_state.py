@@ -266,7 +266,7 @@ class ExternalHamiltonian(PrimitiveVertex):
         pr = Project(path=self._job_project_path)
         self._job = pr.load(self._job_name)
         self._job.interactive_open()
-        self._job.interactive_initialize_interface()
+        # self._job.interactive_initialize_interface()
         self._job.calc_static()
         self._job.run(run_again=True)
 

@@ -333,6 +333,8 @@ class InitializeJob(PrimitiveVertex):
                 input_only=True,
                 new_database_entry=True
             )
+            job.calc_static()
+            job.run()
             ref_jobs.append(job)
 
         return {

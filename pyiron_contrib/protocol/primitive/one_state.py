@@ -244,19 +244,19 @@ class ExternalHamiltonian(PrimitiveVertex):
         if isinstance(job, GenericInteractive):
             job.interactive_open()
 
-        if isinstance(job, LammpsInteractive) and self._fast_lammps_mode:
-            # Note: This might be done by default at some point in LammpsInteractive,
-            # and could then be removed here
-            job.interactive_flush_frequency = 10 ** 10
-            job.interactive_write_frequency = 10 ** 10
-            self._disable_lmp_output = True
+            if isinstance(job, LammpsInteractive) and self._fast_lammps_mode:
+                # Note: This might be done by default at some point in LammpsInteractive,
+                # and could then be removed here
+                job.interactive_flush_frequency = 10 ** 10
+                job.interactive_write_frequency = 10 ** 10
+                self._disable_lmp_output = True
+
+            job.calc_static()
+            job.run(run_again=True)
+            # TODO: Running is fine for Lammps, but wasteful for DFT codes! Get the much cheaper interface
+            #  initialization working -- right now it throws a (passive) TypeError due to database issues
         else:
             raise TypeError('Job of class {} is not compatible.'.format(ref_job.__class__))
-
-        job.calc_static()
-        job.run(run_again=True)
-        # TODO: Running is fine for Lammps, but wasteful for DFT codes! Get the much cheaper interface
-        #  initialization working -- right now it throws a (passive) TypeError due to database issues
 
         self._job = job
         self._job_name = job.job_name

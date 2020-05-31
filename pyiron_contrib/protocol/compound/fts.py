@@ -101,6 +101,8 @@ class StringEvolution(CompoundVertex):
     def define_vertices(self):
         # Graph components
         g = self.graph
+        g.initialize_images = InitializeJob()
+        g.initialize_centroids = InitializeJob()
         g.initial_positions = InitialPositions()
         g.initial_velocities = SerialList(RandomVelocity)
         g.initial_forces = Zeros()
@@ -125,6 +127,8 @@ class StringEvolution(CompoundVertex):
         # Execution flow
         g = self.graph
         g.make_pipeline(
+            g.initialize_images,
+            g.initialize_centroids,
             g.initial_positions,
             g.initial_velocities,
             g.initial_forces,
@@ -148,7 +152,7 @@ class StringEvolution(CompoundVertex):
         )
         g.make_edge(g.check_thermalized, g.recenter, 'false')
         g.make_edge(g.check_sampling_period, g.recenter, 'false')
-        g.starting_vertex = g.initial_positions
+        g.starting_vertex = g.initialize_images
         g.restarting_vertex = g.check_steps
 
     def define_information_flow(self):
@@ -156,6 +160,14 @@ class StringEvolution(CompoundVertex):
         g = self.graph
         gp = Pointer(self.graph)
         ip = Pointer(self.input)
+
+        # initialize_images
+        g.initialize_images.input.n_images = ip.n_images
+        g.initialize_images.input.ref_job_full_path = ip.ref_job_full_path
+
+        # initialize_centroids
+        g.initialize_centroids.input.n_images = ip.n_images
+        g.initialize_centroids.input.ref_job_full_path = ip.ref_job_full_path
 
         # initial_positions
         g.initial_positions.input.structure_initial = ip.structure_initial
@@ -232,6 +244,7 @@ class StringEvolution(CompoundVertex):
         # calc_static_images
         g.calc_static_images.input.n_children = ip.n_images
         g.calc_static_images.direct.ref_job_full_path = ip.ref_job_full_path
+        g.calc_static_images.broadcast.ref_job_name = gp.initialize_images.output.ref_job_names[-1]
         g.calc_static_images.direct.structure = ip.structure_initial
         g.calc_static_images.broadcast.positions = gp.reflect_atoms.output.positions[-1]
         g.calc_static_images.direct.default.job_path = ip.job_path
@@ -296,6 +309,7 @@ class StringEvolution(CompoundVertex):
         # calc_static_centroids
         g.calc_static_centroids.input.n_children = ip.n_images
         g.calc_static_centroids.direct.ref_job_full_path = ip.ref_job_full_path
+        g.calc_static_centroids.broadcast.ref_job_name = gp.initialize_centroids.output.ref_job_names[-1]
         g.calc_static_centroids.direct.structure = ip.structure_initial
         g.calc_static_centroids.broadcast.positions = gp.reparameterize.output.centroids_pos_list[-1]
         g.calc_static_centroids.direct.default.job_path = ip.job_path
@@ -488,7 +502,7 @@ class ConstrainedMD(CompoundVertex):
 
         # calc_static
         g.calc_static.input.ref_job_full_path = ip.ref_job_full_path
-        g.calc_static.input.ref_job = ip.ref_job
+        g.calc_static.input.ref_job_name = ip.ref_job_names
         g.calc_static.input.structure = ip.structure
         g.calc_static.input.positions = gp.reflect_atoms.output.positions[-1]
         g.calc_static.input.default.job_path = ip.job_path
@@ -689,7 +703,7 @@ class StringEvolutionParallel(StringEvolution):
 
         # constrained_evolution - calc_static
         g.constrained_evo.direct.ref_job_full_path = ip.ref_job_full_path
-        g.constrained_evo.broadcast.ref_job = gp.initialize_images.output.ref_jobs[-1]
+        g.constrained_evo.broadcast.ref_job_names = gp.initialize_images.output.ref_job_names[-1]
 
         g.constrained_evo.direct.default.job_path = ip.job_path
         g.constrained_evo.direct.default.job_name = ip.job_name
@@ -745,7 +759,7 @@ class StringEvolutionParallel(StringEvolution):
         # calc_static_centroids
         g.calc_static_centroids.input.n_children = ip.n_images
         g.calc_static_centroids.direct.ref_job_full_path = ip.ref_job_full_path
-        g.calc_static_centroids.broadcast.ref_job = gp.initialize_centroids.output.ref_jobs[-1]
+        g.calc_static_centroids.broadcast.ref_job_name = gp.initialize_centroids.output.ref_job_names[-1]
         g.calc_static_centroids.direct.structure = ip.structure_initial
         g.calc_static_centroids.broadcast.positions = gp.reparameterize.output.centroids_pos_list[-1]
 

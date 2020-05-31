@@ -174,7 +174,7 @@ class ExternalHamiltonian(PrimitiveVertex):
         self._job = None
         self._job_name = None
 
-        self.input.default.ref_job = None
+        self.input.default.ref_job_name = None
         self.input.default.structure = None
         self.input.default.interesting_keys = ['forces', 'energy_pot', 'pressures', 'volume', 'job_path',
                                                'job_name']
@@ -183,7 +183,7 @@ class ExternalHamiltonian(PrimitiveVertex):
         self.input.default.job_path = None
         self.input.default.job_name = None
 
-    def command(self, job_name, job_path, ref_job, ref_job_full_path, structure,
+    def command(self, job_name, job_path, ref_job_name, ref_job_full_path, structure,
                 interesting_keys, positions, cell):
 
         if self._job_project_path is None:
@@ -191,7 +191,7 @@ class ExternalHamiltonian(PrimitiveVertex):
             self._job_name = job_name
 
         if self._job_project_path is None:
-            self._initialize(ref_job, ref_job_full_path, structure)
+            self._initialize(ref_job_name, ref_job_full_path, structure)
         elif self._job is None:
             self._reload()
         elif not self._job.interactive_is_activated():
@@ -222,9 +222,11 @@ class ExternalHamiltonian(PrimitiveVertex):
 
         return {key: self.get_interactive_value(key) for key in interesting_keys}
 
-    def _initialize(self, ref_job, ref_job_full_path, structure):
-        if ref_job is not None:
-            job = ref_job
+    def _initialize(self, ref_job_name, ref_job_full_path, structure):
+        if ref_job_name is not None:
+            project_path, ref_job_path = split(ref_job_full_path)
+            pr = Project(path=project_path)
+            job = pr.load(ref_job_name)
         else:
             loc = self.get_graph_location()
             name = loc + '_job'
@@ -316,9 +318,9 @@ class InitializeJob(PrimitiveVertex):
 
     def __init__(self, name=None):
         super(InitializeJob, self).__init__(name=name)
+        self.ref_job_names = []
 
     def command(self, ref_job_full_path, n_images):
-        ref_jobs = []
         for i in np.arange(n_images):
             loc = self.get_graph_location()
             name = loc + '_' + str(i)
@@ -331,10 +333,10 @@ class InitializeJob(PrimitiveVertex):
                 input_only=True,
                 new_database_entry=True
             )
-            ref_jobs.append(job)
+            self.ref_job_names.append(job.job_name)
 
         return {
-            'ref_jobs': ref_jobs
+            'ref_job_names': self.ref_job_names
         }
 
 

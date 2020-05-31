@@ -31,6 +31,7 @@ __date__ = "18 July, 2019"
 class NEB(CompoundVertex):
     """
     Relaxes a system according to the nudged elastic band method (Jonsson et al).
+
     Input dictionary:
         ref_job_full_path (str): Path to the pyiron job to use for evaluating forces and energies.
         structure_initial (Atoms): The starting structure for the elastic band.
@@ -50,6 +51,7 @@ class NEB(CompoundVertex):
         fix_com (bool): Whether the center of mass motion should be subtracted off of the position update. (Default is
             True)
         use_adagrad (bool): Whether to have the step size decay according to adagrad. (Default is False)
+
     Output dictionary:
         energy_pot (list[float]): Total potential energy of the system in eV.
         positions_list (list[numpy.ndarray]): Atomic positions in angstroms for each image.
@@ -84,7 +86,8 @@ class NEB(CompoundVertex):
     def define_vertices(self):
         # Graph components
         g = self.graph
-        g.initial_positions = InitialPositions()
+        g.initialize_jobs = InitializeJob()
+        g.interpolate_images = InitialPositions()
         g.check_steps = IsGEq()
         g.calc_static = AutoList(ExternalHamiltonian)
         g.neb_forces = NEBForces()
@@ -95,7 +98,8 @@ class NEB(CompoundVertex):
         # Execution flow
         g = self.graph
         g.make_pipeline(
-            g.initial_positions,
+            g.initialize_jobs,
+            g.interpolate_images,
             g.check_steps, 'false',
             g.calc_static,
             g.neb_forces,
@@ -103,7 +107,7 @@ class NEB(CompoundVertex):
             g.clock,
             g.check_steps
         )
-        g.starting_vertex = self.graph.initial_positions
+        g.starting_vertex = self.graph.initialize_jobs
         g.restarting_vertex = self.graph.check_steps
 
     def define_information_flow(self):
@@ -112,9 +116,12 @@ class NEB(CompoundVertex):
         gp = Pointer(self.graph)
         ip = Pointer(self.input)
 
-        g.initial_positions.input.structure_initial = ip.structure_initial
-        g.initial_positions.input.structure_final = ip.structure_final
-        g.initial_positions.input.n_images = ip.n_images
+        g.initialize_jobs.input.n_images = ip.n_images
+        g.initialize_jobs.input.ref_job_full_path = ip.ref_job_full_path
+
+        g.interpolate_images.input.structure_initial = ip.structure_initial
+        g.interpolate_images.input.structure_final = ip.structure_final
+        g.interpolate_images.input.n_images = ip.n_images
 
         g.check_steps.input.target = gp.clock.output.n_counts[-1]
         g.check_steps.input.threshold = ip.n_steps
@@ -122,10 +129,11 @@ class NEB(CompoundVertex):
         g.calc_static.input.n_children = ip.n_images
         g.calc_static.direct.ref_job_full_path = ip.ref_job_full_path
         g.calc_static.direct.structure = ip.structure_initial
-        g.calc_static.broadcast.default.positions = gp.initial_positions.output.initial_positions[-1]
+        g.calc_static.broadcast.ref_job_name = gp.initialize_jobs.output.ref_job_names[-1]
+        g.calc_static.broadcast.default.positions = gp.interpolate_images.output.initial_positions[-1]
         g.calc_static.broadcast.positions = gp.gradient_descent.output.positions[-1]
 
-        g.neb_forces.input.default.positions_list = gp.initial_positions.output.initial_positions[-1]
+        g.neb_forces.input.default.positions_list = gp.interpolate_images.output.initial_positions[-1]
         g.neb_forces.input.positions_list = gp.gradient_descent.output.positions[-1]
         g.neb_forces.input.energies = gp.calc_static.output.energy_pot[-1]
         g.neb_forces.input.forces_list = gp.calc_static.output.forces[-1]
@@ -137,7 +145,7 @@ class NEB(CompoundVertex):
         g.neb_forces.input.smoothing = ip.smoothing
 
         g.gradient_descent.input.n_children = ip.n_images
-        g.gradient_descent.broadcast.default.positions = gp.initial_positions.output.initial_positions[-1]
+        g.gradient_descent.broadcast.default.positions = gp.interpolate_images.output.initial_positions[-1]
         g.gradient_descent.broadcast.positions = gp.gradient_descent.output.positions[-1]
         g.gradient_descent.broadcast.forces = gp.neb_forces.output.forces_list[-1]
         g.gradient_descent.direct.masses = ip.structure_initial.get_masses

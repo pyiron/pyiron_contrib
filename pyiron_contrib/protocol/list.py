@@ -12,7 +12,6 @@ from multiprocessing import Process, Manager
 from pyiron.vasp.interactive import VaspInteractive
 from pyiron.sphinx.interactive import SphinxInteractive
 
-
 """
 A command class for running multiple of the same node
 """
@@ -37,8 +36,8 @@ class ListVertex(PrimitiveVertex):
     Attributes:
         child_type (Command): A class inheriting from ``Command`` with which to create child instances. (Passed as an
             argument at instantiation.)
-        children (list): The instances of the child command to execute. These are created automatically (at run-time
-        if they don't exist already).
+        children (list): The instances of the child command to execute. These are created automatically (at run-time if
+            they don't exist already).
         broadcast (InputDictionary): Input data to be split element-wise across all the child commands. (Entries here
             should always have the same number of entries as there are children, i.e. each child can have its own
             value.)
@@ -60,8 +59,6 @@ class ListVertex(PrimitiveVertex):
         self.broadcast = InputDictionary()
         self._n_history = None
         self.n_history = 1
-        self._n_cores = None
-        self.n_cores = 1
 
     @abstractmethod
     def command(self, n_children):
@@ -113,14 +110,6 @@ class ListVertex(PrimitiveVertex):
         if self.children is not None:
             for child in self.children:
                 child.n_history = n_hist
-
-    @property
-    def n_cores(self):
-        return self._n_cores
-
-    @n_cores.setter
-    def n_cores(self, n_cor):
-        self._n_cores = n_cor
 
     def _extract_output_data_from_children(self):
         output_keys = list(self.children[0].output.keys())  # Assumes that all the children are the same...
@@ -218,12 +207,15 @@ class ParallelList(ListVertex):
 
         return output_data
 
+    def finish(self):
+        super(ParallelList, self).finish()
+        self.queue.close()
+
 
 class SerialList(ListVertex):
     """
     A list of commands which are run in serial.
     """
-
     def __init__(self, child_type):
         super(SerialList, self).__init__(child_type=child_type)
 
@@ -243,15 +235,14 @@ class AutoList(ParallelList, SerialList):
     """
     Choose between `SerialList` and `ParallelList` depending on the nature of the children.
     """
-
     def __init__(self, child_type):
         super(AutoList, self).__init__(child_type=child_type)
 
     def _is_expensive(self):
         try:
             if isinstance(
-                    self.children[0],
-                    (VaspInteractive, SphinxInteractive, CompoundVertex)
+                self.children[0],
+                (VaspInteractive, SphinxInteractive, CompoundVertex)
             ):  # Whitelist types that should be treated in parallel
                 return True
             else:  # Everything else is cheap enough to treat in serial

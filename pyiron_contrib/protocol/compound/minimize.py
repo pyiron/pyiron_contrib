@@ -139,5 +139,5 @@ class Minimize(CompoundVertex):
         }
 
 
-class ProtoMinimize(Protocol, Minimize):
+class ProtocolMinimize(Protocol, Minimize):
     pass

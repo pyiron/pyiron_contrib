@@ -97,7 +97,7 @@ class Counter(PrimitiveVertex):
 
 class ResetSamplingPeriod(PrimitiveVertex):
     """
-    
+
     """
 
     def __init__(self, name=None):

@@ -4,7 +4,7 @@ from __future__ import print_function
 # Distributed under the terms of "New BSD License", see the LICENSE file.
 
 from logging import getLogger
-from inspect import getargspec
+from inspect import getfullargspec
 from pydoc import locate
 from itertools import islice
 import re
@@ -29,7 +29,9 @@ def ordered_dict_get_index(ordered_dict, index):
     Args:
         ordered_dict: (collections.OrderedDict) the dict to get the value from
         index: (int) the index
+
     Returns: (object) the object at "index"
+
     """
     return ordered_dict[next(islice(ordered_dict, index, None))]
 
@@ -37,9 +39,12 @@ def ordered_dict_get_index(ordered_dict, index):
 def ordered_dict_get_last(ordered_dict):
     """
     Gets the last most recently added object of an collections.OrderedDict instance
+
     Args:
         ordered_dict: (collections.OrderedDict) the dict to get the value from
+
     Returns: (object) the object at the back
+
     """
 
     return ordered_dict[next(reversed(ordered_dict))]
@@ -54,6 +59,7 @@ class LoggerMixin(object):
     def fullname(self):
         """
         Returns the fully qualified type name of the instance
+
         Returns:
             str: fully qualified type name of the instance
         """
@@ -67,11 +73,14 @@ class LoggerMixin(object):
 def requires_arguments(func):
     """
     Determines if a function of method needs arguments, ingores self
+
     Args:
         func: (callable) the callable
-    Returns: (bool) wether arguments (except "self" for methods) are needed
+
+    Returns: (bool) whether arguments (except "self" for methods) are needed
+
     """
-    args, varargs, varkw, defaults = getargspec(func)
+    args, varargs, varkw, defaults, kwonlyargs, kwonlydefaults, annotations = getfullargspec(func)
     if defaults:
         args = args[:-len(defaults)]
     # It could be a bound method too
@@ -86,9 +95,12 @@ flatten = lambda l: [item for sublist in l for item in sublist]
 def fullname(obj):
     """
     Returns the fully qualified class name of an object
+
     Args:
         obj: (object) the object
+
     Returns: (str) the class name
+
     """
     obj_type = type(obj)
     return '{}.{}'.format(obj_type.__module__, obj_type.__name__)
@@ -101,8 +113,10 @@ def get_cls(string):
 def is_iterable(o):
     """
     Convenience method to test for an iterator
+
     Args:
         o: the object to test
+
     Returns:
         bool: wether the input argument is iterable or not
     """

@@ -207,10 +207,6 @@ class ParallelList(ListVertex):
 
         return output_data
 
-    def finish(self):
-        super(ParallelList, self).finish()
-        self.queue.close()
-
 
 class SerialList(ListVertex):
     """

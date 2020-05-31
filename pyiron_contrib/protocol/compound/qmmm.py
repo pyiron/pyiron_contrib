@@ -624,5 +624,5 @@ class PartitionStructure(PrimitiveVertex):
         return np.concatenate([domain_ids_qm['seed'], domain_ids_qm['core']])
 
 
-class ProtoQMMM(Protocol, QMMM):
+class ProtocolQMMM(Protocol, QMMM):
     pass

@@ -49,6 +49,7 @@ class StringDistances(PrimitiveVertex):
         """
         Checks which centroid the image is closest too, then measures whether or not that closest centroid is sufficiently
         close to the image's parent centroid.
+
         Args:
             positions (numpy.ndarray): Atomic positions of this image.
             centroid_positions (numpy.ndarray): The positions of the image's centroid.
@@ -58,6 +59,7 @@ class StringDistances(PrimitiveVertex):
                 the minimum distance convention.
             eps (float): The maximum distance between the closest centroid and the parent centroid to be considered a match
                 (i.e. no recentering necessary).
+
         Returns:
             (bool): Whether the image is closest to its own parent centroid.
         """
@@ -130,19 +132,23 @@ class StringReflect(StringDistances):
     """
     def __init__(self, name=None):
         super(StringReflect, self).__init__(name=name)
+        self.input.default.forces = None
+        self.input.default.previous_forces = None
 
     def command(self, positions, velocities, previous_positions, previous_velocities, centroid_positions,
-                all_centroid_positions, cell, pbc, eps):
+                all_centroid_positions, cell, pbc, eps, forces, previous_forces):
         if self.check_closest_to_parent(positions, centroid_positions, all_centroid_positions, cell, pbc, eps):
             return {
                 'positions': positions,
                 'velocities': velocities,
+                'forces': forces,
                 'reflected': False
             }
         else:
             return {
                 'positions': previous_positions,
                 'velocities': -previous_velocities,
+                'forces': previous_forces,
                 'reflected': True
             }
 
@@ -152,13 +158,13 @@ class PositionsRunningAverage(PrimitiveVertex):
     Calculates the running average of input positions at each call.
 
     Input attributes:
-        positions (list/numpy.ndarray): The instantaneous position, which will be updated to the running average
-        running_average_positions (list/numpy.ndarray): The running average of positions
+        positions_list (list/numpy.ndarray): The instantaneous position, which will be updated to the running average
+        running_average_list (list/numpy.ndarray): List of existing running averages
         cell (numpy.ndarray): The cell of the structure
         pbc (numpy.ndarray): Periodic boundary condition of the structure
 
     Output attributes:
-        running_average_positions (list/numpy.ndarray): The updated running average list
+        running_average_list (list/numpy.ndarray): The updated running average list
 
     TODO:
         Handle non-static cells, or at least catch them.
@@ -167,27 +173,24 @@ class PositionsRunningAverage(PrimitiveVertex):
 
     def __init__(self, name=None):
         super(PositionsRunningAverage, self).__init__(name=name)
-        self.input.default.divisor = 1
+        self._divisor = 1
 
-    def command(self, positions, running_average_positions, cell, pbc, divisor):
-
-        if running_average_positions is None:
-            running_average_positions = positions
-
+    def command(self, positions_list, running_average_list, relax_endpoints, cell, pbc):
         # On the first step, divide by 2 to average two positions
-        divisor += 1
+        self._divisor += 1
         # How much of the current step to mix into the average
-        weight = 1. / divisor
+        weight = 1. / self._divisor
+        running_average_list = np.array(running_average_list)  # Don't modify this input in place
 
-        running_average_positions = np.array(running_average_positions)
-        positions = np.array(positions)
-
-        displacement = find_mic(positions - running_average_positions, cell, pbc)[0]
-        running_average_positions += weight * displacement
+        for i, pos in enumerate(positions_list):
+            if (i == 0 or i == len(positions_list) - 1) and not relax_endpoints:
+                continue
+            else:
+                disp = find_mic(pos - running_average_list[i], cell, pbc)[0]
+                running_average_list[i] += weight * disp
 
         return {
-            'running_average_positions': np.array(running_average_positions),
-            'divisor': divisor
+            'running_average_list': running_average_list
         }
 
 
@@ -213,23 +216,16 @@ class CentroidsRunningAverageMix(PrimitiveVertex):
     def __init__(self, name=None):
         super(CentroidsRunningAverageMix, self).__init__(name=name)
         self.input.default.mixing_fraction = 0.1
-        self.input.default.relax_endpoints = False
 
-    def command(self, mixing_fraction, centroids_pos_list, running_average_list, cell, pbc, relax_endpoints):
-
+    def command(self, mixing_fraction, centroids_pos_list, running_average_list, cell, pbc):
         centroids_pos_list = np.array(centroids_pos_list)
-        running_average_list = np.array(running_average_list)
-
         for i, cent in enumerate(centroids_pos_list):
-            if i == 0 or i == len(centroids_pos_list) - 1:
-                continue
-            else:
-                displacement = find_mic(running_average_list[i] - cent, cell, pbc)[0]
-                update = mixing_fraction * displacement
-                centroids_pos_list[i] += update
+            disp = find_mic(running_average_list[i] - cent, cell, pbc)[0]
+            update = mixing_fraction * disp
+            centroids_pos_list[i] += update
 
         return {
-            'centroids_pos_list': np.array(centroids_pos_list)
+            'centroids_pos_list': centroids_pos_list
         }
 
 
@@ -246,14 +242,15 @@ class CentroidsSmoothing(PrimitiveVertex):
     Output Attributes:
         all_centroid_positions (list/numpy.ndarray): List of smoothed centroid positions.
     """
-    def command(self, kappa, dtau, centroids_pos_list):
+    def command(self, kappa, dtau, all_centroid_positions):
         # Get the smoothing matrix
-        n_images = len(centroids_pos_list)
+        n_images = len(all_centroid_positions)
         smoothing_strength = kappa * n_images * dtau
         smoothing_matrix = self._get_smoothing_matrix(n_images, smoothing_strength)
-        smoothed_centroid_positions = np.tensordot(smoothing_matrix, np.array(centroids_pos_list), axes=1)
+        smoothed_centroid_positions = np.tensordot(smoothing_matrix, np.array(all_centroid_positions), axes=1)
+
         return {
-            'centroids_pos_list': np.array(smoothed_centroid_positions)
+            'all_centroid_positions': smoothed_centroid_positions
         }
 
     @staticmethod
@@ -330,7 +327,7 @@ class CentroidsReparameterization(PrimitiveVertex):
         centroids_pos_list = new_positions
 
         return {
-            'centroids_pos_list': np.array(centroids_pos_list)
+            'centroids_pos_list': centroids_pos_list
         }
 
     @staticmethod

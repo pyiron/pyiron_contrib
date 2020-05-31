@@ -458,6 +458,7 @@ class CompoundVertex(Vertex): #, PyironJobTypeRegistry):
         with hdf.open(self.vertex_name) as graph_hdf:
             self.graph.to_hdf(hdf=graph_hdf, group_name="graph")
         super(CompoundVertex, self).to_hdf(hdf=hdf, group_name=group_name)
+        self.graph.to_hdf(hdf=hdf, group_name="graph")
 
     def from_hdf(self, hdf=None, group_name=None):
         """

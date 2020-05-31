@@ -178,12 +178,10 @@ class ParallelList(ListVertex):
         for i, child in enumerate(self.children):
             job = Process(target=child.execute_parallel, args=(i, return_dict))
             job.start()
-            time.sleep(1)
             jobs.append(job)
 
         for job in jobs:
             job.join()
-            time.sleep(1)
 
         print(return_dict.keys())
 

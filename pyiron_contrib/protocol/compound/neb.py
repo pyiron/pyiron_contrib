@@ -31,7 +31,6 @@ __date__ = "18 July, 2019"
 class NEB(CompoundVertex):
     """
     Relaxes a system according to the nudged elastic band method (Jonsson et al).
-
     Input dictionary:
         ref_job_full_path (str): Path to the pyiron job to use for evaluating forces and energies.
         structure_initial (Atoms): The starting structure for the elastic band.
@@ -51,7 +50,6 @@ class NEB(CompoundVertex):
         fix_com (bool): Whether the center of mass motion should be subtracted off of the position update. (Default is
             True)
         use_adagrad (bool): Whether to have the step size decay according to adagrad. (Default is False)
-
     Output dictionary:
         energy_pot (list[float]): Total potential energy of the system in eV.
         positions_list (list[numpy.ndarray]): Atomic positions in angstroms for each image.
@@ -86,7 +84,6 @@ class NEB(CompoundVertex):
     def define_vertices(self):
         # Graph components
         g = self.graph
-        g.initialize_jobs = InitializeJob()
         g.initial_positions = InitialPositions()
         g.check_steps = IsGEq()
         g.calc_static = AutoList(ExternalHamiltonian)
@@ -98,7 +95,6 @@ class NEB(CompoundVertex):
         # Execution flow
         g = self.graph
         g.make_pipeline(
-            g.initialize_jobs,
             g.initial_positions,
             g.check_steps, 'false',
             g.calc_static,
@@ -107,7 +103,7 @@ class NEB(CompoundVertex):
             g.clock,
             g.check_steps
         )
-        g.starting_vertex = self.graph.initialize_jobs
+        g.starting_vertex = self.graph.initial_positions
         g.restarting_vertex = self.graph.check_steps
 
     def define_information_flow(self):
@@ -115,9 +111,6 @@ class NEB(CompoundVertex):
         g = self.graph
         gp = Pointer(self.graph)
         ip = Pointer(self.input)
-
-        g.initialize_jobs.input.n_images = ip.n_images
-        g.initialize_jobs.input.ref_job_full_path = ip.ref_job_full_path
 
         g.initial_positions.input.structure_initial = ip.structure_initial
         g.initial_positions.input.structure_final = ip.structure_final
@@ -129,7 +122,6 @@ class NEB(CompoundVertex):
         g.calc_static.input.n_children = ip.n_images
         g.calc_static.direct.ref_job_full_path = ip.ref_job_full_path
         g.calc_static.direct.structure = ip.structure_initial
-        g.calc_static.broadcast.ref_job = gp.initialize_jobs.output.ref_jobs[-1]
         g.calc_static.broadcast.default.positions = gp.initial_positions.output.initial_positions[-1]
         g.calc_static.broadcast.positions = gp.gradient_descent.output.positions[-1]
 

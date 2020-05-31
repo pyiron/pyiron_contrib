@@ -341,14 +341,12 @@ class InitializeJob(PrimitiveVertex):
 class GradientDescent(PrimitiveVertex):
     """
     Simple gradient descent update for positions in `flex_output` and structure.
-
     Input attributes:
         gamma0 (float): Initial step size as a multiple of the force. (Default is 0.1.)
         fix_com (bool): Whether the center of mass motion should be subtracted off of the position update. (Default is
             True)
         use_adagrad (bool): Whether to have the step size decay according to adagrad. (Default is False)
         output_displacements (bool): Whether to return the per-atom displacement vector in the output dictionary.
-
     TODO:
         Fix adagrad bug when GradientDescent is passed as a Serial vertex
     """

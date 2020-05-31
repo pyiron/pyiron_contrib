@@ -614,7 +614,7 @@ class CompoundVertex(Vertex): #, PyironJobTypeRegistry):
             pptree(self.whitelist, file=file, name='%s.%s' % (self.vertex_name, 'whitelist'))
 
 
-class Protocol(CompoundVertex, GenericJob):
+class Protocol(CompoundVertex, GenericJob, ABC):
     """
     A parent class for compound vertices which are being instantiated as regular pyiron jobs, i.e. the highest level
     graph in their context.

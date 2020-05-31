@@ -4,11 +4,10 @@ from __future__ import print_function
 # Distributed under the terms of "New BSD License", see the LICENSE file.
 
 from logging import getLogger
-from inspect import getfullargspec
+from inspect import getargspec
 from pydoc import locate
 from itertools import islice
 import re
-
 """
 Classes for handling protocols, particularly setting up input and output pipes.
 """
@@ -23,6 +22,7 @@ __status__ = "development"
 __date__ = "18 July, 2019"
 
 
+
 def ordered_dict_get_index(ordered_dict, index):
     """
     Gets the object at "index" of an collections.OrderedDict without copying the keys list
@@ -34,7 +34,6 @@ def ordered_dict_get_index(ordered_dict, index):
 
     """
     return ordered_dict[next(islice(ordered_dict, index, None))]
-
 
 def ordered_dict_get_last(ordered_dict):
     """
@@ -77,10 +76,10 @@ def requires_arguments(func):
     Args:
         func: (callable) the callable
 
-    Returns: (bool) whether arguments (except "self" for methods) are needed
+    Returns: (bool) wether arguments (except "self" for methods) are needed
 
     """
-    args, varargs, varkw, defaults, kwonlyargs, kwonlydefaults, annotations = getfullargspec(func)
+    args, varargs, varkw, defaults = getargspec(func)
     if defaults:
         args = args[:-len(defaults)]
     # It could be a bound method too
@@ -88,9 +87,7 @@ def requires_arguments(func):
         args.remove('self')
     return len(args) > 0
 
-
 flatten = lambda l: [item for sublist in l for item in sublist]
-
 
 def fullname(obj):
     """
@@ -107,7 +104,7 @@ def fullname(obj):
 
 
 def get_cls(string):
-    return locate([v for v in re.findall(r'(?!\.)[\w\.]+(?!\.)', string) if v != 'class'][0])
+    return locate([v for v in re.findall(r'(?!\.)[\w\.]+(?!\.)', string)if v != 'class'][0])
 
 
 def is_iterable(o):
@@ -127,7 +124,6 @@ def is_iterable(o):
     else:
         return not isinstance(o, str)
 
-
 # convenience function to ensure the passed argument is iterable
 ensure_iterable = lambda v: v if is_iterable(v) else [v]
 
@@ -138,4 +134,4 @@ class Registry(type):
         if not hasattr(cls, 'registry'):
             cls.registry = set()
         cls.registry.add(cls)
-        cls.registry -= set(bases)  # Remove base classes
+        cls.registry -= set(bases) # Remove base classes

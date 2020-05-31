@@ -506,7 +506,6 @@ class ConstrainedMD(CompoundVertex):
         g.verlet_velocities.input.forces = gp.calc_static.output.forces[-1]
 
         # check_thermalized
-        g.check_thermalized.input.short = ip.thermalized
         g.check_thermalized.input.target = gp.clock.output.n_counts[-1]
         g.check_thermalized.input.default.threshold = ip.thermalization_steps
 
@@ -583,8 +582,7 @@ class StringEvolutionParallel(StringEvolution):
         id_.energy_kins = []
         id_.initial_running_average_positions = None
         id_.divisor = 1
-        id_.initial_thermalized = False
-        id_.final_thermalized = True
+        id_.thermalized = 0
         id_.mixing_fraction = 0.1
         id_.nominal_smoothing = 0.1
 
@@ -703,9 +701,8 @@ class StringEvolutionParallel(StringEvolution):
         # takes inputs already specified in verlet_positions
 
         # constrained_evolution - check_thermalized
-        g.constrained_evo.direct.thermalization_steps = ip.thermalization_steps
-        g.constrained_evo.direct.default.thermalized = ip.initial_thermalized
-        g.constrained_evo.direct.thermalized = gp.replace.output.new_value[-1]
+        g.constrained_evo.direct.default.thermalization_steps = ip.thermalization_steps
+        g.constrained_evo.direct.thermalization_steps = gp.replace.output.new_value[-1]
 
         # constrained_evolution - running_average_positions
         g.constrained_evo.broadcast.default.running_average_positions = gp.initial_positions.output.initial_positions[-1]
@@ -725,7 +722,7 @@ class StringEvolutionParallel(StringEvolution):
         g.constrained_evo.direct.n_steps = ip.sampling_period
 
         # replace
-        g.replace.input.new_value = ip.final_thermalized
+        g.replace.input.new_value = ip.thermalized
 
         # mix
         g.mix.input.default.centroids_pos_list = gp.initial_positions.output.initial_positions[-1]

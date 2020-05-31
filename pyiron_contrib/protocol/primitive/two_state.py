@@ -30,11 +30,9 @@ class IsGEq(BoolVertex):
     """
     Checks if an input value is greater than or equal to a target threshold. Vertex state switches from 'false' to
     'true' when the target exceeds the threshold.
-
     Input attributes:
         target (float/int): The value being checked. (Default is numpy infinity.)
         threshold (float/int): What it's being checked against. (Default is zero.)
-        short (Boolean): Short circuits the Boolean, always returning 'true'. (Default is False)
     """
     def __init__(self, name=None):
         super(IsGEq, self).__init__(name=name)

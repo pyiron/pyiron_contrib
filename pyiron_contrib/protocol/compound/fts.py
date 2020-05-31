@@ -657,7 +657,7 @@ class StringEvolutionParallel(StringEvolution):
         g.initial_forces.input.shape = ip.structure_initial.positions.shape
 
         # check_steps
-        g.check_steps.input.default.target = gp.clock.output.n_counts[-1]
+        g.check_steps.input.target = gp.clock.output.n_counts[-1]
         g.check_steps.input.threshold = ip.n_steps
 
         # constrained_evolution - initialze
@@ -767,7 +767,7 @@ class StringEvolutionParallel(StringEvolution):
         g.recenter.broadcast.forces = gp.constrained_evo.output.forces[-1]
 
         # clock
-        g.clock.input.default.max_count = ip.n_steps
+        g.clock.input.max_count = ip.n_steps
         g.clock.input.new_count = gp.constrained_evo.output.clock[-1][-1]
 
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])

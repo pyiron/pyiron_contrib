@@ -40,16 +40,12 @@ class IsGEq(BoolVertex):
         super(IsGEq, self).__init__(name=name)
         self.input.default.target = np.inf
         self.input.default.threshold = 0
-        self.input.default.short = False
 
-    def command(self, short, target=np.inf, threshold=0):
-        if short is False:
-            if target >= threshold:
-                self.vertex_state = "true"
-            else:
-                self.vertex_state = "false"
-        else:
+    def command(self, target=np.inf, threshold=0):
+        if target >= threshold:
             self.vertex_state = "true"
+        else:
+            self.vertex_state = "false"
 
 
 class IsLEq(BoolVertex):

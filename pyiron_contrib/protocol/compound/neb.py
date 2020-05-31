@@ -87,7 +87,7 @@ class NEB(CompoundVertex):
         # Graph components
         g = self.graph
         g.initialize_jobs = InitializeJob()
-        g.interpolate_images = InitialPositions()
+        g.initial_positions = InitialPositions()
         g.check_steps = IsGEq()
         g.calc_static = AutoList(ExternalHamiltonian)
         g.neb_forces = NEBForces()
@@ -99,7 +99,7 @@ class NEB(CompoundVertex):
         g = self.graph
         g.make_pipeline(
             g.initialize_jobs,
-            g.interpolate_images,
+            g.initial_positions,
             g.check_steps, 'false',
             g.calc_static,
             g.neb_forces,
@@ -119,9 +119,9 @@ class NEB(CompoundVertex):
         g.initialize_jobs.input.n_images = ip.n_images
         g.initialize_jobs.input.ref_job_full_path = ip.ref_job_full_path
 
-        g.interpolate_images.input.structure_initial = ip.structure_initial
-        g.interpolate_images.input.structure_final = ip.structure_final
-        g.interpolate_images.input.n_images = ip.n_images
+        g.initial_positions.input.structure_initial = ip.structure_initial
+        g.initial_positions.input.structure_final = ip.structure_final
+        g.initial_positions.input.n_images = ip.n_images
 
         g.check_steps.input.target = gp.clock.output.n_counts[-1]
         g.check_steps.input.threshold = ip.n_steps
@@ -130,10 +130,10 @@ class NEB(CompoundVertex):
         g.calc_static.direct.ref_job_full_path = ip.ref_job_full_path
         g.calc_static.direct.structure = ip.structure_initial
         g.calc_static.broadcast.ref_job = gp.initialize_jobs.output.ref_jobs[-1]
-        g.calc_static.broadcast.default.positions = gp.interpolate_images.output.initial_positions[-1]
+        g.calc_static.broadcast.default.positions = gp.initial_positions.output.initial_positions[-1]
         g.calc_static.broadcast.positions = gp.gradient_descent.output.positions[-1]
 
-        g.neb_forces.input.default.positions_list = gp.interpolate_images.output.initial_positions[-1]
+        g.neb_forces.input.default.positions_list = gp.initial_positions.output.initial_positions[-1]
         g.neb_forces.input.positions_list = gp.gradient_descent.output.positions[-1]
         g.neb_forces.input.energies = gp.calc_static.output.energy_pot[-1]
         g.neb_forces.input.forces_list = gp.calc_static.output.forces[-1]
@@ -145,7 +145,7 @@ class NEB(CompoundVertex):
         g.neb_forces.input.smoothing = ip.smoothing
 
         g.gradient_descent.input.n_children = ip.n_images
-        g.gradient_descent.broadcast.default.positions = gp.interpolate_images.output.initial_positions[-1]
+        g.gradient_descent.broadcast.default.positions = gp.initial_positions.output.initial_positions[-1]
         g.gradient_descent.broadcast.positions = gp.gradient_descent.output.positions[-1]
         g.gradient_descent.broadcast.forces = gp.neb_forces.output.forces_list[-1]
         g.gradient_descent.direct.masses = ip.structure_initial.get_masses
@@ -215,7 +215,7 @@ class NEBSerial(NEB):
     def define_vertices(self):
         # Graph components
         g = self.graph
-        g.interpolate_images = InterpolatePositions()
+        g.initial_positions = InitialPositions()
         g.check_steps = IsGEq()
         g.calc_static = SerialList(ExternalHamiltonian)  # Enforce serial
         g.neb_forces = NEBForces()
@@ -232,16 +232,16 @@ class NEBParallel(NEB):
         # Graph components
         g = self.graph
         g.initialize_jobs = InitializeJob()
-        g.interpolate_images = InitialPositions()
+        g.initial_positions = InitialPositions()
         g.check_steps = IsGEq()
         g.calc_static = ParallelList(ExternalHamiltonian)  # Enforce parallel
         g.neb_forces = NEBForces()
         g.gradient_descent = SerialList(GradientDescent)
         g.clock = Counter()
 
-    # def parallel_setup(self):
-    #     super(NEBParallel, self).parallel_setup()
-    #     self.graph.calc_static.parallel_setup()
+    def parallel_setup(self):
+        super(NEBParallel, self).parallel_setup()
+        self.graph.calc_static.parallel_setup()
 
 
 class ProtoNEBParallel(Protocol, NEBParallel):

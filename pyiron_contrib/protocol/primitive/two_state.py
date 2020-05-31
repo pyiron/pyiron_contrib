@@ -34,17 +34,22 @@ class IsGEq(BoolVertex):
     Input attributes:
         target (float/int): The value being checked. (Default is numpy infinity.)
         threshold (float/int): What it's being checked against. (Default is zero.)
+        short (Boolean): Short circuits the Boolean, always returning 'true'. (Default is False)
     """
     def __init__(self, name=None):
         super(IsGEq, self).__init__(name=name)
         self.input.default.target = np.inf
         self.input.default.threshold = 0
+        self.input.default.short = False
 
-    def command(self, target=np.inf, threshold=0):
-        if target >= threshold:
-            self.vertex_state = "true"
+    def command(self, short, target=np.inf, threshold=0):
+        if short is False:
+            if target >= threshold:
+                self.vertex_state = "true"
+            else:
+                self.vertex_state = "false"
         else:
-            self.vertex_state = "false"
+            self.vertex_state = "true"
 
 
 class IsLEq(BoolVertex):

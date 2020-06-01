@@ -226,6 +226,7 @@ class ExternalHamiltonian(PrimitiveVertex):
         if ref_job_name is not None:
             project_path, ref_job_path = split(ref_job_full_path)
             pr = Project(path=project_path)
+            print(project_path, ref_job_path, ref_job_name)
             job = pr.load(ref_job_name)
         else:
             loc = self.get_graph_location()

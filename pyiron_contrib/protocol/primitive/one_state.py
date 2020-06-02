@@ -333,7 +333,8 @@ class InitializeJob(PrimitiveVertex):
                 input_only=True,
                 new_database_entry=True
             )
-            job.save()
+            job.calc_static()
+            job.run(run_again=True)
             self.ref_job_names.append(job.job_name)
 
         return {

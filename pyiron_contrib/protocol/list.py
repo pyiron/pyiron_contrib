@@ -59,6 +59,8 @@ class ListVertex(PrimitiveVertex):
         self.broadcast = InputDictionary()
         self._n_history = None
         self.n_history = 1
+        self._sleep_time = None
+        self.sleep_time = None
 
     @abstractmethod
     def command(self, n_children):
@@ -110,6 +112,14 @@ class ListVertex(PrimitiveVertex):
         if self.children is not None:
             for child in self.children:
                 child.n_history = n_hist
+
+    @property
+    def sleep_time(self):
+        return self._sleep_time
+
+    @sleep_time.setter
+    def sleep_time(self, n_sleep):
+        self._sleep_time = n_sleep
 
     def _extract_output_data_from_children(self):
         output_keys = list(self.children[0].output.keys())  # Assumes that all the children are the same...
@@ -178,12 +188,12 @@ class ParallelList(ListVertex):
         for i, child in enumerate(self.children):
             job = Process(target=child.execute_parallel, args=(i, return_dict))
             job.start()
-            # time.sleep(1)
+            time.sleep(self.sleep_time)
             jobs.append(job)
 
         for job in jobs:
             job.join()
-            # time.sleep(1)
+            time.sleep(self.sleep_time)
 
         print(return_dict.keys())
 

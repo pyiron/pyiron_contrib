@@ -600,9 +600,12 @@ class StringEvolutionParallel(StringEvolution):
         id_.mixing_fraction = 0.1
         id_.nominal_smoothing = 0.1
 
+        id_.sleep_time = 0
+
     def define_vertices(self):
         # Graph components
         g = self.graph
+        ip = Pointer(self.input)
         g.initialize_images = InitializeJob()
         g.initialize_centroids = InitializeJob()
         g.initial_positions = InitialPositions()
@@ -610,7 +613,7 @@ class StringEvolutionParallel(StringEvolution):
         g.initial_forces = Zeros()
         g.check_steps = IsGEq()
         g.clock = Counter()
-        g.constrained_evo = ParallelList(ConstrainedMD)
+        g.constrained_evo = ParallelList(ConstrainedMD, sleep_time = ip.sleep_time)
         g.replace = Replace()
         g.mix = CentroidsRunningAverageMix()
         g.smooth = CentroidsSmoothing()

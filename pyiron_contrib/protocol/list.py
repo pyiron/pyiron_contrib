@@ -59,8 +59,6 @@ class ListVertex(PrimitiveVertex):
         self.broadcast = InputDictionary()
         self._n_history = None
         self.n_history = 1
-        self._sleep_time = None
-        self.sleep_time = None
 
     @abstractmethod
     def command(self, n_children):
@@ -113,14 +111,6 @@ class ListVertex(PrimitiveVertex):
             for child in self.children:
                 child.n_history = n_hist
 
-    @property
-    def sleep_time(self):
-        return self._sleep_time
-
-    @sleep_time.setter
-    def sleep_time(self, n_sleep):
-        self._sleep_time = n_sleep
-
     def _extract_output_data_from_children(self):
         output_keys = list(self.children[0].output.keys())  # Assumes that all the children are the same...
         if len(output_keys) > 0:
@@ -168,8 +158,9 @@ class ParallelList(ListVertex):
             times due to subprocess communication between the large number of workers in a single core.
     """
 
-    def __init__(self, child_type):
+    def __init__(self, child_type, sleep_time):
         super(ParallelList, self).__init__(child_type)
+        self.sleep_time = sleep_time
 
     def command(self, n_children):
         """This controls how the commands are run and is about logistics."""
@@ -180,6 +171,7 @@ class ParallelList(ListVertex):
             child.parallel_setup()
 
         start_time = time.time()
+        sleep_time = ~self.sleep_time
 
         manager = Manager()
         return_dict = manager.dict()
@@ -188,12 +180,12 @@ class ParallelList(ListVertex):
         for i, child in enumerate(self.children):
             job = Process(target=child.execute_parallel, args=(i, return_dict))
             job.start()
-            time.sleep(self.sleep_time)
+            time.sleep(sleep_time)
             jobs.append(job)
 
         for job in jobs:
             job.join()
-            time.sleep(self.sleep_time)
+            time.sleep(sleep_time)
 
         print(return_dict.keys())
 

@@ -613,12 +613,12 @@ class StringEvolutionParallel(StringEvolution):
         g.initial_forces = Zeros()
         g.check_steps = IsGEq()
         g.clock = Counter()
-        g.constrained_evo = ParallelList(ConstrainedMD, sleep_time = ip.sleep_time)
+        g.constrained_evo = ParallelList(ConstrainedMD, sleep_time=ip.sleep_time)
         g.replace = Replace()
         g.mix = CentroidsRunningAverageMix()
         g.smooth = CentroidsSmoothing()
         g.reparameterize = CentroidsReparameterization()
-        g.calc_static_centroids = SerialList(ExternalHamiltonian)
+        g.calc_static_centroids = ParallelList(ExternalHamiltonian, sleep_time=ip.sleep_time)
         g.recenter = SerialList(StringRecenter)
 
     def define_execution_flow(self):
@@ -745,7 +745,7 @@ class StringEvolutionParallel(StringEvolution):
         g.mix.input.default.centroids_pos_list = gp.initial_positions.output.initial_positions[-1]
         g.mix.input.centroids_pos_list = gp.reparameterize.output.centroids_pos_list[-1]
         g.mix.input.mixing_fraction = ip.mixing_fraction
-        g.mix.input.running_average_list = gp.constrained_evo.output.running_average_positions[-1]
+        g.mix.input.running_average_positions = gp.constrained_evo.output.running_average_positions[-1]
         g.mix.input.cell = ip.structure_initial.cell
         g.mix.input.pbc = ip.structure_initial.pbc
 
@@ -790,7 +790,7 @@ class StringEvolutionParallel(StringEvolution):
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
 
 
-class ProtoStringEvolutionParallel(Protocol, StringEvolutionParallel):
+class ProtoStringEvolutionParallel(Protocol, StringEvolutionParallel, ABC):
     pass
 
 

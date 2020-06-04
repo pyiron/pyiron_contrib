@@ -215,21 +215,23 @@ class CentroidsRunningAverageMix(PrimitiveVertex):
         self.input.default.mixing_fraction = 0.1
         self.input.default.relax_endpoints = False
 
-    def command(self, mixing_fraction, centroids_pos_list, running_average_list, cell, pbc, relax_endpoints):
+    def command(self, mixing_fraction, centroids_pos_list, running_average_positions, cell, pbc, relax_endpoints):
 
         centroids_pos_list = np.array(centroids_pos_list)
-        running_average_list = np.array(running_average_list)
+        running_average_positions = np.array(running_average_positions)
 
-        for i, cent in enumerate(centroids_pos_list):
+        updated_centroids = []
+
+        for i, (cent, avg) in enumerate(zip(centroids_pos_list, running_average_positions)):
             if i == 0 or i == len(centroids_pos_list) - 1:
-                continue
+                updated_centroids.append(cent)
             else:
-                displacement = find_mic(running_average_list[i] - cent, cell, pbc)[0]
+                displacement = find_mic(running_average_positions[i] - cent, cell, pbc)[0]
                 update = mixing_fraction * displacement
-                centroids_pos_list[i] += update
+                updated_centroids.append(cent + update)
 
         return {
-            'centroids_pos_list': np.array(centroids_pos_list)
+            'centroids_pos_list': np.array(updated_centroids)
         }
 
 

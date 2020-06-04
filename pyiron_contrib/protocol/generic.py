@@ -333,11 +333,10 @@ class PrimitiveVertex(Vertex):
         """The command method controls the physics"""
         pass
 
-    def execute_parallel(self, queue, n, input_dict):
+    def execute_parallel(self, n, return_dict):
         """How to execute in parallel when there's a list of these vertices together."""
-        output_data = self.command(**input_dict)
-        queue.put((n, output_data))
-        # Note: The output needs to be explicitly collected and archived later if this is used in place of `execute`
+        output_data = self.command(**self.input.resolve())
+        return_dict[n] = output_data
 
 
 class CompoundVertex(Vertex): #, PyironJobTypeRegistry):

@@ -158,7 +158,7 @@ class ParallelList(ListVertex):
             times due to subprocess communication between the large number of workers in a single core.
     """
 
-    def __init__(self, child_type, sleep_time):
+    def __init__(self, child_type, sleep_time=0):
         super(ParallelList, self).__init__(child_type)
         self.sleep_time = sleep_time
 

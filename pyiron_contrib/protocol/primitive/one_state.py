@@ -174,24 +174,21 @@ class ExternalHamiltonian(PrimitiveVertex):
         self._job = None
         self._job_name = None
 
-        self.input.default.ref_job_name = None
+        self.input.default.job_name = None
         self.input.default.structure = None
-        self.input.default.interesting_keys = ['forces', 'energy_pot', 'pressures', 'volume', 'job_path',
-                                               'job_name']
         self.input.default.positions = None
         self.input.default.cell = None
-        self.input.default.job_path = None
-        self.input.default.job_name = None
+        self.input.default.interesting_keys = ['forces', 'energy_pot', 'pressures', 'volume']
 
-    def command(self, job_name, job_path, ref_job_name, ref_job_full_path, structure,
-                interesting_keys, positions, cell):
+    def command(self, job_name, ref_job_full_path, structure, interesting_keys, positions, cell):
 
-        if self._job_project_path is None:
-            self._job_project_path = job_path
+        if self._job_name is None:
+            project_path, ref_job_path = split(ref_job_full_path)
+            self._job_project_path = project_path
             self._job_name = job_name
 
         if self._job_project_path is None:
-            self._initialize(ref_job_name, ref_job_full_path, structure)
+            self._initialize(job_name, ref_job_full_path, structure)
         elif self._job is None:
             self._reload()
         elif not self._job.interactive_is_activated():
@@ -222,11 +219,11 @@ class ExternalHamiltonian(PrimitiveVertex):
 
         return {key: self.get_interactive_value(key) for key in interesting_keys}
 
-    def _initialize(self, ref_job_name, ref_job_full_path, structure):
-        if ref_job_name is not None:
+    def _initialize(self, job_name, ref_job_full_path, structure):
+        if job_name is not None:
             project_path, ref_job_path = split(ref_job_full_path)
             pr = Project(path=project_path)
-            job = pr.load(ref_job_name)
+            job = pr.load(job_name)
         else:
             loc = self.get_graph_location()
             name = loc + '_job'
@@ -269,8 +266,8 @@ class ExternalHamiltonian(PrimitiveVertex):
         self._job = pr.load(self._job_name)
         self._job.interactive_open()
         self._job.interactive_initialize_interface()
-        self._job.calc_static()
-        self._job.run(run_again=True)
+        # self._job.calc_static()
+        # self._job.run(run_again=True)
 
     def get_interactive_value(self, key):
         if key == 'positions':
@@ -285,10 +282,6 @@ class ExternalHamiltonian(PrimitiveVertex):
             val = self._job.interactive_volume_getter()
         elif key == 'cells':
             val = np.array(self._job.interactive_cells_getter())
-        elif key == 'job_path':
-            val = self._job_project_path
-        elif key == 'job_name':
-            val = self._job_name
         else:
             raise NotImplementedError
         return val
@@ -318,9 +311,11 @@ class InitializeJob(PrimitiveVertex):
 
     def __init__(self, name=None):
         super(InitializeJob, self).__init__(name=name)
-        self.ref_job_names = []
+        self._jobs = []
+        self.job_names = []
+        self._fast_lammps_mode = True
 
-    def command(self, ref_job_full_path, n_images):
+    def command(self, ref_job_full_path, n_images, structure):
         for i in np.arange(n_images):
             loc = self.get_graph_location()
             name = loc + '_' + str(i)
@@ -333,12 +328,29 @@ class InitializeJob(PrimitiveVertex):
                 input_only=True,
                 new_database_entry=True
             )
-            job.calc_static()
-            job.run(run_again=True)
-            self.ref_job_names.append(job.job_name)
+
+            if structure is not None:
+                job.structure = structure
+
+            if isinstance(job, GenericInteractive):
+                job.interactive_open()
+
+                if isinstance(job, LammpsInteractive) and self._fast_lammps_mode:
+                    # Note: This might be done by default at some point in LammpsInteractive,
+                    # and could then be removed here
+                    job.interactive_flush_frequency = 10 ** 10
+                    job.interactive_write_frequency = 10 ** 10
+
+                job.calc_static()
+                job.run()
+            else:
+                raise TypeError('Job of class {} is not compatible.'.format(ref_job.__class__))
+
+            self.job_names.append(job.job_name)
+            self._jobs.append(job)
 
         return {
-            'ref_job_names': self.ref_job_names
+            'job_names': self.job_names
         }
 
 

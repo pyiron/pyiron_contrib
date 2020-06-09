@@ -183,10 +183,10 @@ class PositionsRunningAverage(PrimitiveVertex):
         positions = np.array(positions)
 
         displacement = find_mic(positions - running_average_positions, cell, pbc)[0]
-        running_average_positions += weight * displacement
+        new_running_average = running_average_positions + (weight * displacement)
 
         return {
-            'running_average_positions': np.array(running_average_positions),
+            'running_average_positions': np.array(new_running_average),
             'divisor': divisor
         }
 
@@ -226,7 +226,7 @@ class CentroidsRunningAverageMix(PrimitiveVertex):
             if i == 0 or i == len(centroids_pos_list) - 1:
                 updated_centroids.append(cent)
             else:
-                displacement = find_mic(running_average_positions[i] - cent, cell, pbc)[0]
+                displacement = find_mic(avg - cent, cell, pbc)[0]
                 update = mixing_fraction * displacement
                 updated_centroids.append(cent + update)
 
@@ -300,6 +300,9 @@ class CentroidsReparameterization(PrimitiveVertex):
 
     def command(self, centroids_pos_list, cell, pbc):
         # How long is the piecewise parameterized path to begin with?
+
+        centroids_pos_list = np.array(centroids_pos_list)
+
         lengths = self._find_lengths(centroids_pos_list, cell, pbc)
         length_tot = lengths[-1]
         length_per_frame = length_tot / (len(centroids_pos_list) - 1)

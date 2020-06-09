@@ -118,6 +118,7 @@ class NEB(CompoundVertex):
 
         g.initialize_jobs.input.n_images = ip.n_images
         g.initialize_jobs.input.ref_job_full_path = ip.ref_job_full_path
+        g.initialize_jobs.input.structure = ip.structure_initial
 
         g.interpolate_images.input.structure_initial = ip.structure_initial
         g.interpolate_images.input.structure_final = ip.structure_final
@@ -129,7 +130,7 @@ class NEB(CompoundVertex):
         g.calc_static.input.n_children = ip.n_images
         g.calc_static.direct.ref_job_full_path = ip.ref_job_full_path
         g.calc_static.direct.structure = ip.structure_initial
-        g.calc_static.broadcast.ref_job_name = gp.initialize_jobs.output.ref_job_names[-1]
+        g.calc_static.broadcast.job_name = gp.initialize_jobs.output.job_names[-1]
         g.calc_static.broadcast.default.positions = gp.interpolate_images.output.initial_positions[-1]
         g.calc_static.broadcast.positions = gp.gradient_descent.output.positions[-1]
 

@@ -390,15 +390,6 @@ class ConstrainedMD(CompoundVertex):
     WARNING: Presently for use only with Finite Temperature String (FTS) related Protocols
     """
 
-    DefaultWhitelist = {
-        'calc_static': {
-            'output': {'energy_pot': 1}
-        },
-        'verlet_velocities': {
-            'output': {'energy_kin': 1}
-        },
-    }
-
     def __init__(self, **kwargs):
         super(ConstrainedMD, self).__init__(**kwargs)
 
@@ -549,12 +540,6 @@ class StringEvolutionParallel(StringEvolution):
     """
 
     """
-
-    DefaultWhitelist = {
-        'constrained_evo': {
-            'output': {'positions': 1, 'velocities': 1, 'forces': 1}
-        }
-    }
 
     def __init__(self, **kwargs):
         super(StringEvolutionParallel, self).__init__(**kwargs)

@@ -169,10 +169,7 @@ class PositionsRunningAverage(PrimitiveVertex):
         super(PositionsRunningAverage, self).__init__(name=name)
         self.input.default.divisor = 1
 
-    def command(self, positions, running_average_positions, cell, pbc, divisor):
-
-        if running_average_positions is None:
-            running_average_positions = positions
+    def command(self, positions, running_average_positions, cell, pbc, divisor, initial_positions, job_name, n_images):
 
         # On the first step, divide by 2 to average two positions
         divisor += 1
@@ -182,8 +179,13 @@ class PositionsRunningAverage(PrimitiveVertex):
         running_average_positions = np.array(running_average_positions)
         positions = np.array(positions)
 
-        displacement = find_mic(positions - running_average_positions, cell, pbc)[0]
-        new_running_average = running_average_positions + (weight * displacement)
+        image = int(job_name.split('_')[-1])
+
+        if image in [0, n_images - 1]:
+            new_running_average = initial_positions
+        else:
+            displacement = find_mic(positions - running_average_positions, cell, pbc)[0]
+            new_running_average = running_average_positions + (weight * displacement)
 
         return {
             'running_average_positions': np.array(new_running_average),
@@ -223,16 +225,92 @@ class CentroidsRunningAverageMix(PrimitiveVertex):
         updated_centroids = []
 
         for i, (cent, avg) in enumerate(zip(centroids_pos_list, running_average_positions)):
-            if i == 0 or i == len(centroids_pos_list) - 1:
-                updated_centroids.append(cent)
-            else:
-                displacement = find_mic(avg - cent, cell, pbc)[0]
-                update = mixing_fraction * displacement
-                updated_centroids.append(cent + update)
+            displacement = find_mic(avg - cent, cell, pbc)[0]
+            update = mixing_fraction * displacement
+            updated_centroids.append(cent + update)
 
         return {
             'centroids_pos_list': np.array(updated_centroids)
         }
+
+
+# class PositionsRunningAverage(PrimitiveVertex):
+#     """
+#     Calculates the running average of input positions at each call.
+#     Input attributes:
+#         positions_list (list/numpy.ndarray): The instantaneous position, which will be updated to the running average
+#         running_average_list (list/numpy.ndarray): List of existing running averages
+#         cell (numpy.ndarray): The cell of the structure
+#         pbc (numpy.ndarray): Periodic boundary condition of the structure
+#     Output attributes:
+#         running_average_list (list/numpy.ndarray): The updated running average list
+#     TODO:
+#         Handle non-static cells, or at least catch them.
+#         Refactor this so there are list and serial versions equally available
+#     """
+#
+#     def __init__(self, name=None):
+#         super(PositionsRunningAverage, self).__init__(name=name)
+#         self.input.default.divisor = 1
+#
+#     def command(self, positions, running_average_positions, cell, pbc, divisor, n_images, job_name):
+#         # On the first step, divide by 2 to average two positions
+#         divisor += 1
+#         # How much of the current step to mix into the average
+#         weight = 1. / divisor
+#
+#         running_average_positions = np.array(running_average_positions)
+#         positions = np.array(positions)
+#
+#         image = int(job_name.split('_')[-1])
+#
+#         if image in [0, n_images - 1]:
+#             new_running_average = running_average_positions
+#         else:
+#             displacement = find_mic(positions - running_average_positions, cell, pbc)[0]
+#             new_running_average = running_average_positions + (weight * displacement)
+#
+#         return {
+#             'running_average_positions': new_running_average,
+#             'divisor': divisor
+#         }
+#
+#
+# class CentroidsRunningAverageMix(PrimitiveVertex):
+#     """
+#     Mix in the running average of the positions to the centroid, moving the centroid towards that
+#     running average by a fraction.
+#     Input attributes:
+#         mixing_fraction (float): The fraction of the running average to mix into centroid (Default is 0.1)
+#         centroids_pos_list (list/numpy.ndarray): List of all the centroids along the string
+#         running_average_list (list/numpy.ndarray): List of running averages
+#         cell (numpy.ndarray): The cell of the structure
+#         pbc (numpy.ndarray): Periodic boundary condition of the structure
+#     Output attributes:
+#         centroids_pos_list (list/numpy.ndarray): List centroids updated towards the running average
+#     TODO:
+#         Re-write Command base class(es) to better handle serial/list/parallel.
+#     """
+#
+#     def __init__(self, name=None):
+#         super(CentroidsRunningAverageMix, self).__init__(name=name)
+#         self.input.default.mixing_fraction = 0.1
+#
+#     def command(self, mixing_fraction, centroids_pos_list, running_average_positions, cell, pbc):
+#         centroids_pos_list = np.array(centroids_pos_list)
+#         running_average_positions = np.array(running_average_positions)
+#
+#         updated_centroids = []
+#
+#
+#         for i, cent in enumerate(centroids_pos_list):
+#             disp = find_mic(running_average_list[i] - cent, cell, pbc)[0]
+#             update = mixing_fraction * disp
+#             centroids_pos_list[i] += update
+#
+#         return {
+#             'centroids_pos_list': centroids_pos_list
+#         }
 
 
 class CentroidsSmoothing(PrimitiveVertex):
@@ -300,8 +378,6 @@ class CentroidsReparameterization(PrimitiveVertex):
 
     def command(self, centroids_pos_list, cell, pbc):
         # How long is the piecewise parameterized path to begin with?
-
-        centroids_pos_list = np.array(centroids_pos_list)
 
         lengths = self._find_lengths(centroids_pos_list, cell, pbc)
         length_tot = lengths[-1]

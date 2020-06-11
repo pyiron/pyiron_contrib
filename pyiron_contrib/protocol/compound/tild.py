@@ -5,7 +5,7 @@
 from __future__ import print_function
 
 from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
-from pyiron_contrib.protocol.primitive.one_state import Counter, ExternalHamiltonian, WeightedSum, \
+from pyiron_contrib.protocol.primitive.one_state import InitializeJob, Counter, ExternalHamiltonian, WeightedSum, \
     HarmonicHamiltonian, Transpose, RandomVelocity, LangevinThermostat, \
     VerletPositionUpdate, VerletVelocityUpdate, BuildMixingPairs, DeleteAtom, Overwrite, Slice, VoronoiReflection, \
     WelfordOnline, Zeros, TILDPostProcess, SphereReflection
@@ -98,6 +98,8 @@ class HarmonicTILD(TILDParent):
         id_.zero_k_energy = 0.0
         id_.force_constants = None
         id_.spring_constant = None
+
+        id_.sleep_time = 0
 
     def define_vertices(self):
         # Graph components
@@ -557,100 +559,12 @@ class ProtoVacancyTILD(Protocol, VacancyTILD):
     pass
 
 
-class HarmonicTILDParallel(HarmonicTILD):
-    DefaultWhitelist = {}
-
-    def define_vertices(self):
-        # Graph components
-        g = self.graph
-        g.build_lambdas = BuildMixingPairs()
-        g.run_lambda_points = ParallelList(HarmonicallyCoupled)
-
-    def define_execution_flow(self):
-        # Execution flow
-        g = self.graph
-        g.make_pipeline(
-            g.build_lambdas,
-            g.run_lambda_points
-        )
-        g.starting_vertex = g.build_lambdas
-        g.restarting_vertex = g.run_lambda_points
-
-    def define_information_flow(self):
-        # Data flow
-        g = self.graph
-        gp = Pointer(self.graph)
-        ip = Pointer(self.input)
-
-        g.build_lambdas.input.n_lambdas = ip.n_lambdas
-        g.build_lambdas.input.custom_lambdas = ip.custom_lambdas
-
-        g.run_lambda_points.input.n_children = ip.n_lambdas
-        g.run_lambda_points.direct.n_steps = ip.n_steps
-        g.run_lambda_points.direct.temperature = ip.temperature
-        g.run_lambda_points.direct.masses = ip.structure.get_masses
-        g.run_lambda_points.direct.overheat_fraction = ip.overheat_fraction
-        g.run_lambda_points.direct.threshold = ip.n_steps
-        g.run_lambda_points.direct.ref_job_full_path = ip.ref_job_full_path
-        g.run_lambda_points.direct.structure = ip.structure
-        g.run_lambda_points.direct.spring_constant = ip.spring_constant
-        g.run_lambda_points.broadcast.coupling_weights = gp.build_lambdas.output.lambda_pairs[-1]
-        g.run_lambda_points.direct.temperature_damping_timescale = ip.temperature_damping_timescale
-        g.run_lambda_points.direct.time_step = ip.time_step
-        g.run_lambda_points.direct.fix_com = ip.fix_com
-        g.run_lambda_points.direct.use_reflection = ip.use_reflection
-
-    def get_output(self):
-        o = Pointer(self.graph.run_lambda_points.output)
-        return {
-            'job_energy_pot': ~o.job_energy_pot[-1],
-            'harmonic_energy_pot': ~o.harmonic_energy_pot[-1],
-            'energy_kin': ~o.energy_kin[-1],
-            'positions': ~o.positions[-1],
-            'velocities': ~o.velocities[-1],
-            'forces': ~o.forces[-1],
-        }
-
-
-class ProtocolHarmonicTILDParallel(Protocol, HarmonicTILDParallel):
-    pass
-
-
 class HarmonicallyCoupled(CompoundVertex):
-    DefaultWhitelist = {
-        'reflect': {
-            'output': {
-                'positions': 1000,
-            },
-        },
-        'calc_static': {
-            'output': {
-                'energy_pot': 1,
-            },
-        },
-        'harmonic': {
-            'output': {
-                'energy_pot': 1,
-            },
-        },
-        'mix': {
-            'output': {
-                'weighted_sum': 1,
-            }
-        },
-        'verlet_velocities': {
-            'output': {
-                'energy_kin': 1,
-                'velocities': 1000,
-            },
-        },
-    }
+    # DefaultWhitelist = {}
 
     def define_vertices(self):
         # Graph components
         g = self.graph
-        g.initial_velocity = RandomVelocity()
-        g.initial_forces = Zeros()
         g.check_steps = IsGEq()
         g.verlet_positions = VerletPositionUpdate()
         g.reflect = VoronoiReflection()
@@ -658,25 +572,33 @@ class HarmonicallyCoupled(CompoundVertex):
         g.harmonic = HarmonicHamiltonian()
         g.mix = WeightedSum()
         g.verlet_velocities = VerletVelocityUpdate()
+        g.check_thermalized = IsGEq()
+        g.check_sampling_period = ModIsZero()
+        g.addition = WeightedSum()
+        g.average = WelfordOnline()
         g.clock = Counter()
 
     def define_execution_flow(self):
         # Execution flow
         g = self.graph
         g.make_pipeline(
-            g.initial_velocity,
-            g.initial_forces,
             g.check_steps, 'false',
+            g.clock,
             g.verlet_positions,
             g.reflect,
             g.calc_static,
             g.harmonic,
             g.mix,
             g.verlet_velocities,
-            g.clock,
-            g.check_steps,
+            g.check_thermalized, 'true',
+            g.check_sampling_period, 'true',
+            g.addition,
+            g.average,
+            g.check_steps
         )
-        g.starting_vertex = g.initial_velocity
+        g.make_edge(g.check_thermalized, g.check_steps, 'false')
+        g.make_edge(g.check_sampling_period, g.check_steps, 'false')
+        g.starting_vertex = g.check_steps
         g.restarting_vertex = g.check_steps
 
     def define_information_flow(self):
@@ -685,60 +607,92 @@ class HarmonicallyCoupled(CompoundVertex):
         gp = Pointer(self.graph)
         ip = Pointer(self.input)
 
-        g.initial_velocity.input.temperature = ip.temperature
-        g.initial_velocity.input.masses = ip.structure.get_masses
-        g.initial_velocity.input.overheat_fraction = ip.overheat_fraction
-
-        g.initial_forces.input.shape = ip.structure.positions.shape
-
+        # check_steps
         g.check_steps.input.target = gp.clock.output.n_counts[-1]
         g.check_steps.input.threshold = ip.n_steps
 
-        g.verlet_positions.input.default.positions = ip.structure.positions
-        g.verlet_positions.input.default.velocities = gp.initial_velocity.output.velocities[-1]
-        g.verlet_positions.input.default.forces = gp.initial_forces.output.zeros[-1]
-        g.verlet_positions.input.positions = gp.reflect.output.positions[-1]
-        g.verlet_positions.input.velocities = gp.verlet_velocities.output.velocities[-1]
-        g.verlet_positions.input.forces = gp.mix.output.weighted_sum[-1]
-        g.verlet_positions.input.masses = ip.structure.get_masses
+        # verlet_positions
         g.verlet_positions.input.time_step = ip.time_step
         g.verlet_positions.input.temperature = ip.temperature
         g.verlet_positions.input.temperature_damping_timescale = ip.temperature_damping_timescale
+        g.verlet_positions.input.masses = ip.structure.get_masses
 
+        g.verlet_positions.input.default.positions = ip.structure.positions
+        g.verlet_positions.input.default.velocities = ip.velocities
+        g.verlet_positions.input.default.forces = ip.forces
+
+        g.verlet_positions.input.positions = gp.reflect.output.positions[-1]
+        g.verlet_positions.input.velocities = gp.verlet_velocities.output.velocities[-1]
+        g.verlet_positions.input.forces = gp.mix.output.weighted_sum[-1]
+
+        # reflect
         g.reflect.on = ip.use_reflection
         g.reflect.input.reference_positions = ip.structure.positions
         g.reflect.input.pbc = ip.structure.pbc
         g.reflect.input.cell = ip.structure.cell
-        g.reflect.input.positions = gp.verlet_positions.output.positions[-1]
-        g.reflect.input.velocities = gp.verlet_positions.output.velocities[-1]
+
         g.reflect.input.default.previous_positions = ip.structure.positions
-        g.reflect.input.default.previous_velocities = gp.initial_velocity.output.velocities[-1]
+        g.reflect.input.default.previous_velocities = ip.velocities
+
         g.reflect.input.previous_positions = gp.reflect.output.positions[-1]
         g.reflect.input.previous_velocities = gp.reflect.output.velocities[-1]
+        g.reflect.input.positions = gp.verlet_positions.output.positions[-1]
+        g.reflect.input.velocities = gp.verlet_positions.output.velocities[-1]
 
+        # calc_static
         g.calc_static.input.ref_job_full_path = ip.ref_job_full_path
+        g.calc_static.input.job_name = ip.job_name
         g.calc_static.input.structure = ip.structure
+
         g.calc_static.input.default.positions = gp.verlet_positions.output.positions[-1]
         g.calc_static.input.positions = gp.reflect.output.positions[-1]
 
+        # harmonic
         g.harmonic.input.spring_constant = ip.spring_constant
+        g.harmonic.input.force_constants = ip.force_constants
+        g.harmonic.input.zero_k_energy = ip.zero_k_energy
         g.harmonic.input.home_positions = ip.structure.positions
-        g.harmonic.input.default.positions = gp.verlet_positions.output.positions[-1]
-        g.harmonic.input.positions = gp.reflect.output.positions[-1]
         g.harmonic.input.cell = ip.structure.cell
         g.harmonic.input.pbc = ip.structure.pbc
 
+        g.harmonic.input.default.positions = gp.verlet_positions.output.positions[-1]
+        g.harmonic.input.positions = gp.reflect.output.positions[-1]
+
+        # mix
         g.mix.input.vectors = [
             gp.calc_static.output.forces[-1],
             gp.harmonic.output.forces[-1]
         ]
         g.mix.input.weights = ip.coupling_weights
 
+        # verlet_velocities
+        g.verlet_velocities.input.masses = ip.structure.get_masses
+        g.verlet_velocities.input.time_step = ip.time_step
+
         g.verlet_velocities.input.default.velocities = gp.verlet_positions.output.velocities[-1]
         g.verlet_velocities.input.velocities = gp.reflect.output.velocities[-1]
         g.verlet_velocities.input.forces = gp.mix.output.weighted_sum[-1]
-        g.verlet_velocities.input.masses = ip.structure.get_masses
-        g.verlet_velocities.input.time_step = ip.time_step
+
+        # check_thermalized
+        g.check_thermalized.input.target = gp.clock.output.n_counts[-1]
+        g.check_thermalized.input.threshold = ip.thermalization_steps
+
+        # check_sampling_period
+        g.check_sampling_period.input.target = gp.clock.output.n_counts[-1]
+        g.check_sampling_period.input.default.mod = ip.sampling_period
+
+        # addition
+        g.addition.input.vectors = [
+            gp.calc_static.output.energy_pot[-1],
+            gp.harmonic.output.energy_pot[-1]
+        ]
+        g.addition.input.weights = [1, -1]
+
+        # average
+        g.average.input.sample = gp.addition.output.weighted_sum[-1]
+
+        # clock
+        g.clock.input.max_count = ip.n_steps
 
         self.archive.clock = gp.clock.output.n_counts[-1]
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
@@ -752,7 +706,140 @@ class HarmonicallyCoupled(CompoundVertex):
             'positions': ~gp.reflect.output.positions[-1],
             'velocities': ~gp.verlet_velocities.output.velocities[-1],
             'forces': ~gp.mix.output.weighted_sum[-1],
+            'clock': ~gp.clock.output.n_counts[-1],
+            'mean': ~gp.average.output.mean[-1],
+            'std': ~gp.average.output.std[-1],
+            'n_samples': ~gp.average.output.n_samples[-1]
         }
 
-    def parallel_setup(self):
-        self.graph.calc_static._initialize(self.input.ref_job_full_path, self.input.structure)
+
+class HarmonicTILDParallel(HarmonicTILD):
+    DefaultWhitelist = {}
+
+    def define_vertices(self):
+        # Graph components
+        g = self.graph
+        ip = Pointer(self.input)
+        g.build_lambdas = BuildMixingPairs()
+        g.initialize_lambda_jobs = InitializeJob()
+        g.initial_velocities = SerialList(RandomVelocity)
+        g.initial_forces = SerialList(Zeros)
+        g.run_lambda_points = ParallelList(HarmonicallyCoupled, sleep_time=ip.sleep_time)
+        g.clock = Counter()
+        g.post = TILDPostProcess()
+
+    def define_execution_flow(self):
+        # Execution flow
+        g = self.graph
+        g.make_pipeline(
+            g.build_lambdas,
+            g.initialize_lambda_jobs,
+            g.initial_velocities,
+            g.initial_forces,
+            g.run_lambda_points,
+            g.clock,
+            g.post
+        )
+        g.starting_vertex = g.build_lambdas
+        g.restarting_vertex = g.run_lambda_points
+
+    def define_information_flow(self):
+        # Data flow
+        g = self.graph
+        gp = Pointer(self.graph)
+        ip = Pointer(self.input)
+
+        # build_lambdas
+        g.build_lambdas.input.n_lambdas = ip.n_lambdas
+        g.build_lambdas.input.custom_lambdas = ip.custom_lambdas
+
+        # initialize_integration_points
+        g.initialize_lambda_jobs.input.n_images = ip.n_lambdas
+        g.initialize_lambda_jobs.input.ref_job_full_path = ip.ref_job_full_path
+        g.initialize_lambda_jobs.input.structure = ip.structure
+
+        # initial_velocities
+        g.initial_velocities.input.n_children = ip.n_lambdas
+        g.initial_velocities.direct.temperature = ip.temperature
+        g.initial_velocities.direct.masses = ip.structure.get_masses
+        g.initial_velocities.direct.overheat_fraction = ip.overheat_fraction
+
+        # initial_forces
+        g.initial_forces.input.n_children = ip.n_lambdas
+        g.initial_forces.direct.shape = ip.structure.positions.shape
+
+        # run_lambda_points - initialize
+        g.run_lambda_points.input.n_children = ip.n_lambdas
+
+        # run_lambda_points - verlet_positions
+        g.run_lambda_points.direct.time_step = ip.time_step
+        g.run_lambda_points.direct.temperature = ip.temperature
+        g.run_lambda_points.direct.temperature_damping_timescale = ip.temperature_damping_timescale
+        g.run_lambda_points.direct.structure = ip.structure
+
+        g.run_lambda_points.broadcast.velocities = gp.initial_velocities.output.velocities[-1]
+        g.run_lambda_points.broadcast.forces = gp.initial_forces.output.zeros[-1]
+
+        # run_lambda_points - reflect
+        g.run_lambda_points.direct.use_reflection = ip.use_reflection
+
+        # run_lambda_points - calc_static
+        g.run_lambda_points.direct.ref_job_full_path = ip.ref_job_full_path
+        g.run_lambda_points.broadcast.job_name = gp.initialize_lambda_jobs.output.job_names[-1]
+
+        # run_lambda_points - harmonic
+        g.run_lambda_points.direct.spring_constant = ip.spring_constant
+        g.run_lambda_points.direct.force_constants = ip.force_constants
+        g.run_lambda_points.direct.zero_k_energy = ip.zero_k_energy
+
+        # run_lambda_points - mix
+        g.run_lambda_points.broadcast.coupling_weights = gp.build_lambdas.output.lambda_pairs[-1]
+
+        # run_lambda_points - verlet_velocities
+        # takes inputs already specified
+
+        # run_lambda_points - check_thermalized
+        g.run_lambda_points.direct.thermalization_steps = ip.thermalization_steps
+
+        # run_lambda_points - check_sampling_period
+        g.run_lambda_points.direct.sampling_period = ip.sampling_period
+
+        # run_lambda_points - addition
+
+        # run_lambda_points - average
+
+        # run_lambda_points - clock
+        g.run_lambda_points.direct.n_steps = ip.n_steps
+
+        # clock
+        g.clock.input.max_count = ip.n_steps
+        g.clock.input.new_count = gp.run_lambda_points.output.clock[-1][-1]
+
+        # post_processing
+        g.post.input.lambda_pairs = gp.build_lambdas.output.lambda_pairs[-1]
+        g.post.input.n_samples = gp.run_lambda_points.output.n_samples[-1]
+        g.post.input.mean = gp.run_lambda_points.output.mean[-1]
+        g.post.input.std = gp.run_lambda_points.output.std[-1]
+        g.post.input.plot = ip.plot
+
+        self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
+
+    def get_output(self):
+        gp = Pointer(self.graph)
+        o = Pointer(self.graph.run_lambda_points.output)
+        return {
+            'job_energy_pot': ~o.job_energy_pot[-1],
+            'harmonic_energy_pot': ~o.harmonic_energy_pot[-1],
+            'energy_kin': ~o.energy_kin[-1],
+            'positions': ~o.positions[-1],
+            'velocities': ~o.velocities[-1],
+            'forces': ~o.forces[-1],
+            'integrands': ~o.mean[-1],
+            'integrands_std': ~o.std[-1],
+            'integrands_n_samples': ~o.n_samples[-1],
+            'free_energy_change': ~gp.post.output.free_energy_change[-1]
+        }
+
+
+class ProtoHarmonicTILDParallel(Protocol, HarmonicTILDParallel):
+    pass

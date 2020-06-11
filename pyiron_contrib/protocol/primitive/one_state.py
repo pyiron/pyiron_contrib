@@ -178,7 +178,7 @@ class ExternalHamiltonian(PrimitiveVertex):
         self.input.default.structure = None
         self.input.default.positions = None
         self.input.default.cell = None
-        self.input.default.interesting_keys = ['forces', 'energy_pot', 'pressures', 'volume']
+        self.input.default.interesting_keys = ['positions', 'forces', 'energy_pot', 'pressures', 'volume', 'cells']
 
     def command(self, job_name, ref_job_full_path, structure, interesting_keys, positions, cell):
 

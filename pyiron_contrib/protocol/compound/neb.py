@@ -83,6 +83,8 @@ class NEB(CompoundVertex):
         id_.fix_com = True
         id_.use_adagrad = False
 
+        id_.sleep_time = 0
+
     def define_vertices(self):
         # Graph components
         g = self.graph
@@ -232,10 +234,11 @@ class NEBParallel(NEB):
     def define_vertices(self):
         # Graph components
         g = self.graph
+        ip = Pointer(self.input)
         g.initialize_jobs = InitializeJob()
-        g.initial_positions = InitialPositions()
+        g.interpolate_images = InitialPositions()
         g.check_steps = IsGEq()
-        g.calc_static = ParallelList(ExternalHamiltonian)  # Enforce parallel
+        g.calc_static = ParallelList(ExternalHamiltonian, sleep_time=ip.sleep_time)  # Enforce parallel
         g.neb_forces = NEBForces()
         g.gradient_descent = SerialList(GradientDescent)
         g.clock = Counter()

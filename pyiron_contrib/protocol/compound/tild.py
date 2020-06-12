@@ -868,6 +868,10 @@ class HarmonicTILDParallel(HarmonicTILD):
             'free_energy_change': ~gp.post.output.free_energy_change[-1]
         }
 
+    def get_integrand(self):
+        o = Pointer(self.graph.run_lambda_points.output)
+        return ~o.mean[-1], ~o.std[-1] / np.sqrt(~o.n_samples[-1])
+
 
 class ProtoHarmonicTILDParallel(Protocol, HarmonicTILDParallel):
     pass
@@ -1227,6 +1231,10 @@ class VacancyTILDParallel(VacancyTILD):
             'integrands_n_samples': ~o.n_samples[-1],
             'free_energy_change': ~gp.post.output.free_energy_change[-1]
         }
+
+    def get_integrand(self):
+        o = Pointer(self.graph.run_lambda_points.output)
+        return ~o.mean[-1], ~o.std[-1] / np.sqrt(~o.n_samples[-1])
 
 
 class ProtoVacancyTILDParallel(Protocol, VacancyTILDParallel):

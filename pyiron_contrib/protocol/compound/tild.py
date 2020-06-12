@@ -343,6 +343,7 @@ class VacancyTILD(TILDParent):
         id_.spring_constant = None
         id_.ensure_iterable_mask = True
         id_.sleep_time = 0
+        id_.zero_k_energy = 0.0
 
     def define_vertices(self):
         # Graph components

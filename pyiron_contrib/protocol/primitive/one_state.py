@@ -311,17 +311,16 @@ class InitializeJob(PrimitiveVertex):
 
     def __init__(self, name=None):
         super(InitializeJob, self).__init__(name=name)
-        self._jobs = []
         self.job_names = []
         self._fast_lammps_mode = True
 
     def command(self, ref_job_full_path, n_images, structure):
+        loc = self.get_graph_location()
+        project_path, ref_job_path = split(ref_job_full_path)
+        pr = Project(path=project_path)
+        ref_job = pr.load(ref_job_path)
         for i in np.arange(n_images):
-            loc = self.get_graph_location()
             name = loc + '_' + str(i)
-            project_path, ref_job_path = split(ref_job_full_path)
-            pr = Project(path=project_path)
-            ref_job = pr.load(ref_job_path)
             job = ref_job.copy_to(
                 project=pr,
                 new_job_name=name,
@@ -347,7 +346,6 @@ class InitializeJob(PrimitiveVertex):
                 raise TypeError('Job of class {} is not compatible.'.format(ref_job.__class__))
 
             self.job_names.append(job.job_name)
-            self._jobs.append(job)
 
         return {
             'job_names': self.job_names

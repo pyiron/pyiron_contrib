@@ -183,11 +183,14 @@ class ExternalHamiltonian(PrimitiveVertex):
 
     def command(self, job_name, ref_job_full_path, structure, interesting_keys, positions, cell, job_initialized):
 
+        print(job_initialized)
+
         if job_initialized is True:
             project_path, ref_job_path = split(ref_job_full_path)
             self._job_project_path = project_path
             self._job_name = job_name
         elif self._job_project_path is None:
+            print('doing this')
             self._initialize(ref_job_full_path, structure)
 
         if self._job is None:

@@ -183,17 +183,15 @@ class ExternalHamiltonian(PrimitiveVertex):
 
     def command(self, job_name, ref_job_full_path, structure, interesting_keys, positions, cell, job_initialized):
 
-        print(job_initialized)
-
         if job_initialized is True:
             project_path, ref_job_path = split(ref_job_full_path)
             self._job_project_path = project_path
             self._job_name = job_name
-        elif self._job_project_path is None:
-            print('doing this')
-            self._initialize(ref_job_full_path, structure)
+            print(self._job_project_path)
 
-        if self._job is None:
+        if self._job_project_path is None:
+            self._initialize(ref_job_full_path, structure)
+        elif self._job is None:
             self._reload()
         elif not self._job.interactive_is_activated():
             self._job.status.running = True
@@ -443,7 +441,7 @@ class HarmonicHamiltonian(PrimitiveVertex):
 
         if spring_constant is not None and force_constants is None:
             forces = -spring_constant * dr
-            energy = zero_k_energy - 0.5 * np.tensordot(dr, forces)
+            energy = zero_k_energy - 0.5 * np.dot(dr, forces)
 
         elif force_constants is not None and spring_constant is None:
             transformed_force_constants = self.transform_force_constants(force_constants)

@@ -309,6 +309,7 @@ class InitializeJob(PrimitiveVertex):
     def __init__(self, name=None):
         super(InitializeJob, self).__init__(name=name)
         self.job_names = []
+        self.project_path = []
         self._fast_lammps_mode = True
 
     def command(self, ref_job_full_path, n_images, structure):
@@ -343,10 +344,11 @@ class InitializeJob(PrimitiveVertex):
                 raise TypeError('Job of class {} is not compatible.'.format(ref_job.__class__))
 
             self.job_names.append(job.job_name)
+            self.project_path.append(job.project.path)
 
         return {
             'job_names': self.job_names,
-            'project_path': project_path
+            'project_path': self.project_path
         }
 
 
@@ -442,7 +444,7 @@ class HarmonicHamiltonian(PrimitiveVertex):
 
         if spring_constant is not None and force_constants is None:
             forces = -spring_constant * dr
-            energy = zero_k_energy - 0.5 * np.dot(dr, forces)
+            energy = zero_k_energy - 0.5 * np.tensordot(dr, forces)
 
         elif force_constants is not None and spring_constant is None:
             transformed_force_constants = self.transform_force_constants(force_constants)

@@ -228,7 +228,7 @@ class HarmonicTILD(TILDParent):
         # calc_static
         g.calc_static.input.n_children = ip.n_lambdas
         g.calc_static.direct.job_initialized = ip.job_initialized
-        g.calc_static.direct.ref_job_full_path = ip.ref_job_full_path
+        g.calc_static.direct.project_path = gp.initialize_jobs.output.project_path[-1][-1]
         g.calc_static.direct.structure = ip.structure
         g.calc_static.broadcast.positions = gp.reflect.output.positions[-1]
         g.calc_static.broadcast.job_name = gp.initialize_jobs.output.job_names[-1]
@@ -536,7 +536,7 @@ class VacancyTILD(TILDParent):
 
         # calc_full
         g.calc_full.input.n_children = ip.n_lambdas  # n_children
-        g.calc_full.direct.ref_job_full_path = ip.ref_job_full_path
+        g.calc_full.direct.project_path = gp.initialize_full_jobs.output.project_path[-1][-1]
         g.calc_full.direct.job_initialized = ip.job_initialized
         g.calc_full.broadcast.job_name = gp.initialize_full_jobs.output.job_names[-1]
         g.calc_full.direct.structure = ip.structure
@@ -549,7 +549,7 @@ class VacancyTILD(TILDParent):
 
         # calc_vac
         g.calc_vac.input.n_children = ip.n_lambdas  # n_children
-        g.calc_vac.direct.ref_job_full_path = ip.ref_job_full_path
+        g.calc_vac.direct.project_path = gp.initialize_vac_jobs.output.project_path[-1][-1]
         g.calc_vac.direct.job_initialized = ip.job_initialized
         g.calc_vac.broadcast.job_name = gp.initialize_vac_jobs.output.job_names[-1]
         g.calc_vac.direct.structure = gp.create_vacancy.output.structure[-1]
@@ -763,7 +763,7 @@ class HarmonicallyCoupled(CompoundVertex):
         g.reflect.input.cutoff_distance = ip.cutoff_distance
 
         # calc_static
-        g.calc_static.input.ref_job_full_path = ip.ref_job_full_path
+        g.calc_static.input.project_path = ip.project_path
         g.calc_static.input.job_initialized = ip.job_initialized
         g.calc_static.input.job_name = ip.job_name
 
@@ -937,7 +937,7 @@ class HarmonicTILDParallel(HarmonicTILD):
         g.run_lambda_points.direct.cutoff_distance = ip.cutoff_distance
 
         # run_lambda_points - calc_static
-        g.run_lambda_points.direct.ref_job_full_path = ip.ref_job_full_path
+        g.run_lambda_points.direct.project_path = gp.initialize_jobs.output.project_path[-1][-1]
         g.run_lambda_points.direct.job_initialized = ip.job_initialized
         g.run_lambda_points.broadcast.job_name = gp.initialize_jobs.output.job_names[-1]
 
@@ -1127,7 +1127,7 @@ class Decoupling(CompoundVertex):
         g.reflect.input.cutoff_distance = ip.cutoff_distance
 
         # calc_full
-        g.calc_full.input.ref_job_full_path = ip.ref_job_full_path
+        g.calc_full.input.project_path = ip.project_path_full
         g.calc_full.input.job_initialized = ip.job_initialized
         g.calc_full.input.job_name = ip.full_job_name
 
@@ -1140,7 +1140,7 @@ class Decoupling(CompoundVertex):
         g.slice_positions.input.mask = ip.shared_ids
 
         # calc_vac
-        g.calc_vac.input.ref_job_full_path = ip.ref_job_full_path
+        g.calc_vac.input.project_path = ip.project_path_vac
         g.calc_vac.input.job_initialized = ip.job_initialized
         g.calc_vac.input.job_name = ip.vac_job_name
 
@@ -1356,7 +1356,7 @@ class VacancyTILDParallel(VacancyTILD):
         g.run_lambda_points.direct.cutoff_distance = ip.cutoff_distance
 
         # run_lambda_points - calc_full
-        g.run_lambda_points.direct.ref_job_full_path = ip.ref_job_full_path
+        g.run_lambda_points.direct.project_path_full = gp.initialize_full_jobs.output.project_path[-1][-1]
         g.run_lambda_points.direct.job_initialized = ip.job_initialized
         g.run_lambda_points.broadcast.full_job_name = gp.initialize_full_jobs.output.job_names[-1]
 
@@ -1364,6 +1364,7 @@ class VacancyTILDParallel(VacancyTILD):
         g.run_lambda_points.direct.shared_ids = gp.create_vacancy.output.mask[-1]
 
         # run_lambda_points - calc_vac
+        g.run_lambda_points.direct.project_path_vac = gp.initialize_vac_jobs.output.project_path[-1][-1]
         g.run_lambda_points.broadcast.vac_job_name = gp.initialize_vac_jobs.output.job_names[-1]
         g.run_lambda_points.direct.vacancy_structure = gp.create_vacancy.output.structure[-1]
 

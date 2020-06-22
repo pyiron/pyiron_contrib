@@ -178,20 +178,18 @@ class ExternalHamiltonian(PrimitiveVertex):
         self.input.default.structure = None
         self.input.default.positions = None
         self.input.default.cell = None
-        self.input.default.job_initialized = False
+        self.input.default.project_path = None
         self.input.default.interesting_keys = ['positions', 'forces', 'energy_pot', 'pressures', 'volume', 'cells']
 
-    def command(self, job_name, ref_job_full_path, structure, interesting_keys, positions, cell, job_initialized):
+    def command(self, job_name, ref_job_full_path, structure, interesting_keys, positions, cell, project_path):
 
-        if job_initialized is True:
-            project_path, ref_job_path = split(ref_job_full_path)
+        if project_path is not None:
             self._job_project_path = project_path
             self._job_name = job_name
-            print(self._job_project_path)
-
-        if self._job_project_path is None:
+        elif self._job_project_path is None:
             self._initialize(ref_job_full_path, structure)
-        elif self._job is None:
+
+        if self._job is None:
             self._reload()
         elif not self._job.interactive_is_activated():
             self._job.status.running = True
@@ -345,7 +343,8 @@ class InitializeJob(PrimitiveVertex):
             self.job_names.append(job.job_name)
 
         return {
-            'job_names': self.job_names
+            'job_names': self.job_names,
+            'project_path': project_path
         }
 
 

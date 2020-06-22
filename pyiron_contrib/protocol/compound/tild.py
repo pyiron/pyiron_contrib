@@ -76,6 +76,10 @@ class TILDParent(CompoundVertex, ABC):
 
 class HarmonicTILD(TILDParent):
     """
+    A serial TILD protocol to compute the free energy change when the system changes from a set of harmonically
+        oscillating atoms to a system following the specified potential (for ex. EAM).
+
+    Note: Pressure control is not yet implemented in this protocol.
 
     """
     DefaultWhitelist = {
@@ -85,10 +89,9 @@ class HarmonicTILD(TILDParent):
         super(HarmonicTILD, self).__init__(**kwargs)
 
         id_ = self.input.default
+        # Default values
         id_.temperature = 1.
         id_.pressure = 0.
-        id_.previous_volume = None
-        id_.energy_kin = None
         id_.n_steps = 100
         id_.temperature_damping_timescale = 100.
         id_.pressure_damping_timescale = 1000.
@@ -96,23 +99,25 @@ class HarmonicTILD(TILDParent):
         id_.overheat_fraction = 2.
         id_.time_step = 1.
         id_.sampling_period = 1
+        id_.thermalization_steps = 10
+        id_.zero_k_energy = 0.0
+        id_.sleep_time = 0
+        id_.previous_volume = None
+        id_.energy_kin = None
+        id_.custom_lambdas = None
+        id_.force_constants = None
+        id_.spring_constant = None
         id_.fix_com = True
         id_.use_reflection = True
         # TODO: Need more than input and default, but rather access order, to work without reflection...
-        id_.custom_lambdas = None
-        id_.thermalization_steps = 10
         id_.plot = False
-        id_.zero_k_energy = 0.0
-        id_.force_constants = None
-        id_.spring_constant = None
-        id_.sleep_time = 0
         id_.job_initialized = True
 
     def define_vertices(self):
         # Graph components
         g = self.graph
         g.build_lambdas = BuildMixingPairs()
-        g.initialize_lambda_jobs = InitializeJob()
+        g.initialize_jobs = InitializeJob()
         g.initial_forces = Zeros()
         g.initial_velocity = SerialList(RandomVelocity)
         g.check_steps = IsGEq()
@@ -136,7 +141,7 @@ class HarmonicTILD(TILDParent):
         g = self.graph
         g.make_pipeline(
             g.build_lambdas,
-            g.initialize_lambda_jobs,
+            g.initialize_jobs,
             g.initial_forces,
             g.initial_velocity,
             g.check_steps, 'false',
@@ -167,25 +172,32 @@ class HarmonicTILD(TILDParent):
         gp = Pointer(self.graph)
         ip = Pointer(self.input)
 
+        # build_lambdas
         g.build_lambdas.input.n_lambdas = ip.n_lambdas
         g.build_lambdas.input.custom_lambdas = ip.custom_lambdas
 
-        g.initialize_lambda_jobs.input.n_images = ip.n_lambdas
-        g.initialize_lambda_jobs.input.ref_job_full_path = ip.ref_job_full_path
-        g.initialize_lambda_jobs.input.structure = ip.structure
+        # initialize_jobs
+        g.initialize_jobs.input.n_images = ip.n_lambdas
+        g.initialize_jobs.input.ref_job_full_path = ip.ref_job_full_path
+        g.initialize_jobs.input.structure = ip.structure
 
+        # initial_forces
         g.initial_forces.input.shape = ip.structure.positions.shape
 
+        # initial_velocity
         g.initial_velocity.input.n_children = ip.n_lambdas
         g.initial_velocity.direct.temperature = ip.temperature
         g.initial_velocity.direct.masses = ip.structure.get_masses
         g.initial_velocity.direct.overheat_fraction = ip.overheat_fraction
 
+        # check_steps
         g.check_steps.input.target = gp.clock.output.n_counts[-1]
         g.check_steps.input.threshold = ip.n_steps
 
+        # clock
         g.clock.input.default.max_count = ip.n_steps
 
+        # verlet_positions
         g.verlet_positions.input.n_children = ip.n_lambdas
         g.verlet_positions.direct.default.positions = ip.structure.positions
         g.verlet_positions.broadcast.default.velocities = gp.initial_velocity.output.velocities[-1]
@@ -199,6 +211,7 @@ class HarmonicTILD(TILDParent):
         g.verlet_positions.direct.temperature = ip.temperature
         g.verlet_positions.direct.temperature_damping_timescale = ip.temperature_damping_timescale
 
+        # reflect
         g.reflect.input.n_children = ip.n_lambdas
         g.reflect.direct.default.previous_positions = ip.structure.positions
         g.reflect.broadcast.default.previous_velocities = gp.initial_velocity.output.velocities[-1]
@@ -212,14 +225,15 @@ class HarmonicTILD(TILDParent):
         g.reflect.broadcast.previous_positions = gp.reflect.output.positions[-1]
         g.reflect.broadcast.previous_velocities = gp.reflect.output.velocities[-1]
 
+        # calc_static
         g.calc_static.input.n_children = ip.n_lambdas
         g.calc_static.direct.job_initialized = ip.job_initialized
         g.calc_static.direct.ref_job_full_path = ip.ref_job_full_path
         g.calc_static.direct.structure = ip.structure
         g.calc_static.broadcast.positions = gp.reflect.output.positions[-1]
-        g.calc_static.broadcast.job_name = gp.initialize_lambda_jobs.output.job_names[-1]
+        g.calc_static.broadcast.job_name = gp.initialize_jobs.output.job_names[-1]
 
-
+        # harmonic
         g.harmonic.input.n_children = ip.n_lambdas
         g.harmonic.direct.spring_constant = ip.spring_constant
         g.harmonic.direct.force_constants = ip.force_constants
@@ -229,15 +243,18 @@ class HarmonicTILD(TILDParent):
         g.harmonic.direct.cell = ip.structure.cell
         g.harmonic.direct.pbc = ip.structure.pbc
 
+        # transpose_forces
         g.transpose_forces.input.matrix = [
             gp.calc_static.output.forces[-1],
             gp.harmonic.output.forces[-1]
         ]
 
+        # mix
         g.mix.input.n_children = ip.n_lambdas
         g.mix.broadcast.vectors = gp.transpose_forces.output.matrix_transpose[-1]
         g.mix.broadcast.weights = gp.build_lambdas.output.lambda_pairs[-1]
 
+        # verlet_velocities
         g.verlet_velocities.input.n_children = ip.n_lambdas
         g.verlet_velocities.broadcast.velocities = gp.reflect.output.velocities[-1]
         g.verlet_velocities.broadcast.forces = gp.mix.output.weighted_sum[-1]
@@ -247,24 +264,30 @@ class HarmonicTILD(TILDParent):
         g.verlet_velocities.direct.temperature_damping_timescale = ip.temperature_damping_timescale
         g.verlet_velocities.direct.time_step = ip.time_step
 
+        # check_thermalized
         g.check_thermalized.input.target = gp.clock.output.n_counts[-1]
         g.check_thermalized.input.threshold = ip.thermalization_steps
 
+        # check_sampling_period
         g.check_sampling_period.input.target = gp.clock.output.n_counts[-1]
         g.check_sampling_period.input.default.mod = ip.sampling_period
 
+        # transpose_energies
         g.transpose_energies.input.matrix = [
             gp.calc_static.output.energy_pot[-1],
             gp.harmonic.output.energy_pot[-1]
         ]
 
+        # addition
         g.addition.input.n_children = ip.n_lambdas
         g.addition.broadcast.vectors = gp.transpose_energies.output.matrix_transpose[-1]
         g.addition.direct.weights = [1, -1]
 
+        # average
         g.average.input.n_children = ip.n_lambdas
         g.average.broadcast.sample = gp.addition.output.weighted_sum[-1]
 
+        # post
         g.post.input.lambda_pairs = gp.build_lambdas.output.lambda_pairs[-1]
         g.post.input.n_samples = gp.average.output.n_samples[-1]
         g.post.input.mean = gp.average.output.mean[-1]
@@ -290,8 +313,8 @@ class HarmonicTILD(TILDParent):
 
     def get_classical_harmonic_free_energy(self, temperatures=None):
         """
-        Get the total free energy of a harmonic oscillator with this frequency and these atoms. Temperatures are clipped
-        at 1 micro-Kelvin.
+        Get the total free energy of a harmonic oscillator with this frequency and these atoms. Temperatures are
+            clipped at 1 micro-Kelvin.
 
         Returns:
             float/np.ndarray: The sum of the free energy of each atom.
@@ -305,8 +328,8 @@ class HarmonicTILD(TILDParent):
 
     def get_quantum_harmonic_free_energy(self, temperatures=None):
         """
-        Get the total free energy of a harmonic oscillator with this frequency and these atoms. Temperatures are clipped
-        at 1 micro-Kelvin.
+        Get the total free energy of a harmonic oscillator with this frequency and these atoms. Temperatures are
+            clipped at 1 micro-Kelvin.
 
         Returns:
             float/np.ndarray: The sum of the free energy of each atom.
@@ -322,15 +345,21 @@ class HarmonicTILD(TILDParent):
         return f
 
 
-class ProtoHarmonicTILD(Protocol, HarmonicTILD):
+class ProtoHarmonicTILD(Protocol, HarmonicTILD, ABC):
     pass
 
 
 class VacancyTILD(TILDParent):
     """
+    A serial TILD protocol to compute the free energy change when the system changes from a regular structure to one
+        with a vacancy. This is done by 'decoupling' one of the atoms from the structure and letting it behave as
+        a harmonic oscillator, thus creating a pseudo-vacancy. The chemical potential of this harmonically oscillating
+        atom is then subtracted from the total free energy change.
 
+    Note: Pressure control is not yet implemented in this protocol.
     """
-    DefaultWhitelist = {}
+    DefaultWhitelist = {
+    }
 
     def __init__(self, **kwargs):
         super(VacancyTILD, self).__init__(**kwargs)
@@ -339,8 +368,6 @@ class VacancyTILD(TILDParent):
         id_.vacancy_id = 0
         id_.temperature = 1.
         id_.pressure = 0.
-        id_.previous_volume = None
-        id_.energy_kin = None
         id_.n_steps = 100
         id_.temperature_damping_timescale = 100.
         id_.pressure_damping_timescale = 1000.
@@ -348,16 +375,18 @@ class VacancyTILD(TILDParent):
         id_.overheat_fraction = 2.
         id_.time_step = 1.
         id_.sampling_period = 1
+        id_.thermalization_steps = 10
+        id_.zero_k_energy = 0.0
+        id_.sleep_time = 0
+        id_.previous_volume = None
+        id_.energy_kin = None
+        id_.custom_lambdas = None
+        id_.force_constants = None
+        id_.spring_constant = None
         id_.fix_com = True
         id_.use_reflection = True
         # TODO: Need more than input and default, but rather access order, to work without reflection...
-        id_.custom_lambdas = None
-        id_.thermalization_steps = 10
         id_.plot = False
-        id_.zero_k_energy = 0.0
-        id_.force_constants = None
-        id_.spring_constant = None
-        id_.sleep_time = 0
         id_.job_initialized = True
         id_.ensure_iterable_mask = True
 
@@ -436,14 +465,14 @@ class VacancyTILD(TILDParent):
         gp = Pointer(self.graph)
         ip = Pointer(self.input)
 
+        # create_vacancy
         g.create_vacancy.input.structure = ip.structure
         g.create_vacancy.input.id = ip.vacancy_id
         shared_ids = gp.create_vacancy.output.mask[-1]
 
+        # build_lambdas
         g.build_lambdas.input.n_lambdas = ip.n_lambdas
         g.build_lambdas.input.custom_lambdas = ip.custom_lambdas
-        # n_children = graph_pointer.build_lambdas.output.lambda_pairs[-1].__len__
-        # This doesn't yet work because utils can't import MethodWrapperType and use it at line 305 until I have py 3.7
 
         # initialize_full_jobs
         g.initialize_full_jobs.input.n_images = ip.n_lambdas
@@ -455,24 +484,29 @@ class VacancyTILD(TILDParent):
         g.initialize_vac_jobs.input.ref_job_full_path = ip.ref_job_full_path
         g.initialize_vac_jobs.input.structure = gp.create_vacancy.output.structure[-1]
 
+        # random velocity
         g.random_velocity.input.n_children = ip.n_lambdas  # n_children
         g.random_velocity.direct.temperature = ip.temperature
         g.random_velocity.direct.masses = ip.structure.get_masses
         g.random_velocity.direct.overheat_fraction = ip.overheat_fraction
 
+        # initial_forces
         g.initial_forces.input.shape = ip.structure.positions.shape
 
+        # slice_Structure
         g.slice_structure.input.vector = ip.structure.positions
         g.slice_structure.input.mask = ip.vacancy_id
-        g.slice_structure.input.ensure_iterable_mask = ip.ensure_iterable_mask  # To keep positions (1,3) instead of (3,)
+        g.slice_structure.input.ensure_iterable_mask = ip.ensure_iterable_mask
+        # To keep positions (1,3) instead of (3,)
 
+        # check_steps
         g.check_steps.input.target = gp.clock.output.n_counts[-1]
         g.check_steps.input.threshold = ip.n_steps
 
+        # clock
         g.clock.input.default.max_count = ip.n_steps
 
-        self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
-
+        # verlet_positions
         g.verlet_positions.input.n_children = ip.n_lambdas
         g.verlet_positions.direct.default.positions = ip.structure.positions
         g.verlet_positions.broadcast.default.velocities = gp.random_velocity.output.velocities[-1]
@@ -486,6 +520,7 @@ class VacancyTILD(TILDParent):
         g.verlet_positions.direct.temperature = ip.temperature
         g.verlet_positions.direct.temperature_damping_timescale = ip.temperature_damping_timescale
 
+        # reflect
         g.reflect.input.n_children = ip.n_lambdas
         g.reflect.direct.default.previous_positions = ip.structure.positions
         g.reflect.broadcast.default.previous_velocities = gp.random_velocity.output.velocities[-1]
@@ -499,6 +534,7 @@ class VacancyTILD(TILDParent):
         g.reflect.broadcast.previous_positions = gp.reflect.output.positions[-1]
         g.reflect.broadcast.previous_velocities = gp.verlet_velocities.output.velocities[-1]
 
+        # calc_full
         g.calc_full.input.n_children = ip.n_lambdas  # n_children
         g.calc_full.direct.ref_job_full_path = ip.ref_job_full_path
         g.calc_full.direct.job_initialized = ip.job_initialized
@@ -506,21 +542,26 @@ class VacancyTILD(TILDParent):
         g.calc_full.direct.structure = ip.structure
         g.calc_full.broadcast.positions = gp.reflect.output.positions[-1]
 
+        # slice_positions
         g.slice_positions.input.n_children = ip.n_lambdas
         g.slice_positions.broadcast.vector = gp.reflect.output.positions[-1]
         g.slice_positions.direct.mask = shared_ids
 
+        # calc_vac
         g.calc_vac.input.n_children = ip.n_lambdas  # n_children
         g.calc_vac.direct.ref_job_full_path = ip.ref_job_full_path
+        g.calc_vac.direct.job_initialized = ip.job_initialized
         g.calc_vac.broadcast.job_name = gp.initialize_vac_jobs.output.job_names[-1]
         g.calc_vac.direct.structure = gp.create_vacancy.output.structure[-1]
         g.calc_vac.broadcast.positions = gp.slice_positions.output.sliced[-1]
 
+        # slice_harmonic
         g.slice_harmonic.input.n_children = ip.n_lambdas
         g.slice_harmonic.broadcast.vector = gp.reflect.output.positions[-1]
         g.slice_harmonic.direct.mask = ip.vacancy_id
         g.slice_harmonic.direct.ensure_iterable_mask = ip.ensure_iterable_mask
 
+        # harmonic
         g.harmonic.input.n_children = ip.n_lambdas
         g.harmonic.direct.spring_constant = ip.spring_constant
         g.harmonic.direct.force_constants = ip.force_constants
@@ -530,25 +571,30 @@ class VacancyTILD(TILDParent):
         g.harmonic.direct.cell = ip.structure.cell
         g.harmonic.direct.pbc = ip.structure.pbc
 
+        # write_vac_forces
         g.write_vac_forces.input.n_children = ip.n_lambdas
         g.write_vac_forces.broadcast.target = gp.calc_full.output.forces[-1]
         g.write_vac_forces.direct.mask = shared_ids
         g.write_vac_forces.broadcast.new_values = gp.calc_vac.output.forces[-1]
 
+        # write_harmonic_forces
         g.write_harmonic_forces.input.n_children = ip.n_lambdas
         g.write_harmonic_forces.broadcast.target = gp.write_vac_forces.output.overwritten[-1]
         g.write_harmonic_forces.direct.mask = ip.vacancy_id
         g.write_harmonic_forces.broadcast.new_values = gp.harmonic.output.forces[-1]
 
+        # transpose_lambda
         g.transpose_lambda.input.matrix = [
             gp.calc_full.output.forces[-1],
             gp.write_harmonic_forces.output.overwritten[-1]
         ]
 
+        # mix
         g.mix.input.n_children = ip.n_lambdas
         g.mix.broadcast.vectors = gp.transpose_lambda.output.matrix_transpose[-1]
         g.mix.broadcast.weights = gp.build_lambdas.output.lambda_pairs[-1]
 
+        # verlet_velocities
         g.verlet_velocities.input.n_children = ip.n_lambdas
         g.verlet_velocities.broadcast.velocities = gp.reflect.output.velocities[-1]
         g.verlet_velocities.broadcast.forces = gp.mix.output.weighted_sum[-1]
@@ -557,30 +603,38 @@ class VacancyTILD(TILDParent):
         g.verlet_velocities.direct.temperature = ip.temperature
         g.verlet_velocities.direct.temperature_damping_timescale = ip.temperature_damping_timescale
 
+        # check_thermalized
         g.check_thermalized.input.target = gp.clock.output.n_counts[-1]
         g.check_thermalized.input.threshold = ip.thermalization_steps
 
+        # check_sampling_period
         g.check_sampling_period.input.target = gp.clock.output.n_counts[-1]
         g.check_sampling_period.input.default.mod = ip.sampling_period
 
+        # transpose_energies
         g.transpose_energies.input.matrix = [
             gp.calc_vac.output.energy_pot[-1],
             gp.harmonic.output.energy_pot[-1],
             gp.calc_full.output.energy_pot[-1]
         ]
 
+        # addition
         g.addition.input.n_children = ip.n_lambdas
         g.addition.broadcast.vectors = gp.transpose_energies.output.matrix_transpose[-1]
         g.addition.direct.weights = [1, 1, -1]
 
+        # average
         g.average.input.n_children = ip.n_lambdas
         g.average.broadcast.sample = gp.addition.output.weighted_sum[-1]
 
+        # post
         g.post.input.lambda_pairs = gp.build_lambdas.output.lambda_pairs[-1]
         g.post.input.n_samples = gp.average.output.n_samples[-1]
         g.post.input.mean = gp.average.output.mean[-1]
         g.post.input.std = gp.average.output.std[-1]
         g.post.input.plot = ip.plot
+
+        self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
 
     def get_output(self):
         gp = Pointer(self.graph)
@@ -597,12 +651,16 @@ class VacancyTILD(TILDParent):
         }
 
 
-class ProtoVacancyTILD(Protocol, VacancyTILD):
+class ProtoVacancyTILD(Protocol, VacancyTILD, ABC):
     pass
 
 
 class HarmonicallyCoupled(CompoundVertex):
-    # DefaultWhitelist = {}
+    """
+    A sub-protocol for HarmonicTILDParallel that is executed in parallel using ParallelList.
+    """
+    DefaultWhitelist = {
+    }
 
     def define_vertices(self):
         # Graph components
@@ -788,14 +846,20 @@ class HarmonicallyCoupled(CompoundVertex):
 
 
 class HarmonicTILDParallel(HarmonicTILD):
-    DefaultWhitelist = {}
+    """
+    A version of HarmonicTILD where the lambda jobs are executed in parallel, thus giving a substantial speed-up.
+
+    Note: Pressure control is implemented in this protocol.
+    """
+    DefaultWhitelist = {
+    }
 
     def define_vertices(self):
         # Graph components
         g = self.graph
         ip = Pointer(self.input)
         g.build_lambdas = BuildMixingPairs()
-        g.initialize_lambda_jobs = InitializeJob()
+        g.initialize_jobs = InitializeJob()
         g.initial_velocities = SerialList(RandomVelocity)
         g.initial_forces = SerialList(Zeros)
         g.initial_pressures = SerialList(Zeros)
@@ -808,7 +872,7 @@ class HarmonicTILDParallel(HarmonicTILD):
         g = self.graph
         g.make_pipeline(
             g.build_lambdas,
-            g.initialize_lambda_jobs,
+            g.initialize_jobs,
             g.initial_velocities,
             g.initial_forces,
             g.initial_pressures,
@@ -830,9 +894,9 @@ class HarmonicTILDParallel(HarmonicTILD):
         g.build_lambdas.input.custom_lambdas = ip.custom_lambdas
 
         # initialize_integration_points
-        g.initialize_lambda_jobs.input.n_images = ip.n_lambdas
-        g.initialize_lambda_jobs.input.ref_job_full_path = ip.ref_job_full_path
-        g.initialize_lambda_jobs.input.structure = ip.structure
+        g.initialize_jobs.input.n_images = ip.n_lambdas
+        g.initialize_jobs.input.ref_job_full_path = ip.ref_job_full_path
+        g.initialize_jobs.input.structure = ip.structure
 
         # initial_velocities
         g.initial_velocities.input.n_children = ip.n_lambdas
@@ -875,7 +939,7 @@ class HarmonicTILDParallel(HarmonicTILD):
         # run_lambda_points - calc_static
         g.run_lambda_points.direct.ref_job_full_path = ip.ref_job_full_path
         g.run_lambda_points.direct.job_initialized = ip.job_initialized
-        g.run_lambda_points.broadcast.job_name = gp.initialize_lambda_jobs.output.job_names[-1]
+        g.run_lambda_points.broadcast.job_name = gp.initialize_jobs.output.job_names[-1]
 
         # run_lambda_points - harmonic
         g.run_lambda_points.direct.spring_constant = ip.spring_constant
@@ -939,12 +1003,16 @@ class HarmonicTILDParallel(HarmonicTILD):
         return ~o.mean[-1], ~o.std[-1] / np.sqrt(~o.n_samples[-1])
 
 
-class ProtoHarmonicTILDParallel(Protocol, HarmonicTILDParallel):
+class ProtoHarmonicTILDParallel(Protocol, HarmonicTILDParallel, ABC):
     pass
 
 
 class Decoupling(CompoundVertex):
-    # DefaultWhitelist = {}
+    """
+    A sub-protocol for VacancyTILDParallel that is executed in parallel using ParallelList.
+    """
+    DefaultWhitelist = {
+    }
 
     def define_vertices(self):
         # Graph components
@@ -1177,7 +1245,13 @@ class Decoupling(CompoundVertex):
 
 
 class VacancyTILDParallel(VacancyTILD):
-    DefaultWhitelist = {}
+    """
+    A version of VacancyTILD where the lambda jobs are executed in parallel, thus giving a substantial speed-up.
+
+    Note: Pressure control is implemented in this protocol.
+    """
+    DefaultWhitelist = {
+    }
 
     def define_vertices(self):
         # Graph components
@@ -1361,5 +1435,5 @@ class VacancyTILDParallel(VacancyTILD):
         return ~o.mean[-1], ~o.std[-1] / np.sqrt(~o.n_samples[-1])
 
 
-class ProtoVacancyTILDParallel(Protocol, VacancyTILDParallel):
+class ProtoVacancyTILDParallel(Protocol, VacancyTILDParallel, ABC):
     pass

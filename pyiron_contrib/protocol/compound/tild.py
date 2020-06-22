@@ -111,7 +111,6 @@ class HarmonicTILD(TILDParent):
         id_.use_reflection = True
         # TODO: Need more than input and default, but rather access order, to work without reflection...
         id_.plot = False
-        id_.job_initialized = True
 
     def define_vertices(self):
         # Graph components
@@ -227,7 +226,6 @@ class HarmonicTILD(TILDParent):
 
         # calc_static
         g.calc_static.input.n_children = ip.n_lambdas
-        g.calc_static.direct.job_initialized = ip.job_initialized
         g.calc_static.direct.project_path = gp.initialize_jobs.output.project_path[-1][-1]
         g.calc_static.direct.structure = ip.structure
         g.calc_static.broadcast.positions = gp.reflect.output.positions[-1]
@@ -387,7 +385,6 @@ class VacancyTILD(TILDParent):
         id_.use_reflection = True
         # TODO: Need more than input and default, but rather access order, to work without reflection...
         id_.plot = False
-        id_.job_initialized = True
         id_.ensure_iterable_mask = True
 
     def define_vertices(self):
@@ -537,7 +534,6 @@ class VacancyTILD(TILDParent):
         # calc_full
         g.calc_full.input.n_children = ip.n_lambdas  # n_children
         g.calc_full.direct.project_path = gp.initialize_full_jobs.output.project_path[-1][-1]
-        g.calc_full.direct.job_initialized = ip.job_initialized
         g.calc_full.broadcast.job_name = gp.initialize_full_jobs.output.job_names[-1]
         g.calc_full.direct.structure = ip.structure
         g.calc_full.broadcast.positions = gp.reflect.output.positions[-1]
@@ -550,7 +546,6 @@ class VacancyTILD(TILDParent):
         # calc_vac
         g.calc_vac.input.n_children = ip.n_lambdas  # n_children
         g.calc_vac.direct.project_path = gp.initialize_vac_jobs.output.project_path[-1][-1]
-        g.calc_vac.direct.job_initialized = ip.job_initialized
         g.calc_vac.broadcast.job_name = gp.initialize_vac_jobs.output.job_names[-1]
         g.calc_vac.direct.structure = gp.create_vacancy.output.structure[-1]
         g.calc_vac.broadcast.positions = gp.slice_positions.output.sliced[-1]
@@ -764,7 +759,6 @@ class HarmonicallyCoupled(CompoundVertex):
 
         # calc_static
         g.calc_static.input.project_path = ip.project_path
-        g.calc_static.input.job_initialized = ip.job_initialized
         g.calc_static.input.job_name = ip.job_name
 
         g.calc_static.input.structure = gp.barostat.output.structure[-1]
@@ -938,7 +932,6 @@ class HarmonicTILDParallel(HarmonicTILD):
 
         # run_lambda_points - calc_static
         g.run_lambda_points.direct.project_path = gp.initialize_jobs.output.project_path[-1][-1]
-        g.run_lambda_points.direct.job_initialized = ip.job_initialized
         g.run_lambda_points.broadcast.job_name = gp.initialize_jobs.output.job_names[-1]
 
         # run_lambda_points - harmonic
@@ -1128,7 +1121,6 @@ class Decoupling(CompoundVertex):
 
         # calc_full
         g.calc_full.input.project_path = ip.project_path_full
-        g.calc_full.input.job_initialized = ip.job_initialized
         g.calc_full.input.job_name = ip.full_job_name
 
         g.calc_full.input.structure = gp.barostat.output.structure[-1]
@@ -1141,7 +1133,6 @@ class Decoupling(CompoundVertex):
 
         # calc_vac
         g.calc_vac.input.project_path = ip.project_path_vac
-        g.calc_vac.input.job_initialized = ip.job_initialized
         g.calc_vac.input.job_name = ip.vac_job_name
 
         g.calc_vac.input.structure = ip.vacancy_structure
@@ -1357,7 +1348,6 @@ class VacancyTILDParallel(VacancyTILD):
 
         # run_lambda_points - calc_full
         g.run_lambda_points.direct.project_path_full = gp.initialize_full_jobs.output.project_path[-1][-1]
-        g.run_lambda_points.direct.job_initialized = ip.job_initialized
         g.run_lambda_points.broadcast.full_job_name = gp.initialize_full_jobs.output.job_names[-1]
 
         # run_lambda_points - slice_positions

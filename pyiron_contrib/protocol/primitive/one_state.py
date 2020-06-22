@@ -187,10 +187,10 @@ class ExternalHamiltonian(PrimitiveVertex):
             project_path, ref_job_path = split(ref_job_full_path)
             self._job_project_path = project_path
             self._job_name = job_name
-
-        if self._job_project_path is None:
+        elif self._job_project_path is None:
             self._initialize(ref_job_full_path, structure)
-        elif self._job is None:
+
+        if self._job is None:
             self._reload()
         elif not self._job.interactive_is_activated():
             self._job.status.running = True

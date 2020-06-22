@@ -173,21 +173,23 @@ class ExternalHamiltonian(PrimitiveVertex):
         self._job_project_path = None
         self._job = None
         self._job_name = None
-
         self.input.default.job_name = None
         self.input.default.structure = None
         self.input.default.positions = None
         self.input.default.cell = None
         self.input.default.project_path = None
+        self.input.default.ref_job_full_path = None
         self.input.default.interesting_keys = ['positions', 'forces', 'energy_pot', 'pressures', 'volume', 'cells']
 
     def command(self, job_name, ref_job_full_path, structure, interesting_keys, positions, cell, project_path):
 
-        if project_path is not None:
+        if project_path is None and ref_job_full_path is not None:
+            self._initialize(ref_job_full_path, structure)
+        elif project_path is not None and ref_job_full_path is None:
             self._job_project_path = project_path
             self._job_name = job_name
-        elif self._job_project_path is None:
-            self._initialize(ref_job_full_path, structure)
+        else:
+            raise AttributeError('Please specify valid project path OR ref_job_full_path')
 
         if self._job is None:
             self._reload()

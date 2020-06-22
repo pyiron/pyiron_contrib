@@ -76,7 +76,7 @@ class MolecularDynamics(CompoundVertex):
         id_ = self.input.default
         id_.temperature = None
         id_.pressure = None
-        id_.volume = None
+        id_.previous_volume = None
         id_.energy_kin = None
         id_.n_steps = 100
         id_.time_step = 1.
@@ -134,12 +134,12 @@ class MolecularDynamics(CompoundVertex):
         g.barostat.input.default.structure = ip.structure
         g.barostat.input.default.positions = ip.structure.positions
         g.barostat.input.default.energy_kin = ip.energy_kin
-        g.barostat.input.default.volume = ip.volume
+        g.barostat.input.default.previous_volume = ip.previous_volume
         g.barostat.input.box_pressures = gp.calc_static.output.pressures[-1]
         g.barostat.input.structure = gp.barostat.output.structure[-1]
         g.barostat.input.positions = gp.verlet_positions.output.positions[-1]
         g.barostat.input.energy_kin = gp.verlet_velocities.output.energy_kin[-1]
-        g.barostat.input.volume = gp.calc_static.output.volume[-1]
+        g.barostat.input.previous_volume = gp.calc_static.output.volume[-1]
         g.barostat.input.pressure = ip.pressure
         g.barostat.input.temperature = ip.temperature
         g.barostat.input.time_step = ip.time_step

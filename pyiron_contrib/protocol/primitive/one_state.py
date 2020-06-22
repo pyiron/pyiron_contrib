@@ -178,17 +178,18 @@ class ExternalHamiltonian(PrimitiveVertex):
         self.input.default.structure = None
         self.input.default.positions = None
         self.input.default.cell = None
+        self.input.default.job_initialized = False
         self.input.default.interesting_keys = ['positions', 'forces', 'energy_pot', 'pressures', 'volume', 'cells']
 
-    def command(self, job_name, ref_job_full_path, structure, interesting_keys, positions, cell):
+    def command(self, job_name, ref_job_full_path, structure, interesting_keys, positions, cell, job_initialized):
 
-        if self._job_name is None:
+        if job_initialized is True:
             project_path, ref_job_path = split(ref_job_full_path)
             self._job_project_path = project_path
             self._job_name = job_name
 
         if self._job_project_path is None:
-            self._initialize(job_name, ref_job_full_path, structure)
+            self._initialize(ref_job_full_path, structure)
         elif self._job is None:
             self._reload()
         elif not self._job.interactive_is_activated():
@@ -219,23 +220,18 @@ class ExternalHamiltonian(PrimitiveVertex):
 
         return {key: self.get_interactive_value(key) for key in interesting_keys}
 
-    def _initialize(self, job_name, ref_job_full_path, structure):
-        if job_name is not None:
-            project_path, ref_job_path = split(ref_job_full_path)
-            pr = Project(path=project_path)
-            job = pr.load(job_name)
-        else:
-            loc = self.get_graph_location()
-            name = loc + '_job'
-            project_path, ref_job_path = split(ref_job_full_path)
-            pr = Project(path=project_path)
-            ref_job = pr.load(ref_job_path)
-            job = ref_job.copy_to(
-                project=pr,
-                new_job_name=name,
-                input_only=True,
-                new_database_entry=True
-            )
+    def _initialize(self, ref_job_full_path, structure):
+        loc = self.get_graph_location()
+        name = loc + '_job'
+        project_path, ref_job_path = split(ref_job_full_path)
+        pr = Project(path=project_path)
+        ref_job = pr.load(ref_job_path)
+        job = ref_job.copy_to(
+            project=pr,
+            new_job_name=name,
+            input_only=True,
+            new_database_entry=True
+        )
 
         if structure is not None:
             job.structure = structure
@@ -340,8 +336,8 @@ class InitializeJob(PrimitiveVertex):
                     job.interactive_flush_frequency = 10 ** 10
                     job.interactive_write_frequency = 10 ** 10
 
-                job.calc_static()
-                job.run()
+                # job.calc_static()
+                job.save()
             else:
                 raise TypeError('Job of class {} is not compatible.'.format(ref_job.__class__))
 
@@ -1324,7 +1320,7 @@ class BerendsenBarostat(PrimitiveVertex):
         compressibility (float): The compressibility of water in bar-1 (Default is 4.57e-5 bar-1)
         structure (Atoms): The structure whose cell and positions are to be scaled.
         positions (numpy.ndarray): The updated positions from `VerletPositionUpdate`.
-        volume (float): The volume of the cell in Ang3 (Default is None)
+        previous_volume (float): The volume of the cell from the previous step in Ang3 (Default is None)
 
     Output dictionary:
         pressure (float): The isotropic pressure in GPa
@@ -1336,45 +1332,46 @@ class BerendsenBarostat(PrimitiveVertex):
     def __init__(self, name=None):
         super(BerendsenBarostat, self).__init__(name=name)
         id = self.input.default
-        id.pressure = None
+        id.pressure = 0.
         id.temperature = 0.
         id.pressure_damping_timescale = 1000.
         id.time_step = 1.
         id.compressibility = 4.57e-5  # compressibility of water in bar^-1
 
     def command(self, pressure, temperature, box_pressures, energy_kin, time_step,
-                pressure_damping_timescale, compressibility, structure, positions, volume):
+                pressure_damping_timescale, compressibility, structure, previous_volume):
 
-        structure.positions = positions
-        n_atoms = len(positions)
+        n_atoms = len(structure.positions)
 
         # convert the pressure tensor to a scalar pressure
         isotropic_pressure = np.trace(box_pressures) / 3  # pyiron stores pressure in GPa
 
-        if volume is None:
-            volume = structure.cell.diagonal().prod()
+        if previous_volume is None:
+            previous_volume = structure.cell.diagonal().prod()
 
         if energy_kin is None:
             energy_kin = (3 / 2) * n_atoms * KB * temperature
 
         if pressure is None:
-            scaled_structure = structure
+            new_structure = structure
             total_pressure = isotropic_pressure
+            volume = previous_volume
         else:
-            first_term = ((2 * energy_kin) / (3 * volume)) * EV_PER_ANGCUB_TO_GPA
+            new_structure = structure.copy()
+            first_term = ((2 * energy_kin) / (3 * previous_volume)) * EV_PER_ANGCUB_TO_GPA
             total_pressure = first_term + isotropic_pressure  # GPa
             eta = 1 - ((time_step / pressure_damping_timescale) * (compressibility / 3) *
                        (pressure - total_pressure) * GPA_TO_BAR)
 
-            scaled_structure = structure.copy()
-            new_cell = structure.cell * eta
-            scaled_structure.set_cell(new_cell, scale_atoms=True)
+            new_cell = new_structure.cell * eta
+            new_structure.set_cell(new_cell, scale_atoms=True)
+            volume = new_structure.cell.diagonal().prod()
 
         return {
             'pressure': total_pressure,
             'volume': volume,
-            'structure': scaled_structure,
-            'positions': scaled_structure.positions
+            'structure': new_structure,
+            'positions': new_structure.positions
         }
 
 

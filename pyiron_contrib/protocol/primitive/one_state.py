@@ -183,13 +183,14 @@ class ExternalHamiltonian(PrimitiveVertex):
 
     def command(self, job_name, ref_job_full_path, structure, interesting_keys, positions, cell, project_path):
 
-        if project_path is None and ref_job_full_path is not None:
-            self._initialize(ref_job_full_path, structure)
-        elif project_path is not None and ref_job_full_path is None:
-            self._job_project_path = project_path
-            self._job_name = job_name
-        else:
-            raise AttributeError('Please specify valid project path OR ref_job_full_path')
+        if self._job_project_path is None:
+            if project_path is None and ref_job_full_path is not None:
+                self._initialize(ref_job_full_path, structure)
+            elif project_path is not None and ref_job_full_path is None:
+                self._job_project_path = project_path
+                self._job_name = job_name
+            else:
+                raise AttributeError('Please specify valid project path OR ref_job_full_path, but ot both!')
 
         if self._job is None:
             self._reload()
@@ -1341,39 +1342,58 @@ class BerendsenBarostat(PrimitiveVertex):
         id.pressure_damping_timescale = 1000.
         id.time_step = 1.
         id.compressibility = 4.57e-5  # compressibility of water in bar^-1
+        id.style = 'anisotropic'
 
     def command(self, pressure, temperature, box_pressures, energy_kin, time_step,
-                pressure_damping_timescale, compressibility, structure, previous_volume):
+                pressure_damping_timescale, compressibility, structure, previous_volume, style):
+
+        if style != 'isotropic' and style != 'anisotropic':
+            raise TypeError('style can only be \'isotropic\' or \'anisotropic\'')
 
         n_atoms = len(structure.positions)
-
-        # convert the pressure tensor to a scalar pressure
-        isotropic_pressure = np.trace(box_pressures) / 3  # pyiron stores pressure in GPa
-
         if previous_volume is None:
             previous_volume = structure.cell.diagonal().prod()
 
         if energy_kin is None:
             energy_kin = (3 / 2) * n_atoms * KB * temperature
 
+        # convert the pressure tensor to a scalar pressure
+        isotropic_pressure = np.trace(box_pressures) / 3  # pyiron stores pressure in GPa
+
         if pressure is None:
             new_structure = structure
             total_pressure = isotropic_pressure
-            volume = previous_volume
-        else:
+        elif pressure is not None and style == 'isotropic':
             new_structure = structure.copy()
             first_term = ((2 * energy_kin) / (3 * previous_volume)) * EV_PER_ANGCUB_TO_GPA
+            tau = (time_step / pressure_damping_timescale) * (compressibility / 3)
             total_pressure = first_term + isotropic_pressure  # GPa
-            eta = 1 - ((time_step / pressure_damping_timescale) * (compressibility / 3) *
-                       (pressure - total_pressure) * GPA_TO_BAR)
-
+            eta = 1 - (tau * (pressure - total_pressure) * GPA_TO_BAR)
             new_cell = new_structure.cell * eta
             new_structure.set_cell(new_cell, scale_atoms=True)
-            volume = new_structure.cell.diagonal().prod()
+        elif pressure is not None and style == 'anisotropic':
+            new_structure = structure.copy()
+            first_term = ((2 * energy_kin) / (3 * previous_volume)) * EV_PER_ANGCUB_TO_GPA
+            tau = (time_step / pressure_damping_timescale) * (compressibility / 3)
+            total_pressure_x = first_term + box_pressures[0, 0]  # GPa
+            eta_x = 1 - (tau * (pressure - total_pressure_x) * GPA_TO_BAR)
+            total_pressure_y = first_term + box_pressures[1, 1]  # GPa
+            eta_y = 1 - (tau * (pressure - total_pressure_y) * GPA_TO_BAR)
+            total_pressure_z = first_term + box_pressures[2, 2]  # GPa
+            eta_z = 1 - (tau * (pressure - total_pressure_z) * GPA_TO_BAR)
+
+            old_cell = new_structure.cell
+            new_cell = np.array([eta_x * old_cell[0],
+                                 eta_y * old_cell[1],
+                                 eta_z * old_cell[2]])
+
+            new_structure.set_cell(new_cell, scale_atoms=True)
+            total_pressure = np.mean([total_pressure_x, total_pressure_y, total_pressure_z])
+        else:
+            raise TypeError('Invalid value for pressure')
 
         return {
             'pressure': total_pressure,
-            'volume': volume,
             'structure': new_structure,
             'positions': new_structure.positions
         }

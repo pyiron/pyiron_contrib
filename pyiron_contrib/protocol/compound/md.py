@@ -4,6 +4,8 @@
 
 from __future__ import print_function
 
+from abc import ABC
+
 from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
 from pyiron_contrib.protocol.primitive.one_state import Counter, ExternalHamiltonian, RandomVelocity, Zeros, \
     VerletPositionUpdate, VerletVelocityUpdate, SphereReflection, WelfordOnline, NearestNeighbors, \
@@ -76,6 +78,7 @@ class MolecularDynamics(CompoundVertex):
         id_ = self.input.default
         id_.temperature = None
         id_.pressure = None
+        id_.style = 'anisotropic'
         id_.previous_volume = None
         id_.energy_kin = None
         id_.n_steps = 100
@@ -132,12 +135,10 @@ class MolecularDynamics(CompoundVertex):
 
         g.barostat.input.default.box_pressures = gp.initial_pressures.output.zeros[-1]
         g.barostat.input.default.structure = ip.structure
-        g.barostat.input.default.positions = ip.structure.positions
         g.barostat.input.default.energy_kin = ip.energy_kin
         g.barostat.input.default.previous_volume = ip.previous_volume
         g.barostat.input.box_pressures = gp.calc_static.output.pressures[-1]
         g.barostat.input.structure = gp.barostat.output.structure[-1]
-        g.barostat.input.positions = gp.verlet_positions.output.positions[-1]
         g.barostat.input.energy_kin = gp.verlet_velocities.output.energy_kin[-1]
         g.barostat.input.previous_volume = gp.calc_static.output.volume[-1]
         g.barostat.input.pressure = ip.pressure
@@ -145,10 +146,12 @@ class MolecularDynamics(CompoundVertex):
         g.barostat.input.time_step = ip.time_step
         g.barostat.input.pressure_damping_timescale = ip.pressure_damping_timescale
         g.barostat.input.compressibility = ip.compressibility
+        g.barostat.input.style = ip.style
 
         g.verlet_positions.input.default.positions = gp.barostat.output.positions[-1]
         g.verlet_positions.input.default.velocities = gp.initial_velocity.output.velocities[-1]
         g.verlet_positions.input.default.forces = gp.initial_forces.output.zeros[-1]
+        g.verlet_positions.input.positions = gp.verlet_positions.output.positions[-1]
         g.verlet_positions.input.velocities = gp.verlet_velocities.output.velocities[-1]
         g.verlet_positions.input.forces = gp.calc_static.output.forces[-1]
         g.verlet_positions.input.masses = ip.structure.get_masses
@@ -158,8 +161,8 @@ class MolecularDynamics(CompoundVertex):
 
         g.calc_static.input.ref_job_full_path = ip.ref_job_full_path
         g.calc_static.input.structure = gp.barostat.output.structure[-1]
-        g.calc_static.input.positions = gp.verlet_positions.output.positions[-1]
         g.calc_static.input.cell = gp.barostat.output.structure[-1].cell
+        g.calc_static.input.positions = gp.verlet_positions.output.positions[-1]
 
         g.verlet_velocities.input.velocities = gp.verlet_positions.output.velocities[-1]
         g.verlet_velocities.input.forces = gp.calc_static.output.forces[-1]
@@ -184,11 +187,11 @@ class MolecularDynamics(CompoundVertex):
             'velocities': ~gp.verlet_velocities.output.velocities[-1],
             'forces': ~gp.calc_static.output.forces[-1],
             'pressure': ~gp.barostat.output.pressure[-1],
-            'volume': ~gp.barostat.output.volume[-1]
+            'volume': ~gp.calc_static.output.volume[-1]
         }
 
 
-class ProtoMD(Protocol, MolecularDynamics):
+class ProtoMD(Protocol, MolecularDynamics, ABC):
     pass
 
 

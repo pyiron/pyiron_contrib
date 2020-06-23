@@ -95,6 +95,7 @@ class HarmonicTILD(TILDParent):
         id_.n_steps = 100
         id_.temperature_damping_timescale = 100.
         id_.pressure_damping_timescale = 1000.
+        id_.style = 'anisotropic'
         id_.compressibility = 4.57e-5  # bar^-1
         id_.overheat_fraction = 2.
         id_.time_step = 1.
@@ -369,6 +370,7 @@ class VacancyTILD(TILDParent):
         id_.n_steps = 100
         id_.temperature_damping_timescale = 100.
         id_.pressure_damping_timescale = 1000.
+        id_.style = 'anisotropic'
         id_.compressibility = 4.57e-5  # bar^-1
         id_.overheat_fraction = 2.
         id_.time_step = 1.
@@ -726,12 +728,13 @@ class HarmonicallyCoupled(CompoundVertex):
         g.barostat.input.time_step = ip.time_step
         g.barostat.input.pressure_damping_timescale = ip.pressure_damping_timescale
         g.barostat.input.compressibility = ip.compressibility
+        g.barostat.input.style = ip.style
 
         # verlet_positions
+        g.verlet_positions.input.masses = ip.structure.get_masses
         g.verlet_positions.input.time_step = ip.time_step
         g.verlet_positions.input.temperature = ip.temperature
         g.verlet_positions.input.temperature_damping_timescale = ip.temperature_damping_timescale
-        g.verlet_positions.input.masses = ip.structure.get_masses
 
         g.verlet_positions.input.default.positions = gp.barostat.output.positions[-1]
         g.verlet_positions.input.default.velocities = ip.velocities
@@ -747,11 +750,11 @@ class HarmonicallyCoupled(CompoundVertex):
         g.reflect.input.default.previous_velocities = ip.velocities
 
         g.reflect.input.reference_positions = gp.barostat.output.positions[-1]
-        g.reflect.input.pbc = gp.barostat.output.structure[-1].pbc
         g.reflect.input.cell = gp.barostat.output.structure[-1].cell
+        g.reflect.input.pbc = ip.structure.pbc
 
         g.reflect.input.previous_positions = gp.reflect.output.positions[-1]
-        g.reflect.input.previous_velocities = gp.reflect.output.velocities[-1]
+        g.reflect.input.previous_velocities = gp.verlet_velocities.output.velocities[-1]
 
         g.reflect.input.positions = gp.verlet_positions.output.positions[-1]
         g.reflect.input.velocities = gp.verlet_positions.output.velocities[-1]
@@ -771,7 +774,7 @@ class HarmonicallyCoupled(CompoundVertex):
         g.harmonic.input.zero_k_energy = ip.zero_k_energy
         g.harmonic.input.home_positions = gp.barostat.output.positions[-1]
         g.harmonic.input.cell = gp.barostat.output.structure[-1].cell
-        g.harmonic.input.pbc = gp.barostat.output.structure[-1].pbc
+        g.harmonic.input.pbc = ip.structure.pbc
 
         g.harmonic.input.positions = gp.reflect.output.positions[-1]
 
@@ -910,12 +913,13 @@ class HarmonicTILDParallel(HarmonicTILD):
         g.run_lambda_points.input.n_children = ip.n_lambdas
 
         # run_lambda_points - barostat
-        g.run_lambda_points.direct.box_pressures = gp.initial_pressures.output.zeros[-1]
+        g.run_lambda_points.broadcast.box_pressures = gp.initial_pressures.output.zeros[-1]
         g.run_lambda_points.direct.energy_kin = ip.energy_kin
         g.run_lambda_points.direct.previous_volume = ip.previous_volume
         g.run_lambda_points.direct.pressure_damping_timescale = ip.pressure_damping_timescale
         g.run_lambda_points.direct.pressure = ip.pressure
         g.run_lambda_points.direct.compressibility = ip.compressibility
+        g.run_lambda_points.direct.style = ip.style
 
         # run_lambda_points - verlet_positions
         g.run_lambda_points.direct.time_step = ip.time_step
@@ -1088,12 +1092,13 @@ class Decoupling(CompoundVertex):
         g.barostat.input.time_step = ip.time_step
         g.barostat.input.pressure_damping_timescale = ip.pressure_damping_timescale
         g.barostat.input.compressibility = ip.compressibility
+        g.barostat.input.style = ip.style
 
         # verlet_positions
+        g.verlet_positions.input.masses = ip.structure.get_masses
         g.verlet_positions.input.time_step = ip.time_step
         g.verlet_positions.input.temperature = ip.temperature
         g.verlet_positions.input.temperature_damping_timescale = ip.temperature_damping_timescale
-        g.verlet_positions.input.masses = ip.structure.get_masses
 
         g.verlet_positions.input.default.positions = gp.barostat.output.positions[-1]
         g.verlet_positions.input.default.velocities = ip.velocities
@@ -1109,11 +1114,11 @@ class Decoupling(CompoundVertex):
         g.reflect.input.default.previous_velocities = ip.velocities
 
         g.reflect.input.reference_positions = gp.barostat.output.positions[-1]
-        g.reflect.input.pbc = gp.barostat.output.structure[-1].pbc
         g.reflect.input.cell = gp.barostat.output.structure[-1].cell
+        g.reflect.input.pbc = ip.structure.pbc
 
         g.reflect.input.previous_positions = gp.reflect.output.positions[-1]
-        g.reflect.input.previous_velocities = gp.reflect.output.velocities[-1]
+        g.reflect.input.previous_velocities = gp.verlet_velocities.output.velocities[-1]
 
         g.reflect.input.positions = gp.verlet_positions.output.positions[-1]
         g.reflect.input.velocities = gp.verlet_positions.output.velocities[-1]
@@ -1155,7 +1160,7 @@ class Decoupling(CompoundVertex):
         g.harmonic.input.zero_k_energy = ip.zero_k_energy
         g.harmonic.input.home_positions = gp.slice_home_positions.output.sliced[-1]
         g.harmonic.input.cell = gp.barostat.output.structure[-1].cell
-        g.harmonic.input.pbc = gp.barostat.output.structure[-1].pbc
+        g.harmonic.input.pbc = ip.structure.pbc
 
         g.harmonic.input.positions = gp.slice_harmonic.output.sliced[-1]
 
@@ -1326,12 +1331,13 @@ class VacancyTILDParallel(VacancyTILD):
         g.run_lambda_points.input.n_children = ip.n_lambdas
 
         # run_lambda_points - barostat
-        g.run_lambda_points.direct.box_pressures = gp.initial_pressures.output.zeros[-1]
+        g.run_lambda_points.broadcast.box_pressures = gp.initial_pressures.output.zeros[-1]
         g.run_lambda_points.direct.energy_kin = ip.energy_kin
         g.run_lambda_points.direct.previous_volume = ip.previous_volume
         g.run_lambda_points.direct.pressure_damping_timescale = ip.pressure_damping_timescale
         g.run_lambda_points.direct.pressure = ip.pressure
         g.run_lambda_points.direct.compressibility = ip.compressibility
+        g.run_lambda_points.direct.style = ip.style
 
         # run_lambda_points - verlet_positions
         g.run_lambda_points.direct.time_step = ip.time_step

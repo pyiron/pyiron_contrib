@@ -381,7 +381,7 @@ class StringEvolution(CompoundVertex):
         return self.get_forward_barrier(frame=frame)
 
 
-class ProtoStringEvolution(Protocol, StringEvolution):
+class ProtoStringEvolution(Protocol, StringEvolution, ABC):
     pass
 
 
@@ -445,8 +445,8 @@ class ConstrainedMD(CompoundVertex):
         g.check_steps.input.threshold = ip.n_steps
 
         # verlet_positions
-        g.verlet_positions.input.time_step = ip.time_step
         g.verlet_positions.input.masses = ip.structure.get_masses
+        g.verlet_positions.input.time_step = ip.time_step
         g.verlet_positions.input.temperature = ip.temperature
         g.verlet_positions.input.temperature_damping_timescale = ip.temperature_damping_timescale
 
@@ -489,15 +489,15 @@ class ConstrainedMD(CompoundVertex):
         g.reflect_atoms.input.reference_positions = ip.centroid_positions
 
         # calc_static
-        g.calc_static.input.ref_job_full_path = ip.ref_job_full_path
+        g.calc_static.input.project_path = ip.project_path
         g.calc_static.input.job_name = ip.job_name
 
         g.calc_static.input.structure = ip.structure
         g.calc_static.input.positions = gp.reflect_atoms.output.positions[-1]
 
         # verlet_velocities
-        g.verlet_velocities.input.time_step = ip.time_step
         g.verlet_velocities.input.masses = ip.structure.get_masses
+        g.verlet_velocities.input.time_step = ip.time_step
         g.verlet_velocities.input.temperature = ip.temperature
         g.verlet_velocities.input.temperature_damping_timescale = ip.temperature_damping_timescale
 
@@ -509,17 +509,15 @@ class ConstrainedMD(CompoundVertex):
         g.check_thermalized.input.threshold = ip.thermalization_steps
 
         # running_average_positions
-        g.running_av_positions.input.default.running_average_positions = ip.positions
+        g.running_av_positions.input.default.running_average_positions = ip.running_average_positions
         g.running_av_positions.input.default.divisor = ip.divisor
 
+        g.running_av_positions.input.positions = gp.reflect_atoms.output.positions[-1]
         g.running_av_positions.input.running_average_positions = \
             gp.running_av_positions.output.running_average_positions[-1]
-        g.running_av_positions.input.positions = gp.reflect_atoms.output.positions[-1]
         g.running_av_positions.input.cell = ip.structure.cell
         g.running_av_positions.input.pbc = ip.structure.pbc
-        g.running_av_positions.input.n_images = ip.n_images
-        g.running_av_positions.input.job_name = ip.job_name
-        g.running_av_positions.input.initial_positions = ip.initial_positions
+        g.running_av_positions.input.divisor = gp.running_av_positions.output.divisor[-1]
 
         # clock
         g.clock.input.max_count = ip.n_steps
@@ -536,10 +534,6 @@ class ConstrainedMD(CompoundVertex):
             'divisor': ~gp.running_av_positions.output.divisor[-1],
             'clock': ~gp.clock.output.n_counts[-1]
         }
-
-    def parallel_setup(self):
-        super(ConstrainedMD, self).parallel_setup()
-        self.graph.calc_static.parallel_setup()
 
 
 class StringEvolutionParallel(StringEvolution):
@@ -648,8 +642,8 @@ class StringEvolutionParallel(StringEvolution):
         g.constrained_evo.input.n_children = ip.n_images
 
         # constrained_evolution - verlet_positions
-        g.constrained_evo.direct.time_step = ip.time_step
         g.constrained_evo.direct.structure = ip.structure_initial
+        g.constrained_evo.direct.time_step = ip.time_step
         g.constrained_evo.direct.temperature = ip.temperature
         g.constrained_evo.direct.temperature_damping_timescale = ip.temperature_damping_timescale
 
@@ -672,7 +666,7 @@ class StringEvolutionParallel(StringEvolution):
         g.constrained_evo.direct.reflection_cutoff_distance = ip.reflection_cutoff_distance
 
         # constrained_evolution - calc_static
-        g.constrained_evo.direct.ref_job_full_path = ip.ref_job_full_path
+        g.constrained_evo.broadcast.project_path = gp.initialize_images.output.project_path[-1]
         g.constrained_evo.broadcast.job_name = gp.initialize_images.output.job_names[-1]
 
         # constrained_evolution - verlet_velocities
@@ -683,14 +677,13 @@ class StringEvolutionParallel(StringEvolution):
         g.constrained_evo.direct.thermalization_steps = gp.replace.output.new_value[-1]
 
         # constrained_evolution - running_average_positions
-        g.constrained_evo.broadcast.default.running_average_positions = gp.initial_positions.output.initial_positions[-1]
+        g.constrained_evo.broadcast.default.running_average_positions = \
+            gp.initial_positions.output.initial_positions[-1]
         g.constrained_evo.direct.default.divisor = ip.divisor
-        g.constrained_evo.direct.default.n_images = ip.n_images
 
-        g.constrained_evo.broadcast.running_average_positions = gp.constrained_evo.output.running_average_positions[-1]
+        g.constrained_evo.broadcast.running_average_positions = \
+            gp.constrained_evo.output.running_average_positions[-1]
         g.constrained_evo.broadcast.divisor = gp.constrained_evo.output.divisor[-1]
-        g.constrained_evo.broadcast.initial_positions = gp.initial_positions.output.initial_positions[-1]
-        g.constrained_evo.broadcast.job_name = gp.initialize_images.output.job_names[-1]
 
         # constrained_evolution - clock
         g.constrained_evo.direct.n_steps = ip.sampling_period
@@ -722,7 +715,7 @@ class StringEvolutionParallel(StringEvolution):
 
         # calc_static_centroids
         g.calc_static_centroids.input.n_children = ip.n_images
-        g.calc_static_centroids.direct.ref_job_full_path = ip.ref_job_full_path
+        g.calc_static_centroids.broadcast.project_path = gp.initialize_centroids.output.project_path[-1]
         g.calc_static_centroids.broadcast.job_name = gp.initialize_centroids.output.job_names[-1]
 
         g.calc_static_centroids.direct.structure = ip.structure_initial
@@ -732,10 +725,6 @@ class StringEvolutionParallel(StringEvolution):
         g.recenter.input.n_children = ip.n_images
         g.recenter.direct.cell = ip.structure_initial.cell
         g.recenter.direct.pbc = ip.structure_initial.pbc
-
-        g.recenter.direct.default.all_centroid_positions = gp.initial_positions.output.initial_positions[-1]
-        g.recenter.broadcast.default.centroid_positions = gp.initial_positions.output.initial_positions[-1]
-        g.recenter.broadcast.default.centroid_forces = gp.initial_forces.output.zeros[-1]
 
         g.recenter.direct.all_centroid_positions = gp.reparameterize.output.centroids_pos_list[-1]
         g.recenter.broadcast.centroid_positions = gp.reparameterize.output.centroids_pos_list[-1]

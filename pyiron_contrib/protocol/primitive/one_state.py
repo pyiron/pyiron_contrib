@@ -190,7 +190,7 @@ class ExternalHamiltonian(PrimitiveVertex):
                 self._job_project_path = project_path
                 self._job_name = job_name
             else:
-                raise AttributeError('Please specify valid project path OR ref_job_full_path, but ot both!')
+                raise AttributeError('Please specify valid project path OR ref_job_full_path, but not both!')
 
         if self._job is None:
             self._reload()

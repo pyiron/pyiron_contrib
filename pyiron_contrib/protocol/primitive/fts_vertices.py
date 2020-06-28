@@ -168,23 +168,36 @@ class PositionsRunningAverage(PrimitiveVertex):
     def __init__(self, name=None):
         super(PositionsRunningAverage, self).__init__(name=name)
         self.input.default.divisor = 1
+        self.input.default.total_steps = 0
+        self.input.default.thermalized = False
+        self.input.default.thermalization_steps = 0
 
-    def command(self, positions, running_average_positions, cell, pbc, divisor):
+    def command(self, thermalized, total_steps, divisor, running_average_positions, positions, cell, pbc,
+                thermalization_steps, initial_positions):
 
-        # On the first step, divide by 2 to average two positions
-        divisor += 1
-        # How much of the current step to mix into the average
-        weight = 1. / divisor
+        total_steps += 1
+        if total_steps > thermalization_steps:
+            thermalized = True
 
-        running_average_positions = np.array(running_average_positions)
-        positions = np.array(positions)
+        if thermalized is False:
+            new_running_average = initial_positions
+        else:
+            # On the first step, divide by 2 to average two positions
+            divisor += 1
+            # How much of the current step to mix into the average
+            weight = 1. / divisor
 
-        displacement = find_mic(positions - running_average_positions, cell, pbc)[0]
-        new_running_average = running_average_positions + (weight * displacement)
+            running_average_positions = np.array(running_average_positions)
+            positions = np.array(positions)
+
+            displacement = find_mic(positions - running_average_positions, cell, pbc)[0]
+            new_running_average = running_average_positions + (weight * displacement)
 
         return {
             'running_average_positions': np.array(new_running_average),
-            'divisor': divisor
+            'divisor': divisor,
+            'thermalized': thermalized,
+            'total_steps': total_steps
         }
 
 

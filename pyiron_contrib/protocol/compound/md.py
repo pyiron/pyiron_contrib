@@ -8,7 +8,7 @@ from abc import ABC
 
 from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
 from pyiron_contrib.protocol.primitive.one_state import Counter, ExternalHamiltonian, RandomVelocity, Zeros, \
-    VerletPositionUpdate, VerletVelocityUpdate, SphereReflection, WelfordOnline, NearestNeighbors, \
+    VerletPositionUpdate, VerletVelocityUpdate, SphereReflectionPeratom, WelfordOnline, NearestNeighbors, \
     HarmonicHamiltonian, BerendsenBarostat
 from pyiron_contrib.protocol.primitive.two_state import IsGEq, ModIsZero
 from pyiron_contrib.protocol.primitive.fts_vertices import PositionsRunningAverage
@@ -91,21 +91,21 @@ class MolecularDynamics(CompoundVertex):
     def define_vertices(self):
         # Graph components
         g = self.graph
-        g.initial_velocity = RandomVelocity()
+        g.initial_velocities = RandomVelocity()
         g.initial_forces = Zeros()
         g.initial_pressures = Zeros()
         g.check_steps = IsGEq()
         g.clock = Counter()
-        g.calc_static = ExternalHamiltonian()
         g.barostat = BerendsenBarostat()
         g.verlet_positions = VerletPositionUpdate()
+        g.calc_static = ExternalHamiltonian()
         g.verlet_velocities = VerletVelocityUpdate()
 
     def define_execution_flow(self):
         # Execution flow
         g = self.graph
         g.make_pipeline(
-            g.initial_velocity,
+            g.initial_velocities,
             g.initial_forces,
             g.initial_pressures,
             g.check_steps, 'false',
@@ -116,7 +116,7 @@ class MolecularDynamics(CompoundVertex):
             g.clock,
             g.check_steps
         )
-        g.starting_vertex = g.initial_velocity
+        g.starting_vertex = g.initial_velocities
         g.restarting_vertex = g.check_steps
 
     def define_information_flow(self):
@@ -125,22 +125,34 @@ class MolecularDynamics(CompoundVertex):
         gp = Pointer(self.graph)
         ip = Pointer(self.input)
 
-        g.initial_velocity.input.temperature = ip.temperature
-        g.initial_velocity.input.masses = ip.structure.get_masses
-        g.initial_velocity.input.overheat_fraction = ip.overheat_fraction
+        # initial_velocity
+        g.initial_velocities.input.temperature = ip.temperature
+        g.initial_velocities.input.masses = ip.structure.get_masses
+        g.initial_velocities.input.overheat_fraction = ip.overheat_fraction
 
+        # initial_forces
         g.initial_forces.input.shape = ip.structure.positions.shape
 
+        # initial_pressures
         g.initial_pressures.input.shape = ip.structure.cell.shape
 
-        g.barostat.input.default.box_pressures = gp.initial_pressures.output.zeros[-1]
+        # check_steps
+        g.check_steps.input.target = gp.clock.output.n_counts[-1]
+        g.check_steps.input.threshold = ip.n_steps
+
+        # barostat
+        g.barostat.input.default.box_pressure = gp.initial_pressures.output.zeros[-1]
         g.barostat.input.default.structure = ip.structure
         g.barostat.input.default.energy_kin = ip.energy_kin
         g.barostat.input.default.previous_volume = ip.previous_volume
-        g.barostat.input.box_pressures = gp.calc_static.output.pressures[-1]
+        g.barostat.input.default.positions = ip.structure.positions
+
+        g.barostat.input.box_pressure = gp.calc_static.output.pressures[-1]
         g.barostat.input.structure = gp.barostat.output.structure[-1]
         g.barostat.input.energy_kin = gp.verlet_velocities.output.energy_kin[-1]
         g.barostat.input.previous_volume = gp.calc_static.output.volume[-1]
+        g.barostat.input.positions = gp.verlet_positions.output.positions[-1]
+
         g.barostat.input.pressure = ip.pressure
         g.barostat.input.temperature = ip.temperature
         g.barostat.input.time_step = ip.time_step
@@ -148,32 +160,35 @@ class MolecularDynamics(CompoundVertex):
         g.barostat.input.compressibility = ip.compressibility
         g.barostat.input.style = ip.style
 
-        g.verlet_positions.input.default.positions = gp.barostat.output.positions[-1]
-        g.verlet_positions.input.default.velocities = gp.initial_velocity.output.velocities[-1]
+        # verelt_positions
+        g.verlet_positions.input.default.velocities = gp.initial_velocities.output.velocities[-1]
         g.verlet_positions.input.default.forces = gp.initial_forces.output.zeros[-1]
-        g.verlet_positions.input.positions = gp.verlet_positions.output.positions[-1]
+
+        g.verlet_positions.input.positions = gp.barostat.output.positions[-1]
         g.verlet_positions.input.velocities = gp.verlet_velocities.output.velocities[-1]
         g.verlet_positions.input.forces = gp.calc_static.output.forces[-1]
+
         g.verlet_positions.input.masses = ip.structure.get_masses
         g.verlet_positions.input.time_step = ip.time_step
         g.verlet_positions.input.temperature = ip.temperature
         g.verlet_positions.input.temperature_damping_timescale = ip.temperature_damping_timescale
 
+        # calc_static
         g.calc_static.input.ref_job_full_path = ip.ref_job_full_path
         g.calc_static.input.structure = gp.barostat.output.structure[-1]
         g.calc_static.input.cell = gp.barostat.output.structure[-1].cell
         g.calc_static.input.positions = gp.verlet_positions.output.positions[-1]
 
+        # verlet_velocities
         g.verlet_velocities.input.velocities = gp.verlet_positions.output.velocities[-1]
         g.verlet_velocities.input.forces = gp.calc_static.output.forces[-1]
+
         g.verlet_velocities.input.masses = ip.structure.get_masses
         g.verlet_velocities.input.time_step = ip.time_step
         g.verlet_velocities.input.temperature = ip.temperature
         g.verlet_velocities.input.temperature_damping_timescale = ip.temperature_damping_timescale
 
-        g.check_steps.input.target = gp.clock.output.n_counts[-1]
-        g.check_steps.input.threshold = ip.n_steps
-
+        # clock
         g.clock.input.default.max_count = ip.n_steps
 
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
@@ -195,7 +210,7 @@ class ProtoMD(Protocol, MolecularDynamics, ABC):
     pass
 
 
-class ConfinedMD(CompoundVertex):
+class ConfinedMD(MolecularDynamics):
     """
     Similar to MolecularDynamics protocol, ConfinedMD performs MD on a structure. The difference, is that the
     atoms are confined to their lattice sites. This is especially helpful when vacancies are present in the
@@ -210,32 +225,34 @@ class ConfinedMD(CompoundVertex):
 
         # Protocol defaults
         id_ = self.input.default
-        id_.time_step = 1.
-        id_.overheat_fraction = 2.
-        id_.damping_timescale = 100.
+        id_.total_steps = 0
+        id_.divisor = 1
+        id_.thermalized = False
         id_.sampling_period = 1
-        id_.thermalization_steps = 10
-        id_.relax_endpoints = True
-        id_.reset = False
+        id_.thermalization_steps = 0
         id_.crystal_structure = 'fcc'
         id_.lattice_site = [0., 0., 0]
+        id_.pressure =None
 
     def define_vertices(self):
         # Graph components
         g = self.graph
         g.initial_velocities = RandomVelocity()
         g.initial_forces = Zeros()
+        g.initial_pressures = Zeros()
         g.check_steps = IsGEq()
+        g.clock = Counter()
+        g.barostat = BerendsenBarostat()
         g.verlet_positions = VerletPositionUpdate()
-        g.reflect_atoms = SphereReflection()
+        g.reflect_atoms = SphereReflectionPeratom()
         g.calc_static = ExternalHamiltonian()
         g.verlet_velocities = VerletVelocityUpdate()
+        g.running_average_positions = PositionsRunningAverage()
         g.check_thermalized = IsGEq()
-        g.check_sampling_period = ModIsZero()
-        g.running_average = PositionsRunningAverage()
+        g.running_average_forces = WelfordOnline()
         g.nn = NearestNeighbors()
-        g.average_distance = WelfordOnline()
-        g.clock = Counter()
+        g.running_average_nn_distance = WelfordOnline()
+        g.running_average_nn_forces = WelfordOnline()
 
     def define_execution_flow(self):
         # Execution flow
@@ -243,21 +260,23 @@ class ConfinedMD(CompoundVertex):
         g.make_pipeline(
             g.initial_velocities,
             g.initial_forces,
+            g.initial_pressures,
             g.check_steps, 'false',
-            g.clock,
+            g.barostat,
             g.verlet_positions,
             g.reflect_atoms,
             g.calc_static,
             g.verlet_velocities,
+            g.running_average_positions,
             g.check_thermalized, 'true',
-            g.check_sampling_period, 'true',
-            g.running_average,
+            g.running_average_forces,
             g.nn,
-            g.average_distance,
+            g.running_average_nn_distance,
+            g.running_average_nn_forces,
+            g.clock,
             g.check_steps
         )
-        g.make_edge(g.check_thermalized, g.check_steps, 'false')
-        g.make_edge(g.check_sampling_period, g.check_steps, 'false')
+        g.make_edge(g.check_thermalized, g.clock, 'false')
         g.starting_vertex = g.initial_velocities
         g.restarting_vertex = g.check_steps
 
@@ -275,97 +294,133 @@ class ConfinedMD(CompoundVertex):
         # initial_forces
         g.initial_forces.input.shape = ip.structure.positions.shape
 
+        # initial_pressures
+        g.initial_pressures.input.shape = ip.structure.cell.shape
+
         # check_steps
         g.check_steps.input.target = gp.clock.output.n_counts[-1]
         g.check_steps.input.threshold = ip.n_steps
 
-        self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
+        # barostat
+        g.barostat.input.default.box_pressure = gp.initial_pressures.output.zeros[-1]
+        g.barostat.input.default.structure = ip.structure
+        g.barostat.input.default.energy_kin = ip.energy_kin
+        g.barostat.input.default.previous_volume = ip.previous_volume
+        g.barostat.input.default.positions = ip.structure.positions
+
+        g.barostat.input.box_pressure = gp.calc_static.output.pressures[-1]
+        g.barostat.input.structure = gp.barostat.output.structure[-1]
+        g.barostat.input.energy_kin = gp.verlet_velocities.output.energy_kin[-1]
+        g.barostat.input.previous_volume = gp.calc_static.output.volume[-1]
+        g.barostat.input.positions = gp.reflect_atoms.output.positions[-1]
+
+        g.barostat.input.pressure = ip.pressure
+        g.barostat.input.temperature = ip.temperature
+        g.barostat.input.time_step = ip.time_step
+        g.barostat.input.pressure_damping_timescale = ip.pressure_damping_timescale
+        g.barostat.input.compressibility = ip.compressibility
+        g.barostat.input.style = ip.style
 
         # verlet_positions
-        g.verlet_positions.input.time_step = ip.time_step
-        g.verlet_positions.input.masses = ip.structure.get_masses
-        g.verlet_positions.input.temperature = ip.temperature
-        g.verlet_positions.input.temperature_damping_timescale = ip.temperature_damping_timescale
-
-        g.verlet_positions.input.default.positions = ip.structure.positions
         g.verlet_positions.input.default.velocities = gp.initial_velocities.output.velocities[-1]
         g.verlet_positions.input.default.forces = gp.initial_forces.output.zeros[-1]
 
-        g.verlet_positions.input.positions = gp.reflect_atoms.output.positions[-1]
+        g.verlet_positions.input.positions = gp.barostat.output.positions[-1]
         g.verlet_positions.input.velocities = gp.verlet_velocities.output.velocities[-1]
         g.verlet_positions.input.forces = gp.calc_static.output.forces[-1]
 
+        g.verlet_positions.input.masses = ip.structure.get_masses
+        g.verlet_positions.input.time_step = ip.time_step
+        g.verlet_positions.input.temperature = ip.temperature
+        g.verlet_positions.input.temperature_damping_timescale = ip.temperature_damping_timescale
+
         # reflect individual atoms which stray too far
-        g.reflect_atoms.input.cutoff_distance = ip.reflection_cutoff_distance
-        g.reflect_atoms.input.cell = ip.structure.cell
-        g.reflect_atoms.input.pbc = ip.structure.pbc
-
-        g.reflect_atoms.input.reference_positions = ip.structure.positions
-
         g.reflect_atoms.input.default.previous_positions = ip.structure.positions
         g.reflect_atoms.input.default.previous_velocities = gp.initial_velocities.output.velocities[-1]
+        g.reflect_atoms.input.default.cutoff_distance = ip.reflection_cutoff_distance
 
-        g.reflect_atoms.input.previous_positions = gp.reflect_atoms.output.positions[-1]
+        g.reflect_atoms.input.reference_positions = ip.structure.positions
+        g.reflect_atoms.input.previous_positions = gp.barostat.output.positions[-1]
         g.reflect_atoms.input.previous_velocities = gp.reflect_atoms.output.velocities[-1]
-
         g.reflect_atoms.input.positions = gp.verlet_positions.output.positions[-1]
         g.reflect_atoms.input.velocities = gp.verlet_positions.output.velocities[-1]
 
+        g.reflect_atoms.input.cell = ip.structure.cell
+        g.reflect_atoms.input.pbc = ip.structure.pbc
+
         # calc_static
         g.calc_static.input.ref_job_full_path = ip.ref_job_full_path
-        g.calc_static.input.structure = ip.structure
-
+        g.calc_static.input.structure = gp.barostat.output.structure[-1]
+        g.calc_static.input.cell = gp.barostat.output.structure[-1].cell
         g.calc_static.input.positions = gp.reflect_atoms.output.positions[-1]
 
         # verlet_velocities
-        g.verlet_velocities.input.time_step = ip.time_step
+        g.verlet_velocities.input.velocities = gp.verlet_positions.output.velocities[-1]
+        g.verlet_velocities.input.forces = gp.calc_static.output.forces[-1]
+
         g.verlet_velocities.input.masses = ip.structure.get_masses
+        g.verlet_velocities.input.time_step = ip.time_step
         g.verlet_velocities.input.temperature = ip.temperature
         g.verlet_velocities.input.temperature_damping_timescale = ip.temperature_damping_timescale
 
-        g.verlet_velocities.input.velocities = gp.reflect_atoms.output.velocities[-1]
-        g.verlet_velocities.input.forces = gp.calc_static.output.forces[-1]
+        # running_average_positions
+        g.running_average_positions.input.default.thermalized = ip.thermalized
+        g.running_average_positions.input.default.total_steps = ip.total_steps
+        g.running_average_positions.input.default.divisor = ip.divisor
+        g.running_average_positions.input.default.running_average_positions = gp.reflect_atoms.output.positions[-1]
+
+        g.running_average_positions.input.thermalized = gp.running_average_positions.output.thermalized[-1]
+        g.running_average_positions.input.total_steps = gp.running_average_positions.output.total_steps[-1]
+        g.running_average_positions.input.divisor = gp.running_average_positions.output.divisor[-1]
+        g.running_average_positions.input.running_average_positions = \
+            gp.running_average_positions.output.running_average_positions[-1]
+        g.running_average_positions.input.positions = gp.reflect_atoms.output.positions[-1]
+        g.running_average_positions.input.cell = gp.barostat.output.structure[-1].cell
+        g.running_average_positions.input.pbc = ip.structure.pbc
+        g.running_average_positions.input.thermalization_steps = ip.thermalization_steps
+        g.running_average_positions.input.initial_positions = ip.structure.positions
 
         # check_thermalized
         g.check_thermalized.input.target = gp.clock.output.n_counts[-1]
         g.check_thermalized.input.threshold = ip.thermalization_steps
 
-        # check_sampling_period
-        g.check_sampling_period.input.target = gp.clock.output.n_counts[-1]
-        g.check_sampling_period.input.default.mod = ip.sampling_period
-
-        # running_average_positions
-        g.running_average.input.default.running_average_list = gp.reflect_atoms.output.positions[-1]
-        g.running_average.input.running_average_list = gp.running_average.output.running_average_list[-1]
-        g.running_average.input.positions_list = gp.reflect_atoms.output.positions[-1]
-        g.running_average.input.sampling_period = ip.sampling_period
-        g.running_average.input.reset = ip.reset
-        g.running_average.input.relax_endpoints = ip.relax_endpoints
-        g.running_average.input.cell = ip.structure.cell
-        g.running_average.input.pbc = ip.structure.pbc
+        # running_average_forces
+        g.running_average_forces.input.sample = gp.calc_static.output.forces[-1]
 
         # nearest_neighbor_distances
-        g.nn.input.structure = ip.structure
-        g.nn.input.crystal_structure = ip.crystal_structure
         g.nn.input.lattice_site = ip.lattice_site
-        g.nn.input.atoms_positions = gp.running_average.output.running_average_list[-1]
+        g.nn.input.nn_indices = ip.nn_indices
+        g.nn.input.positions = gp.reflect_atoms.output.positions[-1]
+        g.nn.input.forces = gp.calc_static.output.forces[-1]
+        g.nn.input.cell = gp.barostat.output.structure[-1].cell
+        g.nn.input.pbc = ip.structure.pbc
 
-        # average_nearest_neighbor_distances
-        g.average_distance.input.sample = gp.nn.output.NN_distance[-1]
+        # running_average_nn_distance
+        g.running_average_nn_distance.input.sample = gp.nn.output.nn_distances[-1]
+
+        # running_average_nn_forces
+        g.running_average_nn_forces.input.sample = gp.nn.output.nn_forces[-1]
+
+        self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
 
     def get_output(self):
         gp = Pointer(self.graph)
         return {
+            'energy_pot': ~gp.calc_static.output.energy_pot[-1],
+            'energy_kin': ~gp.verlet_velocities.output.energy_kin[-1],
             'positions': ~gp.reflect_atoms.output.positions[-1],
             'velocities': ~gp.verlet_velocities.output.velocities[-1],
             'forces': ~gp.calc_static.output.forces[-1],
-            'running_average_positions': ~gp.running_average.output.running_average_list[-1],
-            'nn_distance_mean': ~gp.average_distance.output.mean[-1],
-            'nn_distance_std': ~gp.average_distance.output.std[-1]
+            'pressure': ~gp.barostat.output.pressure[-1],
+            'volume': ~gp.calc_static.output.volume[-1],
+            'running_average_positions': ~gp.running_average_positions.output.running_average_positions[-1],
+            'running_average_forces': ~gp.running_average_forces.output.mean[-1],
+            'nn_distances': ~gp.running_average_nn_distance.output.mean[-1],
+            'nn_forces': ~gp.running_average_nn_forces.output.mean[-1]
         }
 
 
-class ProtoConfinedMD(Protocol, ConfinedMD):
+class ProtoConfinedMD(Protocol, ConfinedMD, ABC):
     pass
 
 
@@ -402,7 +457,7 @@ class ConfinedHarmonicMD(CompoundVertex):
         g.initial_forces = Zeros()
         g.check_steps = IsGEq()
         g.verlet_positions = VerletPositionUpdate()
-        g.reflect_atoms = SphereReflection()
+        g.reflect_atoms = SphereReflectionPeratom()
         g.harmonic = HarmonicHamiltonian()
         g.verlet_velocities = VerletVelocityUpdate()
         g.check_thermalized = IsGEq()

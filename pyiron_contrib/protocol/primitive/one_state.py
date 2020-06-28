@@ -85,7 +85,7 @@ class Counter(PrimitiveVertex):
         self.input.default.max_count = 0
 
     def command(self, new_count, max_count):
-        if max_count >= new_count != 0:
+        if new_count != 0:
             count = self.output.n_counts[-1] + new_count
         else:
             count = self.output.n_counts[-1] + 1
@@ -452,7 +452,7 @@ class HarmonicHamiltonian(PrimitiveVertex):
             transformed_displacements = self.transform_displacements(dr)
             transformed_forces = -np.dot(transformed_force_constants, transformed_displacements)
             forces = self.retransform_forces(transformed_forces, dr)
-            energy = zero_k_energy - 0.5 * np.dot(transformed_displacements, transformed_forces)
+            energy = zero_k_energy - 0.5 * np.tensordot(transformed_displacements, transformed_forces)
 
         else:
             raise TypeError('Please specify either a spring constant or the force constant matrix')
@@ -864,8 +864,8 @@ class SphereReflection(PrimitiveVertex):
 
     def command(self, reference_positions, cutoff_distance, positions, velocities, previous_positions,
                 previous_velocities, pbc, cell, atom_reflect_switch):
-        distance = np.linalg.norm(find_mic(reference_positions - positions, cell=cell, pbc=pbc)[0], axis=-1)
-        is_at_home = (distance < cutoff_distance)[:, np.newaxis]
+        distance = find_mic(reference_positions - positions, cell=cell, pbc=pbc)[0]
+        is_at_home = (distance.flatten() < cutoff_distance)[:, np.newaxis]
 
         if np.all(is_at_home) or atom_reflect_switch is False:
             return {
@@ -910,8 +910,16 @@ class SphereReflectionPeratom(PrimitiveVertex):
 
     def command(self, reference_positions, cutoff_distance, positions, velocities, previous_positions,
                 previous_velocities, pbc, cell):
-        distance = np.linalg.norm(find_mic(reference_positions - positions, cell=cell, pbc=pbc)[0], axis=-1)
-        is_at_home = (distance < cutoff_distance)[:, np.newaxis]
+        distance = np.abs(find_mic(reference_positions - positions, cell=cell, pbc=pbc)[0].flatten())
+        boolean = (distance < cutoff_distance)[:, np.newaxis]
+        reshaped_boolean = boolean.reshape(positions.shape)
+        is_at_home = []
+        for i in reshaped_boolean:
+            if False in i:
+                is_at_home.append([False])
+            else:
+                is_at_home.append([True])
+        is_at_home = np.array(is_at_home)
         is_away = 1 - is_at_home
 
         return {
@@ -1247,27 +1255,25 @@ class Replace(PrimitiveVertex):
 
 class NearestNeighbors(PrimitiveVertex):
     """
-    Gives the mean first nearest neighbor distances. Used specifically in the ConfinedMD and ConfinedHarmonicMD.
+    Gives the mean first nearest neighbor distances and forces. Used specifically in ConfinedMD and
+     ConfinedHarmonicMD.
     """
 
     def __init__(self, name=None):
         super(NearestNeighbors, self).__init__(name=name)
-        self.input.default.crystal_structure = 'fcc'
+        self.input.default.nn_indices = None
         self.input.default.lattice_site = [0., 0., 0.]
 
-    def command(self, structure, atoms_positions, crystal_structure, lattice_site):
-        new_struct = structure.copy()
-        new_struct.positions = atoms_positions
-
-        if crystal_structure == 'fcc' or crystal_structure == 'hcp':
-            nn = 12
-        elif crystal_structure == 'bcc':
-            nn = 8
-        else:
-            raise TypeError("Not a valid crystal structure")
+    def command(self, lattice_site, nn_indices, positions, forces, cell, pbc):
+        nn_positions = np.array([positions[i] for i in nn_indices])
+        nn_forces = np.array([forces[j] for j in nn_indices])
+        nn_distances = np.linalg.norm(find_mic(nn_positions - lattice_site, cell, pbc)[0], axis=-1)
+        cutoff_distance = np.mean(nn_distances) * 0.5
 
         return {
-            'NN_distance': np.mean(new_struct.get_neighborhood(position=lattice_site, num_neighbors=nn).distances)
+            'nn_distances': nn_distances,
+            'nn_forces': nn_forces,
+            'cutoff_distance': cutoff_distance
         }
 
 
@@ -1342,29 +1348,30 @@ class BerendsenBarostat(PrimitiveVertex):
         id.pressure_damping_timescale = 1000.
         id.time_step = 1.
         id.compressibility = 4.57e-5  # compressibility of water in bar^-1
-        id.style = 'anisotropic'
+        id.style = 'isotropic'
 
-    def command(self, pressure, temperature, box_pressures, energy_kin, time_step,
+    def command(self, pressure, temperature, box_pressure, energy_kin, time_step, positions,
                 pressure_damping_timescale, compressibility, structure, previous_volume, style):
 
         if style != 'isotropic' and style != 'anisotropic':
             raise TypeError('style can only be \'isotropic\' or \'anisotropic\'')
 
         n_atoms = len(structure.positions)
+
         if previous_volume is None:
             previous_volume = structure.cell.diagonal().prod()
 
         if energy_kin is None:
             energy_kin = (3 / 2) * n_atoms * KB * temperature
 
-        # convert the pressure tensor to a scalar pressure
-        isotropic_pressure = np.trace(box_pressures) / 3  # pyiron stores pressure in GPa
+        isotropic_pressure = np.trace(box_pressure) / 3  # pyiron stores pressure in GPa
 
         if pressure is None:
-            new_structure = structure
+            new_structure = structure.copy()
             total_pressure = isotropic_pressure
         elif pressure is not None and style == 'isotropic':
             new_structure = structure.copy()
+            new_structure.positions = positions
             first_term = ((2 * energy_kin) / (3 * previous_volume)) * EV_PER_ANGCUB_TO_GPA
             tau = (time_step / pressure_damping_timescale) * (compressibility / 3)
             total_pressure = first_term + isotropic_pressure  # GPa
@@ -1373,13 +1380,14 @@ class BerendsenBarostat(PrimitiveVertex):
             new_structure.set_cell(new_cell, scale_atoms=True)
         elif pressure is not None and style == 'anisotropic':
             new_structure = structure.copy()
+            new_structure.positions = positions
             first_term = ((2 * energy_kin) / (3 * previous_volume)) * EV_PER_ANGCUB_TO_GPA
             tau = (time_step / pressure_damping_timescale) * (compressibility / 3)
-            total_pressure_x = first_term + box_pressures[0, 0]  # GPa
+            total_pressure_x = first_term + box_pressure[0, 0]  # GPa
             eta_x = 1 - (tau * (pressure - total_pressure_x) * GPA_TO_BAR)
-            total_pressure_y = first_term + box_pressures[1, 1]  # GPa
+            total_pressure_y = first_term + box_pressure[1, 1]  # GPa
             eta_y = 1 - (tau * (pressure - total_pressure_y) * GPA_TO_BAR)
-            total_pressure_z = first_term + box_pressures[2, 2]  # GPa
+            total_pressure_z = first_term + box_pressure[2, 2]  # GPa
             eta_z = 1 - (tau * (pressure - total_pressure_z) * GPA_TO_BAR)
 
             old_cell = new_structure.cell
@@ -1416,4 +1424,20 @@ class StepEnergies(PrimitiveVertex):
         return {
             'energy_pots': energy_pots,
             'energy_kins': energy_kins
+        }
+
+
+class GetMixedPressure(PrimitiveVertex):
+    """
+
+    """
+
+    def command(self, home_positions, positions, mixed_forces, temperature, volume, cell, pbc):
+        n_atoms = len(positions)
+        dr = find_mic(positions - home_positions, cell, pbc)[0]
+        pressure = (n_atoms * KB * temperature / volume) + (np.sum(dr * mixed_forces) / (3 * volume))
+        print(pressure)
+
+        return {
+            'mixed_pressure': pressure * EV_PER_ANGCUB_TO_GPA
         }

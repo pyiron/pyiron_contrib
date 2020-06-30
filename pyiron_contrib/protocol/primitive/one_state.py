@@ -864,8 +864,8 @@ class SphereReflection(PrimitiveVertex):
 
     def command(self, reference_positions, cutoff_distance, positions, velocities, previous_positions,
                 previous_velocities, pbc, cell, atom_reflect_switch):
-        distance = find_mic(reference_positions - positions, cell=cell, pbc=pbc)[0]
-        is_at_home = (distance.flatten() < cutoff_distance)[:, np.newaxis]
+        distance = np.linalg.norm(find_mic(reference_positions - positions, cell=cell, pbc=pbc)[0], axis=-1)
+        is_at_home = (distance < cutoff_distance)[:, np.newaxis]
 
         if np.all(is_at_home) or atom_reflect_switch is False:
             return {
@@ -906,7 +906,6 @@ class SphereReflectionPeratom(PrimitiveVertex):
 
     def __init__(self, name=None):
         super(SphereReflectionPeratom, self).__init__(name=name)
-        # self.input.default.previous_velocities = Pointer(self.input.velocities)
 
     def command(self, reference_positions, cutoff_distance, positions, velocities, previous_positions,
                 previous_velocities, pbc, cell):
@@ -1427,17 +1426,13 @@ class StepEnergies(PrimitiveVertex):
         }
 
 
-class GetMixedPressure(PrimitiveVertex):
+class EnergyPotWeights(PrimitiveVertex):
     """
 
     """
 
-    def command(self, home_positions, positions, mixed_forces, temperature, volume, cell, pbc):
-        n_atoms = len(positions)
-        dr = find_mic(positions - home_positions, cell, pbc)[0]
-        pressure = (n_atoms * KB * temperature / volume) + (np.sum(dr * mixed_forces) / (3 * volume))
-        print(pressure)
+    def command(self, positions):
 
         return {
-            'mixed_pressure': pressure * EV_PER_ANGCUB_TO_GPA
+            'energy_pot_weights': [1, 1 / len(positions), -1]
         }

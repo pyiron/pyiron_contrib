@@ -997,15 +997,15 @@ class Decoupling(CompoundVertex):
         g.calc_full = ExternalHamiltonian()
         g.slice_positions = Slice()
         g.calc_vac = ExternalHamiltonian()
+        g.slice_harmonic = Slice()
+        g.slice_home_positions = Slice()
         g.harmonic = HarmonicHamiltonian()
-        g.slice_harmonic_forces = Slice()
         g.write_vac_forces = Overwrite()
         g.write_harmonic_forces = Overwrite()
         g.mix = WeightedSum()
         g.verlet_velocities = VerletVelocityUpdate()
         g.check_thermalized = IsGEq()
         g.check_sampling_period = ModIsZero()
-        g.energy_pot_weights = EnergyPotWeights()
         g.addition = WeightedSum()
         g.average = WelfordOnline()
         g.clock = Counter()
@@ -1015,27 +1015,27 @@ class Decoupling(CompoundVertex):
         g = self.graph
         g.make_pipeline(
             g.check_steps, 'false',
+            g.clock,
             g.verlet_positions,
             g.reflect,
             g.calc_full,
             g.slice_positions,
             g.calc_vac,
+            g.slice_harmonic,
+            g.slice_home_positions,
             g.harmonic,
-            g.slice_harmonic_forces,
             g.write_vac_forces,
             g.write_harmonic_forces,
             g.mix,
             g.verlet_velocities,
             g.check_thermalized, 'true',
             g.check_sampling_period, 'true',
-            g.energy_pot_weights,
             g.addition,
             g.average,
-            g.clock,
             g.check_steps
         )
-        g.make_edge(g.check_thermalized, g.clock, 'false')
-        g.make_edge(g.check_sampling_period, g.clock, 'false')
+        g.make_edge(g.check_thermalized, g.check_steps, 'false')
+        g.make_edge(g.check_sampling_period, g.check_steps, 'false')
         g.starting_vertex = g.check_steps
         g.restarting_vertex = g.check_steps
 
@@ -1069,13 +1069,14 @@ class Decoupling(CompoundVertex):
         g.reflect.input.default.previous_velocities = ip.velocities
 
         g.reflect.input.reference_positions = ip.structure.positions
-        g.reflect.input.previous_positions = gp.reflect.output.positions[-1]
-        g.reflect.input.previous_velocities = gp.verlet_velocities.output.velocities[-1]
-        g.reflect.input.positions = gp.verlet_positions.output.positions[-1]
-        g.reflect.input.velocities = gp.verlet_positions.output.velocities[-1]
-
         g.reflect.input.cell = ip.structure.cell
         g.reflect.input.pbc = ip.structure.pbc
+
+        g.reflect.input.previous_positions = gp.reflect.output.positions[-1]
+        g.reflect.input.previous_velocities = gp.verlet_velocities.output.velocities[-1]
+
+        g.reflect.input.positions = gp.verlet_positions.output.positions[-1]
+        g.reflect.input.velocities = gp.verlet_positions.output.velocities[-1]
         g.reflect.input.cutoff_distance = ip.cutoff_distance
 
         # calc_full
@@ -1083,7 +1084,6 @@ class Decoupling(CompoundVertex):
         g.calc_full.input.job_name = ip.full_job_name
 
         g.calc_full.input.structure = ip.structure
-        g.calc_full.input.cell = ip.structure.cell
         g.calc_full.input.positions = gp.reflect.output.positions[-1]
 
         # slice_positions
@@ -1095,23 +1095,27 @@ class Decoupling(CompoundVertex):
         g.calc_vac.input.job_name = ip.vac_job_name
 
         g.calc_vac.input.structure = ip.vacancy_structure
-        g.calc_vac.input.cell = ip.vacancy_structure.cell
         g.calc_vac.input.positions = gp.slice_positions.output.sliced[-1]
+
+        # slice_harmonic
+        g.slice_harmonic.input.vector = gp.reflect.output.positions[-1]
+        g.slice_harmonic.input.mask = ip.vacancy_id
+        g.slice_harmonic.input.ensure_iterable_mask = ip.ensure_iterable_mask
+
+        # slice_home_positions
+        g.slice_home_positions.input.vector = ip.structure.positions
+        g.slice_home_positions.input.mask = ip.vacancy_id
+        g.slice_home_positions.input.ensure_iterable_mask = ip.ensure_iterable_mask
 
         # harmonic
         g.harmonic.input.spring_constant = ip.spring_constant
         g.harmonic.input.force_constants = ip.force_constants
         g.harmonic.input.zero_k_energy = ip.zero_k_energy
-        g.harmonic.input.home_positions = ip.structure.positions
+        g.harmonic.input.home_positions = gp.slice_home_positions.output.sliced[-1]
         g.harmonic.input.cell = ip.structure.cell
         g.harmonic.input.pbc = ip.structure.pbc
 
-        g.harmonic.input.positions = gp.reflect.output.positions[-1]
-
-        # slice_harmonic_forces
-        g.slice_harmonic_forces.input.vector = gp.harmonic.output.forces[-1]
-        g.slice_harmonic_forces.input.mask = ip.vacancy_id
-        g.slice_harmonic_forces.input.ensure_iterable_mask = ip.ensure_iterable_mask
+        g.harmonic.input.positions = gp.slice_harmonic.output.sliced[-1]
 
         # write_vac_forces
         g.write_vac_forces.input.target = gp.calc_full.output.forces[-1]
@@ -1121,7 +1125,7 @@ class Decoupling(CompoundVertex):
         # write_harmonic_forces
         g.write_harmonic_forces.input.target = gp.write_vac_forces.output.overwritten[-1]
         g.write_harmonic_forces.input.mask = ip.vacancy_id
-        g.write_harmonic_forces.input.new_values = gp.slice_harmonic_forces.output.sliced[-1]
+        g.write_harmonic_forces.input.new_values = gp.harmonic.output.forces[-1]
 
         # mix
         g.mix.input.vectors = [
@@ -1147,18 +1151,15 @@ class Decoupling(CompoundVertex):
         g.check_sampling_period.input.target = gp.clock.output.n_counts[-1]
         g.check_sampling_period.input.default.mod = ip.sampling_period
 
-        # energy_pot_weights
-        g.energy_pot_weights.input.positions = gp.reflect.output.positions[-1]
-
         # addition
         g.addition.input.vectors = [
             gp.calc_vac.output.energy_pot[-1],
             gp.harmonic.output.energy_pot[-1],
             gp.calc_full.output.energy_pot[-1]
         ]
-        g.addition.input.weights = gp.energy_pot_weights.output.energy_pot_weights[-1]
+        g.addition.input.weights = [1, 1, -1]
 
-        # average
+        # average_addition
         g.average.input.sample = gp.addition.output.weighted_sum[-1]
 
         # clock
@@ -1187,7 +1188,6 @@ class Decoupling(CompoundVertex):
 class VacancyTILDParallel(VacancyTILD):
     """
     A version of VacancyTILD where the lambda jobs are executed in parallel, thus giving a substantial speed-up.
-
     Note: Pressure control is implemented in this protocol.
     """
     DefaultWhitelist = {
@@ -1203,6 +1203,7 @@ class VacancyTILDParallel(VacancyTILD):
         g.initialize_vac_jobs = InitializeJob()
         g.initial_velocities = SerialList(RandomVelocity)
         g.initial_forces = SerialList(Zeros)
+        g.slice_structure = Slice()
         g.run_lambda_points = ParallelList(Decoupling, sleep_time=ip.sleep_time)
         g.clock = Counter()
         g.post = TILDPostProcess()
@@ -1275,7 +1276,7 @@ class VacancyTILDParallel(VacancyTILD):
         g.run_lambda_points.direct.cutoff_distance = ip.cutoff_distance
 
         # run_lambda_points - calc_full
-        g.run_lambda_points.broadcast.project_path_full = gp.initialize_full_jobs.output.project_path[-1]
+        g.run_lambda_points.direct.project_path_full = gp.initialize_full_jobs.output.project_path[-1][-1]
         g.run_lambda_points.broadcast.full_job_name = gp.initialize_full_jobs.output.job_names[-1]
 
         # run_lambda_points - slice_positions
@@ -1286,14 +1287,14 @@ class VacancyTILDParallel(VacancyTILD):
         g.run_lambda_points.broadcast.vac_job_name = gp.initialize_vac_jobs.output.job_names[-1]
         g.run_lambda_points.direct.vacancy_structure = gp.create_vacancy.output.structure[-1]
 
+        # run_lambda_points - slice_harmonic
+        g.run_lambda_points.direct.vacancy_id = ip.vacancy_id
+        g.run_lambda_points.direct.ensure_iterable_mask = ip.ensure_iterable_mask
+
         # run_lambda_points - harmonic
         g.run_lambda_points.direct.spring_constant = ip.spring_constant
         g.run_lambda_points.direct.force_constants = ip.force_constants
         g.run_lambda_points.direct.zero_k_energy = ip.zero_k_energy
-
-        # run_lambda_points - slice_harmonic_forces
-        g.run_lambda_points.direct.vacancy_id = ip.vacancy_id
-        g.run_lambda_points.direct.ensure_iterable_mask = ip.ensure_iterable_mask
 
         # run_lambda_points - write_vac_forces -  takes inputs already specified
 
@@ -1311,7 +1312,6 @@ class VacancyTILDParallel(VacancyTILD):
         g.run_lambda_points.direct.sampling_period = ip.sampling_period
 
         # run_lambda_points - addition - does not need inputs
-        g.run_lambda_points.direct.n_atoms = ip.n_atoms
 
         # run_lambda_points - average - does not need inputs
 

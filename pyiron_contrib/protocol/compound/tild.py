@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
 from pyiron_contrib.protocol.list import SerialList, ParallelList
 from pyiron_contrib.protocol.utils import Pointer
-from pyiron_contrib.protocol.primitive.one_state import Counter, BuildMixingPairs, DeleteAtom, EnergyPotWeights, \
+from pyiron_contrib.protocol.primitive.one_state import Counter, BuildMixingPairs, DeleteAtom, \
     ExternalHamiltonian, HarmonicHamiltonian, InitializeJob, Overwrite, RandomVelocity, Slice, SphereReflection, \
     TILDPostProcess, Transpose, VerletPositionUpdate, VerletVelocityUpdate, WeightedSum, \
     WelfordOnline, Zeros
@@ -99,7 +99,6 @@ class HarmonicTILD(TILDParent):
         id_.time_step = 1.
         id_.sampling_period = 1
         id_.thermalization_steps = 10
-        id_.zero_k_energy = 0.0
         id_.sleep_time = 0
         id_.custom_lambdas = None
         id_.force_constants = None
@@ -235,7 +234,6 @@ class HarmonicTILD(TILDParent):
         g.harmonic.input.n_children = ip.n_lambdas
         g.harmonic.direct.spring_constant = ip.spring_constant
         g.harmonic.direct.force_constants = ip.force_constants
-        g.harmonic.direct.zero_k_energy = ip.zero_k_energy
         g.harmonic.direct.home_positions = ip.structure.positions
         g.harmonic.broadcast.positions = gp.reflect.output.positions[-1]
         g.harmonic.direct.cell = ip.structure.cell
@@ -375,7 +373,6 @@ class VacancyTILD(TILDParent):
         id_.time_step = 1.
         id_.sampling_period = 1
         id_.thermalization_steps = 10
-        id_.zero_k_energy = 0.0
         id_.sleep_time = 0
         id_.previous_volume = None
         id_.energy_kin = None
@@ -561,7 +558,6 @@ class VacancyTILD(TILDParent):
         g.harmonic.input.n_children = ip.n_lambdas
         g.harmonic.direct.spring_constant = ip.spring_constant
         g.harmonic.direct.force_constants = ip.force_constants
-        g.harmonic.direct.zero_k_energy = ip.zero_k_energy
         g.harmonic.direct.home_positions = gp.slice_structure.output.sliced[-1]
         g.harmonic.broadcast.positions = gp.slice_harmonic.output.sliced[-1]
         g.harmonic.direct.cell = ip.structure.cell
@@ -749,7 +745,6 @@ class HarmonicallyCoupled(CompoundVertex):
         # harmonic
         g.harmonic.input.spring_constant = ip.spring_constant
         g.harmonic.input.force_constants = ip.force_constants
-        g.harmonic.input.zero_k_energy = ip.zero_k_energy
         g.harmonic.input.home_positions = ip.structure.positions
         g.harmonic.input.cell = ip.structure.cell
         g.harmonic.input.pbc = ip.structure.pbc
@@ -913,7 +908,6 @@ class HarmonicTILDParallel(HarmonicTILD):
         # run_lambda_points - harmonic
         g.run_lambda_points.direct.spring_constant = ip.spring_constant
         g.run_lambda_points.direct.force_constants = ip.force_constants
-        g.run_lambda_points.direct.zero_k_energy = ip.zero_k_energy
 
         # run_lambda_points - mix
         g.run_lambda_points.broadcast.coupling_weights = gp.build_lambdas.output.lambda_pairs[-1]
@@ -1005,7 +999,6 @@ class Decoupling(CompoundVertex):
         g.verlet_velocities = VerletVelocityUpdate()
         g.check_thermalized = IsGEq()
         g.check_sampling_period = ModIsZero()
-        g.energy_pot_weights = EnergyPotWeights()
         g.addition = WeightedSum()
         g.average = WelfordOnline()
         g.clock = Counter()
@@ -1028,7 +1021,6 @@ class Decoupling(CompoundVertex):
             g.verlet_velocities,
             g.check_thermalized, 'true',
             g.check_sampling_period, 'true',
-            g.energy_pot_weights,
             g.addition,
             g.average,
             g.clock,
@@ -1101,10 +1093,10 @@ class Decoupling(CompoundVertex):
         # harmonic
         g.harmonic.input.spring_constant = ip.spring_constant
         g.harmonic.input.force_constants = ip.force_constants
-        g.harmonic.input.zero_k_energy = ip.zero_k_energy
         g.harmonic.input.home_positions = ip.structure.positions
         g.harmonic.input.cell = ip.structure.cell
         g.harmonic.input.pbc = ip.structure.pbc
+        g.harmonic.input.mask = ip.vacancy_id
 
         g.harmonic.input.positions = gp.reflect.output.positions[-1]
 
@@ -1125,8 +1117,8 @@ class Decoupling(CompoundVertex):
 
         # mix
         g.mix.input.vectors = [
-            gp.calc_full.output.forces[-1],
-            gp.write_harmonic_forces.output.overwritten[-1]
+            gp.write_harmonic_forces.output.overwritten[-1],
+            gp.calc_full.output.forces[-1]
         ]
         g.mix.input.weights = ip.coupling_weights
 
@@ -1147,16 +1139,13 @@ class Decoupling(CompoundVertex):
         g.check_sampling_period.input.target = gp.clock.output.n_counts[-1]
         g.check_sampling_period.input.default.mod = ip.sampling_period
 
-        # energy_pot_weights
-        g.energy_pot_weights.input.positions = gp.reflect.output.positions[-1]
-
         # addition
         g.addition.input.vectors = [
             gp.calc_vac.output.energy_pot[-1],
             gp.harmonic.output.energy_pot[-1],
             gp.calc_full.output.energy_pot[-1]
         ]
-        g.addition.input.weights = gp.energy_pot_weights.output.energy_pot_weights[-1]
+        g.addition.input.weights = [1, 1, -1]
 
         # average
         g.average.input.sample = gp.addition.output.weighted_sum[-1]
@@ -1288,7 +1277,6 @@ class VacancyTILDParallel(VacancyTILD):
         # run_lambda_points - harmonic
         g.run_lambda_points.direct.spring_constant = ip.spring_constant
         g.run_lambda_points.direct.force_constants = ip.force_constants
-        g.run_lambda_points.direct.zero_k_energy = ip.zero_k_energy
 
         # run_lambda_points - slice_harmonic_forces
         g.run_lambda_points.direct.vacancy_id = ip.vacancy_id
@@ -1308,9 +1296,6 @@ class VacancyTILDParallel(VacancyTILD):
 
         # run_lambda_points - check_sampling_period
         g.run_lambda_points.direct.sampling_period = ip.sampling_period
-
-        # run_lambda_points - addition - does not need inputs
-        g.run_lambda_points.direct.n_atoms = ip.n_atoms
 
         # run_lambda_points - average - does not need inputs
 

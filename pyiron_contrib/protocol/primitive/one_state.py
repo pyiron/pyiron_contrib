@@ -439,19 +439,25 @@ class HarmonicHamiltonian(PrimitiveVertex):
     """
 
     def command(self, positions, home_positions, cell, pbc, spring_constant=None, force_constants=None,
-                zero_k_energy=0.0):
+                mask=None):
 
         dr = find_mic(positions - home_positions, cell, pbc)[0]
         if spring_constant is not None and force_constants is None:
             forces = -spring_constant * dr
-            energy = 0.5 * np.sum(spring_constant * dr * dr)
+            if mask is not None:
+                energy = 0.5 * np.sum(spring_constant * dr[mask] * dr[mask])
+            else:
+                energy = 0.5 * np.sum(spring_constant * dr * dr)
 
         elif force_constants is not None and spring_constant is None:
             transformed_force_constants = self.transform_force_constants(force_constants)
             transformed_displacements = self.transform_displacements(dr)
             transformed_forces = -np.dot(transformed_force_constants, transformed_displacements)
             forces = self.retransform_forces(transformed_forces, dr)
-            energy = -0.5 * np.dot(transformed_displacements, transformed_forces)
+            if mask is not None:
+                energy = -0.5 * np.dot(transformed_displacements[mask], transformed_forces[mask])
+            else:
+                energy = -0.5 * np.dot(transformed_displacements, transformed_forces)
 
         else:
             raise TypeError('Please specify either a spring constant or the force constant matrix')
@@ -1320,7 +1326,6 @@ class BerendsenBarostat(PrimitiveVertex):
 
     Input dictionary:
         pressure (float): The pressure in GPa to be simulated (Default is None GPa)
-        #TODO: Simulate a pressure tensor, and not just an isotropic pressure
         temperature (float): The temperature in K (Default is 0. K)
         box_pressures (numpy.ndarray): The pressure tensor in GPa generated per step by Lammps
         energy_kin (float): The kinetic energy of the system in eV (Default is None)
@@ -1422,16 +1427,4 @@ class StepEnergies(PrimitiveVertex):
         return {
             'energy_pots': energy_pots,
             'energy_kins': energy_kins
-        }
-
-
-class EnergyPotWeights(PrimitiveVertex):
-    """
-
-    """
-
-    def command(self, positions):
-
-        return {
-            'energy_pot_weights': [1, 1 / len(positions), -1]
         }

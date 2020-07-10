@@ -117,21 +117,21 @@ class Image:
         source (str/numpy.ndarray): The raw data source.
         data (numpy.ndarray): The image data. Not loaded until called, so first call may be slow. Modifications are
             made to this field, leaving the source untouched. NOT saved to hdf.
-        as_grey (bool): Whether to interpret the image as greyscale.
+        as_gray (bool): Whether to interpret the image as grayscale.
         metadata (Metadata): Metadata associated with the source.
     """
 
-    def __init__(self, source, metadata=None, as_grey=False):
+    def __init__(self, source, metadata=None, as_gray=False):
         """
         source (str/numpy.ndarray): The raw data source.
-        as_grey (bool): Whether to interpret the image as greyscale. (Default is False)
+        as_gray (bool): Whether to interpret the image as grayscale. (Default is False)
         metadata (Metadata): Metadata associated with the source. (Default is None.)
         """
 
         # Set data
         self._source = source
         self._data = None
-        self.as_grey = as_grey
+        self.as_gray = as_gray
 
         # Set metadata
         self._metadata = None
@@ -162,19 +162,19 @@ class Image:
     def source(self):
         return self._source
 
-    def overwrite_source(self, new_source, new_metadata=None, as_grey=False):
+    def overwrite_source(self, new_source, new_metadata=None, as_gray=False):
         """
         Apply a new source of image data to the image object.
 
         Args:
             new_source (str/numpy.ndarray): The filepath to the data, or the raw array of data itself.
             new_metadata (Metadata): The metadata associated with the new source. (Default is None.)
-            as_grey (bool): Whether to interpret the new data as greyscale. (Default is False.)
+            as_gray (bool): Whether to interpret the new data as grayscale. (Default is False.)
         """
 
         self._source = new_source
         self._data = None
-        self.as_grey = as_grey
+        self.as_gray = as_gray
         self.metadata = new_metadata or Metadata()
 
     @property
@@ -209,9 +209,9 @@ class Image:
         if isinstance(self.source, np.ndarray):
             self._data = self.source.copy()
             if len(self._data.shape) == 3:
-                self.convert_to_greyscale()
+                self.convert_to_grayscale()
         elif isinstance(self.source, str):
-            self._data = io.imread(self.source, as_grey=self.as_grey)
+            self._data = io.imread(self.source, as_gray=self.as_gray)
         else:
             raise ValueError("Data source not understood, should be numpy.ndarray or string pointing to image file.")
 
@@ -223,18 +223,18 @@ class Image:
 
         self._load_data_from_source()
 
-    def convert_to_greyscale(self):
+    def convert_to_grayscale(self):
         """
-        Flattens (NxMx3) data into (NxM) greyscale data.
+        Flattens (NxMx3) data into (NxM) grayscale data.
         """
         if self._data is not None:
             if len(self.data.shape) == 3 and self.data.shape[-1] == 3:
                 self._data = np.mean(self._data, axis=-1)
-                self.as_grey = True
+                self.as_gray = True
             else:
-                raise ValueError("Can only convert data with shape NxMx3 to greyscale")
+                raise ValueError("Can only convert data with shape NxMx3 to grayscale")
         else:
-            self.as_grey = True
+            self.as_gray = True
 
     def plot(self, ax=None, subplots_kwargs=None, imshow_kwargs=None, hide_axes=True):
         """
@@ -272,16 +272,16 @@ class Image:
         with hdf.open(group_name) as hdf5_server:
             hdf5_server["TYPE"] = str(type(self))
             hdf5_server["source"] = self.source
-            hdf5_server["as_grey"] = self.as_grey
+            hdf5_server["as_gray"] = self.as_gray
             self.metadata.to_hdf(hdf=hdf5_server, group_name="metadata")
 
     def from_hdf(self, hdf, group_name=None):
         with hdf.open(group_name) as hdf5_server:
             source = hdf5_server["source"]
-            as_grey = hdf5_server["as_grey"]
+            as_gray = hdf5_server["as_gray"]
             metadata = Metadata()
             metadata.from_hdf(hdf=hdf5_server, group_name="metadata")
-        self.overwrite_source(source, new_metadata=metadata, as_grey=as_grey)
+        self.overwrite_source(source, new_metadata=metadata, as_gray=as_gray)
 
 
 class Metadata(UserDict):

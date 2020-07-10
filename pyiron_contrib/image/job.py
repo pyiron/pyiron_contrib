@@ -102,14 +102,14 @@ class ImageJob(GenericJob):
         fig.tight_layout()
         return fig, axes
 
-    def add_image(self, source, metadata=None, as_grey=False, relative_path=True):
+    def add_image(self, source, metadata=None, as_gray=False, relative_path=True):
         """
         Add an image to the job.
 
         Args:
             source (str/numpy.ndarray): The filepath to the data, or the raw array of data itself.
             metadata (Metadata): The metadata associated with the source. (Default is None.)
-            as_grey (bool): Whether to interpret the new data as greyscale. (Default is False.)
+            as_gray (bool): Whether to interpret the new data as grayscale. (Default is False.)
             relative_path (bool): Whether the path provided is relative. (Default is True, automatically converts to an
                 absolute path before setting the `source` value of the image.)
         """
@@ -118,9 +118,9 @@ class ImageJob(GenericJob):
             raise ValueError("Could not find a file at {}, nor is source an array.".format(source))
         if isinstance(source, str) and relative_path:
             source = abspath(source)
-        self.images.append(Image(source=source, metadata=metadata, as_grey=as_grey))
+        self.images.append(Image(source=source, metadata=metadata, as_gray=as_gray))
 
-    def add_images(self, sources, metadata=None, as_grey=False):
+    def add_images(self, sources, metadata=None, as_gray=False):
         """
         Add multiple images to the job.
 
@@ -128,17 +128,17 @@ class ImageJob(GenericJob):
             sources (str/list/tuple/numpy.ndarray): When a string, uses the `glob` module to look for matching files.
                 When list-like, iteratively uses each element as a new source.
             metadata (Metadata): The metadata associated with all these sources. (Default is None.)
-            as_grey (bool): Whether to interpret all this data as greyscale. (Default is False.)
+            as_gray (bool): Whether to interpret all this data as grayscale. (Default is False.)
             relative_path (bool): Whether the path provided is relative. (Default is True, automatically converts to an
                 absolute path before setting the `source` value of the image.)
         """
 
         if isinstance(sources, str):
             for match in iglob(sources):
-                self.add_image(match, metadata=metadata, as_grey=as_grey)
+                self.add_image(match, metadata=metadata, as_gray=as_gray)
         elif isinstance(sources, (list, tuple, np.ndarray)):
             for source in sources:
-                self.add_image(source, metadata=metadata, as_grey=as_grey)
+                self.add_image(source, metadata=metadata, as_gray=as_gray)
 
     def run(self, run_again=False, repair=False, debug=False, run_mode=None):
         super(ImageJob, self).run(run_again=run_again, repair=repair, debug=debug, run_mode=run_mode)

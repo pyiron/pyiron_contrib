@@ -443,21 +443,24 @@ class HarmonicHamiltonian(PrimitiveVertex):
 
         dr = find_mic(positions - home_positions, cell, pbc)[0]
         if spring_constant is not None and force_constants is None:
-            forces = -spring_constant * dr
             if mask is not None:
                 energy = 0.5 * np.sum(spring_constant * dr[mask] * dr[mask])
+                forces = -spring_constant * dr[mask]
             else:
                 energy = 0.5 * np.sum(spring_constant * dr * dr)
+                forces = -spring_constant * dr
 
         elif force_constants is not None and spring_constant is None:
             transformed_force_constants = self.transform_force_constants(force_constants)
             transformed_displacements = self.transform_displacements(dr)
             transformed_forces = -np.dot(transformed_force_constants, transformed_displacements)
-            forces = self.retransform_forces(transformed_forces, dr)
+            retransformed_forces = self.retransform_forces(transformed_forces, dr)
             if mask is not None:
-                energy = -0.5 * np.dot(transformed_displacements[mask], transformed_forces[mask])
+                forces = retransformed_forces[mask]
+                energy = 0.5 * np.dot(-forces, dr[mask])
             else:
-                energy = -0.5 * np.dot(transformed_displacements, transformed_forces)
+                forces = retransformed_forces
+                energy = 0.5 * np.tensordot(-forces, dr)
 
         else:
             raise TypeError('Please specify either a spring constant or the force constant matrix')

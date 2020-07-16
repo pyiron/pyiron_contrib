@@ -992,7 +992,6 @@ class Decoupling(CompoundVertex):
         g.slice_positions = Slice()
         g.calc_vac = ExternalHamiltonian()
         g.harmonic = HarmonicHamiltonian()
-        g.slice_harmonic_forces = Slice()
         g.write_vac_forces = Overwrite()
         g.write_harmonic_forces = Overwrite()
         g.mix = WeightedSum()
@@ -1014,7 +1013,6 @@ class Decoupling(CompoundVertex):
             g.slice_positions,
             g.calc_vac,
             g.harmonic,
-            g.slice_harmonic_forces,
             g.write_vac_forces,
             g.write_harmonic_forces,
             g.mix,
@@ -1100,11 +1098,6 @@ class Decoupling(CompoundVertex):
 
         g.harmonic.input.positions = gp.reflect.output.positions[-1]
 
-        # slice_harmonic_forces
-        g.slice_harmonic_forces.input.vector = gp.harmonic.output.forces[-1]
-        g.slice_harmonic_forces.input.mask = ip.vacancy_id
-        g.slice_harmonic_forces.input.ensure_iterable_mask = ip.ensure_iterable_mask
-
         # write_vac_forces
         g.write_vac_forces.input.target = gp.calc_full.output.forces[-1]
         g.write_vac_forces.input.mask = ip.shared_ids
@@ -1113,7 +1106,7 @@ class Decoupling(CompoundVertex):
         # write_harmonic_forces
         g.write_harmonic_forces.input.target = gp.write_vac_forces.output.overwritten[-1]
         g.write_harmonic_forces.input.mask = ip.vacancy_id
-        g.write_harmonic_forces.input.new_values = gp.slice_harmonic_forces.output.sliced[-1]
+        g.write_harmonic_forces.input.new_values = gp.harmonic.output.forces[-1]
 
         # mix
         g.mix.input.vectors = [
@@ -1277,10 +1270,7 @@ class VacancyTILDParallel(VacancyTILD):
         # run_lambda_points - harmonic
         g.run_lambda_points.direct.spring_constant = ip.spring_constant
         g.run_lambda_points.direct.force_constants = ip.force_constants
-
-        # run_lambda_points - slice_harmonic_forces
         g.run_lambda_points.direct.vacancy_id = ip.vacancy_id
-        g.run_lambda_points.direct.ensure_iterable_mask = ip.ensure_iterable_mask
 
         # run_lambda_points - write_vac_forces -  takes inputs already specified
 

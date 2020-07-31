@@ -95,24 +95,6 @@ class Counter(PrimitiveVertex):
         }
 
 
-class ResetSamplingPeriod(PrimitiveVertex):
-    """
-
-    """
-
-    def __init__(self, name=None):
-        super(ResetSamplingPeriod, self).__init__(name=name)
-        self.new_sampling_period = 0
-
-    def command(self, base_sampling_period, max_steps):
-        if self.new_sampling_period < max_steps:
-            self.new_sampling_period += base_sampling_period
-        print(self.new_sampling_period)
-        return {
-            'sampling_period': base_sampling_period
-        }
-
-
 class Compute(PrimitiveVertex):
 
     def __init__(self, name=None):
@@ -161,7 +143,7 @@ class ExternalHamiltonian(PrimitiveVertex):
         structure (Atoms): The structure for initializing the external Hamiltonian. Overwrites the reference
         job structure when provided. (Default is None, the reference job needs to have its structure set.)
         interesting_keys (list[str]): String codes for output properties of the underlying job to collect. (
-        Default is ['forces', 'energy_pot'].)
+        Default iscd ['forces', 'energy_pot'].)
         positions (numpy.ndarray): New positions to evaluate. Shape must match the shape of the structure.
         (Not set by default, only necessary if positions are being updated.)
     """
@@ -882,6 +864,7 @@ class SphereReflection(PrimitiveVertex):
                 'reflected': False
             }
         else:
+            print('reflected')
             return {
                 'positions': previous_positions,
                 'velocities': -previous_velocities,
@@ -889,7 +872,7 @@ class SphereReflection(PrimitiveVertex):
             }
 
 
-class SphereReflectionPeratom(PrimitiveVertex):
+class SphereReflectionPerAtom(PrimitiveVertex):
     """
     Checks whether each atom in a structure is within a cutoff radius of its reference position; if not, reverts the
     positions and velocities of *the violating atoms* to an earlier state and reverses those earlier velocities. The
@@ -913,20 +896,12 @@ class SphereReflectionPeratom(PrimitiveVertex):
     """
 
     def __init__(self, name=None):
-        super(SphereReflectionPeratom, self).__init__(name=name)
+        super(SphereReflectionPerAtom, self).__init__(name=name)
 
     def command(self, reference_positions, cutoff_distance, positions, velocities, previous_positions,
                 previous_velocities, pbc, cell):
-        distance = np.abs(find_mic(reference_positions - positions, cell=cell, pbc=pbc)[0].flatten())
-        boolean = (distance < cutoff_distance)[:, np.newaxis]
-        reshaped_boolean = boolean.reshape(positions.shape)
-        is_at_home = []
-        for i in reshaped_boolean:
-            if False in i:
-                is_at_home.append([False])
-            else:
-                is_at_home.append([True])
-        is_at_home = np.array(is_at_home)
+        distance = np.linalg.norm(find_mic(reference_positions - positions, cell=cell, pbc=pbc)[0], axis=-1)
+        is_at_home = (distance < cutoff_distance)[:, np.newaxis]
         is_away = 1 - is_at_home
 
         return {
@@ -1117,7 +1092,6 @@ class VoronoiReflection(PrimitiveVertex):
 
     def __init__(self, name=None):
         super(VoronoiReflection, self).__init__(name=name)
-        # self.input.default.previous_velocities = Pointer(self.input.velocities)
 
     def command(self, reference_positions, positions, velocities, previous_positions, previous_velocities, pbc, cell):
         _, distance_matrix = get_distances(p1=reference_positions, p2=positions, cell=cell, pbc=pbc)
@@ -1249,41 +1223,6 @@ class Nones(PrimitiveVertex):
         }
 
 
-class Replace(PrimitiveVertex):
-    """
-
-    """
-
-    def command(self, new_value):
-        return {
-            'new_value': new_value
-        }
-
-
-class NearestNeighbors(PrimitiveVertex):
-    """
-    Gives the mean first nearest neighbor distances and forces. Used specifically in ConfinedMD and
-     ConfinedHarmonicMD.
-    """
-
-    def __init__(self, name=None):
-        super(NearestNeighbors, self).__init__(name=name)
-        self.input.default.nn_indices = None
-        self.input.default.lattice_site = [0., 0., 0.]
-
-    def command(self, lattice_site, nn_indices, positions, forces, cell, pbc):
-        nn_positions = np.array([positions[i] for i in nn_indices])
-        nn_forces = np.array([forces[j] for j in nn_indices])
-        nn_distances = np.linalg.norm(find_mic(nn_positions - lattice_site, cell, pbc)[0], axis=-1)
-        cutoff_distance = np.mean(nn_distances) * 0.5
-
-        return {
-            'nn_distances': nn_distances,
-            'nn_forces': nn_forces,
-            'cutoff_distance': cutoff_distance
-        }
-
-
 class TILDPostProcess(PrimitiveVertex):
     """
     Post processing for the Harmonic and Vacancy TILD protocols, to remove the necessity to load interactive
@@ -1410,24 +1349,4 @@ class BerendsenBarostat(PrimitiveVertex):
             'pressure': total_pressure,
             'structure': new_structure,
             'positions': new_structure.positions
-        }
-
-
-class StepEnergies(PrimitiveVertex):
-    """
-
-    """
-
-    def __init__(self, name=None):
-        super(StepEnergies, self).__init__(name=name)
-        self.input.default.energy_pots = []
-        self.input.default.energy_kins = []
-
-    def command(self, energy_pots, energy_kins, energy_pot, energy_kin):
-        energy_pots.append(energy_pot)
-        energy_kins.append(energy_kin)
-
-        return {
-            'energy_pots': energy_pots,
-            'energy_kins': energy_kins
         }

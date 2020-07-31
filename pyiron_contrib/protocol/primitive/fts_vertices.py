@@ -96,6 +96,7 @@ class StringRecenter(StringDistances):
                 'recentered': False,
             }
         else:
+            print('recenter')
             return {
                 'positions': centroid_positions,
                 'forces': centroid_forces,
@@ -140,6 +141,7 @@ class StringReflect(StringDistances):
                 'reflected': False
             }
         else:
+            print('reflect_string')
             return {
                 'positions': previous_positions,
                 'velocities': -previous_velocities,
@@ -179,7 +181,7 @@ class PositionsRunningAverage(PrimitiveVertex):
         if total_steps > thermalization_steps:
             thermalized = True
 
-        if thermalized is False:
+        if not thermalized:
             new_running_average = initial_positions
         else:
             # On the first step, divide by 2 to average two positions
@@ -232,13 +234,18 @@ class CentroidsRunningAverageMix(PrimitiveVertex):
 
         updated_centroids = []
 
+        # for i, (cent, avg) in enumerate(zip(centroids_pos_list, running_average_positions)):
+        #     if i == 0 or i == (len(centroids_pos_list) - 1):
+        #         updated_centroids.append(cent)
+        #     else:
+        #         displacement = find_mic(avg - cent, cell, pbc)[0]
+        #         update = mixing_fraction * displacement
+        #         updated_centroids.append(cent + update)
+
         for i, (cent, avg) in enumerate(zip(centroids_pos_list, running_average_positions)):
-            if i == 0 or i == (len(centroids_pos_list) - 1):
-                updated_centroids.append(cent)
-            else:
-                displacement = find_mic(avg - cent, cell, pbc)[0]
-                update = mixing_fraction * displacement
-                updated_centroids.append(cent + update)
+            displacement = find_mic(avg - cent, cell, pbc)[0]
+            update = mixing_fraction * displacement
+            updated_centroids.append(cent + update)
 
         return {
             'centroids_pos_list': np.array(updated_centroids)

@@ -96,7 +96,6 @@ class StringRecenter(StringDistances):
                 'recentered': False,
             }
         else:
-            print('recenter')
             return {
                 'positions': centroid_positions,
                 'forces': centroid_forces,
@@ -141,7 +140,6 @@ class StringReflect(StringDistances):
                 'reflected': False
             }
         else:
-            print('reflect_string')
             return {
                 'positions': previous_positions,
                 'velocities': -previous_velocities,

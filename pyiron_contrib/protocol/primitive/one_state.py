@@ -864,7 +864,6 @@ class SphereReflection(PrimitiveVertex):
                 'reflected': False
             }
         else:
-            print('reflected')
             return {
                 'positions': previous_positions,
                 'velocities': -previous_velocities,

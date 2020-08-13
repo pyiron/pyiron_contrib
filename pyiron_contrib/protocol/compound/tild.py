@@ -762,21 +762,15 @@ class HarmonicallyCoupled(CompoundVertex):
         g.verlet_velocities.input.forces = gp.mix.output.weighted_sum[-1]
 
         # running_average_positions
-        g.running_average.input.default.thermalized = ip.thermalized
-        g.running_average.input.default.total_steps = ip.total_steps
         g.running_average.input.default.divisor = ip.divisor
         g.running_average.input.default.running_average_positions = ip.structure.positions
 
-        g.running_average.input.thermalized = gp.running_average.output.thermalized[-1]
-        g.running_average.input.total_steps = gp.running_average.output.total_steps[-1]
         g.running_average.input.divisor = gp.running_average.output.divisor[-1]
         g.running_average.input.running_average_positions = \
             gp.running_average.output.running_average_positions[-1]
         g.running_average.input.positions = gp.reflect.output.positions[-1]
         g.running_average.input.cell = ip.structure.cell
         g.running_average.input.pbc = ip.structure.pbc
-        g.running_average.input.thermalization_steps = ip.thermalization_steps
-        g.running_average.input.initial_positions = ip.structure.positions
 
         # check_thermalized
         g.check_thermalized.input.target = gp.clock.output.n_counts[-1]
@@ -904,8 +898,6 @@ class HarmonicTILDParallel(HarmonicTILD):
         g.run_lambda_points.broadcast.coupling_weights = gp.build_lambdas.output.lambda_pairs[-1]
 
         # run_lambda_points - running_average
-        g.run_lambda_points.direct.thermalized = ip.thermalized
-        g.run_lambda_points.direct.total_steps = ip.total_steps
         g.run_lambda_points.direct.divisor = ip.divisor
 
         # run_lambda_points - verlet_velocities

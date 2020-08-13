@@ -192,9 +192,6 @@ class HarmonicTILD(TILDParent):
         g.check_steps.input.target = gp.clock.output.n_counts[-1]
         g.check_steps.input.threshold = ip.n_steps
 
-        # clock
-        g.clock.input.default.max_count = ip.n_steps
-
         # verlet_positions
         g.verlet_positions.input.n_children = ip.n_lambdas
         g.verlet_positions.direct.default.positions = ip.structure.positions
@@ -498,9 +495,6 @@ class VacancyTILD(TILDParent):
         g.check_steps.input.target = gp.clock.output.n_counts[-1]
         g.check_steps.input.threshold = ip.n_steps
 
-        # clock
-        g.clock.input.default.max_count = ip.n_steps
-
         # verlet_positions
         g.verlet_positions.input.n_children = ip.n_lambdas
         g.verlet_positions.direct.default.positions = ip.structure.positions
@@ -802,9 +796,6 @@ class HarmonicallyCoupled(CompoundVertex):
         # average
         g.average.input.sample = gp.addition.output.weighted_sum[-1]
 
-        # clock
-        g.clock.input.max_count = ip.n_steps
-
         self.archive.clock = gp.clock.output.n_counts[-1]
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
 
@@ -936,8 +927,7 @@ class HarmonicTILDParallel(HarmonicTILD):
         g.run_lambda_points.direct.n_steps = ip.n_steps
 
         # clock
-        g.clock.input.max_count = ip.n_steps
-        g.clock.input.new_count = gp.run_lambda_points.output.clock[-1][-1]
+        g.clock.input.add_counts = gp.run_lambda_points.output.clock[-1][-1]
 
         # post_processing
         g.post.input.lambda_pairs = gp.build_lambdas.output.lambda_pairs[-1]
@@ -1143,9 +1133,6 @@ class Decoupling(CompoundVertex):
         # average
         g.average.input.sample = gp.addition.output.weighted_sum[-1]
 
-        # clock
-        g.clock.input.max_count = ip.n_steps
-
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
 
     def get_output(self):
@@ -1293,8 +1280,7 @@ class VacancyTILDParallel(VacancyTILD):
         g.run_lambda_points.direct.n_steps = ip.n_steps
 
         # clock
-        g.clock.input.max_count = ip.n_steps
-        g.clock.input.new_count = gp.run_lambda_points.output.clock[-1][-1]
+        g.clock.input.add_counts = gp.run_lambda_points.output.clock[-1][-1]
 
         # post_processing
         g.post.input.lambda_pairs = gp.build_lambdas.output.lambda_pairs[-1]

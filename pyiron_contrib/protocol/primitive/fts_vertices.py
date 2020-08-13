@@ -8,7 +8,7 @@ from pyiron_contrib.protocol.utils import IODictionary
 import numpy as np
 from pyiron.atomistics.job.interactive import GenericInteractive
 from pyiron.lammps.lammps import LammpsInteractive
-from scipy.constants import physical_constants
+from scipy.constants import femto as FS
 from ase.geometry import find_mic, get_distances  # TODO: Wrap things using pyiron functionality
 from pyiron import Project
 from pyiron_contrib.protocol.utils import ensure_iterable
@@ -152,13 +152,16 @@ class PositionsRunningAverage(PrimitiveVertex):
     Calculates the running average of input positions at each call.
 
     Input attributes:
-        positions (list/numpy.ndarray): The instantaneous position, which will be updated to the running average
-        running_average_positions (list/numpy.ndarray): The running average of positions
-        cell (numpy.ndarray): The cell of the structure
-        pbc (numpy.ndarray): Periodic boundary condition of the structure
+        positions (list/numpy.ndarray): The instantaneous position, which will be updated to the running average.
+        running_average_positions (list/numpy.ndarray): The running average of positions.
+        cell (numpy.ndarray): The cell of the structure.
+        pbc (numpy.ndarray): Periodic boundary condition of the structure.
+        divisor (int): The divisor for the running average positions. Increments by 1, each time the vertex is
+            called. (Default is 1.)
 
     Output attributes:
-        running_average_positions (list/numpy.ndarray): The updated running average list
+        running_average_positions (list/numpy.ndarray): The updated running average list.
+        divisor (int): The updated divisor.
 
     TODO:
         Handle non-static cells, or at least catch them.
@@ -168,36 +171,16 @@ class PositionsRunningAverage(PrimitiveVertex):
     def __init__(self, name=None):
         super(PositionsRunningAverage, self).__init__(name=name)
         self.input.default.divisor = 1
-        self.input.default.total_steps = 0
-        self.input.default.thermalized = False
-        self.input.default.thermalization_steps = 0
 
-    def command(self, thermalized, total_steps, divisor, running_average_positions, positions, cell, pbc,
-                thermalization_steps, initial_positions):
-
-        total_steps += 1
-        if total_steps > thermalization_steps:
-            thermalized = True
-
-        if not thermalized:
-            new_running_average = initial_positions
-        else:
-            # On the first step, divide by 2 to average two positions
-            divisor += 1
-            # How much of the current step to mix into the average
-            weight = 1. / divisor
-
-            running_average_positions = np.array(running_average_positions)
-            positions = np.array(positions)
-
-            displacement = find_mic(positions - running_average_positions, cell, pbc)[0]
-            new_running_average = running_average_positions + (weight * displacement)
+    def command(self, positions, running_average_positions, divisor, cell, pbc):
+        divisor += 1  # On the first step, divide by 2 to average two positions
+        weight = 1. / divisor  # How much of the current step to mix into the average
+        displacement = find_mic(positions - running_average_positions, cell, pbc)[0]
+        new_running_average = running_average_positions + (weight * displacement)
 
         return {
-            'running_average_positions': np.array(new_running_average),
-            'divisor': divisor,
-            'thermalized': thermalized,
-            'total_steps': total_steps
+            'running_average_positions': new_running_average,
+            'divisor': divisor
         }
 
 
@@ -348,7 +331,7 @@ class CentroidsReparameterization(PrimitiveVertex):
         centroids_pos_list = new_positions
 
         return {
-            'centroids_pos_list': np.array(centroids_pos_list)
+            'centroids_pos_list': centroids_pos_list
         }
 
     @staticmethod
@@ -374,11 +357,11 @@ class CentroidsReparameterization(PrimitiveVertex):
         return lengths
 
 
-class MilestoningVertex(PrimitiveVertex):
+class ReflectAndMilestone(PrimitiveVertex):
     """
     Checks whether positions are closest to its own centroid. If not, reverses the velocities, and resets the
-        positions and forces to the values from the previous step. Logs total reflections, reflections off edges
-        and time spent at each edge
+        positions to the values from the previous step. For the milestoning part, logs total reflections,
+        reflections off edges and time spent at each edge.
 
     Input attributes:
         positions_list (list/numpy.ndarray): List of current positions
@@ -402,81 +385,166 @@ class MilestoningVertex(PrimitiveVertex):
     """
 
     def __init__(self, name=None):
-        super(MilestoningVertex, self).__init__(name=name)
+        super(ReflectAndMilestone, self).__init__(name=name)
         # initialize matrices to be tracked
-        self.tracker_list = None
-        self.reflections_matrix = None
-        self.edge_reflections_matrix = None
-        self.edge_time_matrix = None
+        self.input.default.image_number = None
+        self.input.default.tracker_list = None
+        self.input.default.reflections_matrix = None
+        self.input.default.edge_reflections_matrix = None
+        self.input.default.edge_time_matrix = None
 
-    def command(self, positions_list, velocities_list, forces_list, prev_positions_list, prev_velocities_list,
-                prev_forces_list, all_centroid_positions, thermalization_steps, cell, pbc):
+    def command(self, positions, velocities, previous_positions, previous_velocities, centroid_positions,
+                all_centroid_positions, thermalization_steps, image_number, tracker_list, reflections_matrix,
+                edge_reflections_matrix, edge_time_matrix, cell, pbc):
         n_images = len(all_centroid_positions)
         n_edges = int(n_images * (n_images - 1) / 2)
         current_step = self.archive.clock
 
-        reflected_positions = []
-        reflected_velocities = []
-        reflected_forces = []
-
-        if current_step == 0:
+        if self.archive.clock == 1:  # clock always starts from 1
             # form the matrices
-            self.tracker_list = [[None, None] for _ in np.arange(n_images)]
-            self.reflections_matrix = np.zeros((n_images, n_images))
-            self.edge_reflections_matrix = np.array([np.zeros((n_edges, n_edges)) for _ in np.arange(n_images)])
-            self.edge_time_matrix = np.array([np.zeros(n_edges) for _ in np.arange(n_images)])
+            image_number = self.get_closest_centroid_index(centroid_positions, all_centroid_positions, cell, pbc)
+            tracker_list = [[None, None] for _ in np.arange(n_images)]
+            reflections_matrix = np.zeros((n_images, n_images))
+            edge_reflections_matrix = np.array([np.zeros((n_edges, n_edges)) for _ in np.arange(n_images)])
+            edge_time_matrix = np.array([np.zeros(n_edges) for _ in np.arange(n_images)])
+
+        tracker = tracker_list[image_number]
 
         # Find distance between positions and each of the centroids
-        for n, (pos, cent) in enumerate(zip(positions_list, all_centroid_positions)):
-            closest_centroid_id = self.get_closest_centroid_index(pos, all_centroid_positions, cell, pbc)
-            tracker = self.tracker_list[n]
+        closest_centroid_id = self.get_closest_centroid_index(positions, all_centroid_positions, cell, pbc)
 
-            if closest_centroid_id == n:
-                # Return current positions, velocities and forces
-                reflected_positions.append(positions_list[n])
-                reflected_velocities.append(velocities_list[n])
-                reflected_forces.append(forces_list[n])
+        if closest_centroid_id == image_number:
+            # Return current positions and velocities
+            reflected_positions = positions
+            reflected_velocities = velocities
 
-                if current_step >= thermalization_steps:
-                    # Start reflection tracking
-                    if tracker[1] is not None:  # If no reflections, increment time
-                        self.edge_time_matrix[n][tracker[1]] += 1
+            if current_step >= thermalization_steps:
+                # Start reflection tracking
+                if tracker[1] is not None:  # If no reflections, increment time
+                    edge_time_matrix[image_number][tracker[1]] += 1
+                # End reflection tracking
+        else:
+            # Update to previous positions and velocities, if positions are not closest to parent centroid
+            reflected_positions = previous_positions
+            reflected_velocities = -previous_velocities
+
+            if current_step >= thermalization_steps:
+                # Start reflection tracking
+                reflections_matrix[image_number, closest_centroid_id] += 1  # Save the reflection
+                indices = np.zeros((n_images, n_images))  # images x images
+                indices[image_number, closest_centroid_id] = 1  # Record the edge
+                ind = np.tril(indices) + np.triu(indices).T  # Convert to triangular matrix
+                # Record the index of the edge (N_j)
+                n_j = int(np.nonzero(ind[np.tril_indices(n_images, k=-1)])[0][0])
+
+                if tracker[1] is None:
+                    tracker[1] = n_j  # Initialize N_j
+                elif tracker[1] == n_j:
+                    edge_time_matrix[image_number][n_j] += 1
+                else:
+                    tracker[0] = tracker[1]  # If reflecting off a different edge, change N_j to N_i
+                    tracker[1] = n_j  # Set new N_j
+                    edge_reflections_matrix[image_number][tracker[0], tracker[1]] += 1
                     # End reflection tracking
-            else:
-                # Update previous positions, velocities and forces, if positions are not closest to parent centroid
-                reflected_positions.append(prev_positions_list[n])
-                reflected_velocities.append(-prev_velocities_list[n])
-                reflected_forces.append(prev_forces_list[n])
-
-                if current_step >= thermalization_steps:
-                    # Start reflection tracking
-                    self.reflections_matrix[n, closest_centroid_id] += 1  # Save the reflection
-                    indices = np.zeros((n_images, n_images))  # images x images
-                    indices[n, closest_centroid_id] = 1  # Record the edge
-                    ind = np.tril(indices) + np.triu(indices).T  # Convert to triangular matrix
-                    # Record the index of the edge (N_j)
-                    n_j = int(np.nonzero(ind[np.tril_indices(n_images, k=-1)])[0][0])
-
-                    if tracker[1] is None:
-                        tracker[1] = n_j  # Initialize N_j
-                    elif tracker[1] == n_j:
-                        self.edge_time_matrix[n][n_j] += 1
-                    else:
-                        tracker[0] = tracker[1]  # If reflecting off a different edge, change N_j to N_i
-                        tracker[1] = n_j  # Set new N_j
-                        self.edge_reflections_matrix[n][tracker[0], tracker[1]] += 1
-                        # End reflection tracking
 
         return {
-            'positions_list': reflected_positions,
-            'velocities_list': reflected_velocities,
-            'forces_list': reflected_forces,
-            'reflections_matrix': self.reflections_matrix,
-            'edge_reflections_matrix': self.edge_reflections_matrix,
-            'edge_time_matrix': self.edge_time_matrix
+            'positions': reflected_positions,
+            'velocities': reflected_velocities,
+            'image_number': image_number,
+            'tracker_list': tracker_list,
+            'reflections_matrix': reflections_matrix,
+            'edge_reflections_matrix': edge_reflections_matrix,
+            'edge_time_matrix': edge_time_matrix,
         }
 
     @staticmethod
     def get_closest_centroid_index(positions, all_centroid_positions, cell, pbc):
         distances = [np.linalg.norm(find_mic(c_pos - positions, cell, pbc)[0]) for c_pos in all_centroid_positions]
         return np.argmin(distances)
+
+
+class MilestonePostProcess(PrimitiveVertex):
+    """
+    Generates jump frequencies of each centroid to the final centroid form the reflections matrix, edge reflections
+    matrix, and the edge time matrix stored by the milestoning vertex.
+
+    Returns:
+        (float): The mean time of first passage from the 0th image to the final image.
+        (list): `n_images - 1` mean times of passage from the 0th Voronoi cell to the final cell.
+        (list): Respective equilibrium probabilities to find the system in each Voronoi cell.
+
+    TODO: Convert the final frequency to THz?
+    """
+
+    def command(self, time_step, reflections_matrix, edge_reflections_matrix, edge_time_matrix, n_images):
+        n_edges = int(n_images * (n_images - 1) / 2)
+        reflections_matrix = np.sum(reflections_matrix, axis=0)
+        edge_reflections_matrix = np.sum(edge_reflections_matrix, axis=0)
+        edge_time_matrix = np.sum(edge_time_matrix, axis=0)
+        pis = self._get_pi(reflections_matrix, n_images)
+
+        # for terminology, refer the following paper: https://doi.org/10.1063/1.3129843
+        n_ij = np.zeros((n_edges, n_edges))
+        r_i = np.zeros(n_edges)
+        for img in np.arange(n_images):
+            n = pis[img] * edge_reflections_matrix[img]
+            r = pis[img] * edge_time_matrix[img]
+            n_ij += n
+            r_i += r
+
+        # The paper uses shows ways to calculate the mean free passage time. The following section is
+        # commented out, as it is redundant. May come in handy for a consistency check?
+
+        # q_ij = []
+        # for i in np.arange(n_edges):
+        #     if r_i[i] != 0:
+        #         q_ij += [n_ij[i] / r_i[i]]
+        #     else:
+        #         q_ij += [np.zeros(n_edges)]
+        #
+        # q_ij = np.array(q_ij)
+
+        p_ij = []
+        tau_i = []
+        n_ji = n_ij.T
+        with np.errstate(invalid='ignore'):  # just ignores the divide by zero error
+            for i in np.arange(n_edges):
+                p_ij += [n_ji[i] / np.sum(n_ji[i])]
+                tau_i += [r_i[i] / np.sum(n_ji[i])]
+        for i in np.arange(n_edges):
+            for j in np.arange(n_edges):
+                if np.isnan(p_ij[i][j]):
+                    p_ij[i][j] = 0
+                    tau_i[i] = 0
+        p_ij = np.array(p_ij)
+        p_new = np.delete(p_ij, n_edges - 1, 0)
+        p_new = np.delete(p_new, n_edges - 1, 1)
+        tau_new = np.delete(tau_i, n_edges - 1, 0)
+
+        t_n = np.linalg.lstsq(np.eye(n_edges - 1) - p_new, tau_new, rcond=None)[0] * time_step * FS
+
+        summation = 0
+        mean_free_passage_times = [t_n[summation]]
+        for i in np.arange(2, len(t_n)):
+            summation += i
+            if summation < len(t_n):
+                mean_free_passage_times += [t_n[summation]]
+        mean_free_passage_times = np.array(mean_free_passage_times)
+        jump_frequencies = 1. / mean_free_passage_times
+
+        return {
+            'jump_frequencies': jump_frequencies,
+            'mean_free_passage_times': mean_free_passage_times,
+            'equilibrium_probability': pis,
+            'reflections_matrix': reflections_matrix,
+            'edge_reflections_matrix': edge_reflections_matrix,
+            'edge_time_matrix': edge_time_matrix,
+        }
+
+    @staticmethod
+    def _get_pi(reflections_matrix, n_images):
+        dia = np.eye(n_images) * np.sum(reflections_matrix, axis=1)
+        pi_mat_a = np.append(reflections_matrix.T - dia, [np.ones(n_images)], axis=0)
+        pi_vec_b = np.append(np.zeros(n_images), [1])
+
+        return np.linalg.lstsq(pi_mat_a, pi_vec_b, rcond=None)[0]

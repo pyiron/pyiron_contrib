@@ -72,21 +72,21 @@ class BuildMixingPairs(PrimitiveVertex):
 
 class Counter(PrimitiveVertex):
     """
-    Increments by one at each execution.
+    Increments by one at each execution. Can be made to increment from a specific value.
 
     Output attributes:
         n_counts (int): How many executions have passed. (Default is 0.)
+        add_counts (int): Add counts to n_counts. (Default is 0.)
     """
 
     def __init__(self, name=None):
         super(Counter, self).__init__(name=name)
-        self.output.n_counts = [0]
-        self.input.default.new_count = 0
-        self.input.default.max_count = 0
+        self.input.default.add_counts = 0
+        self.output.n_counts = [self.input.default.add_counts]
 
-    def command(self, new_count, max_count):
-        if new_count != 0:
-            count = self.output.n_counts[-1] + new_count
+    def command(self, add_counts):
+        if add_counts != 0:
+            count = self.output.n_counts[-1] + add_counts
         else:
             count = self.output.n_counts[-1] + 1
 

@@ -156,8 +156,6 @@ class NEB(CompoundVertex):
         g.gradient_descent.direct.fix_com = ip.fix_com
         g.gradient_descent.direct.use_adagrad = ip.use_adagrad
 
-        g.clock.input.default.max_count = ip.n_steps
-
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
 
     def get_output(self):

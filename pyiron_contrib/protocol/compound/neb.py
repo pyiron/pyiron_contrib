@@ -5,8 +5,8 @@
 from __future__ import print_function
 
 from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
-from pyiron_contrib.protocol.primitive.one_state import Counter, ExternalHamiltonian, GradientDescent, \
-    NEBForces, InitialPositions, InitializeJob
+from pyiron_contrib.protocol.primitive.one_state import Counter, CreateJob, ExternalHamiltonian, GradientDescent, \
+    NEBForces, InitialPositions
 from pyiron_contrib.protocol.primitive.two_state import IsGEq
 from pyiron_contrib.protocol.list import SerialList, ParallelList, AutoList
 from pyiron_contrib.protocol.utils import Pointer
@@ -88,7 +88,7 @@ class NEB(CompoundVertex):
     def define_vertices(self):
         # Graph components
         g = self.graph
-        g.initialize_jobs = InitializeJob()
+        g.initialize_jobs = CreateJob()
         g.interpolate_images = InitialPositions()
         g.check_steps = IsGEq()
         g.calc_static = AutoList(ExternalHamiltonian)
@@ -234,7 +234,7 @@ class NEBParallel(NEB):
         # Graph components
         g = self.graph
         ip = Pointer(self.input)
-        g.initialize_jobs = InitializeJob()
+        g.initialize_jobs = CreateJob()
         g.interpolate_images = InitialPositions()
         g.check_steps = IsGEq()
         g.calc_static = ParallelList(ExternalHamiltonian, sleep_time=ip.sleep_time)  # Enforce parallel

@@ -7,7 +7,7 @@ from __future__ import print_function
 from abc import ABC
 
 from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
-from pyiron_contrib.protocol.primitive.one_state import InitializeJob, InitialPositions, RandomVelocity, \
+from pyiron_contrib.protocol.primitive.one_state import CreateJob, InitialPositions, RandomVelocity, \
     ExternalHamiltonian, VerletPositionUpdate, VerletVelocityUpdate, Counter, Zeros, WelfordOnline, \
     SphereReflection, SphereReflectionPerAtom
 from pyiron_contrib.protocol.primitive.two_state import IsGEq, ModIsZero
@@ -101,8 +101,8 @@ class StringEvolution(CompoundVertex):
     def define_vertices(self):
         # Graph components
         g = self.graph
-        g.initialize_images = InitializeJob()
-        g.initialize_centroids = InitializeJob()
+        g.initialize_images = CreateJob()
+        g.initialize_centroids = CreateJob()
         g.initial_positions = InitialPositions()
         g.initial_velocities = SerialList(RandomVelocity)
         g.initial_forces = Zeros()
@@ -536,8 +536,8 @@ class ProtoStringEvolution(Protocol, StringEvolution, ABC):
 #         # Graph components
 #         g = self.graph
 #         ip = Pointer(self.input)
-#         g.initialize_images = InitializeJob()
-#         g.initialize_centroids = InitializeJob()
+#         g.initialize_images = CreateJob()
+#         g.initialize_centroids = CreateJob()
 #         g.initial_positions = InitialPositions()
 #         g.initial_velocities = SerialList(RandomVelocity)
 #         g.initial_forces = SerialList(Zeros)
@@ -916,8 +916,8 @@ class StringEvolutionParallel(StringEvolution):
         # Graph components
         g = self.graph
         ip = Pointer(self.input)
-        g.initialize_images = InitializeJob()
-        g.initialize_centroids = InitializeJob()
+        g.initialize_images = CreateJob()
+        g.initialize_centroids = CreateJob()
         g.initial_positions = InitialPositions()
         g.initial_velocities = SerialList(RandomVelocity)
         g.initial_forces = SerialList(Zeros)

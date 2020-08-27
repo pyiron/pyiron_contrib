@@ -271,26 +271,26 @@ class ExternalHamiltonian(PrimitiveVertex):
         if self._job is not None:
             self._job.interactive_close()
 
-    def to_hdf(self, hdf=None, group_name=None):
-        super(ExternalHamiltonian, self).to_hdf(hdf=hdf, group_name=group_name)
-        hdf[group_name]["fastlammpsmode"] = self._fast_lammps_mode
-        hdf[group_name]["jobname"] = self._job_name
-        hdf[group_name]["jobprojectpath"] = self._job_project_path
+    # def to_hdf(self, hdf=None, group_name=None):
+    #     super(ExternalHamiltonian, self).to_hdf(hdf=hdf, group_name=group_name)
+    #     hdf[group_name]["fastlammpsmode"] = self._fast_lammps_mode
+    #     hdf[group_name]["jobname"] = self._job_name
+    #     hdf[group_name]["jobprojectpath"] = self._job_project_path
+    #
+    # def from_hdf(self, hdf=None, group_name=None):
+    #     super(ExternalHamiltonian, self).from_hdf(hdf=hdf, group_name=group_name)
+    #     self._fast_lammps_mode = hdf[group_name]["fastlammpsmode"]
+    #     self._job_name = hdf[group_name]["jobname"]
+    #     self._job_project_path = hdf[group_name]["jobprojectpath"]
 
-    def from_hdf(self, hdf=None, group_name=None):
-        super(ExternalHamiltonian, self).from_hdf(hdf=hdf, group_name=group_name)
-        self._fast_lammps_mode = hdf[group_name]["fastlammpsmode"]
-        self._job_name = hdf[group_name]["jobname"]
-        self._job_project_path = hdf[group_name]["jobprojectpath"]
 
-
-class InitializeJob(PrimitiveVertex):
+class CreateJob(PrimitiveVertex):
     """
 
     """
 
     def __init__(self, name=None):
-        super(InitializeJob, self).__init__(name=name)
+        super(CreateJob, self).__init__(name=name)
         self.job_names = []
         self.project_path = []
         self._fast_lammps_mode = True
@@ -333,6 +333,17 @@ class InitializeJob(PrimitiveVertex):
             'job_names': self.job_names,
             'project_path': self.project_path
         }
+
+
+class RemoveJob(PrimitiveVertex):
+    """
+
+    """
+
+    def command(self, project_path, job_names):
+        pr = Project(path=project_path)
+        for name in job_names:
+            pr.remove_job(name)
 
 
 class GradientDescent(PrimitiveVertex):
@@ -406,13 +417,13 @@ class GradientDescent(PrimitiveVertex):
                 'positions': new_pos
             }
 
-    def to_hdf(self, hdf=None, group_name=None):
-        super(GradientDescent, self).to_hdf(hdf=hdf, group_name=group_name)
-        hdf[group_name]["accumulatedforce"] = self._accumulated_force
-
-    def from_hdf(self, hdf=None, group_name=None):
-        super(GradientDescent, self).from_hdf(hdf=hdf, group_name=group_name)
-        self._accumulated_force = hdf[group_name]["accumulatedforce"]
+    # def to_hdf(self, hdf=None, group_name=None):
+    #     super(GradientDescent, self).to_hdf(hdf=hdf, group_name=group_name)
+    #     hdf[group_name]["accumulatedforce"] = self._accumulated_force
+    #
+    # def from_hdf(self, hdf=None, group_name=None):
+    #     super(GradientDescent, self).from_hdf(hdf=hdf, group_name=group_name)
+    #     self._accumulated_force = hdf[group_name]["accumulatedforce"]
 
 
 class HarmonicHamiltonian(PrimitiveVertex):

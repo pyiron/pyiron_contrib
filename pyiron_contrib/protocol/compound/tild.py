@@ -11,7 +11,7 @@ from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
 from pyiron_contrib.protocol.list import SerialList, ParallelList
 from pyiron_contrib.protocol.utils import Pointer
 from pyiron_contrib.protocol.primitive.one_state import Counter, BuildMixingPairs, DeleteAtom, \
-    ExternalHamiltonian, HarmonicHamiltonian, InitializeJob, Overwrite, RandomVelocity, Slice, SphereReflection, \
+    ExternalHamiltonian, HarmonicHamiltonian, CreateJob, Overwrite, RandomVelocity, Slice, SphereReflection, \
     TILDPostProcess, Transpose, VerletPositionUpdate, VerletVelocityUpdate, WeightedSum, \
     WelfordOnline, Zeros
 from pyiron_contrib.protocol.primitive.two_state import IsGEq, ModIsZero
@@ -115,7 +115,7 @@ class HarmonicTILD(TILDParent):
         # Graph components
         g = self.graph
         g.build_lambdas = BuildMixingPairs()
-        g.initialize_jobs = InitializeJob()
+        g.initialize_jobs = CreateJob()
         g.initial_forces = Zeros()
         g.initial_velocity = SerialList(RandomVelocity)
         g.check_steps = IsGEq()
@@ -387,8 +387,8 @@ class VacancyTILD(TILDParent):
         g = self.graph
         g.create_vacancy = DeleteAtom()
         g.build_lambdas = BuildMixingPairs()
-        g.initialize_full_jobs = InitializeJob()
-        g.initialize_vac_jobs = InitializeJob()
+        g.initialize_full_jobs = CreateJob()
+        g.initialize_vac_jobs = CreateJob()
         g.random_velocity = SerialList(RandomVelocity)
         g.initial_forces = Zeros()
         g.slice_structure = Slice()
@@ -823,7 +823,7 @@ class HarmonicTILDParallel(HarmonicTILD):
         g = self.graph
         ip = Pointer(self.input)
         g.build_lambdas = BuildMixingPairs()
-        g.initialize_jobs = InitializeJob()
+        g.initialize_jobs = CreateJob()
         g.initial_velocities = SerialList(RandomVelocity)
         g.initial_forces = SerialList(Zeros)
         g.run_lambda_points = ParallelList(HarmonicallyCoupled, sleep_time=ip.sleep_time)
@@ -1159,8 +1159,8 @@ class VacancyTILDParallel(VacancyTILD):
         ip = Pointer(self.input)
         g.create_vacancy = DeleteAtom()
         g.build_lambdas = BuildMixingPairs()
-        g.initialize_full_jobs = InitializeJob()
-        g.initialize_vac_jobs = InitializeJob()
+        g.initialize_full_jobs = CreateJob()
+        g.initialize_vac_jobs = CreateJob()
         g.initial_velocities = SerialList(RandomVelocity)
         g.initial_forces = SerialList(Zeros)
         g.run_lambda_points = ParallelList(Decoupling, sleep_time=ip.sleep_time)

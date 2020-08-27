@@ -155,15 +155,15 @@ class ExternalHamiltonian(PrimitiveVertex):
         self._job_project_path = None
         self._job = None
         self._job_name = None
+        self.input.default.ref_job_full_path = None
+        self.input.default.project_path = None
         self.input.default.job_name = None
         self.input.default.structure = None
         self.input.default.positions = None
         self.input.default.cell = None
-        self.input.default.project_path = None
-        self.input.default.ref_job_full_path = None
         self.input.default.interesting_keys = ['positions', 'forces', 'energy_pot', 'pressures', 'volume', 'cells']
 
-    def command(self, job_name, ref_job_full_path, structure, interesting_keys, positions, cell, project_path):
+    def command(self, ref_job_full_path, project_path, job_name, structure, positions, cell, interesting_keys):
 
         if self._job_project_path is None:
             if project_path is None and ref_job_full_path is not None:
@@ -291,8 +291,8 @@ class CreateJob(PrimitiveVertex):
 
     def __init__(self, name=None):
         super(CreateJob, self).__init__(name=name)
-        self.job_names = []
-        self.project_path = []
+        self.job_names = None
+        self.project_path = None
         self._fast_lammps_mode = True
 
     def command(self, ref_job_full_path, n_images, structure):
@@ -300,6 +300,8 @@ class CreateJob(PrimitiveVertex):
         project_path, ref_job_path = split(ref_job_full_path)
         pr = Project(path=project_path)
         ref_job = pr.load(ref_job_path)
+        self.job_names = []
+        self.project_path = []
         for i in np.arange(n_images):
             name = loc + '_' + str(i)
             job = ref_job.copy_to(

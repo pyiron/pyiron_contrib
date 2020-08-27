@@ -170,18 +170,27 @@ class PositionsRunningAverage(PrimitiveVertex):
 
     def __init__(self, name=None):
         super(PositionsRunningAverage, self).__init__(name=name)
+        self.input.total_counts = 0
         self.input.default.divisor = 1
 
-    def command(self, positions, running_average_positions, divisor, cell, pbc):
-        divisor += 1  # On the first step, divide by 2 to average two positions
-        weight = 1. / divisor  # How much of the current step to mix into the average
-        displacement = find_mic(positions - running_average_positions, cell, pbc)[0]
-        new_running_average = running_average_positions + (weight * displacement)
-
-        return {
-            'running_average_positions': new_running_average,
-            'divisor': divisor
-        }
+    def command(self, positions, running_average_positions, total_counts, thermalization_steps, divisor, cell, pbc):
+        total_counts += 1
+        if total_counts > thermalization_steps:
+            divisor += 1  # On the first step, divide by 2 to average two positions
+            weight = 1. / divisor  # How much of the current step to mix into the average
+            displacement = find_mic(positions - running_average_positions, cell, pbc)[0]
+            new_running_average = running_average_positions + (weight * displacement)
+            return {
+                'running_average_positions': new_running_average,
+                'total_counts': total_counts,
+                'divisor': divisor,
+            }
+        else:
+            return {
+                'running_average_positions': running_average_positions,
+                'total_counts': total_counts,
+                'divisor': divisor,
+            }
 
 
 class CentroidsRunningAverageMix(PrimitiveVertex):

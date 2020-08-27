@@ -202,7 +202,7 @@ class StringEvolution(CompoundVertex):
 
         # reflect string
         g.reflect_string.input.n_children = ip.n_images
-        g.reflect_string.direct.cell = ip.structure_initial.cell
+        g.reflect_string.direct.cell = ip.structure_initial.cell.array
         g.reflect_string.direct.pbc = ip.structure_initial.pbc
 
         g.reflect_string.direct.default.all_centroid_positions = \
@@ -235,7 +235,7 @@ class StringEvolution(CompoundVertex):
         g.reflect_atoms.broadcast.previous_positions = gp.recenter.output.positions[-1]
         g.reflect_atoms.broadcast.previous_velocities = gp.verlet_velocities.output.velocities[-1]
         g.reflect_atoms.direct.cutoff_distance = ip.reflection_cutoff_distance
-        g.reflect_atoms.direct.cell = ip.structure_initial.cell
+        g.reflect_atoms.direct.cell = ip.structure_initial.cell.array
         g.reflect_atoms.direct.pbc = ip.structure_initial.pbc
 
         # calc_static_images
@@ -270,7 +270,7 @@ class StringEvolution(CompoundVertex):
         g.running_average_pos.broadcast.running_average_positions = \
             gp.running_average_pos.output.running_average_positions[-1]
         g.running_average_pos.broadcast.positions = gp.reflect_atoms.output.positions[-1]
-        g.running_average_pos.direct.cell = ip.structure_initial.cell
+        g.running_average_pos.direct.cell = ip.structure_initial.cell.array
         g.running_average_pos.direct.pbc = ip.structure_initial.pbc
         g.running_average_pos.direct.thermalization_steps = ip.thermalization_steps
         g.running_average_pos.broadcast.initial_positions = gp.initial_positions.output.initial_positions[-1]
@@ -284,7 +284,7 @@ class StringEvolution(CompoundVertex):
         g.mix.input.centroids_pos_list = gp.reparameterize.output.centroids_pos_list[-1]
         g.mix.input.mixing_fraction = ip.mixing_fraction
         g.mix.input.running_average_positions = gp.running_average_pos.output.running_average_positions[-1]
-        g.mix.input.cell = ip.structure_initial.cell
+        g.mix.input.cell = ip.structure_initial.cell.array
         g.mix.input.pbc = ip.structure_initial.pbc
 
         # smooth
@@ -294,7 +294,7 @@ class StringEvolution(CompoundVertex):
 
         # reparameterize
         g.reparameterize.input.centroids_pos_list = gp.smooth.output.centroids_pos_list[-1]
-        g.reparameterize.input.cell = ip.structure_initial.cell
+        g.reparameterize.input.cell = ip.structure_initial.cell.array
         g.reparameterize.input.pbc = ip.structure_initial.pbc
 
         # calc_static_centroids
@@ -307,7 +307,7 @@ class StringEvolution(CompoundVertex):
 
         # recenter
         g.recenter.input.n_children = ip.n_images
-        g.recenter.direct.cell = ip.structure_initial.cell
+        g.recenter.direct.cell = ip.structure_initial.cell.array
         g.recenter.direct.pbc = ip.structure_initial.pbc
 
         g.recenter.direct.default.all_centroid_positions = gp.initial_positions.output.initial_positions[-1]
@@ -446,7 +446,7 @@ class ProtoStringEvolution(Protocol, StringEvolution, ABC):
 #         g.verlet_positions.input.forces = gp.calc_static.output.forces[-1]
 #
 #         # reflect_string
-#         g.reflect_string.input.cell = ip.structure.cell
+#         g.reflect_string.input.cell = ip.structure.cell.array
 #         g.reflect_string.input.pbc = ip.structure.pbc
 #
 #         g.reflect_string.input.default.previous_positions = ip.positions
@@ -462,7 +462,7 @@ class ProtoStringEvolution(Protocol, StringEvolution, ABC):
 #
 #         # reflect_atoms
 #         g.reflect_atoms.input.cutoff_distance = ip.reflection_cutoff_distance
-#         g.reflect_atoms.input.cell = ip.structure.cell
+#         g.reflect_atoms.input.cell = ip.structure.cell.array
 #         g.reflect_atoms.input.pbc = ip.structure.pbc
 #
 #         g.reflect_atoms.input.default.previous_positions = ip.positions
@@ -503,7 +503,7 @@ class ProtoStringEvolution(Protocol, StringEvolution, ABC):
 #         g.running_average_pos.input.running_average_positions = \
 #             gp.running_average_pos.output.running_average_positions[-1]
 #         g.running_average_pos.input.positions = gp.reflect_atoms.output.positions[-1]
-#         g.running_average_pos.input.cell = ip.structure.cell
+#         g.running_average_pos.input.cell = ip.structure.cell.array
 #         g.running_average_pos.input.pbc = ip.structure.pbc
 #         g.running_average_pos.input.thermalization_steps = ip.thermalization_steps
 #         g.running_average_pos.input.initial_positions = ip.running_average_positions
@@ -674,7 +674,7 @@ class ProtoStringEvolution(Protocol, StringEvolution, ABC):
 #         g.mix.input.centroids_pos_list = gp.reparameterize.output.centroids_pos_list[-1]
 #         g.mix.input.mixing_fraction = ip.mixing_fraction
 #         g.mix.input.running_average_positions = gp.constrained_evo.output.running_average_positions[-1]
-#         g.mix.input.cell = ip.structure_initial.cell
+#         g.mix.input.cell = ip.structure_initial.cell.array
 #         g.mix.input.pbc = ip.structure_initial.pbc
 #
 #         # smooth
@@ -684,7 +684,7 @@ class ProtoStringEvolution(Protocol, StringEvolution, ABC):
 #
 #         # reparameterize
 #         g.reparameterize.input.centroids_pos_list = gp.smooth.output.centroids_pos_list[-1]
-#         g.reparameterize.input.cell = ip.structure_initial.cell
+#         g.reparameterize.input.cell = ip.structure_initial.cell.array
 #         g.reparameterize.input.pbc = ip.structure_initial.pbc
 #
 #         # calc_static_centroids
@@ -697,7 +697,7 @@ class ProtoStringEvolution(Protocol, StringEvolution, ABC):
 #
 #         # recenter
 #         g.recenter.input.n_children = ip.n_images
-#         g.recenter.direct.cell = ip.structure_initial.cell
+#         g.recenter.direct.cell = ip.structure_initial.cell.array
 #         g.recenter.direct.pbc = ip.structure_initial.pbc
 #
 #         g.recenter.direct.default.all_centroid_positions = gp.initial_positions.output.initial_positions[-1]
@@ -808,7 +808,7 @@ class ConstrainedMDMilestone(CompoundVertex):
         g.verlet_positions.input.forces = gp.calc_static.output.forces[-1]
 
         # reflect_string
-        g.reflect_and_milestone.input.cell = ip.structure.cell
+        g.reflect_and_milestone.input.cell = ip.structure.cell.array
         g.reflect_and_milestone.input.pbc = ip.structure.pbc
         g.reflect_and_milestone.input.thermalization_steps = ip.thermalization_steps
 
@@ -836,7 +836,7 @@ class ConstrainedMDMilestone(CompoundVertex):
 
         # reflect_atoms
         g.reflect_atoms.input.cutoff_distance = ip.reflection_cutoff_distance
-        g.reflect_atoms.input.cell = ip.structure.cell
+        g.reflect_atoms.input.cell = ip.structure.cell.array
         g.reflect_atoms.input.pbc = ip.structure.pbc
 
         g.reflect_atoms.input.default.previous_positions = ip.positions
@@ -881,7 +881,7 @@ class ConstrainedMDMilestone(CompoundVertex):
         g.running_average_pos.input.running_average_positions = \
             gp.running_average_pos.output.running_average_positions[-1]
         g.running_average_pos.input.positions = gp.reflect_atoms.output.positions[-1]
-        g.running_average_pos.input.cell = ip.structure.cell
+        g.running_average_pos.input.cell = ip.structure.cell.array
         g.running_average_pos.input.pbc = ip.structure.pbc
 
         # running_average_pot_en
@@ -1041,7 +1041,7 @@ class StringEvolutionParallel(StringEvolution):
 
         # reparameterize
         g.reparameterize.input.centroids_pos_list = gp.constrained_evo.output.running_average_positions[-1]
-        g.reparameterize.input.cell = ip.structure_initial.cell
+        g.reparameterize.input.cell = ip.structure_initial.cell.array
         g.reparameterize.input.pbc = ip.structure_initial.pbc
 
         # calc_static_centroids
@@ -1229,7 +1229,7 @@ class VirtualWork(CompoundVertex):
 
         # reflect string
         g.reflect_string.input.n_children = ip.n_images
-        g.reflect_string.direct.cell = ip.structure_initial.cell
+        g.reflect_string.direct.cell = ip.structure_initial.cell.array
         g.reflect_string.direct.pbc = ip.structure_initial.pbc
 
         g.reflect_string.direct.default.all_centroid_positions = \
@@ -1259,7 +1259,7 @@ class VirtualWork(CompoundVertex):
         g.reflect_atoms.broadcast.previous_positions = gp.reflect_atoms.output.positions[-1]
         g.reflect_atoms.broadcast.previous_velocities = gp.reflect_string.output.velocities[-1]
         g.reflect_atoms.direct.cutoff_distance = ip.reflection_cutoff_distance
-        g.reflect_atoms.direct.cell = ip.structure_initial.cell
+        g.reflect_atoms.direct.cell = ip.structure_initial.cell.array
         g.reflect_atoms.direct.pbc = ip.structure_initial.pbc
         g.reflect_atoms.direct.atom_reflect_switch = ip.atom_reflect_switch
 
@@ -1290,7 +1290,7 @@ class VirtualWork(CompoundVertex):
             all_positions = np.array(self.graph.average_positions.output.mean[-1])
         else:
             all_positions = np.array(self.input.initial_positions)
-        cell = self.input.structure.cell
+        cell = self.input.structure.cell.array
         pbc = self.input.structure.pbc
         return np.array([
             find_mic(front - back, cell, pbc)[0]
@@ -1403,7 +1403,7 @@ class VirtualWorkFullStep(VirtualWork):
 
         # reflect entire string
         g.reflect_string.input.n_children = ip.n_images
-        g.reflect_string.direct.cell = ip.structure.cell
+        g.reflect_string.direct.cell = ip.structure.cell.array
         g.reflect_string.direct.pbc = ip.structure.pbc
 
         g.reflect_string.broadcast.default.previous_positions = ip.all_centroid_positions
@@ -1421,7 +1421,7 @@ class VirtualWorkFullStep(VirtualWork):
         # reflect individual atoms which stray too far
         g.reflect_atoms.input.n_children = ip.n_images
         g.reflect_atoms.direct.cutoff_distance = ip.reflection_cutoff_distance
-        g.reflect_atoms.direct.cell = ip.structure.cell
+        g.reflect_atoms.direct.cell = ip.structure.cell.array
         g.reflect_atoms.direct.pbc = ip.structure.pbc
 
         g.reflect_atoms.broadcast.default.previous_positions = ip.all_centroid_positions
@@ -1531,7 +1531,7 @@ class ConstrainedMD2(CompoundVertex):
         g.verlet_positions.input.forces = gp.calc_static.output.forces[-1]
 
         # reflect
-        g.reflect_string.input.cell = ip.structure.cell
+        g.reflect_string.input.cell = ip.structure.cell.array
         g.reflect_string.input.pbc = ip.structure.pbc
 
         g.reflect_string.input.default.previous_positions = ip.centroid_positions
@@ -1548,7 +1548,7 @@ class ConstrainedMD2(CompoundVertex):
 
         # reflect individual atoms which stray too far
         g.reflect_atoms.input.cutoff_distance = ip.reflection_cutoff_distance
-        g.reflect_atoms.input.cell = ip.structure.cell
+        g.reflect_atoms.input.cell = ip.structure.cell.array
         g.reflect_atoms.input.pbc = ip.structure.pbc
 
         g.reflect_atoms.input.reference_positions = ip.centroid_positions
@@ -1814,7 +1814,7 @@ class Milestoning(CompoundVertex):
         g.milestone.input.all_centroid_positions = ip.all_centroid_positions
 
         g.milestone.input.thermalization_steps = ip.thermalization_steps
-        g.milestone.input.cell = ip.structure.cell
+        g.milestone.input.cell = ip.structure.cell.array
         g.milestone.input.pbc = ip.structure.pbc
 
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])

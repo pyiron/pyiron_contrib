@@ -213,7 +213,7 @@ class HarmonicTILD(TILDParent):
 
         g.reflect.direct.reference_positions = ip.structure.positions
         g.reflect.direct.pbc = ip.structure.pbc
-        g.reflect.direct.cell = ip.structure.cell
+        g.reflect.direct.cell = ip.structure.cell.array
         g.reflect.direct.cutoff_distance = ip.cutoff_distance
         g.reflect.broadcast.positions = gp.verlet_positions.output.positions[-1]
         g.reflect.broadcast.velocities = gp.verlet_positions.output.velocities[-1]
@@ -233,7 +233,7 @@ class HarmonicTILD(TILDParent):
         g.harmonic.direct.force_constants = ip.force_constants
         g.harmonic.direct.home_positions = ip.structure.positions
         g.harmonic.broadcast.positions = gp.reflect.output.positions[-1]
-        g.harmonic.direct.cell = ip.structure.cell
+        g.harmonic.direct.cell = ip.structure.cell.array
         g.harmonic.direct.pbc = ip.structure.pbc
 
         # transpose_forces
@@ -516,7 +516,7 @@ class VacancyTILD(TILDParent):
 
         g.reflect.direct.reference_positions = ip.structure.positions
         g.reflect.direct.pbc = ip.structure.pbc
-        g.reflect.direct.cell = ip.structure.cell
+        g.reflect.direct.cell = ip.structure.cell.array
         g.reflect.direct.cutoff_distance = ip.cutoff_distance
         g.reflect.broadcast.positions = gp.verlet_positions.output.positions[-1]
         g.reflect.broadcast.velocities = gp.verlet_positions.output.velocities[-1]
@@ -554,7 +554,7 @@ class VacancyTILD(TILDParent):
         g.harmonic.direct.force_constants = ip.force_constants
         g.harmonic.direct.home_positions = gp.slice_structure.output.sliced[-1]
         g.harmonic.broadcast.positions = gp.slice_harmonic.output.sliced[-1]
-        g.harmonic.direct.cell = ip.structure.cell
+        g.harmonic.direct.cell = ip.structure.cell.array
         g.harmonic.direct.pbc = ip.structure.pbc
 
         # write_vac_forces
@@ -724,7 +724,7 @@ class HarmonicallyCoupled(CompoundVertex):
         g.reflect.input.positions = gp.verlet_positions.output.positions[-1]
         g.reflect.input.velocities = gp.verlet_positions.output.velocities[-1]
 
-        g.reflect.input.cell = ip.structure.cell
+        g.reflect.input.cell = ip.structure.cell.array
         g.reflect.input.pbc = ip.structure.pbc
         g.reflect.input.cutoff_distance = ip.cutoff_distance
 
@@ -733,14 +733,14 @@ class HarmonicallyCoupled(CompoundVertex):
         g.calc_static.input.job_name = ip.job_name
 
         g.calc_static.input.structure = ip.structure
-        g.calc_static.input.cell = ip.structure.cell
+        g.calc_static.input.cell = ip.structure.cell.array
         g.calc_static.input.positions = gp.reflect.output.positions[-1]
 
         # harmonic
         g.harmonic.input.spring_constant = ip.spring_constant
         g.harmonic.input.force_constants = ip.force_constants
         g.harmonic.input.home_positions = ip.structure.positions
-        g.harmonic.input.cell = ip.structure.cell
+        g.harmonic.input.cell = ip.structure.cell.array
         g.harmonic.input.pbc = ip.structure.pbc
 
         g.harmonic.input.positions = gp.reflect.output.positions[-1]
@@ -769,7 +769,7 @@ class HarmonicallyCoupled(CompoundVertex):
         g.running_average.input.running_average_positions = \
             gp.running_average.output.running_average_positions[-1]
         g.running_average.input.positions = gp.reflect.output.positions[-1]
-        g.running_average.input.cell = ip.structure.cell
+        g.running_average.input.cell = ip.structure.cell.array
         g.running_average.input.pbc = ip.structure.pbc
 
         # check_thermalized
@@ -1046,7 +1046,7 @@ class Decoupling(CompoundVertex):
         g.reflect.input.positions = gp.verlet_positions.output.positions[-1]
         g.reflect.input.velocities = gp.verlet_positions.output.velocities[-1]
 
-        g.reflect.input.cell = ip.structure.cell
+        g.reflect.input.cell = ip.structure.cell.array
         g.reflect.input.pbc = ip.structure.pbc
         g.reflect.input.cutoff_distance = ip.cutoff_distance
 
@@ -1055,7 +1055,7 @@ class Decoupling(CompoundVertex):
         g.calc_full.input.job_name = ip.full_job_name
 
         g.calc_full.input.structure = ip.structure
-        g.calc_full.input.cell = ip.structure.cell
+        g.calc_full.input.cell = ip.structure.cell.array
         g.calc_full.input.positions = gp.reflect.output.positions[-1]
 
         # slice_positions
@@ -1067,14 +1067,14 @@ class Decoupling(CompoundVertex):
         g.calc_vac.input.job_name = ip.vac_job_name
 
         g.calc_vac.input.structure = ip.vacancy_structure
-        g.calc_vac.input.cell = ip.vacancy_structure.cell
+        g.calc_vac.input.cell = ip.vacancy_structure.cell.array
         g.calc_vac.input.positions = gp.slice_positions.output.sliced[-1]
 
         # harmonic
         g.harmonic.input.spring_constant = ip.spring_constant
         g.harmonic.input.force_constants = ip.force_constants
         g.harmonic.input.home_positions = ip.structure.positions
-        g.harmonic.input.cell = ip.structure.cell
+        g.harmonic.input.cell = ip.structure.cell.array
         g.harmonic.input.pbc = ip.structure.pbc
         g.harmonic.input.mask = ip.vacancy_id
 

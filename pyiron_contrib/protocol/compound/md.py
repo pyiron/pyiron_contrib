@@ -8,7 +8,7 @@ from abc import ABC
 
 from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
 from pyiron_contrib.protocol.primitive.one_state import Counter, ExternalHamiltonian, RandomVelocity, Zeros, \
-    VerletPositionUpdate, VerletVelocityUpdate, SphereReflectionPeratom, WelfordOnline, NearestNeighbors, \
+    VerletPositionUpdate, VerletVelocityUpdate, WelfordOnline, \
     HarmonicHamiltonian, BerendsenBarostat
 from pyiron_contrib.protocol.primitive.two_state import IsGEq, ModIsZero
 from pyiron_contrib.protocol.primitive.fts_vertices import PositionsRunningAverage
@@ -421,6 +421,126 @@ class ConfinedMD(MolecularDynamics):
 
 
 class ProtoConfinedMD(Protocol, ConfinedMD, ABC):
+    pass
+
+
+class HarmonicMD(CompoundVertex):
+    """
+
+    """
+
+    DefaultWhitelist = {
+    }
+
+    def __init__(self, **kwargs):
+        super(HarmonicMD, self).__init__(**kwargs)
+
+        # Protocol defaults
+        id_ = self.input.default
+        id_.temperature = None
+        id_.energy_kin = None
+        id_.n_steps = 100
+        id_.time_step = 1.
+        id_.temperature_damping_timescale = 100.
+        id_.overheat_fraction = 2
+        id_.spring_constant = 1.
+        id_.force_constants = None
+
+    def define_vertices(self):
+        # Graph components
+        g = self.graph
+        g.initial_velocities = RandomVelocity()
+        g.initial_forces = Zeros()
+        g.initial_pressures = Zeros()
+        g.check_steps = IsGEq()
+        g.clock = Counter()
+        g.verlet_positions = VerletPositionUpdate()
+        g.calc_harmonic= HarmonicHamiltonian()
+        g.verlet_velocities = VerletVelocityUpdate()
+
+    def define_execution_flow(self):
+        # Execution flow
+        g = self.graph
+        g.make_pipeline(
+            g.initial_velocities,
+            g.initial_forces,
+            g.initial_pressures,
+            g.check_steps, 'false',
+            g.verlet_positions,
+            g.calc_harmonic,
+            g.verlet_velocities,
+            g.clock,
+            g.check_steps
+        )
+        g.starting_vertex = g.initial_velocities
+        g.restarting_vertex = g.check_steps
+
+    def define_information_flow(self):
+        # Data flow
+        g = self.graph
+        gp = Pointer(self.graph)
+        ip = Pointer(self.input)
+
+        # initial_velocity
+        g.initial_velocities.input.temperature = ip.temperature
+        g.initial_velocities.input.masses = ip.structure.get_masses
+        g.initial_velocities.input.overheat_fraction = ip.overheat_fraction
+
+        # initial_forces
+        g.initial_forces.input.shape = ip.structure.positions.shape
+
+        # initial_pressures
+        g.initial_pressures.input.shape = ip.structure.cell.array.shape
+
+        # check_steps
+        g.check_steps.input.target = gp.clock.output.n_counts[-1]
+        g.check_steps.input.threshold = ip.n_steps
+
+        # verelt_positions
+        g.verlet_positions.input.default.positions = ip.structure.positions
+        g.verlet_positions.input.default.velocities = gp.initial_velocities.output.velocities[-1]
+        g.verlet_positions.input.default.forces = gp.initial_forces.output.zeros[-1]
+
+        g.verlet_positions.input.positions = gp.verlet_positions.output.positions[-1]
+        g.verlet_positions.input.velocities = gp.verlet_velocities.output.velocities[-1]
+        g.verlet_positions.input.forces = gp.calc_harmonic.output.forces[-1]
+
+        g.verlet_positions.input.masses = ip.structure.get_masses
+        g.verlet_positions.input.time_step = ip.time_step
+        g.verlet_positions.input.temperature = ip.temperature
+        g.verlet_positions.input.temperature_damping_timescale = ip.temperature_damping_timescale
+
+        # calc_harmonic
+        g.calc_harmonic.input.positions = gp.verlet_positions.output.positions[-1]
+        g.calc_harmonic.input.home_positions = ip.structure.positions
+        g.calc_harmonic.input.cell = ip.structure.cell.array
+        g.calc_harmonic.input.pbc = ip.structure.pbc
+        g.calc_harmonic.input.spring_constant = ip.spring_constant
+        g.calc_harmonic.input.force_constants = ip.force_constants
+
+        # verlet_velocities
+        g.verlet_velocities.input.velocities = gp.verlet_positions.output.velocities[-1]
+        g.verlet_velocities.input.forces = gp.calc_harmonic.output.forces[-1]
+
+        g.verlet_velocities.input.masses = ip.structure.get_masses
+        g.verlet_velocities.input.time_step = ip.time_step
+        g.verlet_velocities.input.temperature = ip.temperature
+        g.verlet_velocities.input.temperature_damping_timescale = ip.temperature_damping_timescale
+
+        self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
+
+    def get_output(self):
+        gp = Pointer(self.graph)
+        return {
+            'energy_pot': ~gp.calc_harmonic.output.energy_pot[-1],
+            'energy_kin': ~gp.verlet_velocities.output.energy_kin[-1],
+            'positions': ~gp.verlet_positions.output.positions[-1],
+            'velocities': ~gp.verlet_velocities.output.velocities[-1],
+            'forces': ~gp.calc_harmonic.output.forces[-1],
+        }
+
+
+class ProtoHarmonicMD(Protocol, HarmonicMD, ABC):
     pass
 
 

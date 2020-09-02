@@ -4,6 +4,7 @@ from pyiron.base.job.jobtype import JOB_CLASS_DICT
 # Make classes available for new pyiron version
 JOB_CLASS_DICT['ProtoMinimize'] = 'pyiron_contrib.protocol.compound.minimize'
 JOB_CLASS_DICT['ProtoMD'] = 'pyiron_contrib.protocol.compound.md'
+JOB_CLASS_DICT['ProtoHarmonicMD'] = 'pyiron_contrib.protocol.compound.md'
 JOB_CLASS_DICT['ProtoConfinedMD'] = 'pyiron_contrib.protocol.compound.md'
 JOB_CLASS_DICT['ProtoConfinedHarmonicMD'] = 'pyiron_contrib.protocol.compound.md'
 JOB_CLASS_DICT['ProtoNEB'] = 'pyiron_contrib.protocol.compound.neb'

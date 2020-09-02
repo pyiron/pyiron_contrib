@@ -448,7 +448,7 @@ class HarmonicHamiltonian(PrimitiveVertex):
         elif force_constants is not None and spring_constant is None:
             transformed_force_constants = self.transform_force_constants(force_constants)
             transformed_displacements = self.transform_displacements(dr)
-            transformed_forces = -np.dot(transformed_force_constants, transformed_displacements)
+            transformed_forces = -np.tensordot(transformed_force_constants, transformed_displacements)
             retransformed_forces = self.retransform_forces(transformed_forces, dr)
             if mask is not None:
                 forces = retransformed_forces[mask]

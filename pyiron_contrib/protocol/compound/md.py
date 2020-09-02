@@ -443,7 +443,7 @@ class HarmonicMD(CompoundVertex):
         id_.time_step = 1.
         id_.temperature_damping_timescale = 100.
         id_.overheat_fraction = 2
-        id_.spring_constant = 1.
+        id_.spring_constant = None
         id_.force_constants = None
 
     def define_vertices(self):
@@ -455,7 +455,7 @@ class HarmonicMD(CompoundVertex):
         g.check_steps = IsGEq()
         g.clock = Counter()
         g.verlet_positions = VerletPositionUpdate()
-        g.calc_harmonic= HarmonicHamiltonian()
+        g.calc_harmonic = HarmonicHamiltonian()
         g.verlet_velocities = VerletVelocityUpdate()
 
     def define_execution_flow(self):

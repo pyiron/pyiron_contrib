@@ -528,7 +528,7 @@ class PartitionStructure(PrimitiveVertex):
         qm_structure.cell = np.identity(3) * np.ptp(bb, axis=1)
 
         box_center = tuple(np.dot(np.linalg.inv(superstructure.cell), np.mean(bb, axis=1)))
-        qm_structure.wrap(box_center)
+        qm_structure.wrap(center=box_center)
         # Wrap it to the unit cell
         qm_structure.positions = np.dot(qm_structure.get_scaled_positions(), qm_structure.cell)
 
@@ -557,7 +557,7 @@ class PartitionStructure(PrimitiveVertex):
         box_center_direct = np.dot(np.linalg.inv(structure.cell), box_center)
         # Wrap atoms so that they are the closest image to the box center
         wrapped_structure = structure.copy()
-        wrapped_structure.wrap(tuple(box_center_direct))
+        wrapped_structure.wrap(center=tuple(box_center_direct))
         pos = wrapped_structure.positions
         # Keep only atoms inside the box limits
         masks = []
@@ -605,7 +605,7 @@ class PartitionStructure(PrimitiveVertex):
         wrapped_structure = structure.copy()
         # Take the frist positions and wrap the atoms around there to determine the size of the bounding box
         wrap_center = tuple(np.dot(np.linalg.inv(structure.cell), structure.positions[0, :]))
-        wrapped_structure.wrap(wrap_center)
+        wrapped_structure.wrap(center=wrap_center)
 
         bounding_box = np.vstack([
             np.amin(wrapped_structure.positions, axis=0),

@@ -658,7 +658,6 @@ class HarmonicallyCoupled(CompoundVertex):
         g.harmonic = HarmonicHamiltonian()
         g.mix = WeightedSum()
         g.verlet_velocities = VerletVelocityUpdate()
-        g.running_average = PositionsRunningAverage()
         g.check_thermalized = IsGEq()
         g.check_sampling_period = ModIsZero()
         g.addition = WeightedSum()
@@ -677,7 +676,6 @@ class HarmonicallyCoupled(CompoundVertex):
             g.harmonic,
             g.mix,
             g.verlet_velocities,
-            g.running_average,
             g.check_thermalized, 'true',
             g.check_sampling_period, 'true',
             g.addition,
@@ -761,17 +759,6 @@ class HarmonicallyCoupled(CompoundVertex):
         g.verlet_velocities.input.velocities = gp.reflect.output.velocities[-1]
         g.verlet_velocities.input.forces = gp.mix.output.weighted_sum[-1]
 
-        # running_average_positions
-        g.running_average.input.default.divisor = ip.divisor
-        g.running_average.input.default.running_average_positions = ip.structure.positions
-
-        g.running_average.input.divisor = gp.running_average.output.divisor[-1]
-        g.running_average.input.running_average_positions = \
-            gp.running_average.output.running_average_positions[-1]
-        g.running_average.input.positions = gp.reflect.output.positions[-1]
-        g.running_average.input.cell = ip.structure.cell.array
-        g.running_average.input.pbc = ip.structure.pbc
-
         # check_thermalized
         g.check_thermalized.input.target = gp.clock.output.n_counts[-1]
         g.check_thermalized.input.threshold = ip.thermalization_steps
@@ -803,7 +790,6 @@ class HarmonicallyCoupled(CompoundVertex):
             'velocities': ~gp.verlet_velocities.output.velocities[-1],
             'forces': ~gp.mix.output.weighted_sum[-1],
             'harmonic_forces': ~gp.harmonic.output.forces[-1],
-            'running_average_positions': ~gp.running_average.output.running_average_positions[-1],
             'clock': ~gp.clock.output.n_counts[-1],
             'mean': ~gp.average.output.mean[-1],
             'std': ~gp.average.output.std[-1],
@@ -897,9 +883,6 @@ class HarmonicTILDParallel(HarmonicTILD):
         # run_lambda_points - mix
         g.run_lambda_points.broadcast.coupling_weights = gp.build_lambdas.output.lambda_pairs[-1]
 
-        # run_lambda_points - running_average
-        g.run_lambda_points.direct.divisor = ip.divisor
-
         # run_lambda_points - verlet_velocities
         # takes inputs already specified
 
@@ -941,7 +924,6 @@ class HarmonicTILDParallel(HarmonicTILD):
             'velocities': ~o.velocities[-1],
             'forces': ~o.forces[-1],
             'harmonic_forces': ~o.harmonic_forces[-1],
-            'running_average_positions': ~o.running_average_positions[-1],
             'integrands': ~o.mean[-1],
             'integrands_std': ~o.std[-1],
             'integrands_n_samples': ~o.n_samples[-1],

@@ -8,6 +8,7 @@ JOB_CLASS_DICT['ProtocolNEB'] = 'pyiron_contrib.protocol.compound.nudged_elastic
 JOB_CLASS_DICT['ProtocolQMMM'] = 'pyiron_contrib.protocol.compound.qmmm'
 JOB_CLASS_DICT['ProtocolHarmonicTILD'] = 'pyiron_contrib.protocol.compound.tild'
 JOB_CLASS_DICT['ProtocolHarmonicTILDParallel'] = 'pyiron_contrib.protocol.compound.tild'
+JOB_CLASS_DICT['ImageJob'] = 'pyiron_contrib.image.job'
 
 # Backwards compatibility
 JOB_CLASS_DICT['GenericMaster'] = 'pyiron.base.master.generic'

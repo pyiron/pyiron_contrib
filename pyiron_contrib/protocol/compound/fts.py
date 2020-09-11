@@ -95,7 +95,7 @@ class StringEvolution(CompoundVertex):
         id_.thermalized = False
         id_.total_counts = 0
 
-        id_.job_path = None
+        id_.project_path = None
         id_.job_name = None
 
     def define_vertices(self):
@@ -529,7 +529,6 @@ class StringEvolutionParallel(StringEvolution):
         # Graph components
         g = self.graph
         ip = Pointer(self.input)
-        g.create_initial_images = CreateJob()
         g.create_centroids = CreateJob()
         g.initial_positions = InitialPositions()
         g.new_velocities = SerialList(RandomVelocity)
@@ -550,7 +549,6 @@ class StringEvolutionParallel(StringEvolution):
         # Execution flow
         g = self.graph
         g.make_pipeline(
-            g.create_initial_images,
             g.create_centroids,
             g.initial_positions,
             g.initial_forces,
@@ -569,7 +567,7 @@ class StringEvolutionParallel(StringEvolution):
             g.check_steps
         )
         g.make_edge(g.check_thermalized, g.check_steps, 'false')
-        g.starting_vertex = g.create_initial_images
+        g.starting_vertex = g.create_centroids
         g.restarting_vertex = g.check_steps
 
     def define_information_flow(self):
@@ -577,11 +575,6 @@ class StringEvolutionParallel(StringEvolution):
         g = self.graph
         gp = Pointer(self.graph)
         ip = Pointer(self.input)
-
-        # create_initial_images
-        g.create_initial_images.input.n_images = ip.n_images
-        g.create_initial_images.input.ref_job_full_path = ip.ref_job_full_path
-        g.create_initial_images.input.structure = ip.structure_initial
 
         # create_centroids
         g.create_centroids.input.n_images = ip.n_images
@@ -603,8 +596,8 @@ class StringEvolutionParallel(StringEvolution):
         g.check_steps.input.threshold = ip.n_steps
 
         # remove_images
-        g.remove_images.input.default.project_path = gp.create_initial_images.output.project_path[-1][-1]
-        g.remove_images.input.default.job_names = gp.create_initial_images.output.job_names[-1]
+        g.remove_images.input.default.project_path = ip.project_path
+        g.remove_images.input.default.job_names = ip.job_name
 
         g.remove_images.input.project_path = gp.create_images.output.project_path[-1][-1]
         g.remove_images.input.job_names = gp.create_images.output.job_names[-1]

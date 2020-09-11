@@ -505,6 +505,7 @@ class ConstrainedMD(CompoundVertex):
         g.running_average_pos.input.cell = ip.structure.cell.array
         g.running_average_pos.input.pbc = ip.structure.pbc
 
+        self.archive.clock = gp.clock.output.n_counts[-1]
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
 
     def get_output(self):
@@ -663,10 +664,10 @@ class StringEvolutionParallel(StringEvolution):
         g.constrained_evo.direct.n_steps = ip.sampling_period
 
         # clock
-        g.clock.input.add_counts = gp.constrained_evo.output.clock[-1][-1]
+        g.clock.input.add_counts = ip.sampling_period
 
         # check_thermalized
-        g.check_thermalized.input.default.target = gp.clock.output.n_counts[-1]
+        g.check_thermalized.input.default.target = gp.constrained_evo.output.total_counts[-1][-1]
         g.check_thermalized.input.default.threshold = ip.thermalization_steps
 
         # mix

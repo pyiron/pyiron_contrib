@@ -82,14 +82,13 @@ class Counter(PrimitiveVertex):
     def __init__(self, name=None):
         super(Counter, self).__init__(name=name)
         self.input.default.add_counts = 0
-        self.output.n_counts = [self.input.default.add_counts]
+        self.output.n_counts = [0]
 
     def command(self, add_counts):
-        if add_counts != 0:
+        if add_counts > 0:
             count = self.output.n_counts[-1] + add_counts
         else:
             count = self.output.n_counts[-1] + 1
-
         return {
             'n_counts': count
         }

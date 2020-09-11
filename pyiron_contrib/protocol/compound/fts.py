@@ -531,7 +531,7 @@ class StringEvolutionParallel(StringEvolution):
         ip = Pointer(self.input)
         g.create_centroids = CreateJob()
         g.initial_positions = InitialPositions()
-        g.new_velocities = SerialList(RandomVelocity)
+        g.initial_velocities = SerialList(RandomVelocity)
         g.initial_forces = SerialList(Zeros)
         g.check_steps = IsGEq()
         g.remove_images = RemoveJob()
@@ -551,11 +551,11 @@ class StringEvolutionParallel(StringEvolution):
         g.make_pipeline(
             g.create_centroids,
             g.initial_positions,
+            g.initial_velocities,
             g.initial_forces,
             g.check_steps, 'false',
             g.remove_images,
             g.create_images,
-            g.new_velocities,
             g.constrained_evo,
             g.clock,
             g.check_thermalized, 'true',
@@ -587,6 +587,12 @@ class StringEvolutionParallel(StringEvolution):
         g.initial_positions.input.initial_positions = ip.initial_positions
         g.initial_positions.input.n_images = ip.n_images
 
+        # initial_velocities
+        g.initial_velocities.input.n_children = ip.n_images
+        g.initial_velocities.direct.temperature = ip.temperature
+        g.initial_velocities.direct.masses = ip.structure_initial.get_masses
+        g.initial_velocities.direct.overheat_fraction = ip.overheat_fraction
+
         # initial_forces
         g.initial_forces.input.n_children = ip.n_images
         g.initial_forces.direct.shape = ip.structure_initial.positions.shape
@@ -607,12 +613,6 @@ class StringEvolutionParallel(StringEvolution):
         g.create_images.input.ref_job_full_path = ip.ref_job_full_path
         g.create_images.input.structure = ip.structure_initial
 
-        # new_velocities
-        g.new_velocities.input.n_children = ip.n_images
-        g.new_velocities.direct.temperature = ip.temperature
-        g.new_velocities.direct.masses = ip.structure_initial.get_masses
-        g.new_velocities.direct.overheat_fraction = ip.overheat_fraction
-
         # constrained_evolution - initiailze
         g.constrained_evo.input.n_children = ip.n_images
 
@@ -623,11 +623,11 @@ class StringEvolutionParallel(StringEvolution):
         g.constrained_evo.direct.temperature_damping_timescale = ip.temperature_damping_timescale
 
         g.constrained_evo.broadcast.default.positions = gp.initial_positions.output.initial_positions[-1]
-        g.constrained_evo.broadcast.default.velocities = gp.new_velocities.output.velocities[-1]
+        g.constrained_evo.broadcast.default.velocities = gp.initial_velocities.output.velocities[-1]
         g.constrained_evo.broadcast.default.forces = gp.initial_forces.output.zeros[-1]
 
         g.constrained_evo.broadcast.positions = gp.recenter.output.positions[-1]
-        g.constrained_evo.broadcast.velocities = gp.new_velocities.output.velocities[-1]
+        g.constrained_evo.broadcast.velocities = gp.constrained_evo.output.velocities[-1]
         g.constrained_evo.broadcast.forces = gp.recenter.output.forces[-1]
 
         # constrained_evolution - reflect_string

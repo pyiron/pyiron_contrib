@@ -345,7 +345,10 @@ class RemoveJob(PrimitiveVertex):
     def command(self, project_path, job_names):
         pr = Project(path=project_path)
         for name in job_names:
-            pr.remove_job(name)
+            try:
+                pr.remove_job(name)
+            except FileNotFoundError:
+                pass
 
 
 class GradientDescent(PrimitiveVertex):

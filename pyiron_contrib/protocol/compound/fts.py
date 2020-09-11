@@ -529,11 +529,13 @@ class StringEvolutionParallel(StringEvolution):
         # Graph components
         g = self.graph
         ip = Pointer(self.input)
+        g.create_initial_images = CreateJob()
         g.create_centroids = CreateJob()
         g.initial_positions = InitialPositions()
         g.new_velocities = SerialList(RandomVelocity)
         g.initial_forces = SerialList(Zeros)
         g.check_steps = IsGEq()
+        g.remove_images = RemoveJob()
         g.create_images = CreateJob()
         g.constrained_evo = ParallelList(ConstrainedMD, sleep_time=ip.sleep_time)
         g.check_thermalized = IsGEq()
@@ -542,17 +544,18 @@ class StringEvolutionParallel(StringEvolution):
         g.reparameterize = CentroidsReparameterization()
         g.calc_static_centroids = SerialList(ExternalHamiltonian)
         g.recenter = SerialList(StringRecenter)
-        g.remove_images = RemoveJob()
         g.clock = Counter()
 
     def define_execution_flow(self):
         # Execution flow
         g = self.graph
         g.make_pipeline(
+            g.create_initial_images,
             g.create_centroids,
             g.initial_positions,
             g.initial_forces,
             g.check_steps, 'false',
+            g.remove_images,
             g.create_images,
             g.new_velocities,
             g.constrained_evo,
@@ -563,11 +566,10 @@ class StringEvolutionParallel(StringEvolution):
             g.reparameterize,
             g.calc_static_centroids,
             g.recenter,
-            g.remove_images,
             g.check_steps
         )
-        g.make_edge(g.check_thermalized, g.remove_images, 'false')
-        g.starting_vertex = g.create_centroids
+        g.make_edge(g.check_thermalized, g.check_steps, 'false')
+        g.starting_vertex = g.create_initial_images
         g.restarting_vertex = g.check_steps
 
     def define_information_flow(self):
@@ -575,6 +577,11 @@ class StringEvolutionParallel(StringEvolution):
         g = self.graph
         gp = Pointer(self.graph)
         ip = Pointer(self.input)
+
+        # create_initial_images
+        g.create_initial_images.input.n_images = ip.n_images
+        g.create_initial_images.input.ref_job_full_path = ip.ref_job_full_path
+        g.create_initial_images.input.structure = ip.structure_initial
 
         # create_centroids
         g.create_centroids.input.n_images = ip.n_images
@@ -594,6 +601,13 @@ class StringEvolutionParallel(StringEvolution):
         # check_steps
         g.check_steps.input.target = gp.clock.output.n_counts[-1]
         g.check_steps.input.threshold = ip.n_steps
+
+        # remove_images
+        g.remove_images.input.default.project_path = gp.create_initial_images.output.project_path[-1][-1]
+        g.remove_images.input.default.job_names = gp.create_initial_images.output.job_names[-1]
+
+        g.remove_images.input.project_path = gp.create_images.output.project_path[-1][-1]
+        g.remove_images.input.job_names = gp.create_images.output.job_names[-1]
 
         # create_images
         g.create_images.input.n_images = ip.n_images
@@ -702,10 +716,6 @@ class StringEvolutionParallel(StringEvolution):
         g.recenter.broadcast.centroid_forces = gp.calc_static_centroids.output.forces[-1]
         g.recenter.broadcast.positions = gp.constrained_evo.output.positions[-1]
         g.recenter.broadcast.forces = gp.constrained_evo.output.forces[-1]
-
-        # remove_images
-        g.remove_images.input.project_path = gp.create_images.output.project_path[-1][-1]
-        g.remove_images.input.job_names = gp.create_images.output.job_names[-1]
 
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
 

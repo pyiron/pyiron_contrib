@@ -271,17 +271,17 @@ class ExternalHamiltonian(PrimitiveVertex):
         if self._job is not None:
             self._job.interactive_close()
 
-    def to_hdf(self, hdf=None, group_name=None):
-        super(ExternalHamiltonian, self).to_hdf(hdf=hdf, group_name=group_name)
-        hdf[group_name]["fastlammpsmode"] = self._fast_lammps_mode
-        hdf[group_name]["jobname"] = self._job_name
-        hdf[group_name]["jobprojectpath"] = self._job_project_path
-
-    def from_hdf(self, hdf=None, group_name=None):
-        super(ExternalHamiltonian, self).from_hdf(hdf=hdf, group_name=group_name)
-        self._fast_lammps_mode = hdf[group_name]["fastlammpsmode"]
-        self._job_name = hdf[group_name]["jobname"]
-        self._job_project_path = hdf[group_name]["jobprojectpath"]
+    # def to_hdf(self, hdf=None, group_name=None):
+    #     super(ExternalHamiltonian, self).to_hdf(hdf=hdf, group_name=group_name)
+    #     hdf[group_name]["fastlammpsmode"] = self._fast_lammps_mode
+    #     hdf[group_name]["jobname"] = self._job_name
+    #     hdf[group_name]["jobprojectpath"] = self._job_project_path
+    #
+    # def from_hdf(self, hdf=None, group_name=None):
+    #     super(ExternalHamiltonian, self).from_hdf(hdf=hdf, group_name=group_name)
+    #     self._fast_lammps_mode = hdf[group_name]["fastlammpsmode"]
+    #     self._job_name = hdf[group_name]["jobname"]
+    #     self._job_project_path = hdf[group_name]["jobprojectpath"]
 
 
 class CreateJob(PrimitiveVertex):

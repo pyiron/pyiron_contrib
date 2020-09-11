@@ -715,9 +715,9 @@ class StringEvolutionParallel(StringEvolution):
     def get_output(self):
         gp = Pointer(self.graph)
         return {
-            'energy_pot': ~gp.calc_static_centroids.output.energy_pot[-1],
             'positions': ~gp.reparameterize.output.centroids_pos_list[-1],
-            'forces': ~gp.calc_static_centroids.output.forces[-1]
+            'forces': ~gp.calc_static_centroids.output.forces[-1],
+            'energy_pot': ~gp.calc_static_centroids.output.energy_pot[-1]
         }
 
 

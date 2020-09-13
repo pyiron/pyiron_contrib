@@ -4,7 +4,7 @@ from __future__ import print_function
 # Distributed under the terms of "New BSD License", see the LICENSE file.
 
 import sys
-from pyiron.base.job.generic import GenericJob
+from pyiron_base.job.generic import GenericJob
 from pyiron_contrib.protocol.utils import IODictionary, InputDictionary, LoggerMixin, Event, EventHandler, \
     Pointer, CrumbType, ordered_dict_get_last, Comparer, TimelineDict
 # from pyiron_contrib.protocol.utils.types import PyironJobTypeRegistry

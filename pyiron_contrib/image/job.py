@@ -3,7 +3,7 @@ from __future__ import print_function
 # Copyright (c) Max-Planck-Institut für Eisenforschung GmbH - Computational Materials Design (CM) Department
 # Distributed under the terms of "New BSD License", see the LICENSE file.
 
-from pyiron.base.job.generic import GenericJob
+from pyiron_base.job.generic import GenericJob
 import numpy as np
 import matplotlib.pyplot as plt
 from os.path import isfile
@@ -12,6 +12,9 @@ from os.path import abspath
 
 from pyiron_contrib.image.image import Image
 from pyiron_contrib.image.utils import DistributingList
+from pyiron_base.generic.inputlist import InputList
+#from pyiron.base.generic.inputlist import InputList as DistributingList
+
 from pyiron_contrib.image.custom_filters import brightness_filter
 
 """
@@ -43,8 +46,11 @@ class ImageJob(GenericJob):
         super(ImageJob, self).__init__(project, job_name)
         self.__name__ = "ImageJob"
         self._images = DistributingList()
-        self.input = DotDict()
-        self.output = DotDict()
+        self.input = InputList(table_name ="Input")
+        self.output = InputList(table_name ="Output")
+        #TODO Convert DotDict to inputlist
+#       self.input = DotDict()
+#       self.output = DotDict()
 
     @property
     def images(self):
@@ -183,16 +189,20 @@ class ImageJob(GenericJob):
         super(ImageJob, self).to_hdf(hdf=hdf, group_name=group_name)
         if hdf is None:
             hdf = self.project_hdf5
+        # We have to spacify a group! Otherwise the job class hdf gets corrupted
+        self.input.to_hdf(hdf=hdf, group_name="input")
+        self.output.to_hdf(hdf=hdf, group_name="output")
         with hdf.open("images") as hdf5_server:
             for n, image in enumerate(self.images):
                 image.to_hdf(hdf=hdf5_server, group_name="img{}".format(n))
-        with hdf.open("input") as hdf5_server:
-            for k, v in self.input.items():
-                hdf5_server[k] = v
-        with hdf.open("output") as hdf5_server:
-            for k, v in self.output.items():
-                hdf5_server[k] = v
+        #       with hdf.open("input") as hdf5_server:
+        #           for k, v in self.input.items():
+        #               hdf5_server[k] = v
+        #       with hdf.open("output") as hdf5_server:
+        #           for k, v in self.output.items():
+        #               hdf5_server[k] = v
         hdf["n_images"] = n + 1
+        print ("to_hdf",hdf)
 
     def from_hdf(self, hdf=None, group_name=None):
         """
@@ -202,27 +212,30 @@ class ImageJob(GenericJob):
             hdf (ProjectHDFio): HDF5 group object - optional
             group_name (str): HDF5 subgroup name - optional
         """
-        super(ImageJob, self).to_hdf(hdf=hdf, group_name=group_name)
+        super(ImageJob, self).from_hdf(hdf=hdf, group_name=group_name)
         if hdf is None:
-            hdf = self.project_hdf5
+            hdf = self.project_hdf5 #.to_object(project=self.project_hdf5,)
+        print ("from_hdf",hdf)
+        self.input.from_hdf(hdf=hdf, group_name="input")
+        self.output.from_hdf(hdf=hdf, group_name="output")
         with hdf.open("images") as hdf5_server:
             for n in np.arange(hdf["n_images"], dtype=int):
                 img = Image(source=None)
                 img.from_hdf(hdf=hdf5_server, group_name="img{}".format(n))
                 self.images.append(img)
-        with hdf.open("input") as hdf5_server:
-            for k in hdf5_server.list_nodes():
-                self.input[k] = hdf5_server[k]
-        with hdf.open("output") as hdf5_server:
-            for k in hdf5_server.list_nodes():
-                self.output[k] = hdf5_server[k]
+        #with hdf.open("input") as hdf5_server:
+        #    for k in hdf5_server.list_nodes():
+        #        self.input[k] = hdf5_server[k]
+        #with hdf.open("output") as hdf5_server:
+        #    for k in hdf5_server.list_nodes():
+        #        self.output[k] = hdf5_server[k]
 
 
-class DotDict(dict):
-    """A dictionary which allows `.` setting and getting for items."""
-
-    def __setattr__(self, key, value):
-        self.__setitem__(key, value)
-
-    def __getattr__(self, item):
-        return self.__getitem__(item)
+#class DotDict(dict):
+#    """A dictionary which allows `.` setting and getting for items."""
+#
+#    def __setattr__(self, key, value):
+#        self.__setitem__(key, value)
+#
+#    def __getattr__(self, item):
+#        return self.__getitem__(item)

@@ -1,5 +1,6 @@
-from pyiron import Project
-from pyiron.base.job.jobtype import JOB_CLASS_DICT
+#from pyiron_base.project.generic import Project
+from pyiron.project import Project
+from pyiron_base.job.jobtype import JOB_CLASS_DICT
 
 # Make classes available for new pyiron version
 JOB_CLASS_DICT['ProtocolMinimize'] = 'pyiron_contrib.protocol.compound.minimize'

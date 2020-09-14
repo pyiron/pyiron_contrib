@@ -56,7 +56,7 @@ class PyironJobTypeRegistryMetaType(ABCMeta):
 
             # inject it into pyiron
             # adding it to JOB_CLASS_DICT also enables it for autocomplete
-            from pyiron_base.job.jobtype import JOB_CLASS_DICT
+            from pyiron.base.job.jobtype import JOB_CLASS_DICT
             # make sure that it affects all instances of pyiron.base.job.jobtype.JobTypeChoice
             JOB_CLASS_DICT.update(updates)
 
@@ -86,7 +86,7 @@ class PyironJobTypeRegistryMetaType(ABCMeta):
         # recsursive call to this method, we have to avoid that
         # otherwise we wrap the wrapper again and agin
         if '__artificial__' not in nmspc:
-            from pyiron_base.job.generic import GenericJob
+            from pyiron.base.job.generic import GenericJob
             new_bases = (cls, GenericJob)
             # edit the metainformation
             new_spec = nmspc.copy()

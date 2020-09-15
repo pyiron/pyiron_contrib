@@ -648,7 +648,6 @@ class HarmonicallyCoupled(CompoundVertex):
         g = self.graph
         g.check_steps = IsGEq()
         g.verlet_positions = VerletPositionUpdate()
-        g.reflect = SphereReflection()
         g.calc_static = ExternalHamiltonian()
         g.harmonic = HarmonicHamiltonian()
         g.mix = WeightedSum()
@@ -668,7 +667,6 @@ class HarmonicallyCoupled(CompoundVertex):
             g.check_steps, 'false',
             g.clock,
             g.verlet_positions,
-            g.reflect,
             g.calc_static,
             g.harmonic,
             g.mix,
@@ -701,7 +699,7 @@ class HarmonicallyCoupled(CompoundVertex):
         g.verlet_positions.input.default.velocities = ip.velocities
         g.verlet_positions.input.default.forces = ip.forces
 
-        g.verlet_positions.input.positions = gp.reflect.output.positions[-1]
+        g.verlet_positions.input.positions = gp.verlet_positions.output.positions[-1]
         g.verlet_positions.input.velocities = gp.verlet_velocities.output.velocities[-1]
         g.verlet_positions.input.forces = gp.mix.output.weighted_sum[-1]
 
@@ -710,28 +708,13 @@ class HarmonicallyCoupled(CompoundVertex):
         g.verlet_positions.input.temperature = ip.temperature
         g.verlet_positions.input.temperature_damping_timescale = ip.temperature_damping_timescale
 
-        # reflect
-        g.reflect.on = ip.use_reflection
-        g.reflect.input.default.previous_positions = ip.structure.positions
-        g.reflect.input.default.previous_velocities = ip.velocities
-
-        g.reflect.input.reference_positions = ip.structure.positions
-        g.reflect.input.previous_positions = gp.reflect.output.positions[-1]
-        g.reflect.input.previous_velocities = gp.verlet_velocities.output.velocities[-1]
-        g.reflect.input.positions = gp.verlet_positions.output.positions[-1]
-        g.reflect.input.velocities = gp.verlet_positions.output.velocities[-1]
-
-        g.reflect.input.cell = ip.structure.cell.array
-        g.reflect.input.pbc = ip.structure.pbc
-        g.reflect.input.cutoff_distance = ip.cutoff_distance
-
         # calc_static
         g.calc_static.input.project_path = ip.project_path
         g.calc_static.input.job_name = ip.job_name
 
         g.calc_static.input.structure = ip.structure
         g.calc_static.input.cell = ip.structure.cell.array
-        g.calc_static.input.positions = gp.reflect.output.positions[-1]
+        g.calc_static.input.positions = gp.verlet_positions.output.positions[-1]
 
         # harmonic
         g.harmonic.input.spring_constant = ip.spring_constant
@@ -741,7 +724,7 @@ class HarmonicallyCoupled(CompoundVertex):
         g.harmonic.input.pbc = ip.structure.pbc
         g.harmonic.input.zero_k_energy = ip.zero_k_energy
 
-        g.harmonic.input.positions = gp.reflect.output.positions[-1]
+        g.harmonic.input.positions = gp.verlet_positions.output.positions[-1]
 
         # mix
         g.mix.input.vectors = [
@@ -756,7 +739,7 @@ class HarmonicallyCoupled(CompoundVertex):
         g.verlet_velocities.input.temperature = ip.temperature
         g.verlet_velocities.input.temperature_damping_timescale = ip.temperature_damping_timescale
 
-        g.verlet_velocities.input.velocities = gp.reflect.output.velocities[-1]
+        g.verlet_velocities.input.velocities = gp.verlet_positions.output.velocities[-1]
         g.verlet_velocities.input.forces = gp.mix.output.weighted_sum[-1]
 
         # check_thermalized
@@ -793,7 +776,7 @@ class HarmonicallyCoupled(CompoundVertex):
             'job_energy_pot': ~gp.calc_static.output.energy_pot[-1],
             'harmonic_energy_pot': ~gp.harmonic.output.energy_pot[-1],
             'energy_kin': ~gp.verlet_velocities.output.energy_kin[-1],
-            'positions': ~gp.reflect.output.positions[-1],
+            'positions': ~gp.verlet_positions.output.positions[-1],
             'velocities': ~gp.verlet_velocities.output.velocities[-1],
             'forces': ~gp.mix.output.weighted_sum[-1],
             'harmonic_forces': ~gp.harmonic.output.forces[-1],
@@ -876,10 +859,6 @@ class HarmonicTILDParallel(HarmonicTILD):
 
         g.run_lambda_points.broadcast.velocities = gp.initial_velocities.output.velocities[-1]
         g.run_lambda_points.broadcast.forces = gp.initial_forces.output.zeros[-1]
-
-        # run_lambda_points - reflect
-        g.run_lambda_points.direct.use_reflection = ip.use_reflection
-        g.run_lambda_points.direct.cutoff_distance = ip.cutoff_distance
 
         # run_lambda_points - calc_static
         g.run_lambda_points.broadcast.project_path = gp.initialize_jobs.output.project_path[-1]

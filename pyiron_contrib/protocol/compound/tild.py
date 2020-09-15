@@ -13,9 +13,8 @@ from pyiron_contrib.protocol.utils import Pointer
 from pyiron_contrib.protocol.primitive.one_state import Counter, BuildMixingPairs, DeleteAtom, \
     ExternalHamiltonian, HarmonicHamiltonian, CreateJob, Overwrite, RandomVelocity, Slice, SphereReflection, \
     TILDPostProcess, Transpose, VerletPositionUpdate, VerletVelocityUpdate, WeightedSum, \
-    WelfordOnline, Zeros
+    WelfordOnline, Zeros, RemoveJob, FEPTExponential
 from pyiron_contrib.protocol.primitive.two_state import IsGEq, ModIsZero
-from pyiron_contrib.protocol.primitive.fts_vertices import PositionsRunningAverage
 
 from scipy.constants import physical_constants
 
@@ -48,9 +47,8 @@ class TILDParent(CompoundVertex, ABC):
     representations).
 
     WARNING: The methods in this parent class require loading of the finished interactive jobs that run within the
-    child protocol. Since reloading jobs is (at times) time consuming, a TILDPostProcessing node is added at the end
-    of the child protocol. This makes the methods defined in this parent class redundant. BUT, they will be important
-    if we wish to see the integrand plots, as I leave the default flag for plotting as False.
+    child protocol. Since reloading jobs is (at times) time consuming, I add a TILDPostProcessing vertex at the end
+    of the child protocol. That makes the methods defined in this parent class redundant.
 
     # TODO: Make reflection optional; it makes sense for crystals, but maybe not for molecules
     """
@@ -80,9 +78,6 @@ class HarmonicTILD(TILDParent):
     """
     A serial TILD protocol to compute the free energy change when the system changes from a set of harmonically
         oscillating atoms to a system following the specified potential (for ex. EAM).
-
-    Note: Pressure control is not yet implemented in this protocol.
-
     """
     DefaultWhitelist = {
     }
@@ -643,7 +638,7 @@ class ProtoVacancyTILD(Protocol, VacancyTILD, ABC):
 
 class HarmonicallyCoupled(CompoundVertex):
     """
-    A sub-protocol for HarmonicTILDParallel that is executed in parallel using ParallelList.
+    A sub-protocol for HarmonicTILDParallel, that is executed in parallel over multiple code using ParallelList.
     """
     DefaultWhitelist = {
     }
@@ -662,6 +657,8 @@ class HarmonicallyCoupled(CompoundVertex):
         g.check_sampling_period = ModIsZero()
         g.addition = WeightedSum()
         g.average = WelfordOnline()
+        g.fept_exp = FEPTExponential()
+        g.average_fept_exp= WelfordOnline()
         g.clock = Counter()
 
     def define_execution_flow(self):
@@ -680,6 +677,8 @@ class HarmonicallyCoupled(CompoundVertex):
             g.check_sampling_period, 'true',
             g.addition,
             g.average,
+            g.fept_exp,
+            g.average_fept_exp,
             g.check_steps
         )
         g.make_edge(g.check_thermalized, g.check_steps, 'false')
@@ -740,6 +739,7 @@ class HarmonicallyCoupled(CompoundVertex):
         g.harmonic.input.home_positions = ip.structure.positions
         g.harmonic.input.cell = ip.structure.cell.array
         g.harmonic.input.pbc = ip.structure.pbc
+        g.harmonic.input.zero_k_energy = ip.zero_k_energy
 
         g.harmonic.input.positions = gp.reflect.output.positions[-1]
 
@@ -777,7 +777,14 @@ class HarmonicallyCoupled(CompoundVertex):
         # average
         g.average.input.sample = gp.addition.output.weighted_sum[-1]
 
-        self.archive.clock = gp.clock.output.n_counts[-1]
+        # fept_exp
+        g.fept_exp.input.u_diff = gp.addition.output.weighted_sum[-1]
+        g.fept_exp.input.temperature = ip.temperature
+        g.fept_exp.input.delta_lambda = ip.delta_lambdas
+
+        # average_fept_exp
+        g.average_fept_exp.input.sample = gp.fept_exp.output.exponential_difference[-1]
+
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
 
     def get_output(self):
@@ -791,8 +798,10 @@ class HarmonicallyCoupled(CompoundVertex):
             'forces': ~gp.mix.output.weighted_sum[-1],
             'harmonic_forces': ~gp.harmonic.output.forces[-1],
             'clock': ~gp.clock.output.n_counts[-1],
-            'mean': ~gp.average.output.mean[-1],
-            'std': ~gp.average.output.std[-1],
+            'mean_diff': ~gp.average.output.mean[-1],
+            'std_diff': ~gp.average.output.std[-1],
+            'fept_exp_mean': ~gp.average_fept_exp.output.mean[-1],
+            'fept_exp_std': ~gp.average_fept_exp.output.std[-1],
             'n_samples': ~gp.average.output.n_samples[-1]
         }
 
@@ -879,6 +888,7 @@ class HarmonicTILDParallel(HarmonicTILD):
         # run_lambda_points - harmonic
         g.run_lambda_points.direct.spring_constant = ip.spring_constant
         g.run_lambda_points.direct.force_constants = ip.force_constants
+        g.run_lambda_points.direct.zero_k_energy = ip.zero_k_energy
 
         # run_lambda_points - mix
         g.run_lambda_points.broadcast.coupling_weights = gp.build_lambdas.output.lambda_pairs[-1]
@@ -893,7 +903,7 @@ class HarmonicTILDParallel(HarmonicTILD):
         g.run_lambda_points.direct.sampling_period = ip.sampling_period
 
         # run_lambda_points - addition
-        # no inputs
+        g.run_lambda_points.broadcast.delta_lambdas = ip.delta_lambdas
 
         # run_lambda_points - average
         # no inputs
@@ -906,9 +916,12 @@ class HarmonicTILDParallel(HarmonicTILD):
 
         # post_processing
         g.post.input.lambda_pairs = gp.build_lambdas.output.lambda_pairs[-1]
-        g.post.input.n_samples = gp.run_lambda_points.output.n_samples[-1]
-        g.post.input.mean = gp.run_lambda_points.output.mean[-1]
-        g.post.input.std = gp.run_lambda_points.output.std[-1]
+        g.post.input.tild_mean = gp.run_lambda_points.output.mean_diff[-1]
+        g.post.input.tild_std = gp.run_lambda_points.output.std_diff[-1]
+        g.post.input.fept_exp_mean = gp.run_lambda_points.output.fept_exp_mean[-1]
+        g.post.input.fept_exp_std = gp.run_lambda_points.output.fept_exp_std[-1]
+        g.post.input.temperature = ip.temperature
+        g.post.input.n_samples = gp.run_lambda_points.output.n_samples[-1][-1]
         g.post.input.plot = ip.plot
 
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
@@ -924,10 +937,17 @@ class HarmonicTILDParallel(HarmonicTILD):
             'velocities': ~o.velocities[-1],
             'forces': ~o.forces[-1],
             'harmonic_forces': ~o.harmonic_forces[-1],
-            'integrands': ~o.mean[-1],
-            'integrands_std': ~o.std[-1],
-            'integrands_n_samples': ~o.n_samples[-1],
-            'free_energy_change': ~gp.post.output.free_energy_change[-1]
+            'integrands': ~o.mean_diff[-1],
+            'integrands_std': ~o.std_diff[-1],
+            'fept_exp_mean': ~o.fept_exp_mean[-1],
+            'fept_exp_std': ~o.fept_exp_std[-1],
+            'n_samples': ~o.n_samples[-1],
+            'tild_free_energy_mean': ~gp.post.output.tild_free_energy_mean[-1],
+            'tild_free_energy_std': ~gp.post.output.tild_free_energy_std[-1],
+            'tild_free_energy_se': ~gp.post.output.tild_free_energy_se[-1],
+            'fept_free_energy_mean': ~gp.post.output.fept_free_energy_mean[-1],
+            'fept_free_energy_std': ~gp.post.output.fept_free_energy_std[-1],
+            'fept_free_energy_se': ~gp.post.output.fept_free_energy_se[-1]
         }
 
     def get_integrand(self):
@@ -964,6 +984,8 @@ class Decoupling(CompoundVertex):
         g.check_sampling_period = ModIsZero()
         g.addition = WeightedSum()
         g.average = WelfordOnline()
+        g.fept_exp = FEPTExponential()
+        g.average_fept_exp = WelfordOnline()
         g.clock = Counter()
 
     def define_execution_flow(self):
@@ -971,6 +993,7 @@ class Decoupling(CompoundVertex):
         g = self.graph
         g.make_pipeline(
             g.check_steps, 'false',
+            g.clock,
             g.verlet_positions,
             g.reflect,
             g.calc_full,
@@ -985,7 +1008,8 @@ class Decoupling(CompoundVertex):
             g.check_sampling_period, 'true',
             g.addition,
             g.average,
-            g.clock,
+            g.fept_exp,
+            g.average_fept_exp,
             g.check_steps
         )
         g.make_edge(g.check_thermalized, g.clock, 'false')
@@ -1107,6 +1131,14 @@ class Decoupling(CompoundVertex):
         # average
         g.average.input.sample = gp.addition.output.weighted_sum[-1]
 
+        # fept_exp
+        g.fept_exp.input.u_diff = gp.addition.output.weighted_sum[-1]
+        g.fept_exp.input.temperature = ip.temperature
+        g.fept_exp.input.delta_lambda = ip.delta_lambdas
+
+        # average_fept_exp
+        g.average_fept_exp.input.sample = gp.fept_exp.output.exponential_difference[-1]
+
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
 
     def get_output(self):
@@ -1121,8 +1153,10 @@ class Decoupling(CompoundVertex):
             'forces': ~gp.mix.output.weighted_sum[-1],
             'harmonic_forces': ~gp.harmonic.output.forces[-1],
             'clock': ~gp.clock.output.n_counts[-1],
-            'mean': ~gp.average.output.mean[-1],
-            'std': ~gp.average.output.std[-1],
+            'mean_diff': ~gp.average.output.mean[-1],
+            'std_diff': ~gp.average.output.std[-1],
+            'mean_fept_exp': ~gp.average_fept_exp.output.mean[-1],
+            'std_fept_exp': ~gp.average_fept_exp.output.std[-1],
             'n_samples': ~gp.average.output.n_samples[-1]
         }
 
@@ -1232,6 +1266,7 @@ class VacancyTILDParallel(VacancyTILD):
         g.run_lambda_points.direct.spring_constant = ip.spring_constant
         g.run_lambda_points.direct.force_constants = ip.force_constants
         g.run_lambda_points.direct.vacancy_id = ip.vacancy_id
+        g.run_lambda_points.direct.zero_k_energy = ip.zero_k_energy
 
         # run_lambda_points - write_vac_forces -  takes inputs already specified
 
@@ -1248,7 +1283,11 @@ class VacancyTILDParallel(VacancyTILD):
         # run_lambda_points - check_sampling_period
         g.run_lambda_points.direct.sampling_period = ip.sampling_period
 
-        # run_lambda_points - average - does not need inputs
+        # run_lambda_points - addition
+        g.run_lambda_points.broadcast.delta_lambdas = ip.delta_lambdas
+
+        # run_lambda_points - average
+        # no inputs
 
         # run_lambda_points - clock
         g.run_lambda_points.direct.n_steps = ip.n_steps
@@ -1258,9 +1297,12 @@ class VacancyTILDParallel(VacancyTILD):
 
         # post_processing
         g.post.input.lambda_pairs = gp.build_lambdas.output.lambda_pairs[-1]
-        g.post.input.n_samples = gp.run_lambda_points.output.n_samples[-1]
-        g.post.input.mean = gp.run_lambda_points.output.mean[-1]
-        g.post.input.std = gp.run_lambda_points.output.std[-1]
+        g.post.input.tild_mean = gp.run_lambda_points.output.mean_diff[-1]
+        g.post.input.tild_std = gp.run_lambda_points.output.std_diff[-1]
+        g.post.input.fept_exp_mean = gp.run_lambda_points.output.mean_fept_exp[-1]
+        g.post.input.fept_exp_std = gp.run_lambda_points.output.std_fept_exp[-1]
+        g.post.input.temperature = ip.temperature
+        g.post.input.n_samples = gp.run_lambda_points.output.n_samples[-1][-1]
         g.post.input.plot = ip.plot
 
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
@@ -1277,10 +1319,17 @@ class VacancyTILDParallel(VacancyTILD):
             'velocities': ~o.velocities[-1],
             'forces': ~o.forces[-1],
             'harmonic_forces': ~o.harmonic_forces[-1],
-            'integrands': ~o.mean[-1],
-            'integrands_std': ~o.std[-1],
-            'integrands_n_samples': ~o.n_samples[-1],
-            'free_energy_change': ~gp.post.output.free_energy_change[-1]
+            'integrands': ~o.mean_diff[-1],
+            'integrands_std': ~o.std_diff[-1],
+            'fept_exp_mean': ~o.mean_fept_exp[-1],
+            'fept_exp_std': ~o.std_fept_exp[-1],
+            'n_samples': ~o.n_samples[-1],
+            'tild_free_energy_mean': ~gp.post.output.tild_free_energy_mean[-1],
+            'tild_free_energy_std': ~gp.post.output.tild_free_energy_std[-1],
+            'tild_free_energy_se': ~gp.post.output.tild_free_energy_se[-1],
+            'fept_free_energy_mean': ~gp.post.output.fept_free_energy_mean[-1],
+            'fept_free_energy_std': ~gp.post.output.fept_free_energy_std[-1],
+            'fept_free_energy_se': ~gp.post.output.fept_free_energy_se[-1]
         }
 
     def get_integrand(self):

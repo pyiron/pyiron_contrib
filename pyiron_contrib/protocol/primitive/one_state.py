@@ -6,6 +6,7 @@ from __future__ import print_function
 from pyiron_contrib.protocol.generic import PrimitiveVertex
 from pyiron_contrib.protocol.utils import Pointer
 import numpy as np
+from uncertainties import unumpy
 from pyiron.atomistics.job.interactive import GenericInteractive
 from pyiron.lammps.lammps import LammpsInteractive
 from scipy.constants import physical_constants
@@ -434,7 +435,7 @@ class HarmonicHamiltonian(PrimitiveVertex):
     """
 
     def command(self, positions, home_positions, cell, pbc, spring_constant=None, force_constants=None,
-                mask=None):
+                mask=None, zero_k_energy=None):
 
         dr = find_mic(positions - home_positions, cell, pbc)[0]
         if spring_constant is not None and force_constants is None:
@@ -459,6 +460,9 @@ class HarmonicHamiltonian(PrimitiveVertex):
 
         else:
             raise TypeError('Please specify either a spring constant or the force constant matrix')
+
+        if zero_k_energy is not None:
+            energy += zero_k_energy
 
         return {
             'forces': forces,
@@ -1245,16 +1249,26 @@ class TILDPostProcess(PrimitiveVertex):
         super(TILDPostProcess, self).__init__(name=name)
         self.input.default.plot = True
 
-    def command(self, lambda_pairs, n_samples, mean, std, plot=True):
+    def command(self, lambda_pairs, tild_mean, tild_std, fept_exp_mean, fept_exp_std, temperature, n_samples,
+                plot=True):
         if plot is True:
-            self.plot_integrand(lambda_pairs, n_samples, mean, std)
+            self.plot_integrand(lambda_pairs, tild_mean, tild_std, n_samples)
+
+        tild_mean, tild_std = self.get_tild_free_energy(lambda_pairs, tild_mean, tild_std)
+        fept_mean, fept_std = self.get_fept_free_energy(fept_exp_mean, fept_exp_std, temperature)
 
         return {
-            'free_energy_change': self.get_free_energy_change(lambda_pairs, mean)
+            'tild_free_energy_mean': tild_mean,
+            'tild_free_energy_std': tild_std,
+            'tild_free_energy_se': tild_std / np.sqrt(n_samples),
+            'fept_free_energy_mean': fept_mean,
+            'fept_free_energy_std': fept_std,
+            'fept_free_energy_se': fept_std / np.sqrt(n_samples)
+
         }
 
     @staticmethod
-    def plot_integrand(lambda_pairs, n_samples, mean, std):
+    def plot_integrand(lambda_pairs, mean, std, n_samples):
         fig, ax = plt.subplots()
         lambdas = lambda_pairs[:, 0]
         thermal_average, standard_error = mean, std / np.sqrt(n_samples)
@@ -1265,8 +1279,23 @@ class TILDPostProcess(PrimitiveVertex):
         return fig, ax
 
     @staticmethod
-    def get_free_energy_change(lambda_pairs, mean):
-        return np.trapz(x=lambda_pairs[:, 0], y=mean)
+    def get_tild_free_energy(lambda_pairs, tild_mean, tild_std):
+        y = unumpy.uarray(tild_mean, tild_std)
+        integral = np.trapz(x=lambda_pairs[:, 0], y=y)
+        mean = unumpy.nominal_values(integral)
+        std = unumpy.std_devs(integral)
+        return mean, std
+
+    @staticmethod
+    def get_fept_free_energy(fept_exp_mean, fept_exp_std, temperature):
+        y = unumpy.uarray(fept_exp_mean, fept_exp_std)
+        free_energy = 0
+        for val in y:
+            free_energy += unumpy.log(val)
+        free_energy *= -KB * temperature
+        mean = unumpy.nominal_values(free_energy)
+        std = unumpy.std_devs(free_energy)
+        return mean, std
 
 
 class BerendsenBarostat(PrimitiveVertex):
@@ -1361,4 +1390,16 @@ class BerendsenBarostat(PrimitiveVertex):
             'pressure': total_pressure,
             'structure': new_structure,
             'positions': new_structure.positions
+        }
+
+
+class FEPTExponential(PrimitiveVertex):
+    """
+
+    """
+
+    def command(self, u_diff, temperature, delta_lambda):
+
+        return {
+            'exponential_difference': np.exp(-u_diff * delta_lambda / (KB * temperature))
         }

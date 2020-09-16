@@ -440,11 +440,11 @@ class HarmonicHamiltonian(PrimitiveVertex):
         dr = find_mic(positions - home_positions, cell, pbc)[0]
         if spring_constant is not None and force_constants is None:
             if mask is not None:
-                energy = 0.5 * np.sum(spring_constant * dr[mask] * dr[mask])
                 forces = -spring_constant * dr[mask]
+                energy = 0.5 * np.dot(-forces, dr[mask])
             else:
-                energy = 0.5 * np.sum(spring_constant * dr * dr)
                 forces = -spring_constant * dr
+                energy = 0.5 * np.dot(-forces, dr)
 
         elif force_constants is not None and spring_constant is None:
             transformed_force_constants = self.transform_force_constants(force_constants)
@@ -871,7 +871,7 @@ class SphereReflection(PrimitiveVertex):
 
     def command(self, reference_positions, cutoff_distance, positions, velocities, previous_positions,
                 previous_velocities, pbc, cell, atom_reflect_switch):
-        distance = np.linalg.norm(find_mic(reference_positions - positions, cell=cell, pbc=pbc)[0], axis=-1)
+        distance = find_mic(reference_positions - positions, cell=cell, pbc=pbc)[1]
         is_at_home = (distance < cutoff_distance)[:, np.newaxis]
 
         if np.all(is_at_home) or atom_reflect_switch is False:
@@ -881,6 +881,7 @@ class SphereReflection(PrimitiveVertex):
                 'reflected': False
             }
         else:
+            print('reflected')
             return {
                 'positions': previous_positions,
                 'velocities': -previous_velocities,

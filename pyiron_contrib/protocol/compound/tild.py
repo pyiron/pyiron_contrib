@@ -972,7 +972,6 @@ class Decoupling(CompoundVertex):
         g = self.graph
         g.make_pipeline(
             g.check_steps, 'false',
-            g.clock,
             g.verlet_positions,
             g.reflect,
             g.calc_full,
@@ -989,6 +988,7 @@ class Decoupling(CompoundVertex):
             g.average,
             g.fept_exp,
             g.average_fept_exp,
+            g.clock,
             g.check_steps
         )
         g.make_edge(g.check_thermalized, g.clock, 'false')

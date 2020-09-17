@@ -871,7 +871,7 @@ class SphereReflection(PrimitiveVertex):
 
     def command(self, reference_positions, cutoff_distance, positions, velocities, previous_positions,
                 previous_velocities, pbc, cell, atom_reflect_switch):
-        distance = find_mic(positions - reference_positions, cell=cell, pbc=pbc)[1]
+        distance = np.linalg.norm(find_mic(reference_positions - positions, cell=cell, pbc=pbc)[0], axis=-1)
         is_at_home = (distance < cutoff_distance)[:, np.newaxis]
 
         if np.all(is_at_home) or atom_reflect_switch is False:
@@ -881,7 +881,6 @@ class SphereReflection(PrimitiveVertex):
                 'reflected': False
             }
         else:
-            print('reflected')
             return {
                 'positions': previous_positions,
                 'velocities': -previous_velocities,
@@ -1256,7 +1255,7 @@ class TILDPostProcess(PrimitiveVertex):
             self.plot_integrand(lambda_pairs, tild_mean, tild_std, n_samples)
 
         tild_mean, tild_std = self.get_tild_free_energy(lambda_pairs, tild_mean, tild_std)
-        fept_mean, fept_std = self.get_fept_free_energy(lambda_pairs, fept_exp_mean, fept_exp_std, temperature)
+        fept_mean, fept_std = self.get_fept_free_energy(fept_exp_mean, fept_exp_std, temperature)
 
         return {
             'tild_free_energy_mean': tild_mean,
@@ -1288,14 +1287,11 @@ class TILDPostProcess(PrimitiveVertex):
         return mean, std
 
     @staticmethod
-    def get_fept_free_energy(lambda_pairs, fept_exp_mean, fept_exp_std, temperature):
-        delta_lambdas = np.gradient(lambda_pairs[:, 0])
-        delta_lambdas[0] /= 2
-        delta_lambdas[-1] /= 2
+    def get_fept_free_energy(fept_exp_mean, fept_exp_std, temperature):
         y = unumpy.uarray(fept_exp_mean, fept_exp_std)
         free_energy = 0
-        for val, del_lam in zip(y, delta_lambdas):
-            free_energy += -KB * temperature * unumpy.log(val) * del_lam
+        for val in y:
+            free_energy += -KB * temperature * unumpy.log(val)
         mean = unumpy.nominal_values(free_energy)
         std = unumpy.std_devs(free_energy)
         return mean, std
@@ -1404,5 +1400,5 @@ class FEPTExponential(PrimitiveVertex):
     def command(self, u_diff, temperature, delta_lambda):
 
         return {
-            'exponential_difference': np.exp(-u_diff / (KB * temperature))
+            'exponential_difference': np.exp(-u_diff * delta_lambda / (KB * temperature))
         }

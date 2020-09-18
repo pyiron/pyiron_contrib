@@ -45,8 +45,8 @@ class ImageJob(GenericJob):
         super(ImageJob, self).__init__(project, job_name)
         self.__name__ = "ImageJob"
         self._images = DistributingList()
-        self.input = InputList(table_name ="Input")
-        self.output = InputList(table_name ="Output")
+        self.input = InputList(table_name ="input")
+        self.output = InputList(table_name ="output")
 
 
     @property
@@ -204,7 +204,7 @@ class ImageJob(GenericJob):
         super(ImageJob, self).from_hdf(hdf=hdf, group_name=group_name)
         if hdf is None:
             hdf = self.project_hdf5
-        self.input.from_hdf(hdf=self._hdf5, group_name="Input")
+        self.input.from_hdf(hdf=self._hdf5, group_name=None)
         self.output.from_hdf(hdf=self._hdf5, group_name=None)
         with self._hdf5.open("images") as hdf5_server:
             for n in np.arange(self._hdf5["n_images"], dtype=int):

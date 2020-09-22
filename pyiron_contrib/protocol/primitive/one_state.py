@@ -427,8 +427,8 @@ class HarmonicHamiltonian(PrimitiveVertex):
                 mask=None, zero_k_energy=None):
 
         dr = find_mic(positions - home_positions, cell, pbc)[0]
-        forces = -spring_constant * dr
         if spring_constant is not None and force_constants is None:
+            forces = -spring_constant * dr
             if mask is not None:
                 energy = 0.5 * np.dot(-forces[mask], dr[mask])
                 forces = forces[mask]

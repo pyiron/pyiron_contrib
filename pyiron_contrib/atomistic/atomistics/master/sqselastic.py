@@ -113,7 +113,7 @@ class SQSElasticConstants(GenericMaster):
         job_list = [self._run_elastic(str(n), structure) for n, structure in enumerate(self.output_list.structures)]
         self._wait(job_list)
         self.output_list.elastic_data = [job['output/elasticmatrix'] for job in job_list]
-        elastic_matrices = np.array([job.output_list.elastic_data['C'] for job in job_list])
+        elastic_matrices = np.array([data['C'] for data in self.output_list.elastic_data])
         self.output_list.elastic_matrix_mean = elastic_matrices.mean(axis=0)
         self.output_list.elastic_matrix_std = elastic_matrices.std(axis=0)
         self.output_list.elastic_matrix_sem = self._std_to_sqs_sem(self.output_list.elastic_matrix_std)

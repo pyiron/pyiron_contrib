@@ -44,69 +44,72 @@ class SQSElasticConstants(GenericMaster):
         self.output_list = InputList(table_name='output_list')
         self.output_list.elastic_matrix = None
 
+    def _relative_name(self, name):
+        return '_'.join([self.job_name, name])
+
+    def _create_job(self, job_type, job_name):
+        return self.project.create_job(job_type, self._relative_name(job_name))
+
+    @property
+    def _job_type(self):
+        return self.project.job_type
+
+    @staticmethod
+    def _apply_inputlist(target, source):
+        for k, v in source.items():
+            target[k] = v
+
+    def _wait(self, job_or_jobs):
+        try:
+            self.project.wait_for_job(job_or_jobs)
+        except AttributeError:
+            for job in job_or_jobs:
+                self._wait(job)
+
+    def _copy_ref_job(self, name):
+        return self.ref_job.copy_to(new_job_name=self._relative_name(name), new_database_entry=False)
+
     def run_static(self):
         self._run_sqs()
         self._run_minimization()
         self._run_elastic_list()
 
     def _run_sqs(self):
-        sqs_job = self.project.create_job(self.project.job_type.SQSJob, self.job_name + '_sqs')
+        sqs_job = self._create_job(self._job_type.SQSJob, 'sqs')
         sqs_job.structure = self.ref_job.structure.copy()
-        sqs_job.input.mole_fractions = self.sqs_input.mole_fractions
-        sqs_job.input.iterations = self.sqs_input.iterations
-        sqs_job.input.weights = self.sqs_input.weights
-        sqs_job.input.n_output_structures = self.sqs_input.n_output_structures
-        sqs_job.run()
-        self.project.wait_for_job(sqs_job)
+        self._apply_inputlist(sqs_job.input, self.sqs_input)
+        self._wait(sqs_job.run())
         self.output_list.sqs_structures = sqs_job.list_structures()
 
     def _run_minimization(self):
-        ref_min = self.ref_job.copy_to(
-            new_job_name='_'.join([self.job_name, self.ref_job.job_name, 'min_ref']),
-            new_database_entry=False
-        )
+        ref_min = self._copy_ref_job('minref')
         ref_min.calc_minimize(pressure=0)
 
-        min_job = self.project.create_job(
-            self.project.job_type.StructureListMaster,
-            '_'.join([self.job_name, self.ref_job.job_name, 'minlist'])
-        )
+        min_job = self._create_job(self._job_type.StructureListMaster, 'minlist')
         min_job.ref_job = ref_min
         min_job.structure_lst = list(self.output_list.sqs_structures)
-        min_job.run()
-        self.project.wait_for_job(min_job)
+        self._wait(min_job.run())
         self.output_list.minimized_structures = [
             self.project.load(child_id).get_structure()
             for child_id in min_job.child_ids
         ]
 
     def _run_elastic_list(self):
-        print("N minimized structures = {}".format(len(self.output_list.minimized_structures)))
         job_list = [
             self._run_elastic(str(n), structure)
             for n, structure in enumerate(self.output_list.minimized_structures)
         ]
-        for job in job_list:
-            self.project.wait_for_job(job)
-        print(job_list)
+        self._wait(job_list)
         self.output_list.elastic_data = [job['output/elasticmatrix'] for job in job_list]
 
     def _run_elastic(self, id_, structure):
-        # TODO: Parallelize over a list of structures, e.g. with StructureListMaster
-        engine_job = self.ref_job.copy_to(
-            new_job_name='_'.join([self.job_name, self.ref_job.job_name, 'engine_n' + id_]),
-            new_database_entry=False
-        )
+        engine_job = self._copy_ref_job('engine_n{}'.format(id_))
         engine_job.structure = structure
         elastic_job = engine_job.create_job(
-            self.project.job_type.ElasticMatrixJob,
-            self.job_name + '_elastic_n' + id_
+            self._job_type.ElasticMatrixJob,
+            self._relative_name('elastic_n{}'.format(id_))
         )
-        elastic_job.input.num_of_points = self.elastic_input.num_of_points
-        elastic_job.input.fit_order = self.elastic_input.fit_order
-        elastic_job.input.eps_range = self.elastic_input.eps_range
-        elastic_job.input.relax_atoms = self.elastic_input.relax_atoms
-        elastic_job.input.sqrt_eta = self.elastic_input.sqrt_eta
+        self._apply_inputlist(elastic_job.input, self.elastic_input)
         elastic_job.run()
         return elastic_job
 

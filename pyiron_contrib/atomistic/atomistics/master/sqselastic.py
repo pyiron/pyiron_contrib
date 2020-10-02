@@ -8,6 +8,10 @@ import numpy as np
 
 """
 Calculate the elastic matrix for SQS structure(s).
+
+TODO:
+    - Add an extra layer to loop over SQS concentration ranges
+    - Test and implement server stuff so it can exploit parallelism
 """
 
 __author__ = "Liam Huber"
@@ -85,6 +89,7 @@ class SQSElasticConstants(GenericMaster):
         sqs_job.run()
         self._wait(sqs_job)
         self.output_list.sqs_structures = sqs_job.list_structures()
+        # TODO: Grab the corrected Mole fractions
 
     def _run_minimization(self):
         ref_min = self._copy_ref_job('minref')

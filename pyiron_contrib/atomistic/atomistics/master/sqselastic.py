@@ -23,6 +23,7 @@ __date__ = "Oct 2, 2020"
 class SQSElasticConstants(GenericMaster):
 
     def __init__(self, project, job_name):
+        import pyiron_mpie
         super().__init__(project, job_name=job_name)
         self.__name__ = "SQSElasticConstants"
         self.__version__ = "0.1"

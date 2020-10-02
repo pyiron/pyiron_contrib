@@ -70,6 +70,9 @@ class SQSElasticConstants(GenericMaster):
     def _copy_ref_job(self, name):
         return self.ref_job.copy_to(new_job_name=self._relative_name(name), new_database_entry=False)
 
+    def _std_to_sqs_sem(self, array):
+        return array / np.sqrt(self.sqs_input.n_output_structures)
+
     def run_static(self):
         self._run_sqs()
         self._run_minimization()
@@ -98,9 +101,6 @@ class SQSElasticConstants(GenericMaster):
         self.output_list.cell_mean = cells.mean(axis=0)
         self.output_list.cell_std = cells.std(axis=0)
         self.output_list.cell_sem = self._std_to_sqs_sem(self.output_list.cell_std)
-
-    def _std_to_sqs_sem(self, array):
-        return array / np.sqrt(self.sqs_input.n_output_structures)
 
     def _run_elastic_list(self):
         job_list = [self._run_elastic(str(n), structure) for n, structure in enumerate(self.output_list.structures)]

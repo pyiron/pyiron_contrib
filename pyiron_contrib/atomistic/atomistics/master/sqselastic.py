@@ -4,6 +4,7 @@
 
 from pyiron_base.master.generic import GenericMaster
 from pyiron_base import InputList
+import numpy as np
 
 """
 Calculate the elastic matrix for SQS structure(s).
@@ -89,18 +90,26 @@ class SQSElasticConstants(GenericMaster):
         min_job.ref_job = ref_min
         min_job.structure_lst = list(self.output_list.sqs_structures)
         self._wait(min_job.run())
-        self.output_list.minimized_structures = [
+        self.output_list.structures = [
             self.project.load(child_id).get_structure()
             for child_id in min_job.child_ids
         ]
+        cells = np.array([structure.cell.array for structure in self.output_list.structures])
+        self.output_list.cell_mean = cells.mean(axis=0)
+        self.output_list.cell_std = cells.std(axis=0)
+        self.output_list.cell_sem = self._std_to_sqs_sem(self.output_list.cell_std)
+
+    def _std_to_sqs_sem(self, array):
+        return array / np.sqrt(self.sqs_input.n_output_structures)
 
     def _run_elastic_list(self):
-        job_list = [
-            self._run_elastic(str(n), structure)
-            for n, structure in enumerate(self.output_list.minimized_structures)
-        ]
+        job_list = [self._run_elastic(str(n), structure) for n, structure in enumerate(self.output_list.structures)]
         self._wait(job_list)
         self.output_list.elastic_data = [job['output/elasticmatrix'] for job in job_list]
+        elastic_matrices = np.array([job.output_list.elastic_data['C'] for job in job_list])
+        self.output_list.elastic_matrix_mean = elastic_matrices.mean(axis=0)
+        self.output_list.elastic_matrix_std = elastic_matrices.std(axis=0)
+        self.output_list.elastic_matrix_sem = self._std_to_sqs_sem(self.output_list.elastic_matrix_std)
 
     def _run_elastic(self, id_, structure):
         engine_job = self._copy_ref_job('engine_n{}'.format(id_))

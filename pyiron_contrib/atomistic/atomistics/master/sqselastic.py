@@ -83,7 +83,8 @@ class SQSElasticConstants(GenericMaster):
         sqs_job = self._create_job(self._job_type.SQSJob, 'sqs')
         sqs_job.structure = self.ref_job.structure.copy()
         self._apply_inputlist(sqs_job.input, self.sqs_input)
-        self._wait(sqs_job.run())
+        sqs_job.run()
+        self._wait(sqs_job)
         self.output_list.sqs_structures = sqs_job.list_structures()
 
     def _run_minimization(self):
@@ -93,7 +94,8 @@ class SQSElasticConstants(GenericMaster):
         min_job = self._create_job(self._job_type.StructureListMaster, 'minlist')
         min_job.ref_job = ref_min
         min_job.structure_lst = list(self.output_list.sqs_structures)
-        self._wait(min_job.run())
+        min_job.run()
+        self._wait(min_job)
         self.output_list.structures = [
             self.project.load(child_id).get_structure()
             for child_id in min_job.child_ids

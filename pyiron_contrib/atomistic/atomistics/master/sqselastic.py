@@ -8,6 +8,7 @@ import numpy as np
 from pyiron import Atoms
 from pyiron.atomistics.job.atomistic import AtomisticGenericJob
 from pyiron.atomistics.job.sqs import SQSJob
+from pyiron_mpie.interactive.elastic import ElasticMatrixJob
 
 """
 Calculate the elastic matrix for SQS structure(s).
@@ -36,13 +37,7 @@ class SQSElasticConstants(GenericMaster):
 
         self.ref_job = None
         self.ref_sqs = None
-
-        self.elastic_input = InputList(table_name='elastic_input')
-        self.elastic_input.num_of_points = 5
-        self.elastic_input.fit_order = 2
-        self.elastic_input.eps_range = 0.005
-        self.elastic_input.relax_atoms = True
-        self.elastic_input.sqrt_eta = True
+        self.ref_elastic = None
 
         self.output = _SQSElasticConstantsOutput(self)
 
@@ -87,6 +82,12 @@ class SQSElasticConstants(GenericMaster):
         # This is an ugly hack -- somehow the input mole_fractions dict otherwise gets converted to an InputList of
         # that dict, which the underlying SQSJob is not happy about.
         return job
+
+    def _copy_ref_elastic(self, name):
+        # This isn't actually used because of (what I consider to be) an oddity of ElasticMatrixJob and it's ref_job
+        return self._copy_ref(self.ref_elastic, name)
+        # job.input = self.ref_elastic.input
+        # return job
 
     def _std_to_sqs_sem(self, array):
         return array / np.sqrt(self.ref_sqs.input.n_output_structures)
@@ -151,11 +152,12 @@ class SQSElasticConstants(GenericMaster):
     def _run_elastic(self, id_, structure):
         engine_job = self._copy_ref_job('engine_n{}'.format(id_))
         engine_job.structure = structure
-        elastic_job = engine_job.create_job(
-            self._job_type.ElasticMatrixJob,
-            self._relative_name('elastic_n{}'.format(id_))
-        )
-        self._apply_inputlist(elastic_job.input, self.elastic_input)
+
+        elastic_job = engine_job.create_job(self._job_type.ElasticMatrixJob, 'elastic_n{}'.format(id_))
+        elastic_job.input = self.ref_elastic.input
+        # TODO: Figure out what is up with ElasticMatrixJob that this doesn't work instead:
+        #     elastic_job = self._copy_ref_job('elastic_n{}'.format(id_))
+        #     elastic_job.ref_job = engine_job
         elastic_job.run()
         return elastic_job
 
@@ -163,19 +165,20 @@ class SQSElasticConstants(GenericMaster):
         super().to_hdf(hdf, group_name)
         self._hdf5['refjobname'] = self.ref_job.job_name
         self._hdf5['refsqsname'] = self.ref_sqs.job_name
-        self.elastic_input.to_hdf(self._hdf5, group_name)
+        self._hdf5['refelasticname'] = self.ref_elastic.job_name
         self.output.to_hdf()
 
     def from_hdf(self, hdf=None, group_name=None):
         super().from_hdf(hdf, group_name)
         self.ref_job = self.project.load(self._hdf5['refjobname'])
         self.ref_sqs = self.project.load(self._hdf5['refsqsname'])
-        self.elastic_input.from_hdf(self._hdf5)
+        self.ref_elastic = self.project.load(self._hdf5['refelasticname'])
         self.output.from_hdf()
 
     def validate_ready_to_run(self):
         assert isinstance(self.ref_job, AtomisticGenericJob)
         assert isinstance(self.ref_sqs, SQSJob)
+        assert isinstance(self.ref_elastic, ElasticMatrixJob)
         super().validate_ready_to_run()
 
     def collect_output(self):

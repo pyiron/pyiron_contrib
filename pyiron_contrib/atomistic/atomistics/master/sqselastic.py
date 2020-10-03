@@ -6,6 +6,8 @@ from pyiron_base.master.generic import GenericMaster
 from pyiron_base import InputList
 import numpy as np
 from pyiron import Atoms
+from pyiron.atomistics.job.atomistic import AtomisticGenericJob
+from pyiron.atomistics.job.sqs import SQSJob
 
 """
 Calculate the elastic matrix for SQS structure(s).
@@ -33,12 +35,7 @@ class SQSElasticConstants(GenericMaster):
         self.__version__ = "0.1"
 
         self.ref_job = None
-
-        self.sqs_input = InputList(table_name='sqs_input')
-        self.sqs_input.mole_fractions = None
-        self.sqs_input.iterations = 1e6
-        self.sqs_input.weights = None
-        self.sqs_input.n_output_structures = 1
+        self.ref_sqs = None
 
         self.elastic_input = InputList(table_name='elastic_input')
         self.elastic_input.num_of_points = 5
@@ -71,11 +68,21 @@ class SQSElasticConstants(GenericMaster):
             for job in job_or_jobs:
                 self._wait(job)
 
+    def _copy_ref(self, job, name):
+        return job.copy_to(new_job_name=self._relative_name(name), new_database_entry=False)
+
     def _copy_ref_job(self, name):
-        return self.ref_job.copy_to(new_job_name=self._relative_name(name), new_database_entry=False)
+        return self._copy_ref(self.ref_job, name)
+
+    def _copy_ref_sqs(self):
+        job = self._copy_ref(self.ref_sqs, 'sqs')
+        job.input = self.ref_sqs.input
+        # This is an ugly hack -- somehow the input mole_fractions dict otherwise gets converted to an InputList of
+        # that dict, which the underlying SQSJob is not happy about.
+        return job
 
     def _std_to_sqs_sem(self, array):
-        return array / np.sqrt(self.sqs_input.n_output_structures)
+        return array / np.sqrt(self.ref_sqs.input.n_output_structures)
 
     def _store_statistics_over_sqs(self, storage_object, data):
         """
@@ -98,9 +105,9 @@ class SQSElasticConstants(GenericMaster):
         self.to_hdf()
 
     def _run_sqs(self):
-        sqs_job = self._create_job(self._job_type.SQSJob, 'sqs')
+        sqs_job = self._copy_ref_sqs()
         sqs_job.structure = self.ref_job.structure.copy()
-        self._apply_inputlist(sqs_job.input, self.sqs_input)
+        self.sqs_job = sqs_job
         sqs_job.run()
         self._wait(sqs_job)
         self.output.sqs_structures = sqs_job.list_structures()
@@ -145,22 +152,27 @@ class SQSElasticConstants(GenericMaster):
         elastic_job.run()
         return elastic_job
 
-    def collect_output(self):
-        print("Collecting output")
-
     def to_hdf(self, hdf=None, group_name=None):
         super().to_hdf(hdf, group_name)
         self._hdf5['refjobname'] = self.ref_job.job_name
-        self.sqs_input.to_hdf(self._hdf5, group_name)
+        self._hdf5['refsqsname'] = self.ref_sqs.job_name
         self.elastic_input.to_hdf(self._hdf5, group_name)
         self.output.to_hdf()
 
     def from_hdf(self, hdf=None, group_name=None):
         super().from_hdf(hdf, group_name)
         self.ref_job = self.project.load(self._hdf5['refjobname'])
-        self.sqs_input.from_hdf(self._hdf5)
+        self.ref_sqs = self.project.load(self._hdf5['refsqsname'])
         self.elastic_input.from_hdf(self._hdf5)
         self.output.from_hdf()
+
+    def validate_ready_to_run(self):
+        assert isinstance(self.ref_job, AtomisticGenericJob)
+        assert isinstance(self.ref_sqs, SQSJob)
+        super().validate_ready_to_run()
+
+    def collect_output(self):
+        pass
 
     def write_input(self):
         pass  # We need to reconsider our inheritance scheme

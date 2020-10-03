@@ -174,7 +174,7 @@ class SQSElasticConstants(GenericMaster):
             ['ref_job', 'ref_sqs', 'ref_elastic'],
             [AtomisticGenericJob, SQSJob, ElasticMatrixJob],
         ):
-            job = self.__getattr__(attribute_name)
+            job = getattr(self, attribute_name)
             if not isinstance(job, class_):
                 raise TypeError('{} expected a {} with type {} but got {}'.format(
                     self.job_name,

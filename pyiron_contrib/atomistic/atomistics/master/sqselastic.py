@@ -2,8 +2,7 @@
 # Copyright (c) Max-Planck-Institut für Eisenforschung GmbH - Computational Materials Design (CM) Department
 # Distributed under the terms of "New BSD License", see the LICENSE file.
 
-from pyiron_base.master.generic import GenericMaster
-from pyiron_base import InputList
+from pyiron_base import InputList, GenericJob
 import numpy as np
 from pyiron import Atoms
 from pyiron.atomistics.job.atomistic import AtomisticGenericJob
@@ -28,7 +27,7 @@ __status__ = "development"
 __date__ = "Oct 2, 2020"
 
 
-class SQSElasticConstants(GenericMaster):
+class SQSElasticConstants(GenericJob):
 
     def __init__(self, project, job_name):
         super().__init__(project, job_name=job_name)

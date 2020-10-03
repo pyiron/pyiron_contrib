@@ -14,7 +14,6 @@ Calculate the elastic matrix for SQS structure(s).
 
 TODO:
     - Add an extra layer to loop over SQS concentration ranges
-    - Test and implement server stuff so it can exploit parallelism
 """
 
 __author__ = "Liam Huber"
@@ -114,6 +113,7 @@ class SQSElasticConstants(GenericJob):
     def _run_sqs(self):
         sqs_job = self._copy_ref_sqs()
         sqs_job.structure = self.ref_job.structure.copy()
+        sqs_job.server.cores = self.server.cores
         sqs_job.run()
         self._wait(sqs_job)
         self.output.sqs_structures = sqs_job.list_structures()
@@ -126,6 +126,7 @@ class SQSElasticConstants(GenericJob):
         min_job = self._create_job(self._job_type.StructureListMaster, 'minlist')
         min_job.ref_job = ref_min
         min_job.structure_lst = list(self.output.sqs_structures)
+        min_job.server.cores = self.server.cores
         min_job.run()
         self._wait(min_job)
         self.output.structures = [
@@ -156,6 +157,7 @@ class SQSElasticConstants(GenericJob):
         # TODO: Figure out what is up with ElasticMatrixJob that this doesn't work instead:
         #     elastic_job = self._copy_ref_job('elastic_n{}'.format(id_))
         #     elastic_job.ref_job = engine_job
+        elastic_job.server.cores = self.server.cores
         elastic_job.run()
         return elastic_job
 

@@ -114,7 +114,6 @@ class SQSElasticConstants(GenericJob):
     def _run_sqs(self):
         sqs_job = self._copy_ref_sqs()
         sqs_job.structure = self.ref_job.structure.copy()
-        self.sqs_job = sqs_job
         sqs_job.run()
         self._wait(sqs_job)
         self.output.sqs_structures = sqs_job.list_structures()

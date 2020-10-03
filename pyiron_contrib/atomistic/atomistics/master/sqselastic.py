@@ -134,6 +134,7 @@ class SQSElasticConstantsList(ChemolasticBase):
             job.run()
             self.output.elastic_matrices.append(job.output.elastic_matrix.mean)
             self._collect_actual_chemistry(job)
+        self.to_hdf()
 
     def _collect_actual_chemistry(self, job):
         structure = job.output.structures[0]

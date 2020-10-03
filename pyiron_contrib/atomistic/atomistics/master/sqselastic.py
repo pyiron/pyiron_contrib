@@ -2,7 +2,7 @@
 # Copyright (c) Max-Planck-Institut für Eisenforschung GmbH - Computational Materials Design (CM) Department
 # Distributed under the terms of "New BSD License", see the LICENSE file.
 
-from pyiron_base import InputList, GenericJob
+from pyiron_base import InputList, GenericJob, ParallelMaster, JobGenerator
 import numpy as np
 from pyiron import Atoms
 from pyiron.atomistics.job.atomistic import AtomisticGenericJob
@@ -26,36 +26,31 @@ __status__ = "development"
 __date__ = "Oct 2, 2020"
 
 
-class SQSElasticConstants(GenericJob):
-
+class ChemolasticBase(GenericJob):
     def __init__(self, project, job_name):
         super().__init__(project, job_name=job_name)
-        self.__name__ = "SQSElasticConstants"
-        self.__version__ = "0.1"
+        self.__hdf_version__ = "0.2.0"
 
-        self.ref_job = None
+        self.ref_ham = None
         self.ref_sqs = None
         self.ref_elastic = None
 
-        self.output = _SQSElasticConstantsOutput(self)
-
         self._wait_interval_in_s = 1
         self._wait_max_iterations = 3600
+
+        self._python_only_job = True
 
     def _relative_name(self, name):
         return '_'.join([self.job_name, name])
 
     def _create_job(self, job_type, job_name):
-        return self.project.create_job(job_type, self._relative_name(job_name))
+        job = self.project.create_job(job_type, self._relative_name(job_name))
+        job.server.cores = self.server.cores
+        return job
 
     @property
     def _job_type(self):
         return self.project.job_type
-
-    @staticmethod
-    def _apply_inputlist(target, source):
-        for k, v in source.items():
-            target[k] = v
 
     def _wait(self, job_or_jobs):
         try:
@@ -69,23 +64,106 @@ class SQSElasticConstants(GenericJob):
                 self._wait(job)
 
     def _copy_ref(self, job, name):
-        return job.copy_to(new_job_name=self._relative_name(name), new_database_entry=False)
+        new_job = job.copy_to(new_job_name=self._relative_name(name), new_database_entry=False)
+        new_job.server.cores = self.server.cores
+        return new_job
 
-    def _copy_ref_job(self, name):
-        return self._copy_ref(self.ref_job, name)
+    def _copy_ref_ham(self, name):
+        return self._copy_ref(self.ref_ham, name)
 
-    def _copy_ref_sqs(self):
-        job = self._copy_ref(self.ref_sqs, 'sqs')
+    def _copy_ref_sqs(self, name):
+        job = self._copy_ref(self.ref_sqs, name)
         job.input = self.ref_sqs.input
         # This is an ugly hack -- somehow the input mole_fractions dict otherwise gets converted to an InputList of
         # that dict, which the underlying SQSJob is not happy about.
         return job
 
-    def _copy_ref_elastic(self, name):
-        # This isn't actually used because of (what I consider to be) an oddity of ElasticMatrixJob and it's ref_job
-        return self._copy_ref(self.ref_elastic, name)
-        # job.input = self.ref_elastic.input
-        # return job
+    def _copy_ref_elastic(self, name, structure):
+        engine_job = self._copy_ref_ham(name + '_hamref')
+        engine_job.structure = structure
+
+        job = engine_job.create_job(
+            self._job_type.ElasticMatrixJob,
+            self._relative_name(name)
+        )
+        job.input = self.ref_elastic.input
+        job.server.cores = self.server.cores
+        # This isan even bigger hack because of (what I consider to be) an oddity of ElasticMatrixJob and it's reference
+        # return self._copy_ref(self.ref_elastic, name)
+        return job
+
+    def validate_ready_to_run(self):
+        for attribute_name, class_ in zip(
+            ['ref_ham', 'ref_sqs', 'ref_elastic'],
+            [AtomisticGenericJob, SQSJob, ElasticMatrixJob],
+        ):
+            job = getattr(self, attribute_name)
+            if not isinstance(job, class_):
+                raise TypeError('{} expected a {} with type {} but got {}'.format(
+                    self.job_name,
+                    attribute_name,
+                    class_.__name__,
+                    type(job)
+                ))
+        super().validate_ready_to_run()
+
+
+class SQSElasticConstantsList(ChemolasticBase):
+    def __init__(self, project, job_name):
+        super().__init__(project, job_name=job_name)
+        self.__name__ = "ChemicalElasticConstants"
+        self.__version__ = "0.1"
+
+        self.ref_job = None
+
+        self.input = InputList(table_name='input')
+        self.input.chemistry = []
+
+        self.output = InputList(table_name='output')
+        self.output.elastic_matrices = []
+        self.output.chemistry = []
+
+    def run_static(self):
+        for n, mole_fractions in enumerate(self.input.chemistry):
+            job = self._create_job(SQSElasticConstants, 'chem{}'.format(n))
+            job.ref_ham = self._copy_ref_ham('chem{}_hamref'.format(n))
+            job.ref_sqs = self._copy_ref_sqs('chem{}_sqsref'.format(n))
+            job.ref_sqs.input.mole_fractions = mole_fractions
+            job.ref_elastic = self._copy_ref_elastic('chem{}_elasticref'.format(n), self.ref_ham.structure)
+            job.server.cores = self.server.cores
+            job.run()
+            self.output.elastic_matrices.append(job.output.elastic_matrix.mean)
+            self._collect_actual_chemistry(job)
+
+    def _collect_actual_chemistry(self, job):
+        structure = job.output.structures[0]
+        n0 = len(self.ref_ham.structure)
+        actual_chemistry = {}
+        for symbol in structure.get_species_symbols():
+            actual_chemistry[symbol] = np.sum(structure.get_chemical_symbols() == symbol) / n0
+        if len(structure) < n0:
+            actual_chemistry['0'] = (n0 - len(structure)) / n0
+        self.output.chemistry.append(actual_chemistry)
+
+    def to_hdf(self, hdf=None, group_name=None):
+        super().to_hdf(hdf, group_name)
+        self.input.to_hdf(self._hdf5)
+        self.output.to_hdf(self._hdf5)
+
+    def from_hdf(self, hdf=None, group_name=None):
+        super().from_hdf(hdf, group_name)
+        self.input.from_hdf(self._hdf5)
+        self.output.from_hdf(self._hdf5)
+
+
+class SQSElasticConstants(ChemolasticBase):
+
+    def __init__(self, project, job_name):
+        super().__init__(project, job_name=job_name)
+        self.__name__ = "SQSElasticConstants"
+        self.__version__ = "0.1"
+
+        self.output = _SQSElasticConstantsOutput(self)
 
     def _std_to_sqs_sem(self, array):
         return array / np.sqrt(self.ref_sqs.input.n_output_structures)
@@ -111,22 +189,20 @@ class SQSElasticConstants(GenericJob):
         self.to_hdf()
 
     def _run_sqs(self):
-        sqs_job = self._copy_ref_sqs()
-        sqs_job.structure = self.ref_job.structure.copy()
-        sqs_job.server.cores = self.server.cores
+        sqs_job = self._copy_ref_sqs('sqs')
+        sqs_job.structure = self.ref_ham.structure.copy()
         sqs_job.run()
         self._wait(sqs_job)
         self.output.sqs_structures = sqs_job.list_structures()
         # TODO: Grab the corrected Mole fractions
 
     def _run_minimization(self):
-        ref_min = self._copy_ref_job('minref')
+        ref_min = self._copy_ref_ham('minref')
         ref_min.calc_minimize(pressure=0)
 
         min_job = self._create_job(self._job_type.StructureListMaster, 'minlist')
         min_job.ref_job = ref_min
         min_job.structure_lst = list(self.output.sqs_structures)
-        min_job.server.cores = self.server.cores
         min_job.run()
         self._wait(min_job)
         self.output.structures = [
@@ -139,7 +215,10 @@ class SQSElasticConstants(GenericJob):
         )
 
     def _run_elastic_list(self):
-        job_list = [self._run_elastic(str(n), structure) for n, structure in enumerate(self.output.structures)]
+        job_list = [
+            self._run_elastic('elastic' + str(n), structure)
+            for n, structure in enumerate(self.output.structures)
+        ]
         self._wait(job_list)
         self._store_statistics_over_sqs(
             self.output.elastic_matrix,
@@ -148,16 +227,8 @@ class SQSElasticConstants(GenericJob):
         # TODO: Save more of the elsaticmatrix output as it becomes clear from usage that it's something you need
         #       or just save all of it once output is a class that can save structures as easily as other objects!
 
-    def _run_elastic(self, id_, structure):
-        engine_job = self._copy_ref_job('engine_n{}'.format(id_))
-        engine_job.structure = structure
-
-        elastic_job = engine_job.create_job(self._job_type.ElasticMatrixJob, 'elastic_n{}'.format(id_))
-        elastic_job.input = self.ref_elastic.input
-        # TODO: Figure out what is up with ElasticMatrixJob that this doesn't work instead:
-        #     elastic_job = self._copy_ref_job('elastic_n{}'.format(id_))
-        #     elastic_job.ref_job = engine_job
-        elastic_job.server.cores = self.server.cores
+    def _run_elastic(self, name, structure):
+        elastic_job = self._copy_ref_elastic(name, structure)
         elastic_job.run()
         return elastic_job
 
@@ -168,34 +239,6 @@ class SQSElasticConstants(GenericJob):
     def from_hdf(self, hdf=None, group_name=None):
         super().from_hdf(hdf, group_name)
         self.output.from_hdf()
-
-    def validate_ready_to_run(self):
-        for attribute_name, class_ in zip(
-            ['ref_job', 'ref_sqs', 'ref_elastic'],
-            [AtomisticGenericJob, SQSJob, ElasticMatrixJob],
-        ):
-            job = getattr(self, attribute_name)
-            if not isinstance(job, class_):
-                raise TypeError('{} expected a {} with type {} but got {}'.format(
-                    self.job_name,
-                    attribute_name,
-                    class_.__name__,
-                    type(job)
-                ))
-        super().validate_ready_to_run()
-
-    def collect_output(self):
-        pass
-
-    def write_input(self):
-        pass  # We need to reconsider our inheritance scheme
-
-    def run_if_interactive(self):
-        raise NotImplementedError("Interactive running is not configured for {}".format(self.__name__))
-
-    def run_if_refresh(self):
-        raise NotImplementedError("Refreshed running is not configured for {}".format(self.__name__))
-
 
 
 class _SQSElasticConstantsOutput:

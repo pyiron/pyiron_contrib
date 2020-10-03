@@ -5,6 +5,7 @@
 from pyiron_base.master.generic import GenericMaster
 from pyiron_base import InputList
 import numpy as np
+from pyiron import Atoms
 
 """
 Calculate the elastic matrix for SQS structure(s).
@@ -46,8 +47,7 @@ class SQSElasticConstants(GenericMaster):
         self.elastic_input.relax_atoms = 1
         self.elastic_input.sqrt_eta = True
 
-        self.output_list = InputList(table_name='output_list')
-        self.output_list.elastic_matrix = None
+        self.output = _SQSElasticConstantsOutput(self)
 
     def _relative_name(self, name):
         return '_'.join([self.job_name, name])
@@ -77,10 +77,25 @@ class SQSElasticConstants(GenericMaster):
     def _std_to_sqs_sem(self, array):
         return array / np.sqrt(self.sqs_input.n_output_structures)
 
+    def _store_statistics_over_sqs(self, storage_object, data):
+        """
+        Given some numpy array data running over different SQS structures, take statistics over the structure-axis and
+        store it in place.
+
+        Args:
+            storage_object (pyiron_base.InputList): Where to store the output.
+            data (numpy.ndarray): The data to take statistics of, assuming the 0th axis runs over SQS structures.
+        """
+        storage_object.array = data
+        storage_object.mean = data.mean(axis=0)
+        storage_object.std = data.std(axis=0)
+        storage_object.sem = self._std_to_sqs_sem(storage_object.std)
+
     def run_static(self):
         self._run_sqs()
         self._run_minimization()
         self._run_elastic_list()
+        self.to_hdf()
 
     def _run_sqs(self):
         sqs_job = self._create_job(self._job_type.SQSJob, 'sqs')
@@ -88,7 +103,7 @@ class SQSElasticConstants(GenericMaster):
         self._apply_inputlist(sqs_job.input, self.sqs_input)
         sqs_job.run()
         self._wait(sqs_job)
-        self.output_list.sqs_structures = sqs_job.list_structures()
+        self.output.sqs_structures = sqs_job.list_structures()
         # TODO: Grab the corrected Mole fractions
 
     def _run_minimization(self):
@@ -97,26 +112,27 @@ class SQSElasticConstants(GenericMaster):
 
         min_job = self._create_job(self._job_type.StructureListMaster, 'minlist')
         min_job.ref_job = ref_min
-        min_job.structure_lst = list(self.output_list.sqs_structures)
+        min_job.structure_lst = list(self.output.sqs_structures)
         min_job.run()
         self._wait(min_job)
-        self.output_list.structures = [
+        self.output.structures = [
             self.project.load(child_id).get_structure()
             for child_id in min_job.child_ids
         ]
-        cells = np.array([structure.cell.array for structure in self.output_list.structures])
-        self.output_list.cell_mean = cells.mean(axis=0)
-        self.output_list.cell_std = cells.std(axis=0)
-        self.output_list.cell_sem = self._std_to_sqs_sem(self.output_list.cell_std)
+        self._store_statistics_over_sqs(
+            self.output.cell,
+            np.array([structure.cell.array for structure in self.output.structures])
+        )
 
     def _run_elastic_list(self):
-        job_list = [self._run_elastic(str(n), structure) for n, structure in enumerate(self.output_list.structures)]
+        job_list = [self._run_elastic(str(n), structure) for n, structure in enumerate(self.output.structures)]
         self._wait(job_list)
-        self.output_list.elastic_data = [job['output/elasticmatrix'] for job in job_list]
-        elastic_matrices = np.array([data['C'] for data in self.output_list.elastic_data])
-        self.output_list.elastic_matrix_mean = elastic_matrices.mean(axis=0)
-        self.output_list.elastic_matrix_std = elastic_matrices.std(axis=0)
-        self.output_list.elastic_matrix_sem = self._std_to_sqs_sem(self.output_list.elastic_matrix_std)
+        self._store_statistics_over_sqs(
+            self.output.elastic_matrix,
+            np.array([job['output/elasticmatrix']['C'] for job in job_list])
+        )
+        # TODO: Save more of the elsaticmatrix output as it becomes clear from usage that it's something you need
+        #       or just save all of it once output is a class that can save structures as easily as other objects!
 
     def _run_elastic(self, id_, structure):
         engine_job = self._copy_ref_job('engine_n{}'.format(id_))
@@ -133,19 +149,60 @@ class SQSElasticConstants(GenericMaster):
         print("Collecting output")
 
     def to_hdf(self, hdf=None, group_name=None):
-        self.ref_job.save()
+        super().to_hdf(hdf, group_name)
         self._hdf5['refjobname'] = self.ref_job.job_name
         self.sqs_input.to_hdf(self._hdf5, group_name)
         self.elastic_input.to_hdf(self._hdf5, group_name)
-        self.output_list.to_hdf(self._hdf5, group_name)
-        super().to_hdf(hdf, group_name)
+        self.output.to_hdf()
 
     def from_hdf(self, hdf=None, group_name=None):
         super().from_hdf(hdf, group_name)
         self.ref_job = self.project.load(self._hdf5['refjobname'])
         self.sqs_input.from_hdf(self._hdf5)
         self.elastic_input.from_hdf(self._hdf5)
-        self.output_list.from_hdf(self._hdf5)
+        self.output.from_hdf()
 
     def write_input(self):
         pass  # We need to reconsider our inheritance scheme
+
+
+class _SQSElasticConstantsOutput:
+    def __init__(self, parent):
+        self.parent = parent
+
+        self.sqs_structures = []
+        self.structures = []
+
+        self.cell = InputList(table_name='output/cell')
+        self.cell.array = None
+        self.cell.mean = None
+        self.cell.std = None
+        self.cell.sem = None
+
+        self.elastic_matrix = InputList(table_name='output/elastic_matrix')
+        self.elastic_matrix.array = None
+        self.elastic_matrix.mean = None
+        self.elastic_matrix.std = None
+        self.elastic_matrix.sem = None
+
+        self._hdf5 = self.parent._hdf5
+
+    def to_hdf(self):
+        with self._hdf5.open('output/sqs_structures') as hdf5_server:
+            for n, structure in enumerate(self.sqs_structures):
+                structure.to_hdf(hdf5_server, group_name='structure{}'.format(n))
+        with self._hdf5.open('output/structures') as hdf5_server:
+            for n, structure in enumerate(self.structures):
+                structure.to_hdf(hdf5_server, group_name='structure{}'.format(n))
+        self.cell.to_hdf(self._hdf5)
+        self.elastic_matrix.to_hdf(self._hdf5)
+
+    def from_hdf(self):
+        with self._hdf5.open('output/sqs_structures') as hdf5_server:
+            for group in hdf5_server.list_groups():
+                self.sqs_structures.append(Atoms().from_hdf(hdf5_server, group_name=group))
+        with self._hdf5.open('output/structures') as hdf5_server:
+            for group in hdf5_server.list_groups():
+                self.structures.append(Atoms().from_hdf(hdf5_server, group_name=group))
+        self.cell.from_hdf(self._hdf5)
+        self.elastic_matrix.from_hdf(self._hdf5)

@@ -190,6 +190,13 @@ class SQSElasticConstants(GenericMaster):
     def write_input(self):
         pass  # We need to reconsider our inheritance scheme
 
+    def run_if_interactive(self):
+        raise NotImplementedError("Interactive running is not configured for {}".format(self.__name__))
+
+    def run_if_refresh(self):
+        raise NotImplementedError("Refreshed running is not configured for {}".format(self.__name__))
+
+
 
 class _SQSElasticConstantsOutput:
     def __init__(self, parent):

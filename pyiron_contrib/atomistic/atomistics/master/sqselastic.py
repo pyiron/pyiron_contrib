@@ -44,7 +44,7 @@ class SQSElasticConstants(GenericMaster):
         self.elastic_input.num_of_points = 5
         self.elastic_input.fit_order = 2
         self.elastic_input.eps_range = 0.005
-        self.elastic_input.relax_atoms = 1
+        self.elastic_input.relax_atoms = True
         self.elastic_input.sqrt_eta = True
 
         self.output = _SQSElasticConstantsOutput(self)

@@ -46,6 +46,9 @@ class SQSElasticConstants(GenericMaster):
 
         self.output = _SQSElasticConstantsOutput(self)
 
+        self._wait_interval_in_s = 1
+        self._wait_max_iterations = 3600
+
     def _relative_name(self, name):
         return '_'.join([self.job_name, name])
 
@@ -63,7 +66,11 @@ class SQSElasticConstants(GenericMaster):
 
     def _wait(self, job_or_jobs):
         try:
-            self.project.wait_for_job(job_or_jobs)
+            self.project.wait_for_job(
+                job_or_jobs,
+                interval_in_s=self._wait_interval_in_s,
+                max_iterations=self._wait_max_iterations
+            )
         except AttributeError:
             for job in job_or_jobs:
                 self._wait(job)

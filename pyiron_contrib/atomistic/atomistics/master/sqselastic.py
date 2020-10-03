@@ -163,16 +163,10 @@ class SQSElasticConstants(GenericMaster):
 
     def to_hdf(self, hdf=None, group_name=None):
         super().to_hdf(hdf, group_name)
-        self._hdf5['refjobname'] = self.ref_job.job_name
-        self._hdf5['refsqsname'] = self.ref_sqs.job_name
-        self._hdf5['refelasticname'] = self.ref_elastic.job_name
         self.output.to_hdf()
 
     def from_hdf(self, hdf=None, group_name=None):
         super().from_hdf(hdf, group_name)
-        self.ref_job = self.project.load(self._hdf5['refjobname'])
-        self.ref_sqs = self.project.load(self._hdf5['refsqsname'])
-        self.ref_elastic = self.project.load(self._hdf5['refelasticname'])
         self.output.from_hdf()
 
     def validate_ready_to_run(self):

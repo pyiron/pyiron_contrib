@@ -170,21 +170,18 @@ class SQSElasticConstants(GenericMaster):
         self.output.from_hdf()
 
     def validate_ready_to_run(self):
-        if not isinstance(self.ref_job, AtomisticGenericJob):
-            raise TypeError('{} expected a ref_job with type AtomisticGenericJob, but got {}'.format(
-                self.job_name,
-                type(self.ref_job)
-            ))
-        if not isinstance(self.ref_sqs, SQSJob):
-            raise TypeError('{} expected a ref_job with type SQSJob, but got {}'.format(
-                self.job_name,
-                type(self.ref_sqs)
-            ))
-        if not isinstance(self.ref_elastic, ElasticMatrixJob):
-            raise TypeError('{} expected a ref_job with type ElasticMatrixJob, but got {}'.format(
-                self.job_name,
-                type(self.ref_elastic)
-            ))
+        for attribute_name, class_ in zip(
+            ['ref_job', 'ref_sqs', 'ref_elastic'],
+            [AtomisticGenericJob, SQSJob, ElasticMatrixJob],
+        ):
+            job = self.__getattr__(attribute_name)
+            if not isinstance(job, class_):
+                raise TypeError('{} expected a {} with type {} but got {}'.format(
+                    self.job_name,
+                    attribute_name,
+                    class_.__name__,
+                    type(job)
+                ))
         super().validate_ready_to_run()
 
     def collect_output(self):

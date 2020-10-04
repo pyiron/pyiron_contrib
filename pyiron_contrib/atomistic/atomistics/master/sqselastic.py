@@ -13,9 +13,6 @@ import seaborn as sns
 
 """
 Calculate the elastic matrix for SQS structure(s).
-
-TODO:
-    - Add an extra layer to loop over SQS concentration ranges
 """
 
 __author__ = "Liam Huber"

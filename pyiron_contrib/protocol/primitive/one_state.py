@@ -1352,3 +1352,53 @@ class FEPExponential(PrimitiveVertex):
         return {
             'exponential_difference': np.exp(-u_diff * delta_lambda / (KB * temperature))
         }
+
+
+class AcceptanceCriterion(PrimitiveVertex):
+    """
+
+    """
+
+    def __init__(self, name=None):
+        super(AcceptanceCriterion, self).__init__(name=name)
+        self.step_no = 0
+        self.total_accepted = 0
+        id = self.input.default
+        id.accepted = 1
+
+    def command(self, u, positions, velocities, forces, previous_u, previous_positions, previous_velocities,
+                previous_forces, temperature, accepted):
+        # first check - Metropolis criterion
+        new_positions = positions
+        new_velocities = velocities
+        new_forces = forces
+        new_energy_pot = u
+        accepted = 1
+        if self.step_no != 0:
+            delta_u = (u - previous_u) / len(positions)
+            if delta_u < 0:
+                accepted = 1
+            elif delta_u >= 0:  # second check - Metropolis criterion
+                p = np.exp(-delta_u / (KB * temperature))
+                r = np.random.random_sample()
+                if p > r:
+                    accepted = 1
+                else:
+                    accepted = 0
+        if accepted == 0:
+            new_positions = previous_positions
+            new_velocities = -previous_velocities
+            new_forces = previous_forces
+            new_energy_pot = previous_u
+        self.step_no += 1
+        self.total_accepted += accepted
+        acceptance_rate = self.total_accepted / self.step_no
+
+        return{
+            'positions': new_positions,
+            'velocities': new_velocities,
+            'forces': new_forces,
+            'energy_pot': new_energy_pot,
+            'accepted': accepted,
+            'acceptance_rate': acceptance_rate
+        }

@@ -13,7 +13,7 @@ from pyiron_contrib.protocol.utils import Pointer
 from pyiron_contrib.protocol.primitive.one_state import Counter, BuildMixingPairs, DeleteAtom, \
     ExternalHamiltonian, HarmonicHamiltonian, CreateJob, Overwrite, RandomVelocity, Slice, SphereReflection, \
     TILDPostProcess, Transpose, VerletPositionUpdate, VerletVelocityUpdate, WeightedSum, \
-    WelfordOnline, Zeros, FEPExponential
+    WelfordOnline, Zeros, FEPExponential, AcceptanceCriterion
 from pyiron_contrib.protocol.primitive.two_state import IsGEq, ModIsZero
 
 from scipy.constants import physical_constants
@@ -367,6 +367,7 @@ class VacancyTILD(TILDParent):
         # TODO: Need more than input and default, but rather access order, to work without reflection...
         id_.plot = False
         id_.ensure_iterable_mask = True
+        id_.accepted = 1
 
     def define_vertices(self):
         # Graph components
@@ -943,6 +944,7 @@ class Decoupling(CompoundVertex):
         g.verlet_positions = VerletPositionUpdate()
         g.reflect = SphereReflection()
         g.calc_full = ExternalHamiltonian()
+        g.accept = AcceptanceCriterion()
         g.slice_positions = Slice()
         g.calc_vac = ExternalHamiltonian()
         g.harmonic = HarmonicHamiltonian()
@@ -966,6 +968,7 @@ class Decoupling(CompoundVertex):
             g.verlet_positions,
             g.reflect,
             g.calc_full,
+            g.accept,
             g.slice_positions,
             g.calc_vac,
             g.harmonic,
@@ -1007,7 +1010,7 @@ class Decoupling(CompoundVertex):
         g.verlet_positions.input.default.velocities = ip.velocities
         g.verlet_positions.input.default.forces = ip.forces
 
-        g.verlet_positions.input.positions = gp.reflect.output.positions[-1]
+        g.verlet_positions.input.positions = gp.accept.output.positions[-1]
         g.verlet_positions.input.velocities = gp.verlet_velocities.output.velocities[-1]
         g.verlet_positions.input.forces = gp.mix.output.weighted_sum[-1]
 
@@ -1034,8 +1037,30 @@ class Decoupling(CompoundVertex):
         g.calc_full.input.cell = ip.structure.cell.array
         g.calc_full.input.positions = gp.reflect.output.positions[-1]
 
+        # accept
+        g.accept.input.default.previous_u = gp.calc_full.output.energy_pot[-1]
+        g.accept.input.default.previous_positions = ip.structure.positions
+        g.accept.input.default.previous_velocities = ip.velocities
+        g.accept.input.default.previous_forces = ip.forces
+        g.accept.input.default.positions = ip.structure.positions
+        g.accept.input.default.velocities = ip.velocities
+        g.accept.input.default.forces = ip.forces
+        g.accept.input.default.accepted = ip.accepted
+
+        g.accept.input.previous_u = gp.accept.output.energy_pot[-1]
+        g.accept.input.previous_positions = gp.accept.output.positions[-1]
+        g.accept.input.previous_velocities = gp.verlet_velocities.output.velocities[-1]
+        g.accept.input.previous_forces = gp.mix.output.weighted_sum[-1]
+        g.accept.input.positions = gp.reflect.output.positions[-1]
+        g.accept.input.velocities = gp.reflect.output.velocities[-1]
+        g.accept.input.forces = gp.calc_full.output.forces[-1]
+        g.accept.input.accepted = gp.accept.output.accepted[-1]
+
+        g.accept.input.u = gp.calc_full.output.energy_pot[-1]
+        g.accept.input.temperature = ip.temperature
+
         # slice_positions
-        g.slice_positions.input.vector = gp.reflect.output.positions[-1]
+        g.slice_positions.input.vector = gp.accept.output.positions[-1]
         g.slice_positions.input.mask = ip.shared_ids
 
         # calc_vac
@@ -1055,10 +1080,10 @@ class Decoupling(CompoundVertex):
         g.harmonic.input.mask = ip.vacancy_id
         g.harmonic.input.zero_k_energy = ip.zero_k_energy
 
-        g.harmonic.input.positions = gp.reflect.output.positions[-1]
+        g.harmonic.input.positions = gp.accept.output.positions[-1]
 
         # write_vac_forces
-        g.write_vac_forces.input.target = gp.calc_full.output.forces[-1]
+        g.write_vac_forces.input.target = gp.accept.output.forces[-1]
         g.write_vac_forces.input.mask = ip.shared_ids
         g.write_vac_forces.input.new_values = gp.calc_vac.output.forces[-1]
 
@@ -1070,7 +1095,7 @@ class Decoupling(CompoundVertex):
         # mix
         g.mix.input.vectors = [
             gp.write_harmonic_forces.output.overwritten[-1],
-            gp.calc_full.output.forces[-1]
+            gp.accept.output.forces[-1]
         ]
         g.mix.input.weights = ip.coupling_weights
 
@@ -1080,7 +1105,7 @@ class Decoupling(CompoundVertex):
         g.verlet_velocities.input.temperature = ip.temperature
         g.verlet_velocities.input.temperature_damping_timescale = ip.temperature_damping_timescale
 
-        g.verlet_velocities.input.velocities = gp.reflect.output.velocities[-1]
+        g.verlet_velocities.input.velocities = gp.accept.output.velocities[-1]
         g.verlet_velocities.input.forces = gp.mix.output.weighted_sum[-1]
 
         # check_thermalized
@@ -1115,11 +1140,11 @@ class Decoupling(CompoundVertex):
     def get_output(self):
         gp = Pointer(self.graph)
         return {
-            'full_energy_pot': ~gp.calc_full.output.energy_pot[-1],
+            'full_energy_pot': ~gp.accept.output.energy_pot[-1],
             'harmonic_energy_pot': ~gp.harmonic.output.energy_pot[-1],
             'vac_energy_pot': ~gp.calc_vac.output.energy_pot[-1],
             'energy_kin': ~gp.verlet_velocities.output.energy_kin[-1],
-            'positions': ~gp.reflect.output.positions[-1],
+            'positions': ~gp.accept.output.positions[-1],
             'velocities': ~gp.verlet_velocities.output.velocities[-1],
             'forces': ~gp.mix.output.weighted_sum[-1],
             'harmonic_forces': ~gp.harmonic.output.forces[-1],
@@ -1128,7 +1153,8 @@ class Decoupling(CompoundVertex):
             'std_diff': ~gp.average.output.std[-1],
             'mean_fep_exp': ~gp.average_fep_exp.output.mean[-1],
             'std_fep_exp': ~gp.average_fep_exp.output.std[-1],
-            'n_samples': ~gp.average.output.n_samples[-1]
+            'n_samples': ~gp.average.output.n_samples[-1],
+            'acceptance_rate': ~gp.accept.output.acceptance_rate[-1]
         }
 
 
@@ -1225,6 +1251,9 @@ class VacancyTILDParallel(VacancyTILD):
         g.run_lambda_points.broadcast.project_path_full = gp.initialize_full_jobs.output.project_path[-1]
         g.run_lambda_points.broadcast.full_job_name = gp.initialize_full_jobs.output.job_names[-1]
 
+        # run_lambda_points - accepted
+        g.run_lambda_points.direct.accepted = ip.accepted
+
         # run_lambda_points - slice_positions
         g.run_lambda_points.direct.shared_ids = gp.create_vacancy.output.mask[-1]
 
@@ -1294,6 +1323,7 @@ class VacancyTILDParallel(VacancyTILD):
             'fep_exp_mean': ~o.mean_fep_exp[-1],
             'fep_exp_std': ~o.std_fep_exp[-1],
             'n_samples': ~o.n_samples[-1],
+            'acceptance_rate': ~o.acceptance_rate[-1],
             'tild_free_energy_mean': ~gp.post.output.tild_free_energy_mean[-1],
             'tild_free_energy_std': ~gp.post.output.tild_free_energy_std[-1],
             'tild_free_energy_se': ~gp.post.output.tild_free_energy_se[-1],

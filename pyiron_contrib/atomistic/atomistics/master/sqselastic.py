@@ -2,14 +2,15 @@
 # Copyright (c) Max-Planck-Institut für Eisenforschung GmbH - Computational Materials Design (CM) Department
 # Distributed under the terms of "New BSD License", see the LICENSE file.
 
-from pyiron_base import InputList, GenericJob, ParallelMaster, JobGenerator
+from pyiron_base import InputList, ParallelMaster, JobGenerator
+from pyiron_base.master.flexible import FlexibleMaster
 import numpy as np
-from pyiron import Atoms
+# from pyiron import Atoms
 from pyiron.atomistics.job.atomistic import AtomisticGenericJob
 from pyiron.atomistics.job.sqs import SQSJob
 from pyiron_mpie.interactive.elastic import ElasticMatrixJob
-import matplotlib.pyplot as plt
-import seaborn as sns
+# import matplotlib.pyplot as plt
+# import seaborn as sns
 
 """
 Calculate the elastic matrix for SQS structure(s).
@@ -25,76 +26,104 @@ __status__ = "development"
 __date__ = "Oct 2, 2020"
 
 
-class ChemolasticBase(GenericJob):
+# These can't be methods, or FlexibleMaster throws an IndentationError when you try to load
+def _sqs2minimization(sqs_job, min_job):
+    min_job.structure_lst = sqs_job.list_structures()
+
+
+def _minimization2elastic(min_job, elastic_job):
+    elastic_job.structure_lst = [
+        min_job['struct_{}'.format(int(i))].get_structure()
+        for i in np.arange(len(min_job))
+    ]
+
+
+class SQSElasticConstants(FlexibleMaster):
     def __init__(self, project, job_name):
         super().__init__(project, job_name=job_name)
+        self.__name__ = "SQSElasticConstants"
+        self.__version__ = "0.1"
         self.__hdf_version__ = "0.2.0"
 
         self.ref_ham = None
         self.ref_sqs = None
         self.ref_elastic = None
 
-        self._wait_interval_in_s = 1
-        self._wait_max_iterations = 3600
+        self.output = _SQSElasticConstantsOutput(self)
 
-        self._python_only_job = True
+    def validate_ready_to_run(self):
+        self._create_pipeline()
+        super().validate_ready_to_run()
+
+    def _create_pipeline(self):
+        self.append(self._instantiate_sqs())
+        self.function_lst.append(_sqs2minimization)
+        self.append(self._instantiate_minimization())
+        self.function_lst.append(_minimization2elastic)
+        self.append(self._instantiate_elastic())
+
+    def _instantiate_sqs(self):
+        # sqs_job = self.create_job(self._job_type.SQSJob, self._relative_name('sqs_job'))
+        # sqs_job.input = self.ref_sqs.input
+        sqs_job = self._copy_job(self.ref_sqs, 'sqs_job')
+        sqs_job.input.mole_fractions = dict(sqs_job.input.mole_fractions)  # Input expects dict but gets InputList(dict)
+        sqs_job.structure = self.ref_ham.structure.copy()
+        return sqs_job
+
+    def _create_job(self, job_type, name):
+        return self.project.create_job(job_type, self._relative_name(name))
 
     def _relative_name(self, name):
         return '_'.join([self.job_name, name])
-
-    def _create_job(self, job_type, job_name):
-        job = self.project.create_job(job_type, self._relative_name(job_name))
-        job.server.cores = self.server.cores
-        return job
 
     @property
     def _job_type(self):
         return self.project.job_type
 
-    def _wait(self, job_or_jobs):
-        try:
-            self.project.wait_for_job(
-                job_or_jobs,
-                interval_in_s=self._wait_interval_in_s,
-                max_iterations=self._wait_max_iterations
-            )
-        except AttributeError:
-            for job in job_or_jobs:
-                self._wait(job)
+    def _instantiate_minimization(self):
+        min_ref = self._copy_job(self.ref_ham, 'min_ref')
+        min_ref.calc_minimize(pressure=0)
+        # min_job = self.create_job(self._job_type.StructureListMaster, self._relative_name('min'))
+        min_job = self._create_job(self._job_type.StructureListMaster, 'min')
+        min_job.ref_job = min_ref
+        return min_job
 
-    def _copy_ref(self, job, name):
-        new_job = job.copy_to(new_job_name=self._relative_name(name), new_database_entry=False)
-        new_job.server.cores = self.server.cores
-        return new_job
-
-    def _copy_ref_ham(self, name):
-        return self._copy_ref(self.ref_ham, name)
-
-    def _copy_ref_sqs(self, name):
-        job = self._copy_ref(self.ref_sqs, name)
-        job.input = self.ref_sqs.input
-        # This is an ugly hack -- somehow the input mole_fractions dict otherwise gets converted to an InputList of
-        # that dict, which the underlying SQSJob is not happy about.
-        return job
-
-    def _copy_ref_elastic(self, name, structure):
-        engine_job = self._copy_ref_ham(name + '_hamref')
-        engine_job.structure = structure
-
-        job = engine_job.create_job(
-            self._job_type.ElasticMatrixJob,
-            self._relative_name(name)
+    def _copy_job(self, job, name):
+        return job.copy_to(
+            new_job_name='_'.join([self.job_name, name]),  # , job.job_name
+            new_database_entry=False
         )
-        job.input = self.ref_elastic.input
-        job.server.cores = self.server.cores
-        # This is an even bigger hack because of (what I feel is) an oddity of ElasticMatrixJob and it's reference
-        # return self._copy_ref(self.ref_elastic, name)
-        return job
 
-    def validate_ready_to_run(self):
+    def _instantiate_elastic(self):
+        elastic_ref = self._copy_job(self.ref_ham, 'el_ref')
+
+        # This should work, but doesn't maintain the elastic ref input and goes back to class defaults:
+        # elastic_job = elastic_ref.create_job(self._job_type.ElasticMatrixJob, self._relative_name('el_job'))
+        # return elastic_job.create_job(self._job_type.StructureListMaster, self._relative_name('el_list_job'))
+
+        # elastic_job = self._copy_job(self.ref_elastic, 'el_job')  # ValueError: Unknown item: se_el_ham_ref
+
+        # elastic_job = self.create_job(self._job_type.ElasticMatrixJob, self._relative_name('el_job'))
+        elastic_job = self._create_job(self._job_type.ElasticMatrixJob, 'el_job')
+        elastic_job.input = self.ref_elastic.input
+        elastic_job.ref_job = elastic_ref
+        elastic_job_list = self._create_job(self._job_type.StructureListMaster, 'el_list_job')
+        elastic_job_list.ref_job = elastic_job
+        return elastic_job_list
+
+    def to_hdf(self, hdf=None, group_name=None):
+        super().to_hdf(hdf, group_name)
         self._ensure_has_references()
         self._ensure_references_saved()
-        super().validate_ready_to_run()
+        self._hdf5['refjobs/refhamname'] = self.ref_ham.job_name
+        self._hdf5['refjobs/refsqsname'] = self.ref_sqs.job_name
+        self._hdf5['refjobs/refelasticname'] = self.ref_elastic.job_name
+
+    def from_hdf(self, hdf=None, group_name=None):
+        super().from_hdf(hdf, group_name)
+        self.ref_ham = self.project.load(self._hdf5['refjobs/refhamname'])
+        self.ref_sqs = self.project.load(self._hdf5['refjobs/refsqsname'])
+        self.ref_elastic = self.project.load(self._hdf5['refjobs/refelasticname'])
 
     def _ensure_has_references(self):
         for attribute_name, class_ in zip(
@@ -111,225 +140,131 @@ class ChemolasticBase(GenericJob):
                 ))
 
     def _ensure_references_saved(self):
-        for job in [self.ref_ham, self.ref_sqs, self.ref_elastic]:
-            self._save_if_new(job)
+        if self.ref_ham.job_name != self._relative_name('ham_ref'):
+            self.ref_ham = self._copy_job(self.ref_ham, 'ham_ref')
 
-    def _save_if_new(self, job):
-        if job.job_name not in self.project.list_nodes():
+        if self.ref_sqs.job_name != self._relative_name('sqs_ref'):
+            self.ref_sqs = self._copy_job(self.ref_sqs, 'sqs_ref')
+
+        if self.ref_elastic.ref_job is None \
+                or self.ref_elastic.ref_job.job_name != self._relative_name('el_ham_ref'):
+            self.ref_elastic.ref_job = self._copy_job(self.ref_ham, 'el_ham_ref')
+        if self.ref_elastic.job_name != self._relative_name('el_ref'):
+            self.ref_elastic = self._copy_job(self.ref_elastic, 'el_ref')
+
+        for job in [self.ref_ham, self.ref_sqs, self.ref_elastic]:
+            self._save_reference_if_new(job)
+
+    def _save_reference_if_new(self, job):
+        if job.name not in self.project.list_nodes():
             job.save()
         else:
             job.to_hdf()
-
-    def to_hdf(self, hdf=None, group_name=None):
-        super().to_hdf(hdf, group_name)
-        self._hdf5['refjobs/refhamname'] = self.ref_ham.job_name
-        self._hdf5['refjobs/refsqsname'] = self.ref_sqs.job_name
-        self._hdf5['refjobs/refelasticname'] = self.ref_elastic.job_name
-
-    def from_hdf(self, hdf=None, group_name=None):
-        super().from_hdf(hdf, group_name)
-        self.ref_ham = self.project.load(self._hdf5['refjobs/refhamname'])
-        self.ref_sqs = self.project.load(self._hdf5['refjobs/refsqsname'])
-        self.ref_elastic = self.project.load(self._hdf5['refjobs/refelasticname'])
-
-
-class SQSElasticConstantsList(ChemolasticBase):
-    def __init__(self, project, job_name):
-        super().__init__(project, job_name=job_name)
-        self.__name__ = "ChemicalElasticConstants"
-        self.__version__ = "0.1"
-
-        self.ref_job = None
-
-        self.input = InputList(table_name='input')
-        self.input.chemistry = []
-        # self.input.run_non_modal = False
-
-        self.output = InputList(table_name='output')
-        self.output.elastic_matrices = []
-        self.output.chemistry = []
-
-    def run_static(self):
-        self.status.running = True
-        job_list = []
-        for n, mole_fractions in enumerate(self.input.chemistry):
-            job = self._create_job(SQSElasticConstants, 'chem{}'.format(n))
-            job.ref_ham = self._copy_ref_ham('chem{}_hamref'.format(n))
-            job.ref_sqs = self._copy_ref_sqs('chem{}_sqsref'.format(n))
-            job.ref_sqs.input.mole_fractions = mole_fractions
-            job.ref_elastic = self._copy_ref_elastic('chem{}_elasticref'.format(n), self.ref_ham.structure)
-            # if self.input.run_non_modal:
-            #     job.server.cores = max(1, int(np.floor(self.server.cores / len(self.input.chemistry))))
-            #     job.server.run_mode.non_modal = True
-            # else:
-            #     job.server.cores = self.server.cores
-            job.server.cores = self.server.cores
-            job.run()
-            job_list.append(job)
-        self._wait(job_list)
-        for job in job_list:
-            self.output.elastic_matrices.append(job.output.elastic_matrix.mean)
-            self._collect_actual_chemistry(job)
-        self.to_hdf()
-        self.status.finished = True
-
-    def _collect_actual_chemistry(self, job):
-        structure = job.output.structures[0]
-        n0 = len(self.ref_ham.structure)
-        actual_chemistry = {}
-        for symbol in structure.get_species_symbols():
-            actual_chemistry[symbol] = np.sum(structure.get_chemical_symbols() == symbol) / n0
-        if len(structure) < n0:
-            actual_chemistry['0'] = (n0 - len(structure)) / n0
-        self.output.chemistry.append(actual_chemistry)
-
-    def to_hdf(self, hdf=None, group_name=None):
-        super().to_hdf(hdf, group_name)
-        self.input.to_hdf(self._hdf5)
-        self.output.to_hdf(self._hdf5)
-
-    def from_hdf(self, hdf=None, group_name=None):
-        super().from_hdf(hdf, group_name)
-        self.input.from_hdf(self._hdf5)
-        self.output.from_hdf(self._hdf5)
-
-    def get_elastic_constant(self, indices, chemical_symbol):
-        concentration = [chemistry[chemical_symbol] for chemistry in self.output.chemistry]
-        elastic_constant = [matrix[indices] for matrix in self.output.elastic_matrices]
-        return np.array(concentration), np.array(elastic_constant)
-
-    def plot_elastic_constant(self, indices, chemical_symbol):
-        fig, ax = plt.subplots()
-        ax.scatter(*self.get_elastic_constant(indices, chemical_symbol))
-        return fig, ax
-
-
-class SQSElasticConstants(ChemolasticBase):
-
-    def __init__(self, project, job_name):
-        super().__init__(project, job_name=job_name)
-        self.__name__ = "SQSElasticConstants"
-        self.__version__ = "0.1"
-
-        self.output = _SQSElasticConstantsOutput(self)
-
-    def _std_to_sqs_sem(self, array):
-        return array / np.sqrt(self.ref_sqs.input.n_output_structures)
-
-    def _store_statistics_over_sqs(self, storage_object, data):
-        """
-        Given some numpy array data running over different SQS structures, take statistics over the structure-axis and
-        store it in place.
-
-        Args:
-            storage_object (pyiron_base.InputList): Where to store the output.
-            data (numpy.ndarray): The data to take statistics of, assuming the 0th axis runs over SQS structures.
-        """
-        storage_object.array = data
-        storage_object.mean = data.mean(axis=0)
-        storage_object.std = data.std(axis=0)
-        storage_object.sem = self._std_to_sqs_sem(storage_object.std)
-
-    def run_static(self):
-        self.status.running = True
-        self._run_sqs()
-        self._run_minimization()
-        self._run_elastic_list()
-        self.to_hdf()
-        self.status.finished = True
-
-    def _run_sqs(self):
-        sqs_job = self._copy_ref_sqs('sqs')
-        sqs_job.structure = self.ref_ham.structure.copy()
-        sqs_job.input.mole_fractions = dict(sqs_job.input.mole_fractions)
-        # TODO: Figure out why the input ever gets converted to InputList(dict) to begin with
-        sqs_job.run()
-        self._wait(sqs_job)
-        self.output.sqs_structures = sqs_job.list_structures()
-        # TODO: Grab the corrected Mole fractions
-
-    def _run_minimization(self):
-        ref_min = self._copy_ref_ham('minref')
-        ref_min.calc_minimize(pressure=0)
-
-        min_job = self._create_job(self._job_type.StructureListMaster, 'minlist')
-        min_job.ref_job = ref_min
-        min_job.structure_lst = list(self.output.sqs_structures)
-        min_job.run()
-        self._wait(min_job)
-        self.output.structures = [
-            self.project.load(child_id).get_structure()
-            for child_id in min_job.child_ids
-        ]
-        self._store_statistics_over_sqs(
-            self.output.cell,
-            np.array([structure.cell.array for structure in self.output.structures])
-        )
-
-    def _run_elastic_list(self):
-        job_list = [
-            self._run_elastic('elastic' + str(n), structure)
-            for n, structure in enumerate(self.output.structures)
-        ]
-        self._wait(job_list)
-        self._store_statistics_over_sqs(
-            self.output.elastic_matrix,
-            np.array([job['output/elasticmatrix']['C'] for job in job_list])
-        )
-        # TODO: Save more of the elsaticmatrix output as it becomes clear from usage that it's something you need
-        #       or just save all of it once output is a class that can save structures as easily as other objects!
-
-    def _run_elastic(self, name, structure):
-        elastic_job = self._copy_ref_elastic(name, structure)
-        elastic_job.run()
-        return elastic_job
-
-    def to_hdf(self, hdf=None, group_name=None):
-        super().to_hdf(hdf, group_name)
-        self.output.to_hdf()
-
-    def from_hdf(self, hdf=None, group_name=None):
-        super().from_hdf(hdf, group_name)
-        self.output.from_hdf()
 
 
 class _SQSElasticConstantsOutput:
     def __init__(self, parent):
         self.parent = parent
 
-        self.sqs_structures = []
-        self.structures = []
 
-        self.cell = InputList(table_name='output/cell')
-        self.cell.array = None
-        self.cell.mean = None
-        self.cell.std = None
-        self.cell.sem = None
+class _SQSElasticConstantsGenerator(JobGenerator):
+    @property
+    def parameter_list(self):
+        return self._job.input.chemistry
 
-        self.elastic_matrix = InputList(table_name='output/elastic_matrix')
-        self.elastic_matrix.array = None
-        self.elastic_matrix.mean = None
-        self.elastic_matrix.std = None
-        self.elastic_matrix.sem = None
+    @staticmethod
+    def job_name(parameter):
+        return '_'.join(['{}{:.4}'.format(k, v).replace('.', '') for k, v in parameter.items()])
 
-        self._hdf5 = self.parent._hdf5
+    def modify_job(self, job, parameter):
+        job.ref_sqs.input.mole_fractions = parameter
+        return job
 
-    def to_hdf(self):
-        with self._hdf5.open('output/sqs_structures') as hdf5_server:
-            for n, structure in enumerate(self.sqs_structures):
-                structure.to_hdf(hdf5_server, group_name='structure{}'.format(n))
-        with self._hdf5.open('output/structures') as hdf5_server:
-            for n, structure in enumerate(self.structures):
-                structure.to_hdf(hdf5_server, group_name='structure{}'.format(n))
-        self.cell.to_hdf(self._hdf5)
-        self.elastic_matrix.to_hdf(self._hdf5)
 
-    def from_hdf(self):
-        with self._hdf5.open('output/sqs_structures') as hdf5_server:
-            for group in hdf5_server.list_groups():
-                self.sqs_structures.append(Atoms().from_hdf(hdf5_server, group_name=group))
-        with self._hdf5.open('output/structures') as hdf5_server:
-            for group in hdf5_server.list_groups():
-                self.structures.append(Atoms().from_hdf(hdf5_server, group_name=group))
-        self.cell.from_hdf(self._hdf5)
-        self.elastic_matrix.from_hdf(self._hdf5)
+class SQSElasticConstantsList(ParallelMaster):
+    def __init__(self, project, job_name):
+        super().__init__(project, job_name=job_name)
+        self.__name__ = "SQSElasticConstantsList"
+        self.__version__ = "0.1"
+        self.__hdf_version__ = "0.2.0"
+
+        self.input = InputList(table_name='input')
+        self.input.chemistry = []
+
+        self._job_generator = _SQSElasticConstantsGenerator(self)
+        self._python_only_job = True
+
+    def to_hdf(self, hdf=None, group_name=None):
+        super().to_hdf(hdf, group_name)
+        self.input.to_hdf(self._hdf5)
+
+    def from_hdf(self, hdf=None, group_name=None):
+        super().from_hdf(hdf, group_name)
+        self.input.from_hdf(self._hdf5)
+
+    def collect_output(self):
+        pass
+
+# Snippets for later:
+
+    # def _collect_actual_chemistry(self, job):
+    #     structure = job.output.structures[0]
+    #     n0 = len(self.ref_ham.structure)
+    #     actual_chemistry = {}
+    #     for symbol in structure.get_species_symbols():
+    #         actual_chemistry[symbol] = np.sum(structure.get_chemical_symbols() == symbol) / n0
+    #     if len(structure) < n0:
+    #         actual_chemistry['0'] = (n0 - len(structure)) / n0
+    #     self.output.chemistry.append(actual_chemistry)
+    #
+    # def get_elastic_constant(self, indices, chemical_symbol):
+    #     concentration = [chemistry[chemical_symbol] for chemistry in self.output.chemistry]
+    #     elastic_constant = [matrix[indices] for matrix in self.output.elastic_matrices]
+    #     return np.array(concentration), np.array(elastic_constant)
+    #
+    # def plot_elastic_constant(self, indices, chemical_symbol):
+    #     fig, ax = plt.subplots()
+    #     ax.scatter(*self.get_elastic_constant(indices, chemical_symbol))
+    #     return fig, ax
+
+
+# class _SQSElasticConstantsOutput:
+#     def __init__(self, parent):
+#         self.parent = parent
+#
+#         self.sqs_structures = []
+#         self.structures = []
+#
+#         self.cell = InputList(table_name='output/cell')
+#         self.cell.array = None
+#         self.cell.mean = None
+#         self.cell.std = None
+#         self.cell.sem = None
+#
+#         self.elastic_matrix = InputList(table_name='output/elastic_matrix')
+#         self.elastic_matrix.array = None
+#         self.elastic_matrix.mean = None
+#         self.elastic_matrix.std = None
+#         self.elastic_matrix.sem = None
+#
+#         self._hdf5 = self.parent._hdf5
+#
+#     def to_hdf(self):
+#         with self._hdf5.open('output/sqs_structures') as hdf5_server:
+#             for n, structure in enumerate(self.sqs_structures):
+#                 structure.to_hdf(hdf5_server, group_name='structure{}'.format(n))
+#         with self._hdf5.open('output/structures') as hdf5_server:
+#             for n, structure in enumerate(self.structures):
+#                 structure.to_hdf(hdf5_server, group_name='structure{}'.format(n))
+#         self.cell.to_hdf(self._hdf5)
+#         self.elastic_matrix.to_hdf(self._hdf5)
+#
+#     def from_hdf(self):
+#         with self._hdf5.open('output/sqs_structures') as hdf5_server:
+#             for group in hdf5_server.list_groups():
+#                 self.sqs_structures.append(Atoms().from_hdf(hdf5_server, group_name=group))
+#         with self._hdf5.open('output/structures') as hdf5_server:
+#             for group in hdf5_server.list_groups():
+#                 self.structures.append(Atoms().from_hdf(hdf5_server, group_name=group))
+#         self.cell.from_hdf(self._hdf5)
+#         self.elastic_matrix.from_hdf(self._hdf5)

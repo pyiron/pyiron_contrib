@@ -1375,7 +1375,7 @@ class AcceptanceCriterion(PrimitiveVertex):
         new_energy_pot = u
         accepted = 1
         if self.step_no != 0:
-            delta_u = u - previous_u
+            delta_u = (u - previous_u) / len(positions)
             if delta_u < 0:
                 accepted = 1
             elif delta_u >= 0:  # second check - Metropolis criterion

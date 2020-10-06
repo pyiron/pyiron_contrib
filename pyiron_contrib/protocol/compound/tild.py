@@ -1021,7 +1021,7 @@ class Decoupling(CompoundVertex):
 
         g.reflect.input.reference_positions = ip.structure.positions
         g.reflect.input.previous_positions = gp.reflect.output.positions[-1]
-        g.reflect.input.previous_velocities = gp.verlet_velocities.output.velocities[-1]
+        g.reflect.input.previous_velocities = gp.reflect.output.velocities[-1]
         g.reflect.input.positions = gp.verlet_positions.output.positions[-1]
         g.reflect.input.velocities = gp.verlet_positions.output.velocities[-1]
 

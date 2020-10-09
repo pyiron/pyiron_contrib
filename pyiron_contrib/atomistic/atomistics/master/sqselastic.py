@@ -75,6 +75,17 @@ class SQSElasticConstants(FlexibleMaster):
         self.ref_sqs = None
         self.ref_elastic = None
 
+        self._sqs_job_name_tail = 'sqs'
+        self._min_job_name_tail = 'min'
+        self._min_ref_name_tail = 'min_ref'
+        self._elastic_ref_ham_name_tail = 'el_ref'
+        self._elastic_ref_single_name_tail = 'el_job'
+        self._elastic_job_name_tail = 'elastic'
+
+        self.sqs_job_name = self._relative_name('sqs')
+        self.min_job_name = self._relative_name('min')
+        self.elastic_job_name = self._relative_name('elastic')
+
         self.output = _SQSElasticConstantsOutput(self)
 
     def validate_ready_to_run(self):
@@ -91,7 +102,7 @@ class SQSElasticConstants(FlexibleMaster):
     def _instantiate_sqs(self):
         # sqs_job = self.create_job(self._job_type.SQSJob, self._relative_name('sqs_job'))
         # sqs_job.input = self.ref_sqs.input
-        sqs_job = self._copy_job(self.ref_sqs, 'sqs_job')
+        sqs_job = self._copy_job(self.ref_sqs, self._elastic_job_name_tail)
         sqs_job.input.mole_fractions = dict(sqs_job.input.mole_fractions)  # Input expects dict but gets InputList(dict)
         sqs_job.structure = self.ref_ham.structure.copy()
         return sqs_job
@@ -107,10 +118,10 @@ class SQSElasticConstants(FlexibleMaster):
         return self.project.job_type
 
     def _instantiate_minimization(self):
-        min_ref = self._copy_job(self.ref_ham, 'min_ref')
+        min_ref = self._copy_job(self.ref_ham, self._min_ref_name_tail)
         min_ref.calc_minimize(pressure=0)
         # min_job = self.create_job(self._job_type.StructureListMaster, self._relative_name('min'))
-        min_job = self._create_job(self._job_type.StructureListMaster, 'min')
+        min_job = self._create_job(self._job_type.StructureListMaster, self._min_job_name_tail)
         min_job.ref_job = min_ref
         return min_job
 
@@ -121,7 +132,7 @@ class SQSElasticConstants(FlexibleMaster):
         )
 
     def _instantiate_elastic(self):
-        elastic_ref = self._copy_job(self.ref_ham, 'el_ref')
+        elastic_ref = self._copy_job(self.ref_ham, self._elastic_ref_ham_name_tail)
 
         # This should work, but doesn't maintain the elastic ref input and goes back to class defaults:
         # elastic_job = elastic_ref.create_job(self._job_type.ElasticMatrixJob, self._relative_name('el_job'))
@@ -130,10 +141,10 @@ class SQSElasticConstants(FlexibleMaster):
         # elastic_job = self._copy_job(self.ref_elastic, 'el_job')  # ValueError: Unknown item: se_el_ham_ref
 
         # elastic_job = self.create_job(self._job_type.ElasticMatrixJob, self._relative_name('el_job'))
-        elastic_job = self._create_job(self._job_type.ElasticMatrixJob, 'el_job')
+        elastic_job = self._create_job(self._job_type.ElasticMatrixJob, self._elastic_ref_single_name_tail)
         elastic_job.input = self.ref_elastic.input
         elastic_job.ref_job = elastic_ref
-        elastic_job_list = self._create_job(self._job_type.StructureListMaster, 'el_list_job')
+        elastic_job_list = self._create_job(self._job_type.StructureListMaster, self._elastic_job_name_tail)
         elastic_job_list.ref_job = elastic_job
         return elastic_job_list
 
@@ -173,8 +184,8 @@ class SQSElasticConstants(FlexibleMaster):
             self.ref_sqs = self._copy_job(self.ref_sqs, 'sqs_ref')
 
         if self.ref_elastic.ref_job is None \
-                or self.ref_elastic.ref_job.job_name != self._relative_name('el_ham_ref'):
-            self.ref_elastic.ref_job = self._copy_job(self.ref_ham, 'el_ham_ref')
+                or self.ref_elastic.ref_job.job_name != self._relative_name(self._elastic_ref_single_name_tail):
+            self.ref_elastic.ref_job = self._copy_job(self.ref_ham, self._elastic_ref_single_name_tail)
         if self.ref_elastic.job_name != self._relative_name('el_ref'):
             self.ref_elastic = self._copy_job(self.ref_elastic, 'el_ref')
 
@@ -188,9 +199,56 @@ class SQSElasticConstants(FlexibleMaster):
             job.to_hdf()
 
 
+class _ChemicalArray:
+    """
+    A convenience class for wrapping arrays of SQS elastic data where the zeroth dimension spans across chemistry.
+    """
+    def __init__(self, data):
+        self._data = data
+
+    @property
+    def array(self):
+        return self._data
+
+    @property
+    def mean(self):
+        return self._data.mean(axis=0)
+
+    @property
+    def std(self):
+        return self._data.std(axis=0)
+
+    @property
+    def sem(self):
+        return self._data.std(axis=0) / len(self._data)
+
+    def __repr__(self):
+        return str(self._data)
+
+
 class _SQSElasticConstantsOutput:
     def __init__(self, parent):
         self.parent = parent
+
+    def get_elastic_output(self, key):
+        elastic_hdf = self.parent[self.parent.elastic_job_name]
+        n_structures = len(elastic_hdf['input/structures'].list_groups())
+        try:
+            return _ChemicalArray(
+                np.array([
+                    elastic_hdf['struct_{}/output/elasticmatrix'.format(n)][key]
+                    for n in np.arange(n_structures)
+                ])
+            )
+        except KeyError:
+            raise KeyError("Tried to find {} in elastic output keys but it wasn't there. Please try one of "
+                           "{}.".format(key, list(elastic_hdf['struct_0/output/elasticmatrix'].keys())))
+
+    @property
+    def elastic_matrix(self):
+        return self.get_elastic_output('C')
+
+
 
 
 class _SQSElasticConstantsGenerator(JobGenerator):

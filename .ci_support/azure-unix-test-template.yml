@@ -24,7 +24,7 @@ steps:
 
 - bash: |
     source activate pyiron
-    pip install --pre pyiron pyiron_base
+    pip install --pre --upgrade pyiron pyiron_base
     pip install --pre .
   displayName: Installing deeptools
 

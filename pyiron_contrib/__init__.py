@@ -15,6 +15,7 @@ JOB_CLASS_DICT['ImageJob'] = 'pyiron_contrib.image.job'
 JOB_CLASS_DICT['LangevinAse'] = 'pyiron_contrib.atomistic.interactive.langevin'
 JOB_CLASS_DICT['Mixer'] = 'pyiron_contrib.atomistic.interactive.mixer'
 JOB_CLASS_DICT['ParameterMaster'] = 'pyiron_contrib.atomistic.dft.parametermaster'
+JOB_CLASS_DICT['MonteCarloMaster'] = 'pyiron_contrib.atomistic.interactive.montecarlo'
 
 from ._version import get_versions
 

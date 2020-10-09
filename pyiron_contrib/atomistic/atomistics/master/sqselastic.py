@@ -13,7 +13,7 @@ from pyiron_mpie.interactive.elastic import ElasticMatrixJob
 # import seaborn as sns
 
 """
-Calculate the elastic matrix for SQS structure(s).
+Calculate the elastic matrix for special quasi-random structures.
 """
 
 __author__ = "Liam Huber"
@@ -26,11 +26,12 @@ __status__ = "development"
 __date__ = "Oct 2, 2020"
 
 
-# These can't be methods, or FlexibleMaster throws an IndentationError when you try to load
+# This can't be a method, or FlexibleMaster throws an IndentationError when you try to load
 def _sqs2minimization(sqs_job, min_job):
     min_job.structure_lst = sqs_job.list_structures()
 
 
+# This can't be a method, or FlexibleMaster throws an IndentationError when you try to load
 def _minimization2elastic(min_job, elastic_job):
     elastic_job.structure_lst = [
         min_job['struct_{}'.format(int(i))].get_structure()
@@ -39,6 +40,31 @@ def _minimization2elastic(min_job, elastic_job):
 
 
 class SQSElasticConstants(FlexibleMaster):
+    """
+    Calculates the elastic constants for structures generated according to the special quasi-random structure scheme.
+
+    This job itself takes no input, but rather the input is passed in via the reference jobs, e.g. `ref_ham` handles
+    all input for the force/energy evaluations (e.g. emperical potential if a classical interpreter, kpoints, energy
+    cutoff, etc. for quantum interpreters...), `ref_sqs` handles the SQS input like the molar fractions and how many
+    structures to produce, and `ref_elastic` holds the input for evaluating the elastic constants, like what strain
+    magnitude to apply. See the docstrings of these individual jobs for more details.
+
+    Output is constructed from the output of the underlying child jobs and will become invalid if their data is tampered
+    with.
+
+    Attributes:
+        ref_ham (pyiron.atomistics.job.atomistic.AtomisticGenericJob): The interpreter for calculating forces and
+            energies from the atomic structure.
+        ref_sqs (pyiron.atomistics.job.sqs.SQSJob): Uses the special quasi-random structure approach to randomize the
+            species in `ref_ham.structure` according to the molar fractions provided in its input.
+        ref_elastic (pyiron_mpie.interactive.elastic.ElasticMatrixJob): Calculates elastic constants for each of the SQS
+            structures.
+
+    Output:
+
+
+    Warning: Initial relaxation is only isotropic with respect to cell shape.
+    """
     def __init__(self, project, job_name):
         super().__init__(project, job_name=job_name)
         self.__name__ = "SQSElasticConstants"
@@ -182,6 +208,23 @@ class _SQSElasticConstantsGenerator(JobGenerator):
 
 
 class SQSElasticConstantsList(ParallelMaster):
+    """
+    Calculates the elastic constants for structures generated according to the special quasi-random structure scheme for
+    a series of compositions.
+
+    Attributes:
+        ref_job (SQSElasticConstants): The job over which to iterate different compositions. (Must in turn have all its
+            own reference jobs set.)
+
+    Input:
+        chemistry (list): A list of dictionary items, each providing (key, value) pairs that are the chemical symbol and
+            (approximate) fraction of the cell that should have that species. Following the standard of
+            pyiron.atomistics.job.sqs.SQSJob, each dictionary should have fractions summing to 1 and '0' may be used as
+            a key to indicate vacancies.
+
+    Output:
+
+    """
     def __init__(self, project, job_name):
         super().__init__(project, job_name=job_name)
         self.__name__ = "SQSElasticConstantsList"

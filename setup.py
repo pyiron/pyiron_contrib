@@ -38,6 +38,6 @@ setup(
         'pyiron',
         'scipy',
         'seaborn',
-        'skimage',
+        'scikit-image',
     ]
 )

@@ -8,4 +8,5 @@ conda config --set always_yes yes --set changeps1 no
 # Setup pyiron
 conda install python=${2}
 conda env update --name root --file .ci_support/environment.yml
+pip install --pre pyiron pyiron_base
 pip install --pre .

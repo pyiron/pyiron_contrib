@@ -10,4 +10,4 @@ dependencies:
   - pyiron =0.3.6
   - scipy
   - seaborn
-  - skimage
+  - scikit-image

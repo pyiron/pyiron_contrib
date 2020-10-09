@@ -7,7 +7,7 @@ from setuptools import setup, find_packages
 setup(
     name='pyiron_contrib',
     version='0.0.1',
-    description='Repository for the pyiron plugins developed at the Max Planck Institute für Eisenforschung.',
+    description='Repository for user-generated plugins to the pyiron IDE.',
     long_description='http://pyiron.org',
 
     url='https://github.com/pyiron/pyiron_contrib',

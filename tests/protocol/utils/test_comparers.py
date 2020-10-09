@@ -48,42 +48,42 @@ class TestComparer(unittest.TestCase):
         return a, b, c, d
 
     def test_primitives(self):
-        self.assertTrue(Comparer(4) == 4)
-        self.assertFalse(Comparer(4) == 5)
+        self.assertEqual(Comparer(4), 4)
+        self.assertNotEqual(Comparer(4), 5)
 
-        self.assertTrue(Comparer(4.4) == 4.4)
-        self.assertFalse(Comparer(4.4) == 5.5)
+        self.assertEqual(Comparer(4.4), 4.4)
+        self.assertNotEqual(Comparer(4.4), 5.5)
 
-        self.assertTrue(Comparer('a') == 'a')
-        self.assertFalse(Comparer('a') == 'b')
+        self.assertEqual(Comparer('a'), 'a')
+        self.assertNotEqual(Comparer('a'), 'b')
 
-        self.assertTrue(Comparer(4) == 4.)
-        self.assertFalse(Comparer(4) == 'a')
+        self.assertEqual(Comparer(4), 4.)
+        self.assertNotEqual(Comparer(4), 'a')
 
         # Check that comparing comparers works too
-        self.assertTrue(Comparer(4) == Comparer(4))
-        self.assertTrue(Comparer(4) == Comparer(4.))
-        self.assertFalse(Comparer(4) == Comparer(4.4))
-        self.assertFalse(Comparer(4) == Comparer('a'))
+        self.assertEqual(Comparer(4), Comparer(4))
+        self.assertEqual(Comparer(4), Comparer(4.))
+        self.assertNotEqual(Comparer(4), Comparer(4.4))
+        self.assertNotEqual(Comparer(4), Comparer('a'))
 
     def test_array(self):
         a, b, c = self.create_arrays()
 
-        self.assertTrue(Comparer(a) == a)
+        self.assertEqual(Comparer(a), a)
 
-        self.assertFalse(Comparer(a) == b)
-        self.assertFalse(Comparer(a) == c)
-        self.assertFalse(Comparer(a) == 'a')
+        self.assertNotEqual(Comparer(a), b)
+        self.assertNotEqual(Comparer(a), c)
+        self.assertNotEqual(Comparer(a), 'a')
 
     def test_atoms(self):
         a, b, c, d = self.create_atoms()
 
-        self.assertTrue(Comparer(a) == a)
+        self.assertEqual(Comparer(a), a)
 
-        self.assertFalse(Comparer(a) == b)
-        self.assertFalse(Comparer(a) == c)
-        self.assertFalse(Comparer(a) == d)
-        self.assertFalse(Comparer(a) == 'a')
+        self.assertNotEqual(Comparer(a), b)
+        self.assertNotEqual(Comparer(a), c)
+        self.assertNotEqual(Comparer(a), d)
+        self.assertNotEqual(Comparer(a), 'a')
 
     def test_lists(self):
         array_a, array_b, _ = self.create_arrays()
@@ -92,15 +92,15 @@ class TestComparer(unittest.TestCase):
         a = [1, 'a', array_a, atoms_a]
         b = [[atoms_a, atoms_b], [atoms_c, atoms_d]]
 
-        self.assertTrue(Comparer(a) == a)
-        self.assertTrue(Comparer(b) == b)
+        self.assertEqual(Comparer(a), a)
+        self.assertEqual(Comparer(b), b)
 
-        self.assertFalse(Comparer(a) == [2, 'a', array_a, atoms_a])
-        self.assertFalse(Comparer(a) == [1, 'b', array_a, atoms_a])
-        self.assertFalse(Comparer(a) == [1, 'a', array_b, atoms_b])
-        self.assertFalse(Comparer(a) == [1, 'a', array_a, atoms_a, 1])
+        self.assertNotEqual(Comparer(a), [2, 'a', array_a, atoms_a])
+        self.assertNotEqual(Comparer(a), [1, 'b', array_a, atoms_a])
+        self.assertNotEqual(Comparer(a), [1, 'a', array_b, atoms_b])
+        self.assertNotEqual(Comparer(a), [1, 'a', array_a, atoms_a, 1])
 
-        self.assertFalse(Comparer(b) == [[atoms_a, atoms_b], [atoms_a, atoms_b]])
-        self.assertFalse(Comparer(b) == [[atoms_a, atoms_b], [atoms_c, atoms_d], [atoms_a, atoms_b]])
-        self.assertFalse(Comparer(b) == [b])
-        self.assertFalse(Comparer(b) == [[1, 2], ['a', 'b']])
+        self.assertNotEqual(Comparer(b), [[atoms_a, atoms_b], [atoms_a, atoms_b]])
+        self.assertNotEqual(Comparer(b), [[atoms_a, atoms_b], [atoms_c, atoms_d], [atoms_a, atoms_b]])
+        self.assertNotEqual(Comparer(b), [b])
+        self.assertNotEqual(Comparer(b), [[1, 2], ['a', 'b']])

@@ -1,0 +1,13 @@
+channels:
+  - conda-forge
+dependencies:
+  - ase =3.19
+  - coveralls
+  - coverage
+  - codacy-coverage
+  - matplotlib =3.2.1
+  - numpy =1.19.1
+  - pyiron =0.3.6
+  - scipy =1.5.2
+  - seaborn =0.11.0
+  - scikit-image =0.17.2

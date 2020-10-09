@@ -38,6 +38,7 @@ install:
 - "conda install -q python=%PYTHON_VERSION%"
 - "conda env update --file .ci_support/environment.yml"
 - "conda info -a"
+- "pip install --pre pyiron pyiron_base"
 - "pip install --pre ."
 
 build: false

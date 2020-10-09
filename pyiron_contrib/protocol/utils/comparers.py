@@ -175,7 +175,7 @@ class AtomsComparer(Comparer):
             Comparer(self.object.get_initial_magnetic_moments()) == b.get_initial_magnetic_moments(),
             index_spec_mapping(self.object) == index_spec_mapping(b)
         ]
-        return all(conditions)
+        return np.all(conditions)
 
 
 class ListComparer(Comparer):

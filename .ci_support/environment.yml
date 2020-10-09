@@ -5,9 +5,9 @@ dependencies:
   - coveralls
   - coverage
   - codacy-coverage
-  - matplotlib
-  - numpy
+  - matplotlib =3.2.1
+  - numpy =1.19.1
   - pyiron =0.3.6
-  - scipy
-  - seaborn
-  - scikit-image
+  - scipy =1.5.2
+  - seaborn =0.11.0
+  - scikit-image =0.17.2

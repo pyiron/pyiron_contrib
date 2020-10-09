@@ -12,6 +12,9 @@ JOB_CLASS_DICT['ProtocolQMMM'] = 'pyiron_contrib.protocol.compound.qmmm'
 JOB_CLASS_DICT['ProtocolHarmonicTILD'] = 'pyiron_contrib.protocol.compound.tild'
 JOB_CLASS_DICT['ProtocolHarmonicTILDParallel'] = 'pyiron_contrib.protocol.compound.tild'
 JOB_CLASS_DICT['ImageJob'] = 'pyiron_contrib.image.job'
+JOB_CLASS_DICT['LangevinAse'] = 'pyiron_contrib.atomistic.interactive.langevin'
+JOB_CLASS_DICT['Mixer'] = 'pyiron_contrib.atomistic.interactive.mixer'
+JOB_CLASS_DICT['ParameterMaster'] = 'pyiron_contrib.atomistic.dft.parametermaster'
 
 from ._version import get_versions
 

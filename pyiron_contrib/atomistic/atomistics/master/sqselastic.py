@@ -62,7 +62,17 @@ class SQSElasticConstants(FlexibleMaster):
             structures.
 
     Output:
+        elastic_matrix (ChemicalArray): The six-component elastic matrix.
+        residual_pressures (ChemicalArray): The remaining pressure after minimization.
+        structures (list): The minimized structures.
+        cells (ChemicalArray): The cells of the minimized structures.
+        symbols (list): The chemical symbols (possibly including '0' for vacancy) in the SQS structures.
+        chemistry (dict): The actual chemical fraction of each species (including '0' for vacancy) in the structures.
+        get_elastic_output (fnc): A function taking a string key for accessing other output from the ElasticMatrixJob
+            as a ChemicalArray. (If you ask for an invalid key, all the valid possibilities will be printed for you.)
 
+    Note: The `ChemicalArray` class is a wrapper for numpy arrays that allows you to look at the `.array`, `.mean`,
+        `.std` and `.sem` (standard error) with respect to the different SQS structures.
 
     Warning: Initial relaxation is only isotropic with respect to cell shape.
     """
@@ -200,7 +210,7 @@ class SQSElasticConstants(FlexibleMaster):
             job.to_hdf()
 
 
-class _ChemicalArray:
+class ChemicalArray:
     """
     A convenience class for wrapping arrays of SQS elastic data where the zeroth dimension spans across chemistry.
     """
@@ -230,7 +240,7 @@ class _ChemicalArray:
 
 def _as_chemical_array(fnc):
     def decorated(*args, **kwargs):
-        return _ChemicalArray(fnc(*args, **kwargs))
+        return ChemicalArray(fnc(*args, **kwargs))
 
     return decorated
 

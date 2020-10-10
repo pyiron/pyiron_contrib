@@ -12,7 +12,6 @@ JOB_CLASS_DICT['ProtocolQMMM'] = 'pyiron_contrib.protocol.compound.qmmm'
 JOB_CLASS_DICT['ProtocolHarmonicTILD'] = 'pyiron_contrib.protocol.compound.tild'
 JOB_CLASS_DICT['ProtocolHarmonicTILDParallel'] = 'pyiron_contrib.protocol.compound.tild'
 JOB_CLASS_DICT['ImageJob'] = 'pyiron_contrib.image.job'
-JOB_CLASS_DICT['ATATsqs'] = 'pyiron_contrib.atomistic.atomistics.structures.atatsqs'
 JOB_CLASS_DICT['RandSpg'] = 'pyiron_contrib.atomistic.atomistics.structures.randspg'
 
 from ._version import get_versions

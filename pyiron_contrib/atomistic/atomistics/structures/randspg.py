@@ -22,6 +22,19 @@ __date__ = "Sep 1, 2017"
 
 
 class RandSpg(GenericJob):
+    """
+    RandSpg is a program that generates random crystals with specific space groups.
+    The user inputs a specific composition and space group to be generated. The
+    algorithm then proceeds by finding all combinations of Wyckoff positions that
+    satisfy the composition. It then randomly selects a combination of Wyckoff
+    positions for the space group, generates random coordinates for variables
+    in the Wyckoff positions, and places atoms in those sites. It ensures that any
+    constraints the user placed on the system (lattice constraints including
+    min/max volume, minimum interatomic distances, specific Wyckoff positions for
+    specific atoms, etc.) are satisfied.
+    Code: https://github.com/xtalopt/randSpg
+    Paper: https://www.sciencedirect.com/science/article/pii/S0010465516303848
+    """
     def __init__(self, project, job_name):
         super(RandSpg, self).__init__(project, job_name)
         self.__version__ = "0.1"

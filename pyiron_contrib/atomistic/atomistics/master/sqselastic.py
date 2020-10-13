@@ -250,16 +250,34 @@ class _SQSElasticConstantsOutput:
         self._parent = parent
 
     def get_elastic_output(self, key):
-        elastic_hdf = self._parent[self._parent.elastic_job_name]
-        n_structures = len(elastic_hdf['input/structures'].list_groups())
         try:
             return [
-                elastic_hdf['struct_{}/output/elasticmatrix'.format(n)][key]
-                for n in np.arange(n_structures)
+                self._elastic_hdf['struct_{}/output/elasticmatrix'.format(n)][key]
+                for n in np.arange(self.n_structures)
             ]
         except KeyError:
             raise KeyError("Tried to find {} in elastic output keys but it wasn't there. Please try one of "
-                           "{}.".format(key, list(elastic_hdf['struct_0/output/elasticmatrix'].keys())))
+                           "{}.".format(key, list(self._elastic_hdf['struct_0/output/elasticmatrix'].keys())))
+
+    @property
+    def n_sites(self):
+        return len(self._parent[self._parent.min_job_name]['input/structures/s_0/positions'])
+
+    @property
+    def n_structures(self):
+        return len(self._parent[self._parent.min_job_name]['input/structures'].list_groups())
+
+    @property
+    def _sqs_hdf(self):
+        return self._parent[self._parent.sqs_job_name]
+
+    @property
+    def _min_hdf(self):
+        return self._parent[self._parent.min_job_name]
+
+    @property
+    def _elastic_hdf(self):
+        return self._parent[self._parent.elastic_job_name]
 
     @property
     @_as_chemical_array
@@ -273,21 +291,17 @@ class _SQSElasticConstantsOutput:
     @lru_cache()
     def residual_pressures(self):
         """Pressures after minimization."""
-        min_hdf = self._parent[self._parent.min_job_name]
-        n_structures = len(min_hdf['input/structures'].list_groups())
         return [
-            min_hdf['struct_{}/output/generic/pressures'.format(n)][-1]
-            for n in np.arange(n_structures)
+            self._min_hdf['struct_{}/output/generic/pressures'.format(n)][-1]
+            for n in np.arange(self.n_structures)
         ]
 
     @property
     @lru_cache()
     def structures(self):
-        min_hdf = self._parent[self._parent.min_job_name]
-        n_structures = len(min_hdf['input/structures'].list_groups())
         return [
-            Atoms().from_hdf(min_hdf['struct_{}/output'.format(n)])
-            for n in np.arange(n_structures)
+            Atoms().from_hdf(self._min_hdf['struct_{}/output'.format(n)])
+            for n in np.arange(self.n_structures)
         ]
 
     @property
@@ -298,22 +312,17 @@ class _SQSElasticConstantsOutput:
     @property
     @lru_cache()
     def symbols(self):
-        return list(self._parent[self._parent.sqs_job_name]['input/custom_dict/data']['mole_fractions'].keys())
+        return list(self._sqs_hdf['input/custom_dict/data']['mole_fractions'].keys())
 
     @property
     def chemistry(self):
-        n_atoms = len(self._parent[self._parent.min_job_name]['input/structures/s_0/positions'])
-        return {
-            symbol: self._species_fraction(structure, symbol, n_atoms)
-            for symbol, structure in zip(self.symbols, self.structures)
-        }
+        return {symbol: self._species_fraction(self.structures[0], symbol) for symbol in self.symbols}
 
-    @staticmethod
-    def _species_fraction(structure, symbol, reference_count):
+    def _species_fraction(self, structure, symbol):
         if symbol == '0':
-            return len(structure) / reference_count
+            return len(structure) / self.n_sites
         else:
-            return np.sum(structure.get_chemical_symbols() == symbol) / reference_count
+            return np.sum(structure.get_chemical_symbols() == symbol) / self.n_sites
 
 
 class _SQSElasticConstantsGenerator(JobGenerator):

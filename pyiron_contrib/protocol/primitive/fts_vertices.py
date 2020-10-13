@@ -4,22 +4,15 @@
 
 from __future__ import print_function
 from pyiron_contrib.protocol.generic import PrimitiveVertex
-from pyiron_contrib.protocol.utils import IODictionary
 import numpy as np
-from pyiron.atomistics.job.interactive import GenericInteractive
-from pyiron.lammps.lammps import LammpsInteractive
 from scipy.constants import femto as FS
-from ase.geometry import find_mic, get_distances  # TODO: Wrap things using pyiron functionality
-from pyiron import Project
-from pyiron_contrib.protocol.utils import ensure_iterable
-from os.path import split
+from ase.geometry import find_mic  # TODO: Wrap things using pyiron functionality
 from abc import ABC, abstractmethod
 from scipy.linalg import toeplitz
 
 """
 Vertices whose present application extends only to finite temperature string-based protocols.
 
-TODO: Naming consistency among vertices, e.g. `all_centroid_positions` vs `centroid_pos_list`.
 """
 
 __author__ = "Raynol Dsouza, Liam Huber"
@@ -170,25 +163,25 @@ class PositionsRunningAverage(PrimitiveVertex):
 
     def __init__(self, name=None):
         super(PositionsRunningAverage, self).__init__(name=name)
-        self.input.total_counts = 0
+        self.input.total_steps = 0
         self.input.default.divisor = 1
 
-    def command(self, positions, running_average_positions, total_counts, thermalization_steps, divisor, cell, pbc):
-        total_counts += 1
-        if total_counts > thermalization_steps:
+    def command(self, positions, running_average_positions, total_steps, thermalization_steps, divisor, cell, pbc):
+        total_steps += 1
+        if total_steps > thermalization_steps:
             divisor += 1  # On the first step, divide by 2 to average two positions
             weight = 1. / divisor  # How much of the current step to mix into the average
             displacement = find_mic(positions - running_average_positions, cell, pbc)[0]
             new_running_average = running_average_positions + (weight * displacement)
             return {
                 'running_average_positions': new_running_average,
-                'total_counts': total_counts,
+                'total_steps': total_steps,
                 'divisor': divisor,
             }
         else:
             return {
                 'running_average_positions': running_average_positions,
-                'total_counts': total_counts,
+                'total_steps': total_steps,
                 'divisor': divisor,
             }
 
@@ -255,14 +248,18 @@ class CentroidsSmoothing(PrimitiveVertex):
     Output Attributes:
         all_centroid_positions (list/numpy.ndarray): List of smoothed centroid positions.
     """
-    def command(self, kappa, dtau, centroids_pos_list):
-        # Get the smoothing matrix
+    def command(self, kappa, dtau, centroids_pos_list, cell, pbc, smooth_style='global'):
         n_images = len(centroids_pos_list)
         smoothing_strength = kappa * n_images * dtau
-        smoothing_matrix = self._get_smoothing_matrix(n_images, smoothing_strength)
-        smoothed_centroid_positions = np.tensordot(smoothing_matrix, np.array(centroids_pos_list), axes=1)
+        if smooth_style == 'global':
+            smoothing_matrix = self._get_smoothing_matrix(n_images, smoothing_strength)
+            smoothed_centroid_positions = np.tensordot(smoothing_matrix, np.array(centroids_pos_list), axes=1)
+        elif smooth_style == 'local':
+            smoothed_centroid_positions = self.locally_smoothed(smoothing_strength, centroids_pos_list, cell, pbc)
+        else:
+            raise TypeError('Smoothing: choose style = "global" or "local"')
         return {
-            'centroids_pos_list': np.array(smoothed_centroid_positions)
+            'centroids_pos_list': smoothed_centroid_positions
         }
 
     @staticmethod
@@ -286,6 +283,32 @@ class CentroidsSmoothing(PrimitiveVertex):
         smooth_mat_inv = np.eye(n_images) - smoothing_strength * second_order_deriv
 
         return np.linalg.inv(smooth_mat_inv)
+
+    @staticmethod
+    def locally_smoothed(smoothing_strength, centroids_pos_list, cell, pbc):
+        """
+        A function that applies local smoothing by taking into account immediate neighbors.
+
+        Attributes:
+            n_images (int): number of images
+            smoothing_strength (float): the smoothing penalty
+
+        Returns:
+            smoothing_matrix
+        """
+        smoothed_centroid_positions = [centroids_pos_list[0]]
+        for i, cent in enumerate(centroids_pos_list[1:-1]):
+            left = centroids_pos_list[i]
+            right = centroids_pos_list[i+2]
+            disp_left = find_mic(cent - left, cell, pbc)[0]
+            disp_right = find_mic(right - cent, cell, pbc)[0]
+            switch = (1 + np.cos(np.pi * np.tensordot(disp_left, disp_right) / (
+                        np.linalg.norm(disp_left) * (np.linalg.norm(disp_right))))) / 2
+            r_star = smoothing_strength * switch * (disp_right - disp_left)
+            smoothed_centroid_positions.append(cent + r_star)
+        smoothed_centroid_positions.append(centroids_pos_list[-1])
+
+        return smoothed_centroid_positions
 
 
 class CentroidsReparameterization(PrimitiveVertex):

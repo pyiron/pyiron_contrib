@@ -1,0 +1,703 @@
+# coding: utf-8
+# Copyright (c) Max-Planck-Institut für Eisenforschung GmbH - Computational Materials Design (CM) Department
+# Distributed under the terms of "New BSD License", see the LICENSE file.
+
+from __future__ import print_function
+
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
+
+from abc import ABC
+
+from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
+from pyiron_contrib.protocol.primitive.one_state import CreateJob, Counter, CutoffDistance, ExternalHamiltonian, \
+    InitialPositions, RemoveJob, RandomVelocity, SphereReflectionPerAtom, VerletPositionUpdate, \
+    VerletVelocityUpdate, Zeros
+from pyiron_contrib.protocol.primitive.two_state import IsGEq, ModIsZero
+from pyiron_contrib.protocol.primitive.fts_vertices import CentroidsRunningAverageMix, CentroidsReparameterization, \
+    CentroidsSmoothing, PositionsRunningAverage, StringRecenter, StringReflect
+from pyiron_contrib.protocol.list import SerialList, ParallelList
+from pyiron_contrib.protocol.utils import Pointer
+
+"""
+Protocols for the finite temperature string (FTS) method.
+
+"""
+
+__author__ = "Raynol Dsouza, Liam Huber"
+__copyright__ = "Copyright 2019, Max-Planck-Institut für Eisenforschung GmbH " \
+                "- Computational Materials Design (CM) Department"
+__version__ = "0.0"
+__maintainer__ = "Liam Huber"
+__email__ = "huber@mpie.de"
+__status__ = "development"
+__date__ = "23 July, 2019"
+
+
+class FTSEvolution(CompoundVertex):
+    """
+    A serial Finite Temperature String (FTS) protocol to compute migration barriers between two stable system.
+
+    NOTE: 1. This protocol is as of now untested with DFT pseudopotentials, and only works for sure, with LAMMPS-
+        based potentials.
+          2. Convergence criterion is NOT implemented for this protocol, because it runs serially (and would take
+        a VERY long time to achieve a good convergence.
+
+    """
+
+    # DefaultWhitelist sets the output which will be stored every `archive period' in the final hdf5 file.
+
+    # DefaultWhitelist = {
+    #     'calc_static_centroids': {
+    #         'output': {
+    #             'energy_pot': 1,
+    #         }
+    #     }
+    # }
+
+    def __init__(self, **kwargs):
+        super(FTSEvolution, self).__init__(**kwargs)
+
+        # Protocol defaults
+        id_ = self.input.default
+        id_.temperature = 1.  # The target temperature in K.
+        id_.n_steps = 100  # Number of md steps.
+        id_.temperature_damping_timescale = 100.  # Same as `temperature_damping_timescale' in calc_md().
+        id_.overheat_fraction = 2.  # The fraction by which to overheat the initial velocities.
+        id_.time_step = 1.  # The MD time step in fs.
+        id_.sampling_period = 1  # Account only for output every `sampling_period' for the TI operations.
+        id_.thermalization_steps = 10  # Number of steps the system is thermalized for to reach equilibrium.
+        id_.initial_positions = None  # The initial centroid positions can also be specified with the job.
+        id_.cutoff_factor = 0.4  # This factor times the 1NN distance is the reflection cutoff.
+        id_.mixing_fraction = 0.1  # How much of the running average of the images to mix into the centroids.
+        id_.smooth_style = 'local'  # Smoothing style can be `local' or `global'.
+        id_.nominal_smoothing = 0.1  # How much smoothing to apply to the running average mixed centroids.
+        id_.divisor = 1  # Necessary for calculation of the running average.
+        id_.use_reflection = True  # Whether or not to use reflection.
+        id_.total_steps = 0  # The total number of md steps that have been performed so far.
+        id_.project_path = None  # Initialize default project path.
+        id_.job_name = None  # Initialize default job name.
+
+    def define_vertices(self):
+        # Graph components
+        g = self.graph
+        g.initialize_images = CreateJob()
+        g.initialize_centroids = CreateJob()
+        g.initial_positions = InitialPositions()
+        g.initial_velocities = SerialList(RandomVelocity)
+        g.initial_forces = Zeros()
+        g.cutoff = CutoffDistance()
+        g.check_steps = IsGEq()
+        g.verlet_positions = SerialList(VerletPositionUpdate)
+        g.reflect_string = SerialList(StringReflect)
+        g.reflect_atoms = SerialList(SphereReflectionPerAtom)
+        g.calc_static_images = SerialList(ExternalHamiltonian)
+        g.verlet_velocities = SerialList(VerletVelocityUpdate)
+        g.running_average_pos = SerialList(PositionsRunningAverage)
+        g.check_sampling_period = ModIsZero()
+        g.mix = CentroidsRunningAverageMix()
+        g.smooth = CentroidsSmoothing()
+        g.reparameterize = CentroidsReparameterization()
+        g.calc_static_centroids = SerialList(ExternalHamiltonian)
+        g.recenter = SerialList(StringRecenter)
+        g.clock = Counter()
+
+    def define_execution_flow(self):
+        # Execution flow
+        g = self.graph
+        g.make_pipeline(
+            g.initialize_images,
+            g.initialize_centroids,
+            g.initial_positions,
+            g.initial_velocities,
+            g.initial_forces,
+            g.cutoff,
+            g.check_steps, 'false',
+            g.verlet_positions,
+            g.reflect_string,  # Comes before atomic reflecting so we can actually trigger a full string reflection!
+            g.reflect_atoms,  # Comes after, since even if the string doesn't reflect, an atom might have migrated.
+            g.calc_static_images,
+            g.verlet_velocities,
+            g.running_average_pos,
+            g.check_sampling_period, 'true',
+            g.mix,
+            g.smooth,
+            g.reparameterize,
+            g.calc_static_centroids,
+            g.recenter,
+            g.clock,
+            g.check_steps
+        )
+        g.make_edge(g.check_sampling_period, g.recenter, 'false')
+        g.starting_vertex = g.initialize_images
+        g.restarting_vertex = g.check_steps
+
+    def define_information_flow(self):
+        # Data flow
+        g = self.graph
+        gp = Pointer(self.graph)
+        ip = Pointer(self.input)
+
+        # initialize_images
+        g.initialize_images.input.n_images = ip.n_images
+        g.initialize_images.input.ref_job_full_path = ip.ref_job_full_path
+        g.initialize_images.input.structure = ip.structure_initial
+
+        # initialize_centroids
+        g.initialize_centroids.input.n_images = ip.n_images
+        g.initialize_centroids.input.ref_job_full_path = ip.ref_job_full_path
+        g.initialize_centroids.input.structure = ip.structure_initial
+
+        # initial_positions
+        g.initial_positions.input.structure_initial = ip.structure_initial
+        g.initial_positions.input.structure_final = ip.structure_final
+        g.initial_positions.input.initial_positions = ip.initial_positions
+        g.initial_positions.input.n_images = ip.n_images
+
+        # initial_velocities
+        g.initial_velocities.input.n_children = ip.n_images
+        g.initial_velocities.direct.temperature = ip.temperature
+        g.initial_velocities.direct.masses = ip.structure_initial.get_masses
+        g.initial_velocities.direct.overheat_fraction = ip.overheat_fraction
+
+        # cutoff
+        g.cutoff.input.structure = ip.structure_initial
+        g.cutoff.input.cutoff_factor = ip.cutoff_factor
+
+        # initial_forces
+        g.initial_forces.input.shape = ip.structure_initial.positions.shape
+
+        # check_steps
+        g.check_steps.input.target = gp.clock.output.n_counts[-1]
+        g.check_steps.input.threshold = ip.n_steps
+
+        # verlet_positions
+        g.verlet_positions.input.n_children = ip.n_images
+        g.verlet_positions.broadcast.default.positions = gp.initial_positions.output.initial_positions[-1]
+        g.verlet_positions.broadcast.default.velocities = gp.initial_velocities.output.velocities[-1]
+        g.verlet_positions.direct.default.forces = gp.initial_forces.output.zeros[-1]
+
+        g.verlet_positions.broadcast.positions = gp.recenter.output.positions[-1]
+        g.verlet_positions.broadcast.velocities = gp.verlet_velocities.output.velocities[-1]
+        g.verlet_positions.broadcast.forces = gp.recenter.output.forces[-1]
+        g.verlet_positions.direct.masses = ip.structure_initial.get_masses
+        g.verlet_positions.direct.time_step = ip.time_step
+        g.verlet_positions.direct.temperature = ip.temperature
+        g.verlet_positions.direct.temperature_damping_timescale = ip.temperature_damping_timescale
+
+        # reflect_string
+        g.reflect_string.input.n_children = ip.n_images
+        g.reflect_string.direct.default.all_centroid_positions = \
+            gp.initial_positions.output.initial_positions[-1]
+        g.reflect_string.broadcast.default.centroid_positions = \
+            gp.initial_positions.output.initial_positions[-1]
+        g.reflect_string.broadcast.default.previous_positions = \
+            gp.initial_positions.output.initial_positions[-1]
+        g.reflect_string.broadcast.default.previous_velocities = gp.initial_velocities.output.velocities[-1]
+
+        g.reflect_string.direct.all_centroid_positions = gp.reparameterize.output.centroids_pos_list[-1]
+        g.reflect_string.broadcast.centroid_positions = gp.reparameterize.output.centroids_pos_list[-1]
+        g.reflect_string.broadcast.previous_positions = gp.recenter.output.positions[-1]
+        g.reflect_string.broadcast.previous_velocities = gp.reflect_atoms.output.velocities[-1]
+        g.reflect_string.broadcast.positions = gp.verlet_positions.output.positions[-1]
+        g.reflect_string.broadcast.velocities = gp.verlet_positions.output.velocities[-1]
+        g.reflect_string.direct.cell = ip.structure_initial.cell.array
+        g.reflect_string.direct.pbc = ip.structure_initial.pbc
+
+        # reflect_atoms
+        g.reflect_atoms.input.n_children = ip.n_images
+        g.reflect_atoms.broadcast.default.reference_positions = \
+            gp.initial_positions.output.initial_positions[-1]
+        g.reflect_atoms.broadcast.default.previous_positions = \
+            gp.initial_positions.output.initial_positions[-1]
+        g.reflect_atoms.broadcast.default.previous_velocities = gp.initial_velocities.output.velocities[-1]
+        g.reflect_atoms.direct.default.total_steps = ip.total_steps
+
+        g.reflect_atoms.broadcast.reference_positions = gp.reparameterize.output.centroids_pos_list[-1]
+        g.reflect_atoms.broadcast.positions = gp.reflect_string.output.positions[-1]
+        g.reflect_atoms.broadcast.velocities = gp.reflect_string.output.velocities[-1]
+        g.reflect_atoms.broadcast.previous_positions = gp.recenter.output.positions[-1]
+        g.reflect_atoms.broadcast.previous_velocities = gp.reflect_atoms.output.velocities[-1]
+        g.reflect_atoms.direct.pbc = ip.structure_initial.pbc
+        g.reflect_atoms.direct.cell = ip.structure_initial.cell.array
+        g.reflect_atoms.direct.cutoff_distance = gp.cutoff.output.cutoff_distance[-1]
+        g.reflect_atoms.direct.use_reflection = ip.use_reflection
+        g.reflect_atoms.broadcast.total_steps = gp.reflect_atoms.output.total_steps[-1]
+
+        # calc_static_images
+        g.calc_static_images.input.n_children = ip.n_images
+        g.calc_static_images.direct.structure = ip.structure_initial
+        g.calc_static_images.broadcast.project_path = gp.initialize_images.output.project_path[-1]
+        g.calc_static_images.broadcast.job_name = gp.initialize_images.output.job_names[-1]
+        g.calc_static_images.broadcast.positions = gp.reflect_atoms.output.positions[-1]
+
+        # verlet_velocities
+        g.verlet_velocities.input.n_children = ip.n_images
+        g.verlet_velocities.broadcast.velocities = gp.reflect_atoms.output.velocities[-1]
+        g.verlet_velocities.broadcast.forces = gp.calc_static_images.output.forces[-1]
+        g.verlet_velocities.direct.masses = ip.structure_initial.get_masses
+        g.verlet_velocities.direct.time_step = ip.time_step
+        g.verlet_velocities.direct.temperature = ip.temperature
+        g.verlet_velocities.direct.temperature_damping_timescale = ip.temperature_damping_timescale
+
+        # running_average_positions
+        g.running_average_pos.input.n_children = ip.n_images
+        g.running_average_pos.direct.default.thermalization_steps = ip.thermalization_steps
+        g.running_average_pos.direct.default.total_steps = ip.total_steps
+        g.running_average_pos.direct.default.divisor = ip.divisor
+        g.running_average_pos.broadcast.default.running_average_positions = \
+            gp.initial_positions.output.initial_positions[-1]
+
+        g.running_average_pos.broadcast.total_steps = gp.running_average_pos.output.total_steps[-1]
+        g.running_average_pos.broadcast.divisor = gp.running_average_pos.output.divisor[-1]
+        g.running_average_pos.broadcast.running_average_positions = \
+            gp.running_average_pos.output.running_average_positions[-1]
+        g.running_average_pos.broadcast.positions = gp.reflect_atoms.output.positions[-1]
+        g.running_average_pos.direct.cell = ip.structure_initial.cell.array
+        g.running_average_pos.direct.pbc = ip.structure_initial.pbc
+
+        # check_sampling_period
+        g.check_sampling_period.input.target = gp.clock.output.n_counts[-1]
+        g.check_sampling_period.input.default.mod = ip.sampling_period
+
+        # mix
+        g.mix.input.default.centroids_pos_list = gp.initial_positions.output.initial_positions[-1]
+        g.mix.input.centroids_pos_list = gp.reparameterize.output.centroids_pos_list[-1]
+        g.mix.input.mixing_fraction = ip.mixing_fraction
+        g.mix.input.running_average_positions = gp.running_average_pos.output.running_average_positions[-1]
+        g.mix.input.cell = ip.structure_initial.cell.array
+        g.mix.input.pbc = ip.structure_initial.pbc
+
+        # smooth
+        g.smooth.input.kappa = ip.nominal_smoothing
+        g.smooth.input.dtau = ip.mixing_fraction
+        g.smooth.input.cell = ip.structure_initial.cell.array
+        g.smooth.input.pbc = ip.structure_initial.pbc
+        g.smooth.input.smooth_style = ip.smooth_style
+        g.smooth.input.centroids_pos_list = gp.mix.output.centroids_pos_list[-1]
+
+        # reparameterize
+        g.reparameterize.input.centroids_pos_list = gp.smooth.output.centroids_pos_list[-1]
+        g.reparameterize.input.cell = ip.structure_initial.cell.array
+        g.reparameterize.input.pbc = ip.structure_initial.pbc
+
+        # calc_static_centroids
+        g.calc_static_centroids.input.n_children = ip.n_images
+        g.calc_static_centroids.direct.structure = ip.structure_initial
+        g.calc_static_centroids.broadcast.project_path = gp.initialize_centroids.output.project_path[-1]
+        g.calc_static_centroids.broadcast.job_name = gp.initialize_centroids.output.job_names[-1]
+        g.calc_static_centroids.broadcast.positions = gp.reparameterize.output.centroids_pos_list[-1]
+
+        # recenter
+        g.recenter.input.n_children = ip.n_images
+        g.recenter.direct.default.all_centroid_positions = gp.initial_positions.output.initial_positions[-1]
+        g.recenter.broadcast.default.centroid_positions = gp.initial_positions.output.initial_positions[-1]
+        g.recenter.direct.default.centroid_forces = gp.initial_forces.output.zeros[-1]
+
+        g.recenter.direct.all_centroid_positions = gp.reparameterize.output.centroids_pos_list[-1]
+        g.recenter.broadcast.centroid_positions = gp.reparameterize.output.centroids_pos_list[-1]
+        g.recenter.broadcast.centroid_forces = gp.calc_static_centroids.output.forces[-1]
+        g.recenter.broadcast.positions = gp.reflect_atoms.output.positions[-1]
+        g.recenter.broadcast.forces = gp.calc_static_images.output.forces[-1]
+        g.recenter.direct.cell = ip.structure_initial.cell.array
+        g.recenter.direct.pbc = ip.structure_initial.pbc
+
+        self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
+
+    def get_output(self):
+        gp = Pointer(self.graph)
+        return {
+            'energy_pot': ~gp.calc_static_centroids.output.energy_pot[-1],
+            'positions': ~gp.reparameterize.output.centroids_pos_list[-1],
+            'forces': ~gp.calc_static_centroids.output.forces[-1]
+        }
+
+    def _get_energies(self, frame=None):
+        if frame is None:
+            return self.graph.calc_static_centroids.output.energy_pot[-1]
+        else:
+            return self.graph.calc_static_centroids.archive.output.energy_pot.data[frame]
+
+    def plot_string(self, ax=None, frame=None, plot_kwargs=None):
+        if ax is None:
+            _, ax = plt.subplots()
+        if plot_kwargs is None:
+            plot_kwargs = {}
+        if 'marker' not in plot_kwargs.keys():
+            plot_kwargs = {'marker': 'o'}
+        energies = np.array(self._get_energies(frame=frame))
+        ax.plot(energies - energies[0], **plot_kwargs)
+        ax.set_ylabel("Energy")
+        ax.set_xlabel("Centroid")
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+        return ax
+
+    def get_forward_barrier(self, frame=None):
+        """
+        Get the energy barrier from the 0th image to the highest energy (saddle state).
+        """
+        energies = self._get_energies(frame=frame)
+        return np.amax(energies) - energies[0]
+
+    def get_reverse_barrier(self, frame=None):
+        """
+        Get the energy barrier from the final image to the highest energy (saddle state).
+        """
+        energies = self._get_energies(frame=frame)
+        return np.amax(energies) - energies[-1]
+
+    def get_barrier(self, frame=None):
+        return self.get_forward_barrier(frame=frame)
+
+
+class ProtocolFTSEvolution(Protocol, FTSEvolution, ABC):
+    pass
+
+
+class ConstrainedMD(CompoundVertex):
+    """
+    A sub-protocol for FTSEvolutionParallel for the evolution of each image. This sub-protocol is
+        executed in parallel over multiple cores using ParallelList.
+
+    NOTE: Presently for use only with Finite Temperature String (FTS) related protocols.
+
+    """
+    # DefaultWhitelist = {
+    # }
+
+    def define_vertices(self):
+        # Graph components
+        g = self.graph
+        g.check_steps = IsGEq()
+        g.verlet_positions = VerletPositionUpdate()
+        g.reflect_string = StringReflect()
+        g.reflect_atoms = SphereReflectionPerAtom()
+        g.calc_static = ExternalHamiltonian()
+        g.verlet_velocities = VerletVelocityUpdate()
+        g.running_average_pos = PositionsRunningAverage()
+        g.clock = Counter()
+
+    def define_execution_flow(self):
+        # Execution flow
+        g = self.graph
+        g.make_pipeline(
+            g.check_steps, 'false',
+            g.verlet_positions,
+            g.reflect_string,
+            g.reflect_atoms,
+            g.calc_static,
+            g.verlet_velocities,
+            g.running_average_pos,
+            g.clock,
+            g.check_steps,
+        )
+        g.starting_vertex = g.check_steps
+        g.restarting_vertex = g.check_steps
+
+    def define_information_flow(self):
+        # Data flow
+        g = self.graph
+        gp = Pointer(self.graph)
+        ip = Pointer(self.input)
+
+        # check_steps
+        g.check_steps.input.target = gp.clock.output.n_counts[-1]
+        g.check_steps.input.threshold = ip.n_steps
+
+        # verlet_positions
+        g.verlet_positions.input.default.positions = ip.positions
+        g.verlet_positions.input.default.velocities = ip.velocities
+        g.verlet_positions.input.default.forces = ip.forces
+
+        g.verlet_positions.input.positions = gp.reflect_atoms.output.positions[-1]
+        g.verlet_positions.input.velocities = gp.verlet_velocities.output.velocities[-1]
+        g.verlet_positions.input.forces = gp.calc_static.output.forces[-1]
+        g.verlet_positions.input.masses = ip.structure.get_masses
+        g.verlet_positions.input.time_step = ip.time_step
+        g.verlet_positions.input.temperature = ip.temperature
+        g.verlet_positions.input.temperature_damping_timescale = ip.temperature_damping_timescale
+
+        # reflect_string
+        g.reflect_string.input.default.previous_positions = ip.positions
+        g.reflect_string.input.default.previous_velocities = ip.velocities
+
+        g.reflect_string.input.all_centroid_positions = ip.all_centroid_positions
+        g.reflect_string.input.centroid_positions = ip.centroid_positions
+        g.reflect_string.input.positions = gp.verlet_positions.output.positions[-1]
+        g.reflect_string.input.velocities = gp.verlet_positions.output.velocities[-1]
+        g.reflect_string.input.previous_positions = gp.reflect_atoms.output.positions[-1]
+        g.reflect_string.input.previous_velocities = gp.reflect_atoms.output.velocities[-1]
+        g.reflect_string.input.pbc = ip.structure.pbc
+        g.reflect_string.input.cell = ip.structure.cell.array
+
+        # reflect_atoms
+        g.reflect_atoms.input.default.previous_positions = ip.positions
+        g.reflect_atoms.input.default.previous_velocities = ip.velocities
+        g.reflect_atoms.input.default.total_steps = ip.total_steps
+
+        g.reflect_atoms.input.reference_positions = ip.centroid_positions
+        g.reflect_atoms.input.positions = gp.reflect_string.output.positions[-1]
+        g.reflect_atoms.input.velocities = gp.reflect_string.output.velocities[-1]
+        g.reflect_atoms.input.previous_positions = gp.reflect_atoms.output.positions[-1]
+        g.reflect_atoms.input.previous_velocities = gp.reflect_atoms.output.velocities[-1]
+        g.reflect_atoms.input.pbc = ip.structure.pbc
+        g.reflect_atoms.input.cell = ip.structure.cell.array
+        g.reflect_atoms.input.cutoff_distance = ip.cutoff_distance
+        g.reflect_atoms.input.use_reflection = ip.use_reflection
+        g.reflect_atoms.input.total_steps = gp.reflect_atoms.output.total_steps[-1]
+
+        # calc_static
+        g.calc_static.input.structure = ip.structure
+        g.calc_static.input.project_path = ip.project_path
+        g.calc_static.input.job_name = ip.job_name
+        g.calc_static.input.positions = gp.reflect_atoms.output.positions[-1]
+
+        # verlet_velocities
+        g.verlet_velocities.input.velocities = gp.reflect_atoms.output.velocities[-1]
+        g.verlet_velocities.input.forces = gp.calc_static.output.forces[-1]
+        g.verlet_velocities.input.masses = ip.structure.get_masses
+        g.verlet_velocities.input.time_step = ip.time_step
+        g.verlet_velocities.input.temperature = ip.temperature
+        g.verlet_velocities.input.temperature_damping_timescale = ip.temperature_damping_timescale
+
+        # running_average_positions
+        g.running_average_pos.input.default.thermalization_steps = ip.thermalization_steps
+        g.running_average_pos.input.default.total_steps = ip.total_steps
+        g.running_average_pos.input.default.divisor = ip.divisor
+        g.running_average_pos.input.default.running_average_positions = ip.running_average_positions
+
+        g.running_average_pos.input.total_steps = gp.running_average_pos.output.total_steps[-1]
+        g.running_average_pos.input.divisor = gp.running_average_pos.output.divisor[-1]
+        g.running_average_pos.input.running_average_positions = \
+            gp.running_average_pos.output.running_average_positions[-1]
+        g.running_average_pos.input.positions = gp.reflect_atoms.output.positions[-1]
+        g.running_average_pos.input.cell = ip.structure.cell.array
+        g.running_average_pos.input.pbc = ip.structure.pbc
+
+        self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
+
+    def get_output(self):
+        gp = Pointer(self.graph)
+        return {
+            'positions': ~gp.reflect_atoms.output.positions[-1],
+            'velocities': ~gp.verlet_velocities.output.velocities[-1],
+            'forces': ~gp.calc_static.output.forces[-1],
+            'running_average_positions': ~gp.running_average_pos.output.running_average_positions[-1],
+            'divisor': ~gp.running_average_pos.output.divisor[-1],
+            'total_steps': ~gp.running_average_pos.output.total_steps[-1],
+            'clock': ~gp.clock.output.n_counts[-1]
+        }
+
+
+class FTSEvolutionParallel(FTSEvolution):
+    """
+    A version of FTSEvolution where the evolution of each image is executed in parallel, thus giving a
+        substantial speed-up.
+
+    """
+
+    def __init__(self, **kwargs):
+        super(FTSEvolutionParallel, self).__init__(**kwargs)
+
+        id_ = self.input.default
+        # Default values
+        # The remainder of the default values are inherited from HarmonicTILD
+        id_.sleep_time = 0  # A delay for database access of results. For sqlite, a non-zero delay maybe required.
+
+    def define_vertices(self):
+        # Graph components
+        g = self.graph
+        ip = Pointer(self.input)
+        g.create_centroids = CreateJob()
+        g.initial_positions = InitialPositions()
+        g.initial_forces = Zeros()
+        g.initial_velocities = SerialList(RandomVelocity)
+        g.cutoff = CutoffDistance()
+        g.check_steps = IsGEq()
+        g.remove_images = RemoveJob()
+        g.create_images = CreateJob()
+        g.constrained_evo = ParallelList(ConstrainedMD, sleep_time=ip.sleep_time)
+        g.check_thermalized = IsGEq()
+        g.mix = CentroidsRunningAverageMix()
+        g.smooth = CentroidsSmoothing()
+        g.reparameterize = CentroidsReparameterization()
+        g.calc_static_centroids = SerialList(ExternalHamiltonian)
+        g.recenter = SerialList(StringRecenter)
+        g.clock = Counter()
+
+    def define_execution_flow(self):
+        # Execution flow
+        g = self.graph
+        g.make_pipeline(
+            g.create_centroids,
+            g.initial_positions,
+            g.initial_forces,
+            g.initial_velocities,
+            g.cutoff,
+            g.check_steps, 'false',
+            g.remove_images,
+            g.create_images,
+            g.constrained_evo,
+            g.clock,
+            g.check_thermalized, 'true',
+            g.mix,
+            g.smooth,
+            g.reparameterize,
+            g.calc_static_centroids,
+            g.recenter,
+            g.check_steps
+        )
+        g.make_edge(g.check_thermalized, g.check_steps, 'false')
+        g.starting_vertex = g.create_centroids
+        g.restarting_vertex = g.check_steps
+
+    def define_information_flow(self):
+        # Data flow
+        g = self.graph
+        gp = Pointer(self.graph)
+        ip = Pointer(self.input)
+
+        # create_centroids
+        g.create_centroids.input.n_images = ip.n_images
+        g.create_centroids.input.ref_job_full_path = ip.ref_job_full_path
+        g.create_centroids.input.structure = ip.structure_initial
+
+        # initial_positions
+        g.initial_positions.input.structure_initial = ip.structure_initial
+        g.initial_positions.input.structure_final = ip.structure_final
+        g.initial_positions.input.initial_positions = ip.initial_positions
+        g.initial_positions.input.n_images = ip.n_images
+
+        # initial_forces
+        g.initial_forces.input.shape = ip.structure_initial.positions.shape
+
+        # initial_velocities
+        g.initial_velocities.input.n_children = ip.n_images
+        g.initial_velocities.direct.temperature = ip.temperature
+        g.initial_velocities.direct.masses = ip.structure_initial.get_masses
+        g.initial_velocities.direct.overheat_fraction = ip.overheat_fraction
+
+        # cutoff
+        g.cutoff.input.structure = ip.structure_initial
+        g.cutoff.input.cutoff_factor = ip.cutoff_factor
+
+        # check_steps
+        g.check_steps.input.target = gp.clock.output.n_counts[-1]
+        g.check_steps.input.threshold = ip.n_steps
+
+        # remove_images
+        g.remove_images.input.default.project_path = ip.project_path
+        g.remove_images.input.default.job_names = ip.job_name
+
+        g.remove_images.input.project_path = gp.create_images.output.project_path[-1][-1]
+        g.remove_images.input.job_names = gp.create_images.output.job_names[-1]
+
+        # create_images
+        g.create_images.input.n_images = ip.n_images
+        g.create_images.input.ref_job_full_path = ip.ref_job_full_path
+        g.create_images.input.structure = ip.structure_initial
+
+        # constrained_evolution - initiailze
+        g.constrained_evo.input.n_children = ip.n_images
+
+        # constrained_evolution - verlet_positions
+        g.constrained_evo.direct.structure = ip.structure_initial
+        g.constrained_evo.direct.time_step = ip.time_step
+        g.constrained_evo.direct.temperature = ip.temperature
+        g.constrained_evo.direct.temperature_damping_timescale = ip.temperature_damping_timescale
+
+        g.constrained_evo.broadcast.default.positions = gp.initial_positions.output.initial_positions[-1]
+        g.constrained_evo.broadcast.default.velocities = gp.initial_velocities.output.velocities[-1]
+        g.constrained_evo.direct.default.forces = gp.initial_forces.output.zeros[-1]
+
+        g.constrained_evo.broadcast.positions = gp.recenter.output.positions[-1]
+        g.constrained_evo.broadcast.velocities = gp.constrained_evo.output.velocities[-1]
+        g.constrained_evo.broadcast.forces = gp.recenter.output.forces[-1]
+
+        # constrained_evolution - reflect_string
+        g.constrained_evo.direct.default.all_centroid_positions = gp.initial_positions.output.initial_positions[-1]
+        g.constrained_evo.broadcast.default.centroid_positions = gp.initial_positions.output.initial_positions[-1]
+
+        g.constrained_evo.direct.all_centroid_positions = gp.reparameterize.output.centroids_pos_list[-1]
+        g.constrained_evo.broadcast.centroid_positions = gp.reparameterize.output.centroids_pos_list[-1]
+
+        # constrained_evolution - reflect_atoms
+        g.constrained_evo.direct.default.total_steps = ip.total_steps
+        g.constrained_evo.broadcast.total_steps = gp.constrained_evo.output.total_steps[-1]
+        g.constrained_evo.direct.cutoff_distance = gp.cutoff.output.cutoff_distance[-1]
+
+        # constrained_evolution - calc_static
+        g.constrained_evo.broadcast.project_path = gp.create_images.output.project_path[-1]
+        g.constrained_evo.broadcast.job_name = gp.create_images.output.job_names[-1]
+
+        # constrained_evolution - verlet_velocities
+        # takes inputs already specified in verlet_positions
+
+        # constrained_evolution - running_average_positions
+        g.constrained_evo.direct.default.thermalization_steps = ip.thermalization_steps
+        g.constrained_evo.direct.default.divisor = ip.divisor
+        g.constrained_evo.broadcast.default.running_average_positions = \
+            gp.initial_positions.output.initial_positions[-1]
+
+        g.constrained_evo.broadcast.divisor = gp.constrained_evo.output.divisor[-1]
+        g.constrained_evo.broadcast.running_average_positions = \
+            gp.constrained_evo.output.running_average_positions[-1]
+
+        # constrained_evolution - clock
+        g.constrained_evo.direct.n_steps = ip.sampling_period
+
+        # clock
+        g.clock.input.add_counts = ip.sampling_period
+
+        # check_thermalized
+        g.check_thermalized.input.target = gp.constrained_evo.output.total_steps[-1][-1]
+        g.check_thermalized.input.threshold = ip.thermalization_steps
+
+        # mix
+        g.mix.input.default.centroids_pos_list = gp.initial_positions.output.initial_positions[-1]
+        g.mix.input.centroids_pos_list = gp.reparameterize.output.centroids_pos_list[-1]
+        g.mix.input.mixing_fraction = ip.mixing_fraction
+        g.mix.input.running_average_positions = gp.constrained_evo.output.running_average_positions[-1]
+        g.mix.input.cell = ip.structure_initial.cell.array
+        g.mix.input.pbc = ip.structure_initial.pbc
+
+        # smooth
+        g.smooth.input.kappa = ip.nominal_smoothing
+        g.smooth.input.dtau = ip.mixing_fraction
+        g.smooth.input.cell = ip.structure_initial.cell.array
+        g.smooth.input.pbc = ip.structure_initial.pbc
+        g.smooth.input.smooth_style = ip.smooth_style
+        g.smooth.input.centroids_pos_list = gp.mix.output.centroids_pos_list[-1]
+
+        # reparameterize
+        g.reparameterize.input.centroids_pos_list = gp.smooth.output.centroids_pos_list[-1]
+        g.reparameterize.input.cell = ip.structure_initial.cell.array
+        g.reparameterize.input.pbc = ip.structure_initial.pbc
+
+        # calc_static_centroids
+        g.calc_static_centroids.input.n_children = ip.n_images
+        g.calc_static_centroids.direct.structure = ip.structure_initial
+        g.calc_static_centroids.broadcast.project_path = gp.create_centroids.output.project_path[-1]
+        g.calc_static_centroids.broadcast.job_name = gp.create_centroids.output.job_names[-1]
+        g.calc_static_centroids.broadcast.positions = gp.reparameterize.output.centroids_pos_list[-1]
+
+        # recenter
+        g.recenter.input.n_children = ip.n_images
+        g.recenter.direct.default.all_centroid_positions = gp.initial_positions.output.initial_positions[-1]
+        g.recenter.broadcast.default.centroid_positions = gp.initial_positions.output.initial_positions[-1]
+        g.recenter.broadcast.default.centroid_forces = gp.initial_forces.output.zeros[-1]
+
+        g.recenter.direct.all_centroid_positions = gp.reparameterize.output.centroids_pos_list[-1]
+        g.recenter.broadcast.centroid_positions = gp.reparameterize.output.centroids_pos_list[-1]
+        g.recenter.broadcast.centroid_forces = gp.calc_static_centroids.output.forces[-1]
+        g.recenter.broadcast.positions = gp.constrained_evo.output.positions[-1]
+        g.recenter.broadcast.forces = gp.constrained_evo.output.forces[-1]
+        g.recenter.direct.cell = ip.structure_initial.cell.array
+        g.recenter.direct.pbc = ip.structure_initial.pbc
+
+        self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
+
+
+class ProtocolFTSEvolutionParallel(Protocol, FTSEvolutionParallel, ABC):
+    pass

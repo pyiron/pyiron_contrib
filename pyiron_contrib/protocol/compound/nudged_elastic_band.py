@@ -4,18 +4,22 @@
 
 from __future__ import print_function
 
-from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
-from pyiron_contrib.protocol.primitive.one_state import Counter, CreateJob, ExternalHamiltonian, GradientDescent, \
-    NEBForces, InitialPositions
-from pyiron_contrib.protocol.primitive.two_state import IsGEq
-from pyiron_contrib.protocol.list import SerialList, ParallelList, AutoList
-from pyiron_contrib.protocol.utils import Pointer
+from abc import ABC
+
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
+from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
+from pyiron_contrib.protocol.primitive.one_state import Counter, CreateJob, ExternalHamiltonian, GradientDescent, \
+    InitialPositions, NEBForces
+from pyiron_contrib.protocol.primitive.two_state import IsGEq
+from pyiron_contrib.protocol.list import SerialList, ParallelList, AutoList
+from pyiron_contrib.protocol.utils import Pointer
+
 """
-Protocol for nudged elastic band minimization.
+Protocol for nudged elastic band (NEB) minimization.
+
 """
 
 __author__ = "Liam Huber, Raynol Dsouza, Jan Janssen"
@@ -35,7 +39,7 @@ class NEB(CompoundVertex):
     Input dictionary:
         ref_job_full_path (str): Path to the pyiron job to use for evaluating forces and energies.
         structure_initial (Atoms): The starting structure for the elastic band.
-        structure_final (Atoms): The final structure for the elastic band. Warning: must have the same numper and
+        structure_final (Atoms): The final structure for the elastic band. Warning: must have the same number and
             species of atoms, cell, and periodic boundary conditions as the initial structure.
         n_images (int): How many images create by interpolating between the two structures.
         n_steps (int): How many steps to run for. (Default is 100.)
@@ -45,26 +49,29 @@ class NEB(CompoundVertex):
             (Default is 'upwinding'.)
         use_climbing_image (bool): Whether to replace the force with one that climbs along the tangent direction for
             the job with the highest energy. (Default is True.)
-        smoothing (float): Strength of the smoothing spring when consecutive images form an angle. (Default is None, do
-            not apply such a force.)
+        smoothing (float): Strength of the smoothing spring when consecutive images form an angle. (Default is None,
+            do not apply such a force.)
         gamma0 (float): Initial step size as a multiple of the force. (Default is 0.1.)
-        fix_com (bool): Whether the center of mass motion should be subtracted off of the position update. (Default is
-            True)
+        fix_com (bool): Whether the center of mass motion should be subtracted off of the position update. (Default
+            is True)
         use_adagrad (bool): Whether to have the step size decay according to adagrad. (Default is False)
 
     Output dictionary:
         energy_pot (list[float]): Total potential energy of the system in eV.
-        positions_list (list[numpy.ndarray]): Atomic positions in angstroms for each image.
-        forces_list (list[numpy.ndarray]): Atomic forces in eV/angstrom for each image, including spring forces.
+        positions (list[numpy.ndarray]): Atomic positions in angstroms for each image.
+        forces (list[numpy.ndarray]): Atomic forces in eV/angstrom for each image, including spring forces.
+
     """
 
-    DefaultWhitelist = {
-        'calc_static': {
-            'output': {
-                'energy_pot': 1,
-            },
-        },
-    }
+    # DefaultWhitelist sets the output which will be stored every `archive period' in the final hdf5 file.
+
+    # DefaultWhitelist = {
+    #     'calc_static': {
+    #         'output': {
+    #             'energy_pot': 1,
+    #         },
+    #     },
+    # }
 
     def __init__(self, **kwargs):
         super(NEB, self).__init__(**kwargs)
@@ -73,17 +80,13 @@ class NEB(CompoundVertex):
         id_ = self.input.default
         id_.n_steps = 100
         id_.f_tol = 1e-4
-
         id_.spring_constant = 1.
         id_.tangent_style = 'upwinding'
         id_.use_climbing_image = True
         id_.smoothing = None
-
         id_.gamma0 = 0.1
         id_.fix_com = True
         id_.use_adagrad = False
-
-        id_.sleep_time = 0
 
     def define_vertices(self):
         # Graph components
@@ -118,29 +121,34 @@ class NEB(CompoundVertex):
         gp = Pointer(self.graph)
         ip = Pointer(self.input)
 
+        # initialize_jobs
         g.initialize_jobs.input.n_images = ip.n_images
         g.initialize_jobs.input.ref_job_full_path = ip.ref_job_full_path
         g.initialize_jobs.input.structure = ip.structure_initial
 
+        # interpolate_images
         g.interpolate_images.input.structure_initial = ip.structure_initial
         g.interpolate_images.input.structure_final = ip.structure_final
         g.interpolate_images.input.n_images = ip.n_images
 
+        # check_steps
         g.check_steps.input.target = gp.clock.output.n_counts[-1]
         g.check_steps.input.threshold = ip.n_steps
 
+        # calc_static
         g.calc_static.input.n_children = ip.n_images
         g.calc_static.direct.structure = ip.structure_initial
-
-        g.calc_static.broadcast.job_name = gp.initialize_jobs.output.job_names[-1]
         g.calc_static.broadcast.project_path = gp.initialize_jobs.output.project_path[-1]
+        g.calc_static.broadcast.job_name = gp.initialize_jobs.output.job_names[-1]
         g.calc_static.broadcast.default.positions = gp.interpolate_images.output.initial_positions[-1]
         g.calc_static.broadcast.positions = gp.gradient_descent.output.positions[-1]
 
-        g.neb_forces.input.default.positions_list = gp.interpolate_images.output.initial_positions[-1]
-        g.neb_forces.input.positions_list = gp.gradient_descent.output.positions[-1]
+        # neb_forces
+        g.neb_forces.input.default.positions = gp.interpolate_images.output.initial_positions[-1]
+
+        g.neb_forces.input.positions = gp.gradient_descent.output.positions[-1]
         g.neb_forces.input.energies = gp.calc_static.output.energy_pot[-1]
-        g.neb_forces.input.forces_list = gp.calc_static.output.forces[-1]
+        g.neb_forces.input.forces = gp.calc_static.output.forces[-1]
         g.neb_forces.input.cell = ip.structure_initial.cell.array
         g.neb_forces.input.pbc = ip.structure_initial.pbc
         g.neb_forces.input.spring_constant = ip.spring_constant
@@ -148,10 +156,12 @@ class NEB(CompoundVertex):
         g.neb_forces.input.use_climbing_image = ip.use_climbing_image
         g.neb_forces.input.smoothing = ip.smoothing
 
+        # gradient_descent
         g.gradient_descent.input.n_children = ip.n_images
         g.gradient_descent.broadcast.default.positions = gp.interpolate_images.output.initial_positions[-1]
+
         g.gradient_descent.broadcast.positions = gp.gradient_descent.output.positions[-1]
-        g.gradient_descent.broadcast.forces = gp.neb_forces.output.forces_list[-1]
+        g.gradient_descent.broadcast.forces = gp.neb_forces.output.forces[-1]
         g.gradient_descent.direct.masses = ip.structure_initial.get_masses
         g.gradient_descent.direct.gamma0 = ip.gamma0
         g.gradient_descent.direct.fix_com = ip.fix_com
@@ -163,8 +173,8 @@ class NEB(CompoundVertex):
         gp = Pointer(self.graph)
         return {
             'energy_pot': ~gp.calc_static.output.energy_pot[-1],
-            'positions_list': ~gp.gradient_descent.output.positions[-1],
-            'forces_list': ~gp.neb_forces.output.forces_list[-1]
+            'positions': ~gp.gradient_descent.output.positions[-1],
+            'forces': ~gp.neb_forces.output.forces[-1]
         }
 
     def _get_energies(self, frame=None):
@@ -205,47 +215,5 @@ class NEB(CompoundVertex):
         return self.get_forward_barrier(frame=frame)
 
 
-class ProtoNEB(Protocol, NEB):
-    pass
-
-
-class NEBSerial(NEB):
-    """
-    The same as the NEB protocol, but ensures that the force/energy calls are treated in series.
-    """
-
-    def define_vertices(self):
-        # Graph components
-        g = self.graph
-        g.initial_positions = InitialPositions()
-        g.check_steps = IsGEq()
-        g.calc_static = SerialList(ExternalHamiltonian)  # Enforce serial
-        g.neb_forces = NEBForces()
-        g.gradient_descent = SerialList(GradientDescent)
-        g.clock = Counter()
-
-
-class NEBParallel(NEB):
-    """
-    The same as the NEB protocol, but ensures that the force/energy calls are treated in parallel.
-    """
-
-    def define_vertices(self):
-        # Graph components
-        g = self.graph
-        ip = Pointer(self.input)
-        g.initialize_jobs = CreateJob()
-        g.interpolate_images = InitialPositions()
-        g.check_steps = IsGEq()
-        g.calc_static = ParallelList(ExternalHamiltonian, sleep_time=ip.sleep_time)  # Enforce parallel
-        g.neb_forces = NEBForces()
-        g.gradient_descent = SerialList(GradientDescent)
-        g.clock = Counter()
-
-    def parallel_setup(self):
-        super(NEBParallel, self).parallel_setup()
-        self.graph.calc_static.parallel_setup()
-
-
-class ProtoNEBParallel(Protocol, NEBParallel):
+class ProtocolNEB(Protocol, NEB, ABC):
     pass

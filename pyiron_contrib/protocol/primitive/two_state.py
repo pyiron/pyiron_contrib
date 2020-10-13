@@ -81,3 +81,26 @@ class ModIsZero(BoolVertex):
             self.vertex_state = "true"
         else:
             self.vertex_state = "false"
+
+
+class ExitProtocol(BoolVertex):
+    """
+
+    """
+
+    def command(self, vertices):
+        bool_list = []
+        for i in vertices:
+            if i == "true":
+                bool_list.append(1)
+            else:
+                bool_list.append(0)
+
+        if np.any(bool_list):
+            if bool_list[0]:
+                print('Maximum steps reached')
+            elif bool_list[1]:
+                print('Convergence reached')
+            self.vertex_state = "true"
+        else:
+            self.vertex_state = "false"

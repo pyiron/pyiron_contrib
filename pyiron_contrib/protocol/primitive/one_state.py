@@ -51,6 +51,8 @@ class BuildMixingPairs(PrimitiveVertex):
         Exactly one of `n_lambdas` or `lambdas` must be provided.
     Output attributes:
         lambda_pairs (numpy.ndarray): The (`n_lambdas`, 2)-shaped array of mixing pairs.
+        delta_lambdas (list/numpy.ndarray): The delta between each consecutive lambda pair. The end deltas are
+            halved.
     """
 
     def __init__(self, name=None):
@@ -59,13 +61,21 @@ class BuildMixingPairs(PrimitiveVertex):
         self.input.default.custom_lambdas = None
 
     def command(self, n_lambdas, custom_lambdas):
+
         if custom_lambdas is not None:
             lambdas = np.array(custom_lambdas)
         else:
             lambdas = np.linspace(0, 1, num=n_lambdas)
+
+        lambda_pairs = np.array([lambdas, 1 - lambdas]).T
+        delta_lambdas = np.gradient(lambdas)
+        delta_lambdas[0] = delta_lambdas[0] / 2
+        delta_lambdas[-1] = delta_lambdas[-1] / 2
+
         return {
-            'lambda_pairs': np.array([lambdas, 1 - lambdas]).T
-        }
+                'lambda_pairs': lambda_pairs,
+                'delta_lambdas': delta_lambdas
+            }
 
 
 class Counter(PrimitiveVertex):
@@ -279,6 +289,7 @@ class ExternalHamiltonian(PrimitiveVertex):
 
 class CreateJob(PrimitiveVertex):
     """
+    TODO: This vertex is the same as _initialize() from ExternalHamiltonian. Needs refactoring.
     """
 
     def __init__(self, name=None):
@@ -292,6 +303,8 @@ class CreateJob(PrimitiveVertex):
         project_path, ref_job_path = split(ref_job_full_path)
         pr = Project(path=project_path)
         ref_job = pr.load(ref_job_path)
+        self.job_names = []
+        self.project_path = []
         for i in np.arange(n_images):
             name = loc + '_' + str(i)
             job = ref_job.copy_to(
@@ -324,6 +337,39 @@ class CreateJob(PrimitiveVertex):
         return {
             'job_names': self.job_names,
             'project_path': self.project_path
+        }
+
+
+class MinimizeReferenceJob(PrimitiveVertex):
+    """
+    TODO: Part of this vertex is the same as _initialize() from ExternalHamiltonian. Needs refactoring.
+    """
+
+    def __init__(self, name=None):
+        super(MinimizeReferenceJob, self).__init__(name=name)
+        self.pressure = None
+
+    def command(self, ref_job_full_path, structure):
+        project_path, ref_job_path = split(ref_job_full_path)
+        pr = Project(path=project_path)
+        ref_job = pr.load(ref_job_path)
+        name = 'minimize_ref_job'
+        job = ref_job.copy_to(
+            project=pr,
+            new_job_name=name,
+            input_only=True,
+            new_database_entry=True
+        )
+
+        if structure is not None:
+            job.structure = structure
+
+        job.calc_minimize(pressure=self.pressure)
+        job.run()
+
+        return {
+            'energy_pot': job.output.energy_pot[-1],
+            'forces': job.output.forces[-1]
         }
 
 
@@ -423,11 +469,15 @@ class HarmonicHamiltonian(PrimitiveVertex):
     """
     """
 
-    def command(self, positions, home_positions, cell, pbc, spring_constant=None, force_constants=None,
+    def __init__(self, name=None):
+        super(HarmonicHamiltonian, self).__init__(name=name)
+        self.input.default.spring_constant = 1.0
+
+    def command(self, positions, reference_positions, cell, pbc, spring_constant, force_constants=None,
                 mask=None, zero_k_energy=None):
 
-        dr = find_mic(positions - home_positions, cell, pbc)[0]
-        if spring_constant is not None and force_constants is None:
+        dr = find_mic(positions - reference_positions, cell, pbc)[0]
+        if force_constants is None:
             forces = -spring_constant * dr
             if mask is not None:
                 energy = 0.5 * np.dot(-forces[mask], dr[mask])
@@ -435,7 +485,7 @@ class HarmonicHamiltonian(PrimitiveVertex):
             else:
                 energy = 0.5 * np.tensordot(-forces, dr)
 
-        elif force_constants is not None and spring_constant is None:
+        elif force_constants is not None:
             transformed_force_constants = self.transform_force_constants(force_constants)
             transformed_displacements = self.transform_displacements(dr)
             transformed_forces = -np.dot(transformed_force_constants, transformed_displacements)
@@ -596,11 +646,11 @@ class NEBForces(PrimitiveVertex):
     Note:
         All images must use the same cell and contain the same number of atoms.
     Input attributes:
-        positions_list (list/numpy.ndarray): The positions of the images. Each element should have the same shape, and
+        positions (list/numpy.ndarray): The positions of the images. Each element should have the same shape, and
             the order of the images is relevant!
         energies (list/numpy.ndarray): The potential energies associated with each set of positions. (Not always
             needed.)
-        force_list (list/numpy.ndarray): The forces from the underlying energy landscape on which the NEB is being run.
+        force (list/numpy.ndarray): The forces from the underlying energy landscape on which the NEB is being run.
             Must have the same shape as `positions_list`. (Not always needed.)
         cell (numpy.ndarray): The cell matrix the positions live in. All positions must share the same cell.
         pbc (list/numpy.ndarray): Three bools declaring the presence of periodic boundary conditions along the three
@@ -626,23 +676,23 @@ class NEBForces(PrimitiveVertex):
         self.input.default.use_climbing_image = True
         self.input.default.smoothing = None
 
-    def command(self, positions_list, energies, forces_list, cell, pbc,
+    def command(self, positions, energies, forces, cell, pbc,
                 spring_constant, tangent_style, smoothing, use_climbing_image):
         if use_climbing_image:
             climbing_image_index = np.argmax(energies)
         else:
             climbing_image_index = None
 
-        n_images = len(positions_list)
+        n_images = len(positions)
         neb_forces = []
-        for i, pos in enumerate(positions_list):
+        for i, pos in enumerate(positions):
             if i == 0 or i == n_images - 1:
                 neb_forces.append(np.zeros(pos.shape))
                 continue
 
             # Otherwise calculate the spring forces
-            pos_left = positions_list[i - 1]
-            pos_right = positions_list[i + 1]
+            pos_left = positions[i - 1]
+            pos_right = positions[i + 1]
 
             # Get displacement to adjacent images
             dr_left = find_mic(pos - pos_left, cell, pbc)[0]
@@ -673,7 +723,7 @@ class NEBForces(PrimitiveVertex):
                 force_smoothing = 0
 
             # Decompose the original forces
-            input_force = forces_list[i]
+            input_force = forces[i]
             input_force_parallel = np.sum(input_force * tau) * tau
             input_force_perpendicular = input_force - input_force_parallel
 
@@ -687,7 +737,7 @@ class NEBForces(PrimitiveVertex):
                 neb_forces.append(input_force_perpendicular + force_spring + force_smoothing)
 
         return {
-            'forces_list': neb_forces
+            'forces': neb_forces
         }
 
     def _get_upwinding_tau(self, tau_left, tau_right, en_left, en, en_right):
@@ -777,7 +827,7 @@ class Overwrite(PrimitiveVertex):
 class RandomVelocity(PrimitiveVertex):
     """
     Generates a set of random velocities which (on average) have give the requested temperature.
-    Hard-coded for 3D systems.
+        Hard-coded for 3D systems.
     Input attributes:
         temperature (float): The temperature of the velocities (in Kelvin).
         masses (numpy.ndarray/list): The masses of the atoms.
@@ -834,14 +884,15 @@ class SphereReflection(PrimitiveVertex):
 
     def __init__(self, name=None):
         super(SphereReflection, self).__init__(name=name)
-        self.input.default.atom_reflect_switch = True
+        self.input.default.use_reflection = True
 
-    def command(self, reference_positions, cutoff_distance, positions, velocities, previous_positions,
-                previous_velocities, pbc, cell, atom_reflect_switch):
-        distance = np.linalg.norm(find_mic(reference_positions - positions, cell=cell, pbc=pbc)[0], axis=-1)
+    def command(self, reference_positions, positions, velocities, previous_positions, previous_velocities,
+                pbc, cell, cutoff_distance, use_reflection):
+
+        distance = find_mic(reference_positions - positions, cell=cell, pbc=pbc)[1]
         is_at_home = (distance < cutoff_distance)[:, np.newaxis]
 
-        if np.all(is_at_home) or atom_reflect_switch is False:
+        if np.all(is_at_home) or use_reflection is False:
             return {
                 'positions': positions,
                 'velocities': velocities,
@@ -878,17 +929,27 @@ class SphereReflectionPerAtom(PrimitiveVertex):
 
     def __init__(self, name=None):
         super(SphereReflectionPerAtom, self).__init__(name=name)
+        id = self.input.default
+        id.use_reflection = True
+        id.total_steps = 0
 
-    def command(self, reference_positions, cutoff_distance, positions, velocities, previous_positions,
-                previous_velocities, pbc, cell):
-        distance = np.linalg.norm(find_mic(reference_positions - positions, cell=cell, pbc=pbc)[0], axis=-1)
-        is_at_home = (distance < cutoff_distance)[:, np.newaxis]
-        is_away = 1 - is_at_home
+    def command(self, reference_positions, positions, velocities, previous_positions, previous_velocities,
+                pbc, cell, cutoff_distance, use_reflection, total_steps):
+
+        total_steps += 1
+        if use_reflection:
+            distance = find_mic(reference_positions - positions, cell=cell, pbc=pbc)[1]
+            is_at_home = (distance < cutoff_distance)[:, np.newaxis]
+            is_away = 1 - is_at_home
+        else:
+            is_at_home = np.ones(len(reference_positions))
+            is_away = 1 - is_at_home
 
         return {
             'positions': is_at_home * positions + is_away * previous_positions,
             'velocities': is_at_home * velocities + is_away * -previous_velocities,
-            'reflected': is_away.astype(bool).flatten()
+            'reflected': is_away.astype(bool).flatten(),
+            'total_steps': total_steps
         }
 
 
@@ -922,9 +983,9 @@ class VerletParent(PrimitiveVertex, ABC):
     Verlet.
     TODO: VerletVelocityUpdate should *always* have its velocity input wired to the velocity outupt of
           VerletPositionUpdate. This implies to me that we need some structure *other* than two fully independent
-          nodes. It would also be nice to syncronize, e.g. the thermostat and timestep input which is also the same for
-          both. However, I haven't figured out how to do that in the confines of the current graph traversal and hdf5
-          setup.
+          nodes. It would also be nice to syncronize, e.g. the thermostat and timestep input which is also the same
+          for both. However, I haven't figured out how to do that in the confines of the current graph traversal
+          and hdf5 setup.
     """
 
     def __init__(self, name=None):
@@ -1036,10 +1097,12 @@ class VerletVelocityUpdate(VerletParent):
                 velocities
             )
         kinetic_energy = 0.5 * np.sum(masses * vel_step * vel_step) / EV_TO_U_ANGSQ_PER_FSSQ
+        instant_temperature = (kinetic_energy * 2) / (3 * KB * len(velocities))
 
         return {
             'velocities': vel_step,
-            'energy_kin': kinetic_energy
+            'energy_kin': kinetic_energy,
+            'instant_temperature': instant_temperature
         }
 
 
@@ -1195,14 +1258,7 @@ class TILDPostProcess(PrimitiveVertex):
     jobs after they have been closed, once the protocol has been executed
     """
 
-    def __init__(self, name=None):
-        super(TILDPostProcess, self).__init__(name=name)
-        self.input.default.plot = True
-
-    def command(self, lambda_pairs, tild_mean, tild_std, fep_exp_mean, fep_exp_std, temperature, n_samples,
-                plot=True):
-        if plot is True:
-            self.plot_integrand(lambda_pairs, tild_mean, tild_std, n_samples)
+    def command(self, lambda_pairs, tild_mean, tild_std, fep_exp_mean, fep_exp_std, temperature, n_samples):
 
         tild_mean, tild_std = self.get_tild_free_energy(lambda_pairs, tild_mean, tild_std)
         fep_mean, fep_std = self.get_fep_free_energy(fep_exp_mean, fep_exp_std, temperature)
@@ -1216,17 +1272,6 @@ class TILDPostProcess(PrimitiveVertex):
             'fep_free_energy_se': fep_std / np.sqrt(n_samples)
 
         }
-
-    @staticmethod
-    def plot_integrand(lambda_pairs, mean, std, n_samples):
-        fig, ax = plt.subplots()
-        lambdas = lambda_pairs[:, 0]
-        thermal_average, standard_error = mean, std / np.sqrt(n_samples)
-        ax.plot(lambdas, thermal_average, marker='o')
-        ax.fill_between(lambdas, thermal_average - standard_error, thermal_average + standard_error, alpha=0.3)
-        ax.set_xlabel("Lambda")
-        ax.set_ylabel("dF/dLambda")
-        return fig, ax
 
     @staticmethod
     def get_tild_free_energy(lambda_pairs, tild_mean, tild_std):
@@ -1283,12 +1328,12 @@ class BerendsenBarostat(PrimitiveVertex):
         id.pressure_damping_timescale = 1000.
         id.time_step = 1.
         id.compressibility = 4.57e-5  # compressibility of water in bar^-1
-        id.style = 'isotropic'
+        id.pressure_style = 'isotropic'
 
     def command(self, pressure, temperature, box_pressure, energy_kin, time_step, positions,
-                pressure_damping_timescale, compressibility, structure, previous_volume, style):
+                pressure_damping_timescale, compressibility, structure, previous_volume, pressure_style):
 
-        if style != 'isotropic' and style != 'anisotropic':
+        if pressure_style != 'isotropic' and pressure_style != 'anisotropic':
             raise TypeError('style can only be \'isotropic\' or \'anisotropic\'')
 
         n_atoms = len(structure.positions)
@@ -1304,7 +1349,7 @@ class BerendsenBarostat(PrimitiveVertex):
         if pressure is None:
             new_structure = structure.copy()
             total_pressure = isotropic_pressure
-        elif pressure is not None and style == 'isotropic':
+        elif pressure is not None and pressure_style == 'isotropic':
             new_structure = structure.copy()
             new_structure.positions = positions
             first_term = ((2 * energy_kin) / (3 * previous_volume)) * EV_PER_ANGCUB_TO_GPA
@@ -1313,7 +1358,7 @@ class BerendsenBarostat(PrimitiveVertex):
             eta = 1 - (tau * (pressure - total_pressure) * GPA_TO_BAR)
             new_cell = new_structure.cell * eta
             new_structure.set_cell(new_cell, scale_atoms=True)
-        elif pressure is not None and style == 'anisotropic':
+        elif pressure is not None and pressure_style == 'anisotropic':
             new_structure = structure.copy()
             new_structure.positions = positions
             first_term = ((2 * energy_kin) / (3 * previous_volume)) * EV_PER_ANGCUB_TO_GPA
@@ -1347,58 +1392,23 @@ class FEPExponential(PrimitiveVertex):
 
     """
 
-    def command(self, u_diff, temperature, delta_lambda):
+    def command(self, u_diff, delta_lambda, temperature):
 
         return {
             'exponential_difference': np.exp(-u_diff * delta_lambda / (KB * temperature))
         }
 
 
-class AcceptanceCriterion(PrimitiveVertex):
+class CutoffDistance(PrimitiveVertex):
     """
 
     """
 
-    def __init__(self, name=None):
-        super(AcceptanceCriterion, self).__init__(name=name)
-        self.step_no = 0
-        self.total_accepted = 0
-        id = self.input.default
-        id.accepted = 1
+    def command(self, structure, cutoff_factor=0.4):
 
-    def command(self, u, positions, velocities, forces, previous_u, previous_positions, previous_velocities,
-                previous_forces, temperature, accepted):
-        # first check - Metropolis criterion
-        new_positions = positions
-        new_velocities = velocities
-        new_forces = forces
-        new_energy_pot = u
-        accepted = 1
-        if self.step_no != 0:
-            delta_u = (u - previous_u) / len(positions)
-            if delta_u < 0:
-                accepted = 1
-            elif delta_u >= 0:  # second check - Metropolis criterion
-                p = np.exp(-delta_u / (KB * temperature))
-                r = np.random.random_sample()
-                if p > r:
-                    accepted = 1
-                else:
-                    accepted = 0
-        if accepted == 0:
-            new_positions = previous_positions
-            new_velocities = -previous_velocities
-            new_forces = previous_forces
-            new_energy_pot = previous_u
-        self.step_no += 1
-        self.total_accepted += accepted
-        acceptance_rate = self.total_accepted / self.step_no
+        nn_list = structure.get_neighbors(num_neighbors=1, exclude_self=True)
+        cutoff_distance = nn_list.distances[0] * cutoff_factor
 
-        return{
-            'positions': new_positions,
-            'velocities': new_velocities,
-            'forces': new_forces,
-            'energy_pot': new_energy_pot,
-            'accepted': accepted,
-            'acceptance_rate': acceptance_rate
+        return {
+            'cutoff_distance': cutoff_distance[-1]
         }

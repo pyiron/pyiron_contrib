@@ -4,6 +4,8 @@
 
 from __future__ import print_function
 
+from abc import ABC
+
 from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
 from pyiron_contrib.protocol.primitive.one_state import Counter, ExternalHamiltonian, GradientDescent, Max, Norm
 from pyiron_contrib.protocol.primitive.two_state import IsGEq
@@ -139,5 +141,5 @@ class Minimize(CompoundVertex):
         }
 
 
-class ProtocolMinimize(Protocol, Minimize):
+class ProtocolMinimize(Protocol, Minimize, ABC):
     pass

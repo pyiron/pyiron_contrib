@@ -247,10 +247,10 @@ def _as_chemical_array(fnc):
 
 class _SQSElasticConstantsOutput:
     def __init__(self, parent):
-        self.parent = parent
+        self._parent = parent
 
     def get_elastic_output(self, key):
-        elastic_hdf = self.parent[self.parent.elastic_job_name]
+        elastic_hdf = self._parent[self._parent.elastic_job_name]
         n_structures = len(elastic_hdf['input/structures'].list_groups())
         try:
             return [
@@ -273,7 +273,7 @@ class _SQSElasticConstantsOutput:
     @lru_cache()
     def residual_pressures(self):
         """Pressures after minimization."""
-        min_hdf = self.parent[self.parent.min_job_name]
+        min_hdf = self._parent[self._parent.min_job_name]
         n_structures = len(min_hdf['input/structures'].list_groups())
         return [
             min_hdf['struct_{}/output/generic/pressures'.format(n)][-1]
@@ -283,7 +283,7 @@ class _SQSElasticConstantsOutput:
     @property
     @lru_cache()
     def structures(self):
-        min_hdf = self.parent[self.parent.min_job_name]
+        min_hdf = self._parent[self._parent.min_job_name]
         n_structures = len(min_hdf['input/structures'].list_groups())
         return [
             Atoms().from_hdf(min_hdf['struct_{}/output'.format(n)])
@@ -298,11 +298,11 @@ class _SQSElasticConstantsOutput:
     @property
     @lru_cache()
     def symbols(self):
-        return list(self.parent[self.parent.sqs_job_name]['input/custom_dict/data']['mole_fractions'].keys())
+        return list(self._parent[self._parent.sqs_job_name]['input/custom_dict/data']['mole_fractions'].keys())
 
     @property
     def chemistry(self):
-        n_atoms = len(self.parent[self.parent.min_job_name]['input/structures/s_0/positions'])
+        n_atoms = len(self._parent[self._parent.min_job_name]['input/structures/s_0/positions'])
         return {
             symbol: self._species_fraction(structure, symbol, n_atoms)
             for symbol, structure in zip(self.symbols, self.structures)

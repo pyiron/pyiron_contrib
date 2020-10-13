@@ -11,7 +11,6 @@ from pyiron.atomistics.job.sqs import SQSJob
 from pyiron_mpie.interactive.elastic import ElasticMatrixJob
 # import matplotlib.pyplot as plt
 # import seaborn as sns
-from functools import lru_cache
 
 """
 Calculate the elastic matrix for special quasi-random structures.
@@ -25,6 +24,49 @@ __maintainer__ = "Liam Huber"
 __email__ = "huber@mpie.de"
 __status__ = "development"
 __date__ = "Oct 2, 2020"
+
+
+class ChemicalArray:
+    """
+    A convenience class for wrapping arrays of SQS elastic data where the zeroth dimension spans across chemistry.
+    """
+
+    def __init__(self, data):
+        self._data = np.array(data)
+
+    @property
+    def array(self):
+        return self._data
+
+    @property
+    def mean(self):
+        return self._data.mean(axis=0)
+
+    @property
+    def std(self):
+        return self._data.std(axis=0)
+
+    @property
+    def sem(self):
+        return self._data.std(axis=0) / len(self._data)
+
+    def __repr__(self):
+        return str(self._data)
+
+    def to_hdf(self, hdf, group_name):
+        with hdf.open(group_name) as hdf5:
+            hdf5['data'] = self._data
+
+    def from_hdf(self, hdf, group_name):
+        with hdf.open(group_name) as hdf5:
+            self._data = hdf5['data']
+
+
+def _as_chemical_array(fnc):
+    """Wrap output as a `ChemicalArray`. Ideal for use together with an `@property`."""
+    def decorated(*args, **kwargs):
+        return ChemicalArray(fnc(*args, **kwargs))
+    return decorated
 
 
 # This can't be a method, or FlexibleMaster throws an IndentationError when you try to load
@@ -68,8 +110,10 @@ class SQSElasticConstants(FlexibleMaster):
         cells (ChemicalArray): The cells of the minimized structures.
         symbols (list): The chemical symbols (possibly including '0' for vacancy) in the SQS structures.
         chemistry (dict): The actual chemical fraction of each species (including '0' for vacancy) in the structures.
-        get_elastic_output (fnc): A function taking a string key for accessing other output from the ElasticMatrixJob
-            as a ChemicalArray. (If you ask for an invalid key, all the valid possibilities will be printed for you.)
+
+    Methods:
+        get_elastic_output: A function taking a string key for accessing other output from the `ElasticMatrixJob` as a
+            `ChemicalArray`. (If you ask for an invalid key, all the valid possibilities will be printed for you.)
 
     Note: The `ChemicalArray` class is a wrapper for numpy arrays that allows you to look at the `.array`, `.mean`,
         `.std` and `.sem` (standard error) with respect to the different SQS structures.
@@ -97,7 +141,7 @@ class SQSElasticConstants(FlexibleMaster):
         self.min_job_name = self._relative_name('min')
         self.elastic_job_name = self._relative_name('elastic')
 
-        self.output = _SQSElasticConstantsOutput(self)
+        self.output = _SQSElasticConstantsOutput(table_name='output')
 
     def validate_ready_to_run(self):
         self._create_pipeline()
@@ -166,12 +210,14 @@ class SQSElasticConstants(FlexibleMaster):
         self._hdf5['refjobs/refhamname'] = self.ref_ham.job_name
         self._hdf5['refjobs/refsqsname'] = self.ref_sqs.job_name
         self._hdf5['refjobs/refelasticname'] = self.ref_elastic.job_name
+        self.output.to_hdf(hdf=self._hdf5)
 
     def from_hdf(self, hdf=None, group_name=None):
         super().from_hdf(hdf, group_name)
         self.ref_ham = self.project.load(self._hdf5['refjobs/refhamname'])
         self.ref_sqs = self.project.load(self._hdf5['refjobs/refsqsname'])
         self.ref_elastic = self.project.load(self._hdf5['refjobs/refelasticname'])
+        self.output.from_hdf(hdf=self._hdf5)
 
     def _ensure_has_references(self):
         for attribute_name, class_ in zip(
@@ -216,122 +262,91 @@ class SQSElasticConstants(FlexibleMaster):
         self.run()
 
     def collect_output(self):
-        print("Collecting output")
+        self.output.n_sites = len(self[self.min_job_name]['input/structures/s_0/positions'])
 
+        self.output.n_structures = len(self[self.min_job_name]['input/structures'].list_groups())
 
-class ChemicalArray:
-    """
-    A convenience class for wrapping arrays of SQS elastic data where the zeroth dimension spans across chemistry.
-    """
+        self.output.elastic_matrix = self.get_elastic_output('C').array
 
-    def __init__(self, data):
-        self._data = np.array(data)
+        self.output.residual_pressures = [
+            self[self.min_job_name]['struct_{}/output/generic/pressures'.format(n)][-1]
+            for n in np.arange(self.output.n_structures)
+        ]
 
-    @property
-    def array(self):
-        return self._data
+        # self.output.structures = [
+        #     Atoms().from_hdf(self[self.min_job_name]['struct_{}/output'.format(n)])
+        #     for n in np.arange(self.output.n_structures)
+        # ]
+        # Saving a list of structures is not yet supported by InputList
 
-    @property
-    def mean(self):
-        return self._data.mean(axis=0)
+        # self.output.cells = [structure.cell.array for structure in self.output.structures]
+        # Awaiting structures output
+        self.output.cells = [
+            self[self.min_job_name]['struct_{}/output/structure/cell/cell'.format(n)]
+            for n in np.arange(self.output.n_structures)
+        ]
 
-    @property
-    def std(self):
-        return self._data.std(axis=0)
+        self.output.symbols = list(self[self.sqs_job_name]['input/custom_dict/data']['mole_fractions'].keys())
 
-    @property
-    def sem(self):
-        return self._data.std(axis=0) / len(self._data)
+        # struct = self.output.structures[0]  # Awaiting structures output
+        struct = Atoms().from_hdf(self[self.min_job_name]['struct_0/output'])
+        self.output.chemistry = {
+            symbol: self._species_fraction(struct, symbol)
+            for symbol in self.output.symbols
+        }
 
-    def __repr__(self):
-        return str(self._data)
+        self.to_hdf()
 
+    def _species_fraction(self, structure, symbol):
+        if symbol == '0':
+            return len(structure) / self.output.n_sites
+        else:
+            return np.sum(structure.get_chemical_symbols() == symbol) / self.output.n_sites
 
-def _as_chemical_array(fnc):
-    def decorated(*args, **kwargs):
-        return ChemicalArray(fnc(*args, **kwargs))
-
-    return decorated
-
-
-class _SQSElasticConstantsOutput:
-    def __init__(self, parent):
-        self._parent = parent
-
+    @_as_chemical_array
     def get_elastic_output(self, key):
         try:
             return [
-                self._elastic_hdf['struct_{}/output/elasticmatrix'.format(n)][key]
-                for n in np.arange(self.n_structures)
+                self[self.elastic_job_name]['struct_{}/output/elasticmatrix'.format(n)][key]
+                for n in np.arange(self.output.n_structures)
             ]
         except KeyError:
             raise KeyError("Tried to find {} in elastic output keys but it wasn't there. Please try one of "
-                           "{}.".format(key, list(self._elastic_hdf['struct_0/output/elasticmatrix'].keys())))
+                           "{}.".format(key, list(self[self.elastic_job_name]['struct_0/output/elasticmatrix'].keys())))
 
-    @property
-    def n_sites(self):
-        return len(self._parent[self._parent.min_job_name]['input/structures/s_0/positions'])
 
-    @property
-    def n_structures(self):
-        return len(self._parent[self._parent.min_job_name]['input/structures'].list_groups())
-
-    @property
-    def _sqs_hdf(self):
-        return self._parent[self._parent.sqs_job_name]
-
-    @property
-    def _min_hdf(self):
-        return self._parent[self._parent.min_job_name]
-
-    @property
-    def _elastic_hdf(self):
-        return self._parent[self._parent.elastic_job_name]
+class _SQSElasticConstantsOutput(InputList):
+    """Powers up certain attributes as `ChemicalArray`"""
 
     @property
     @_as_chemical_array
-    @lru_cache()
     def elastic_matrix(self):
-        """Six-component elastic matrix."""
-        return self.get_elastic_output('C')
+        """Six-component elastic matrix"""
+        return self._elastic_matrix
+
+    @elastic_matrix.setter
+    def elastic_matrix(self, em):
+        self._elastic_matrix = em
 
     @property
     @_as_chemical_array
-    @lru_cache()
     def residual_pressures(self):
         """Pressures after minimization."""
-        return [
-            self._min_hdf['struct_{}/output/generic/pressures'.format(n)][-1]
-            for n in np.arange(self.n_structures)
-        ]
+        return self._residual_pressures
 
-    @property
-    @lru_cache()
-    def structures(self):
-        return [
-            Atoms().from_hdf(self._min_hdf['struct_{}/output'.format(n)])
-            for n in np.arange(self.n_structures)
-        ]
+    @residual_pressures.setter
+    def residual_pressures(self, rp):
+        self._residual_pressures = rp
 
     @property
     @_as_chemical_array
     def cells(self):
-        return [structure.cell.array for structure in self.structures]
+        """Minimized SQS cells"""
+        return self._cells
 
-    @property
-    @lru_cache()
-    def symbols(self):
-        return list(self._sqs_hdf['input/custom_dict/data']['mole_fractions'].keys())
-
-    @property
-    def chemistry(self):
-        return {symbol: self._species_fraction(self.structures[0], symbol) for symbol in self.symbols}
-
-    def _species_fraction(self, structure, symbol):
-        if symbol == '0':
-            return len(structure) / self.n_sites
-        else:
-            return np.sum(structure.get_chemical_symbols() == symbol) / self.n_sites
+    @cells.setter
+    def cells(self, c):
+        self._cells = c
 
 
 class _SQSElasticConstantsGenerator(JobGenerator):

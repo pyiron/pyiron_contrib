@@ -209,6 +209,15 @@ class SQSElasticConstants(FlexibleMaster):
         else:
             job.to_hdf()
 
+    def run_static(self):
+        super().run_static()
+        # Flexible master does not use output collection, but we want that so let's force the issue:
+        self.status.collect = True
+        self.run()
+
+    def collect_output(self):
+        print("Collecting output")
+
 
 class ChemicalArray:
     """

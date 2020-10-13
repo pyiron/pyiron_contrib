@@ -113,7 +113,7 @@ class SQSElasticConstants(FlexibleMaster):
     def _instantiate_sqs(self):
         # sqs_job = self.create_job(self._job_type.SQSJob, self._relative_name('sqs_job'))
         # sqs_job.input = self.ref_sqs.input
-        sqs_job = self._copy_job(self.ref_sqs, self._elastic_job_name_tail)
+        sqs_job = self._copy_job(self.ref_sqs, self._sqs_job_name_tail)
         sqs_job.input.mole_fractions = dict(sqs_job.input.mole_fractions)  # Input expects dict but gets InputList(dict)
         sqs_job.structure = self.ref_ham.structure.copy()
         return sqs_job

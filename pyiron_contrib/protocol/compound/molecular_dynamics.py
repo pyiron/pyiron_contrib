@@ -15,7 +15,6 @@ from pyiron_contrib.protocol.utils import Pointer
 
 """
 Protocols for molecular dynamics.
-
 """
 
 __author__ = "Liam Huber"
@@ -41,6 +40,16 @@ class MolecularDynamics(CompoundVertex):
         n_steps (int): How many MD steps to run for. (Default is 100.)
         temperature_damping_timescale (float): Langevin thermostat timescale in fs. (Default is None, which runs NVE.)
         time_step (float): MD time step in fs. (Default is 1.)
+        overheat_fraction (float): The fraction by which to overheat the initial velocities. This can be useful for
+            more quickly equilibrating a system whose initial structure is its fully relaxed positions -- in which
+            case equipartition of energy tells us that the kinetic energy should be initialized to double the
+            desired value. (Default is 2.0, assume energy equipartition is a good idea.)
+        pressure (float): The pressure in GPa to be simulated (Default is None GPa)
+        pressure_style (string): 'isotorpic' or 'anisotropic'. (Default is 'anisotropic')
+        pressure_damping_timescale (float): Damping timescale in fs. (Default is None, no barostat is used.)
+        compressibility (float): The compressibility of water in bar-1 (Default is 4.57e-5 bar-1)
+        previous_volume (float): The default volume. (Defaults is None.)
+        energy_kin (float): The default energy_kin. (Default is None.)
 
     Output attributes:
         energy_pot (float): Total potential energy of the system in eV.
@@ -49,6 +58,8 @@ class MolecularDynamics(CompoundVertex):
         velocities (numpy.ndarray): Atomic velocities in angstroms/fs.
         forces (numpy.ndarray): Atomic forces in eV/angstrom. Note: These are the potential gradient forces; thermostat
             forces (if any) are not saved.
+        pressure (float): The isotropic pressure in GPa.
+        volume (float): The volume of the system in Ang3.
     """
     # DefaultWhitelist sets the output which will be stored every `archive period' in the final hdf5 file.
 
@@ -78,16 +89,16 @@ class MolecularDynamics(CompoundVertex):
         # Protocol defaults
         id_ = self.input.default
         id_.temperature = None
+        id_.n_steps = 100
+        id_.temperature_damping_timescale = 100.
+        id_.time_step = 1.
+        id_.overheat_fraction = 2
         id_.pressure = None
         id_.pressure_style = 'anisotropic'
-        id_.previous_volume = None
-        id_.energy_kin = None
-        id_.n_steps = 100
-        id_.time_step = 1.
-        id_.temperature_damping_timescale = 100.
-        id_.overheat_fraction = 2
         id_.pressure_damping_timescale = 1000.
         id_.compressibility = 4.57e-5  # bar^-1
+        id_.previous_volume = None
+        id_.energy_kin = None
 
     def define_vertices(self):
         # Graph components
@@ -211,6 +222,14 @@ class ConfinedMD(MolecularDynamics):
         atoms are confined to their lattice sites. This is especially helpful when vacancies are present in the
         structure, and atoms diffuse via the vacancies. This protocol prevents this diffusion from happening.
 
+    Input attributes:
+        cutoff_factor (float): The cutoff is obtained by taking the first nearest neighbor distance and multiplying
+            it by the cutoff factor. A default value of 0.4 is chosen, because taking a cutoff factor of ~0.5
+            sometimes let certain reflections off the hook, and we do not want that to happen. (Default is 0.4.)
+        use_reflection (boolean): Turn on or off `SphereReflectionPerAtom` (Default is True.)
+        total_steps (int): The total number of times `SphereReflectionPerAtom` is called so far. (Default is 0.)
+
+    For inherited input and output attributes, refer the `MolecularDynamics` protocol.
     """
 
     # DefaultWhitelist = {
@@ -221,9 +240,9 @@ class ConfinedMD(MolecularDynamics):
 
         # Protocol defaults
         id_ = self.input.default
-        id_.cutoff_factor = 0.4  # This factor times the 1NN distance is the reflection cutoff.
-        id_.use_reflection = True  # Whether or not to use reflection.
-        id_.total_steps = 0  # The total number of md steps that have been performed so far.
+        id_.cutoff_factor = 0.4
+        id_.use_reflection = True
+        id_.total_steps = 0
 
     def define_vertices(self):
         # Graph components
@@ -355,7 +374,34 @@ class ProtocolConfinedMD(Protocol, ConfinedMD, ABC):
 
 class HarmonicMD(CompoundVertex):
     """
+    Runs molecular dynamics, but treats the atoms in the structure as harmonic oscillators. Calculates the forces
+        on each atom, and the total potential energy of the structure. If the spring constant is specified, the
+        atoms act as Einstein atoms (independent of each other). If the Hessian / force constant matrix is
+        specified, the atoms act as Debye atoms.
 
+    Input attributes:
+        ref_job_full_path (str): Path to the pyiron job to use for evaluating forces and energies.
+        structure (Atoms): The structure evolve.
+        temperature (float): Temperature to run at in K.
+        n_steps (int): How many MD steps to run for. (Default is 100.)
+        temperature_damping_timescale (float): Langevin thermostat timescale in fs. (Default is None, which runs NVE.)
+        time_step (float): MD time step in fs. (Default is 1.)
+        overheat_fraction (float): The fraction by which to overheat the initial velocities. This can be useful for
+            more quickly equilibrating a system whose initial structure is its fully relaxed positions -- in which
+            case equipartition of energy tells us that the kinetic energy should be initialized to double the
+            desired value. (Default is 2.0, assume energy equipartition is a good idea.)
+        spring_constant (float): A single spring / force constant that is used to compute the restoring forces
+            on each atom. (Default is 1.)
+        force_constants (NxN matrix): The Hessian matrix, obtained from, for ex. Phonopy. (Default is None, treat
+            the atoms as independent harmonic oscillators (Einstein atoms.).)
+
+    Output attributes:
+        energy_pot (float): Total potential energy of the system in eV.
+        energy_kin (float): Total kinetic energy of the system in eV.
+        positions (numpy.ndarray): Atomic positions in angstroms.
+        velocities (numpy.ndarray): Atomic velocities in angstroms/fs.
+        forces (numpy.ndarray): Atomic forces in eV/angstrom. Note: These are the potential gradient forces; thermostat
+            forces (if any) are not saved.
     """
 
     # DefaultWhitelist = {
@@ -367,10 +413,9 @@ class HarmonicMD(CompoundVertex):
         # Protocol defaults
         id_ = self.input.default
         id_.temperature = None
-        id_.energy_kin = None
         id_.n_steps = 100
-        id_.time_step = 1.
         id_.temperature_damping_timescale = 100.
+        id_.time_step = 1.
         id_.overheat_fraction = 2
         id_.spring_constant = 1.0
         id_.force_constants = None
@@ -477,6 +522,14 @@ class ConfinedHarmonicMD(HarmonicMD):
         is that the atoms are confined to their lattice sites. This is especially helpful when vacancies are present
         in the structure, and atoms diffuse via the vacancies. This protocol prevents this diffusion from happening.
 
+    Input attributes:
+        cutoff_factor (float): The cutoff is obtained by taking the first nearest neighbor distance and multiplying
+            it by the cutoff factor. A default value of 0.4 is chosen, because taking a cutoff factor of ~0.5
+            sometimes let certain reflections off the hook, and we do not want that to happen. (Default is 0.4.)
+        use_reflection (boolean): Turn on or off `SphereReflectionPerAtom` (Default is True.)
+        total_steps (int): The total number of times `SphereReflectionPerAtom` is called so far. (Default is 0.)
+
+    For inherited input and output attributes, refer the `HarmonicMD` protocol.
     """
 
     # DefaultWhitelist = {

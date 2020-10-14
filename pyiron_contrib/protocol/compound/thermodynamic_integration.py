@@ -27,7 +27,6 @@ ROOT_EV_PER_ANGSTROM_SQUARE_PER_AMU_IN_S = 9.82269385e13
 
 """
 Protocols for thermodynamic integration using langevin dynamics (TILD).
-
 """
 
 __author__ = "Liam Huber"
@@ -87,6 +86,46 @@ class HarmonicTILD(TILDParent):
           2. Convergence criterion is NOT implemented for this protocol, because it runs serially (and would take
         a VERY long time to achieve a good convergence.
 
+    Input attributes:
+        ref_job_full_path (str): Path to the pyiron job to use for evaluating forces and energies.
+        structure (Atoms): The structure evolve.
+        temperature (float): Temperature to run at in K.
+        n_steps (int): How many MD steps to run for. (Default is 100.)
+        temperature_damping_timescale (float): Langevin thermostat timescale in fs. (Default is None, which runs NVE.)
+        time_step (float): MD time step in fs. (Default is 1.)
+        overheat_fraction (float): The fraction by which to overheat the initial velocities. This can be useful for
+            more quickly equilibrating a system whose initial structure is its fully relaxed positions -- in which
+            case equipartition of energy tells us that the kinetic energy should be initialized to double the
+            desired value. (Default is 2.0, assume energy equipartition is a good idea.)
+        sampling_period (int): Account output every `sampling_period' for the TI operations. (Default is 1, account
+            for every MD step.
+        thermalization_steps (int): Number of steps the system is thermalized for to reach equilibrium. (Default is
+            10 steps.)
+        n_lambdas (int): How many mixing pairs to create. (Default is 5.)
+        custom_lambdas (list): Specify the set of lambda values as input. (Default is None.)
+        spring_constant (float): A single spring / force constant that is used to compute the restoring forces
+            on each atom. (Default is 1.)
+        force_constants (NxN matrix): The Hessian matrix, obtained from, for ex. Phonopy. (Default is None, treat
+            the atoms as independent harmonic oscillators (Einstein atoms.).)
+        cutoff_factor (float): The cutoff is obtained by taking the first nearest neighbor distance and multiplying
+            it by the cutoff factor. A default value of 0.4 is chosen, because taking a cutoff factor of ~0.5
+            sometimes let certain reflections off the hook, and we do not want that to happen. (Default is 0.4.)
+        use_reflection (boolean): Turn on or off `SphereReflectionPerAtom` (Default is True.)
+        total_steps (int): The total number of times `SphereReflectionPerAtom` is called so far. (Default is 0.)
+
+    Output attributes:
+        temperature_mean (list): Mean output temperature for each integration point.
+        temperature_std (list): Standard deviation of the output temperature for each integration point.
+        integrands_mean (list): Mean of the integrands from TILD.
+        integrands_std (list): Standard deviation of the integrands from TILD.
+        integrands_n_samples (list): Number of samples over which the mean and standard deviation are calculated.
+        tild_free_energy_mean (float): Mean calculated via thermodynamic integration.
+        tild_free_energy_std (float): Standard deviation calculated via thermodynamic integration.
+        tild_free_energy_se (float): Standard error calculated via thermodynamic integration.
+        fep_free_energy_mean (float): Mean calculated via free energy perturbation.
+        fep_free_energy_std (float): Standard deviation calculated via free energy perturbation.
+        fep_free_energy_se (float): Standard error calculated via free energy perturbation.
+
     """
     # DefaultWhitelist sets the output which will be stored every `archive period' in the final hdf5 file.
 
@@ -108,19 +147,20 @@ class HarmonicTILD(TILDParent):
 
         id_ = self.input.default
         # Default values
-        id_.temperature = 1.  # The target temperature in K.
-        id_.n_steps = 100  # Number of md steps.
-        id_.temperature_damping_timescale = 100.  # Same as `temperature_damping_timescale' in calc_md().
-        id_.overheat_fraction = 2.  # The fraction by which to overheat the initial velocities.
-        id_.time_step = 1.  # The MD time step in fs.
-        id_.sampling_period = 1  # Account only for output every `sampling_period' for the TI operations.
-        id_.thermalization_steps = 10  # Number of steps the system is thermalized for to reach equilibrium.
-        id_.custom_lambdas = None  # Specify the set of lambda values as input.
-        id_.force_constants = None  # The Hessian matrix from Phonopy.
-        id_.spring_constant = 1.0  # The spring constant.
-        id_.cutoff_factor = 0.4  # This factor times the 1NN distance is the reflection cutoff.
-        id_.use_reflection = True  # Whether or not to use reflection.
-        id_.total_steps = 0  # The total number of md steps that have been performed so far.
+        id_.temperature = 1.
+        id_.n_steps = 100
+        id_.temperature_damping_timescale = 100.
+        id_.overheat_fraction = 2.
+        id_.time_step = 1.
+        id_.sampling_period = 1
+        id_.thermalization_steps = 10
+        id_.n_lambdas = 5
+        id_.custom_lambdas = None
+        id_.force_constants = None
+        id_.spring_constant = 1.0
+        id_.cutoff_factor = 0.4
+        id_.use_reflection = True
+        id_.total_steps = 0
 
     def define_vertices(self):
         # Graph components
@@ -140,8 +180,8 @@ class HarmonicTILD(TILDParent):
         g.mix = SerialList(WeightedSum)
         g.verlet_velocities = SerialList(VerletVelocityUpdate)
         g.check_thermalized = IsGEq()
-        g.check_sampling_period = ModIsZero()
         g.average_temp = SerialList(WelfordOnline)
+        g.check_sampling_period = ModIsZero()
         g.transpose_energies = Transpose()
         g.addition = SerialList(WeightedSum)
         g.average_tild = SerialList(WelfordOnline)
@@ -170,8 +210,8 @@ class HarmonicTILD(TILDParent):
             g.mix,
             g.verlet_velocities,
             g.check_thermalized, 'true',
-            g.check_sampling_period, 'true',
             g.average_temp,
+            g.check_sampling_period, 'true',
             g.transpose_energies,
             g.addition,
             g.average_tild,
@@ -267,7 +307,7 @@ class HarmonicTILD(TILDParent):
         g.harmonic.broadcast.positions = gp.reflect.output.positions[-1]
         g.harmonic.direct.cell = ip.structure.cell.array
         g.harmonic.direct.pbc = ip.structure.pbc
-        g.harmonic.direct.zero_k_energy = gp.minimize_job.output.energy_pot[-1]
+        g.harmonic.direct.eq_energy = gp.minimize_job.output.energy_pot[-1]
 
         # transpose_forces
         g.transpose_forces.input.matrix = [
@@ -293,13 +333,13 @@ class HarmonicTILD(TILDParent):
         g.check_thermalized.input.target = gp.clock.output.n_counts[-1]
         g.check_thermalized.input.threshold = ip.thermalization_steps
 
-        # check_sampling_period
-        g.check_sampling_period.input.target = gp.clock.output.n_counts[-1]
-        g.check_sampling_period.input.default.mod = ip.sampling_period
-
         # average_temp
         g.average_temp.input.n_children = ip.n_lambdas
         g.average_temp.broadcast.sample = gp.verlet_velocities.output.instant_temperature[-1]
+
+        # check_sampling_period
+        g.check_sampling_period.input.target = gp.clock.output.n_counts[-1]
+        g.check_sampling_period.input.default.mod = ip.sampling_period
 
         # transpose_energies
         g.transpose_energies.input.matrix = [
@@ -332,7 +372,7 @@ class HarmonicTILD(TILDParent):
         g.post.input.tild_std = gp.average_tild.output.std[-1]
         g.post.input.fep_exp_mean = gp.average_fep_exp.output.mean[-1]
         g.post.input.fep_exp_std = gp.average_fep_exp.output.std[-1]
-        g.post.input.temperature = ip.temperature
+        g.post.input.temperature = gp.average_temp.output.mean[-1]
         g.post.input.n_samples = gp.average_tild.output.n_samples[-1][-1]
 
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
@@ -413,8 +453,8 @@ class HarmonicallyCoupled(CompoundVertex):
         g.mix = WeightedSum()
         g.verlet_velocities = VerletVelocityUpdate()
         g.check_thermalized = IsGEq()
-        g.check_sampling_period = ModIsZero()
         g.average_temp = WelfordOnline()
+        g.check_sampling_period = ModIsZero()
         g.addition = WeightedSum()
         g.average_tild = WelfordOnline()
         g.fep_exp = FEPExponential()
@@ -434,8 +474,8 @@ class HarmonicallyCoupled(CompoundVertex):
             g.mix,
             g.verlet_velocities,
             g.check_thermalized, 'true',
-            g.check_sampling_period, 'true',
             g.average_temp,
+            g.check_sampling_period, 'true',
             g.addition,
             g.average_tild,
             g.fep_exp,
@@ -499,7 +539,7 @@ class HarmonicallyCoupled(CompoundVertex):
         g.harmonic.input.positions = gp.reflect.output.positions[-1]
         g.harmonic.input.cell = ip.structure.cell.array
         g.harmonic.input.pbc = ip.structure.pbc
-        g.harmonic.input.zero_k_energy = ip.zero_k_energy
+        g.harmonic.input.eq_energy = ip.eq_energy
 
         # mix
         g.mix.input.vectors = [
@@ -520,10 +560,6 @@ class HarmonicallyCoupled(CompoundVertex):
         g.check_thermalized.input.default.target = gp.reflect.output.total_steps[-1]
         g.check_thermalized.input.threshold = ip.thermalization_steps
 
-        # check_sampling_period
-        g.check_sampling_period.input.target = gp.clock.output.n_counts[-1]
-        g.check_sampling_period.input.default.mod = ip.sampling_period
-
         # average_temp
         g.average_temp.input.default.mean = ip.average_temp_mean
         g.average_temp.input.default.std = ip.average_temp_std
@@ -532,6 +568,10 @@ class HarmonicallyCoupled(CompoundVertex):
         g.average_temp.input.std = gp.average_temp.output.std[-1]
         g.average_temp.input.n_samples = gp.average_temp.output.n_samples[-1]
         g.average_temp.input.sample = gp.verlet_velocities.output.instant_temperature[-1]
+
+        # check_sampling_period
+        g.check_sampling_period.input.target = gp.clock.output.n_counts[-1]
+        g.check_sampling_period.input.default.mod = ip.sampling_period
 
         # addition
         g.addition.input.vectors = [
@@ -589,6 +629,23 @@ class HarmonicTILDParallel(HarmonicTILD):
         substantial speed-up. A free energy perturbation standard error convergence exit criterion can be applied,
         that is unavailable in the serial version of the HarmonicTILD protocol.
 
+    Input attributes:
+        sleep_time (float): A delay in seconds for database access of results. For sqlite, a non-zero delay maybe
+            required. (Default is 0 seconds, no delay.)
+        project_path (string): Initialize default project path to pass into the child protocol. (Default is None.)
+        job_name (string): Initialize default job name to pass into the child protocol. (Default is None.)
+        convergence_check_steps (int): Check for convergence once every `convergence_check_steps'. (Default is
+            once every 10 steps.)
+        default_free_energy_se (float): Initialize default free energy standard error to pass into the child
+            protocol. (Default is None.)
+        fe_tol (float): The free energy standard error tolerance. This is the convergence criterion in eV. (Default
+            is 0.01 eV)
+        mean (float): Initialize default mean for WelfordOnline. (Default is None.)
+        std (float): Initialize default standard deviation for WelfordOnline. (Default is None.)
+        n_samples (float): Initialize default number of samples for WelfordOnline. (Default is None.)
+
+    For inherited input and output attributes, refer the `HarmonicTILD` protocol.
+
     """
     # DefaultWhitelist = {
     # }
@@ -598,16 +655,15 @@ class HarmonicTILDParallel(HarmonicTILD):
 
         id_ = self.input.default
         # Default values
-        # The remainder of the default values are inherited from HarmonicTILD
-        id_.sleep_time = 0  # A delay for database access of results. For sqlite, a non-zero delay maybe required.
-        id_.project_path = None  # Initialize default project path.
-        id_.job_name = None  # Initialize default job name.
-        id_.convergence_check_steps = 10  # Check for convergence once every `convergence_check_steps'.
-        id_.default_free_energy_se = 1  # Initialize default free energy standard error.
-        id_.fe_tol = 0.01  # Free energy tolerance. This is the convergence criterion in eV.
-        id_.mean = None  # Initialize default mean for WelfordOnline.
-        id_.std = None  # Initialize default std for WelfordOnline.
-        id_.n_samples = None  # Initialize default n_samples for WelfordOnline.
+        id_.sleep_time = 0
+        id_.project_path = None
+        id_.job_name = None
+        id_.convergence_check_steps = 10
+        id_.default_free_energy_se = 1
+        id_.fe_tol = 0.01
+        id_.mean = None
+        id_.std = None
+        id_.n_samples = None
 
     def define_vertices(self):
         # Graph components
@@ -728,7 +784,7 @@ class HarmonicTILDParallel(HarmonicTILD):
         # run_lambda_points - harmonic
         g.run_lambda_points.direct.spring_constant = ip.spring_constant
         g.run_lambda_points.direct.force_constants = ip.force_constants
-        g.run_lambda_points.direct.zero_k_energy = gp.minimize_job.output.energy_pot[-1]
+        g.run_lambda_points.direct.eq_energy = gp.minimize_job.output.energy_pot[-1]
 
         # run_lambda_points - mix
         g.run_lambda_points.broadcast.coupling_weights = gp.build_lambdas.output.lambda_pairs[-1]
@@ -784,7 +840,7 @@ class HarmonicTILDParallel(HarmonicTILD):
         g.post.input.tild_std = gp.run_lambda_points.output.std_diff[-1]
         g.post.input.fep_exp_mean = gp.run_lambda_points.output.fep_exp_mean[-1]
         g.post.input.fep_exp_std = gp.run_lambda_points.output.fep_exp_std[-1]
-        g.post.input.temperature = ip.temperature
+        g.post.input.temperature = gp.run_lambda_points.output.temperature_mean[-1]
         g.post.input.n_samples = gp.run_lambda_points.output.n_samples[-1][-1]
 
         # exit
@@ -831,10 +887,51 @@ class VacancyTILD(TILDParent):
         total free energy change, to give the free energy change between the fully interacting system, and the same
         system with a vacancy.
 
-     NOTE: 1. This protocol is as of now untested with DFT pseudopotentials, and only works for sure, with LAMMPS-
+        NOTE: 1. This protocol is as of now untested with DFT pseudopotentials, and only works for sure, with LAMMPS-
         based potentials.
-          2. Convergence criterion is NOT implemented for this protocol, because it runs serially (and would take
+        2. Convergence criterion is NOT implemented for this protocol, because it runs serially (and would take
         a VERY long time to achieve a good convergence.
+
+    Input attributes:
+        ref_job_full_path (str): Path to the pyiron job to use for evaluating forces and energies.
+        structure (Atoms): The structure evolve.
+        vacancy_id (int): The id of the atom which will be deleted to create a vacancy. (Default is 0, the 0th atom.)
+        temperature (float): Temperature to run at in K.
+        n_steps (int): How many MD steps to run for. (Default is 100.)
+        temperature_damping_timescale (float): Langevin thermostat timescale in fs. (Default is None, which runs NVE.)
+        overheat_fraction (float): The fraction by which to overheat the initial velocities. This can be useful for
+            more quickly equilibrating a system whose initial structure is its fully relaxed positions -- in which
+            case equipartition of energy tells us that the kinetic energy should be initialized to double the
+            desired value. (Default is 2.0, assume energy equipartition is a good idea.)
+        time_step (float): MD time step in fs. (Default is 1.)
+        sampling_period (int): Account output every `sampling_period' for the TI operations. (Default is 1, account
+            for every MD step.
+        thermalization_steps (int): Number of steps the system is thermalized for to reach equilibrium. (Default is
+            10 steps.)
+        n_lambdas (int): How many mixing pairs to create. (Default is 5.)
+        custom_lambdas (list): Specify the set of lambda values as input. (Default is None.)
+        spring_constant (float): A single spring / force constant that is used to compute the restoring forces
+            on each atom. (Default is 1.)
+        force_constants (NxN matrix): The Hessian matrix, obtained from, for ex. Phonopy. (Default is None, treat
+            the atoms as independent harmonic oscillators (Einstein atoms.).)
+        cutoff_factor (float): The cutoff is obtained by taking the first nearest neighbor distance and multiplying
+            it by the cutoff factor. A default value of 0.4 is chosen, because taking a cutoff factor of ~0.5
+            sometimes let certain reflections off the hook, and we do not want that to happen. (Default is 0.4.)
+        use_reflection (boolean): Turn on or off `SphereReflectionPerAtom` (Default is True.)
+        total_steps (int): The total number of times `SphereReflectionPerAtom` is called so far. (Default is 0.)
+
+    Output attributes:
+        temperature_mean (list): Mean output temperature for each integration point.
+        temperature_std (list): Standard deviation of the output temperature for each integration point.
+        integrands_mean (list): Mean of the integrands from TILD.
+        integrands_std (list): Standard deviation of the integrands from TILD.
+        integrands_n_samples (list): Number of samples over which the mean and standard deviation are calculated.
+        tild_free_energy_mean (float): Mean calculated via thermodynamic integration.
+        tild_free_energy_std (float): Standard deviation calculated via thermodynamic integration.
+        tild_free_energy_se (float): Standard error calculated via thermodynamic integration.
+        fep_free_energy_mean (float): Mean calculated via free energy perturbation.
+        fep_free_energy_std (float): Standard deviation calculated via free energy perturbation.
+        fep_free_energy_se (float): Standard error calculated via free energy perturbation.
 
     """
     # DefaultWhitelist = {
@@ -844,22 +941,22 @@ class VacancyTILD(TILDParent):
         super(VacancyTILD, self).__init__(**kwargs)
 
         id_ = self.input.default
-        id_.vacancy_id = 0  # The index of the atom which will be removed to create a vacancy
-        id_.temperature = 1.  # The target temperature in K.
-        id_.n_steps = 100  # Number of md steps.
-        id_.temperature_damping_timescale = 100.  # Same as `temperature_damping_timescale' in calc_md().
-        id_.overheat_fraction = 2.  # The fraction by which to overheat the initial velocities.
-        id_.time_step = 1.  # The MD time step in fs.
-        id_.sampling_period = 1  # Account only for output every `sampling_period' for the TI operations.
-        id_.thermalization_steps = 10  # Number of steps the system is thermalized for to reach equilibrium.
-        id_.custom_lambdas = None  # Specify the set of lambda values as input.
-        id_.force_constants = None  # The Hessian matrix from Phonopy.
-        id_.spring_constant = 1.0  # The spring constant.
-        id_.cutoff_factor = 0.3  # This factor times the 1NN distance is the reflection cutoff.
-        id_.use_reflection = True  # Whether or not to use reflection.
-        id_.total_steps = 0  # The total number of md steps that have been performed so far.
-        id_.ensure_iterable_mask = True  #
-        id_.zero_k_energy = None  # A value that always remains `None' for this protocol.
+        id_.vacancy_id = 0
+        id_.temperature = 1.
+        id_.n_steps = 100
+        id_.temperature_damping_timescale = 100.
+        id_.overheat_fraction = 2.
+        id_.time_step = 1.
+        id_.sampling_period = 1
+        id_.thermalization_steps = 10
+        id_.n_lambdas = 5
+        id_.custom_lambdas = None
+        id_.spring_constant = 1.0
+        id_.force_constants = None
+        id_.cutoff_factor = 0.3
+        id_.use_reflection = True
+        id_.total_steps = 0
+        id_.ensure_iterable_mask = True
 
     def define_vertices(self):
         # Graph components
@@ -884,8 +981,8 @@ class VacancyTILD(TILDParent):
         g.mix = SerialList(WeightedSum)
         g.verlet_velocities = SerialList(VerletVelocityUpdate)
         g.check_thermalized = IsGEq()
-        g.check_sampling_period = ModIsZero()
         g.average_temp = SerialList(WelfordOnline)
+        g.check_sampling_period = ModIsZero()
         g.transpose_energies = Transpose()
         g.addition = SerialList(WeightedSum)
         g.average_tild = SerialList(WelfordOnline)
@@ -919,8 +1016,8 @@ class VacancyTILD(TILDParent):
             g.mix,
             g.verlet_velocities,
             g.check_thermalized, 'true',
-            g.check_sampling_period, 'true',
             g.average_temp,
+            g.check_sampling_period, 'true',
             g.transpose_energies,
             g.addition,
             g.average_tild,
@@ -942,7 +1039,7 @@ class VacancyTILD(TILDParent):
 
         # create_vacancy
         g.create_vacancy.input.structure = ip.structure
-        g.create_vacancy.input.id = ip.vacancy_id
+        g.create_vacancy.input.atom_id = ip.vacancy_id
 
         # build_lambdas
         g.build_lambdas.input.n_lambdas = ip.n_lambdas
@@ -1034,7 +1131,7 @@ class VacancyTILD(TILDParent):
         g.harmonic.direct.cell = ip.structure.cell.array
         g.harmonic.direct.pbc = ip.structure.pbc
         g.harmonic.direct.mask = ip.vacancy_id
-        g.harmonic.direct.zero_k_energy = ip.zero_k_energy
+        g.harmonic.direct.eq_energy = ip.eq_energy
 
         # write_vac_forces
         g.write_vac_forces.input.n_children = ip.n_lambdas
@@ -1072,13 +1169,13 @@ class VacancyTILD(TILDParent):
         g.check_thermalized.input.target = gp.clock.output.n_counts[-1]
         g.check_thermalized.input.threshold = ip.thermalization_steps
 
-        # check_sampling_period
-        g.check_sampling_period.input.target = gp.clock.output.n_counts[-1]
-        g.check_sampling_period.input.default.mod = ip.sampling_period
-
         # average_temp
         g.average_temp.input.n_children = ip.n_lambdas
         g.average_temp.broadcast.sample = gp.verlet_velocities.output.instant_temperature[-1]
+
+        # check_sampling_period
+        g.check_sampling_period.input.target = gp.clock.output.n_counts[-1]
+        g.check_sampling_period.input.default.mod = ip.sampling_period
 
         # transpose_energies
         g.transpose_energies.input.matrix = [
@@ -1161,8 +1258,8 @@ class Decoupling(CompoundVertex):
         g.mix = WeightedSum()
         g.verlet_velocities = VerletVelocityUpdate()
         g.check_thermalized = IsGEq()
-        g.check_sampling_period = ModIsZero()
         g.average_temp = WelfordOnline()
+        g.check_sampling_period = ModIsZero()
         g.addition = WeightedSum()
         g.average_tild = WelfordOnline()
         g.fep_exp = FEPExponential()
@@ -1186,8 +1283,8 @@ class Decoupling(CompoundVertex):
             g.mix,
             g.verlet_velocities,
             g.check_thermalized, 'true',
-            g.check_sampling_period, 'true',
             g.average_temp,
+            g.check_sampling_period, 'true',
             g.addition,
             g.average_tild,
             g.fep_exp,
@@ -1292,10 +1389,6 @@ class Decoupling(CompoundVertex):
         g.check_thermalized.input.target = gp.clock.output.n_counts[-1]
         g.check_thermalized.input.threshold = ip.thermalization_steps
 
-        # check_sampling_period
-        g.check_sampling_period.input.target = gp.clock.output.n_counts[-1]
-        g.check_sampling_period.input.default.mod = ip.sampling_period
-
         # average_temp
         g.average_temp.input.default.mean = ip.average_temp_mean
         g.average_temp.input.default.std = ip.average_temp_std
@@ -1304,6 +1397,10 @@ class Decoupling(CompoundVertex):
         g.average_temp.input.std = gp.average_temp.output.std[-1]
         g.average_temp.input.n_samples = gp.average_temp.output.n_samples[-1]
         g.average_temp.input.sample = gp.verlet_velocities.output.instant_temperature[-1]
+
+        # check_sampling_period
+        g.check_sampling_period.input.target = gp.clock.output.n_counts[-1]
+        g.check_sampling_period.input.default.mod = ip.sampling_period
 
         # addition
         g.addition.input.vectors = [
@@ -1362,6 +1459,22 @@ class VacancyTILDParallel(VacancyTILD):
         substantial speed-up. A free energy perturbation standard error convergence exit criterion can be applied,
         that is unavailable in the serial version of the VacancyTILD protocol.
 
+    Input attributes:
+        sleep_time (float): A delay in seconds for database access of results. For sqlite, a non-zero delay maybe
+            required. (Default is 0 seconds, no delay.)
+        project_path (string): Initialize default project path to pass into the child protocol. (Default is None.)
+        job_name (string): Initialize default job name to pass into the child protocol. (Default is None.)
+        convergence_check_steps (int): Check for convergence once every `convergence_check_steps'. (Default is
+            once every 10 steps.)
+        default_free_energy_se (float): Initialize default free energy standard error to pass into the child
+            protocol. (Default is None.)
+        fe_tol (float): The free energy standard error tolerance. This is the convergence criterion in eV. (Default
+            is 0.01 eV)
+        mean (float): Initialize default mean for WelfordOnline. (Default is None.)
+        std (float): Initialize default standard deviation for WelfordOnline. (Default is None.)
+        n_samples (float): Initialize default number of samples for WelfordOnline. (Default is None.)
+
+    For inherited input and output attributes, refer the `HarmonicTILD` protocol.
     """
     # DefaultWhitelist = {
     # }
@@ -1436,7 +1549,7 @@ class VacancyTILDParallel(VacancyTILD):
 
         # create_vacancy
         g.create_vacancy.input.structure = ip.structure
-        g.create_vacancy.input.id = ip.vacancy_id
+        g.create_vacancy.input.atom_id = ip.vacancy_id
 
         # build_lambdas
         g.build_lambdas.input.n_lambdas = ip.n_lambdas

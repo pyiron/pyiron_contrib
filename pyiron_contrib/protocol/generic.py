@@ -339,7 +339,7 @@ class PrimitiveVertex(Vertex):
         return_dict[n] = output_data
 
 
-class CompoundVertex(Vertex): #, PyironJobTypeRegistry):
+class CompoundVertex(Vertex):
     """
     Vertices which contain a graph and produce output only after traversing their graph to its exit point.
 

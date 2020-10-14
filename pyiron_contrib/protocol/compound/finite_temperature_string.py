@@ -22,7 +22,6 @@ from pyiron_contrib.protocol.utils import Pointer
 
 """
 Protocols for the finite temperature string (FTS) method.
-
 """
 
 __author__ = "Raynol Dsouza, Liam Huber"
@@ -44,6 +43,45 @@ class FTSEvolution(CompoundVertex):
           2. Convergence criterion is NOT implemented for this protocol, because it runs serially (and would take
         a VERY long time to achieve a good convergence.
 
+    Input attributes:
+        ref_job_full_path (string): The path to the saved reference job to use for calculating forces and energies.
+        structure_initial (Atoms): The initial structure.
+        structure_initial (Atoms): The final structure.
+        temperature (float): Temperature to run at in K.
+        n_steps (int): How many MD steps to run for. (Default is 100.)
+        temperature_damping_timescale (float): Langevin thermostat timescale in fs. (Default is None, which runs NVE.)
+        overheat_fraction (float): The fraction by which to overheat the initial velocities. This can be useful for
+            more quickly equilibrating a system whose initial structure is its fully relaxed positions -- in which
+            case equipartition of energy tells us that the kinetic energy should be initialized to double the
+            desired value. (Default is 2.0, assume energy equipartition is a good idea.)
+        time_step (float): MD time step in fs. (Default is 1.)
+        sampling_period (int): Account output every `sampling_period' for the TI operations. (Default is 1, account
+            for every MD step.
+        thermalization_steps (int): Number of steps the system is thermalized for to reach equilibrium. (Default is
+            10 steps.)
+        n_images (int): Number of centroids / images. (Default is 5.)
+        initial_positions (list/np.ndarray): The initial positions of the images (preferably from NEB).
+            Default is None)
+        cutoff_factor (float): The cutoff is obtained by taking the first nearest neighbor distance and multiplying
+            it by the cutoff factor. A default value of 0.4 is chosen, because taking a cutoff factor of ~0.5
+            sometimes let certain reflections off the hook, and we do not want that to happen. (Default is 0.4.)
+        mixing_fraction (float): How much of the images' running average of position to mix into the centroid positions
+            each time the mixer is called. (Default is 0.1.)
+        relax_endpoints (bool): Whether or not to relax the endpoints of the string. (Default is False.)
+        smooth_style (string): Apply 'global' or 'local' smoothing. (Default is 'global'.)
+        nominal_smoothing (float): How much smoothing to apply to the updating centroid positions (endpoints are
+            not effected). The actual smoothing is the product of this nominal value, the number of images, and the
+            mixing fraction, ala Vanden-Eijnden and Venturoli (2009). (Default is 0.1.)
+        divisor (int): Necessary for calculation of the running average. (Default is 1.)
+        use_reflection (boolean): Turn on or off `SphereReflectionPerAtom` (Default is True.)
+        total_steps (int): The total number of times `SphereReflectionPerAtom` is called so far. (Default is 0.)
+        project_path (string): Initialize default project path to pass into the child protocol. (Default is None.)
+        job_name (string): Initialize default job name to pass into the child protocol. (Default is None.)
+
+    Output attributes:
+        energy_pot (list[float]): Total potential energy of the system in eV.
+        positions (list[numpy.ndarray]): Atomic positions in angstroms for each centroid.
+        forces (list[numpy.ndarray]): Atomic forces in eV/angstrom for each centroid.
     """
 
     # DefaultWhitelist sets the output which will be stored every `archive period' in the final hdf5 file.
@@ -61,23 +99,25 @@ class FTSEvolution(CompoundVertex):
 
         # Protocol defaults
         id_ = self.input.default
-        id_.temperature = 1.  # The target temperature in K.
-        id_.n_steps = 100  # Number of md steps.
-        id_.temperature_damping_timescale = 100.  # Same as `temperature_damping_timescale' in calc_md().
-        id_.overheat_fraction = 2.  # The fraction by which to overheat the initial velocities.
-        id_.time_step = 1.  # The MD time step in fs.
-        id_.sampling_period = 1  # Account only for output every `sampling_period' for the TI operations.
-        id_.thermalization_steps = 10  # Number of steps the system is thermalized for to reach equilibrium.
-        id_.initial_positions = None  # The initial centroid positions can also be specified with the job.
-        id_.cutoff_factor = 0.4  # This factor times the 1NN distance is the reflection cutoff.
-        id_.mixing_fraction = 0.1  # How much of the running average of the images to mix into the centroids.
-        id_.smooth_style = 'local'  # Smoothing style can be `local' or `global'.
-        id_.nominal_smoothing = 0.1  # How much smoothing to apply to the running average mixed centroids.
-        id_.divisor = 1  # Necessary for calculation of the running average.
-        id_.use_reflection = True  # Whether or not to use reflection.
-        id_.total_steps = 0  # The total number of md steps that have been performed so far.
-        id_.project_path = None  # Initialize default project path.
-        id_.job_name = None  # Initialize default job name.
+        id_.temperature = 1.
+        id_.n_steps = 100
+        id_.temperature_damping_timescale = 100.
+        id_.overheat_fraction = 2.
+        id_.time_step = 1.
+        id_.sampling_period = 1
+        id_.thermalization_steps = 10
+        id_.n_images = 5
+        id_.initial_positions = None
+        id_.cutoff_factor = 0.4
+        id_.mixing_fraction = 0.1
+        id_.relax_endpoints = True
+        id_.smooth_style = 'local'
+        id_.nominal_smoothing = 0.1
+        id_.divisor = 1
+        id_.use_reflection = True
+        id_.total_steps = 0
+        id_.project_path = None
+        id_.job_name = None
 
     def define_vertices(self):
         # Graph components
@@ -265,6 +305,7 @@ class FTSEvolution(CompoundVertex):
         g.mix.input.default.centroids_pos_list = gp.initial_positions.output.initial_positions[-1]
         g.mix.input.centroids_pos_list = gp.reparameterize.output.centroids_pos_list[-1]
         g.mix.input.mixing_fraction = ip.mixing_fraction
+        g.mix.input.relax_endpoints = ip.relax_endpoints
         g.mix.input.running_average_positions = gp.running_average_pos.output.running_average_positions[-1]
         g.mix.input.cell = ip.structure_initial.cell.array
         g.mix.input.pbc = ip.structure_initial.pbc
@@ -495,6 +536,12 @@ class FTSEvolutionParallel(FTSEvolution):
     A version of FTSEvolution where the evolution of each image is executed in parallel, thus giving a
         substantial speed-up.
 
+    Input attributes:
+      sleep_time (float): A delay in seconds for database access of results. For sqlite, a non-zero delay maybe
+            required. (Default is 0 seconds, no delay.)
+
+    For inherited input and output attributes, refer the `FTSEvolution` protocol.
+
     """
 
     def __init__(self, **kwargs):
@@ -658,6 +705,7 @@ class FTSEvolutionParallel(FTSEvolution):
         g.mix.input.default.centroids_pos_list = gp.initial_positions.output.initial_positions[-1]
         g.mix.input.centroids_pos_list = gp.reparameterize.output.centroids_pos_list[-1]
         g.mix.input.mixing_fraction = ip.mixing_fraction
+        g.mix.input.relax_endpoints = ip.relax_endpoints
         g.mix.input.running_average_positions = gp.constrained_evo.output.running_average_positions[-1]
         g.mix.input.cell = ip.structure_initial.cell.array
         g.mix.input.pbc = ip.structure_initial.pbc

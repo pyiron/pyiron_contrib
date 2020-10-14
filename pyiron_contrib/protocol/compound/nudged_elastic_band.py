@@ -14,12 +14,11 @@ from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
 from pyiron_contrib.protocol.primitive.one_state import Counter, CreateJob, ExternalHamiltonian, GradientDescent, \
     InitialPositions, NEBForces
 from pyiron_contrib.protocol.primitive.two_state import IsGEq
-from pyiron_contrib.protocol.list import SerialList, ParallelList, AutoList
+from pyiron_contrib.protocol.list import SerialList, AutoList
 from pyiron_contrib.protocol.utils import Pointer
 
 """
 Protocol for nudged elastic band (NEB) minimization.
-
 """
 
 __author__ = "Liam Huber, Raynol Dsouza, Jan Janssen"
@@ -36,7 +35,7 @@ class NEB(CompoundVertex):
     """
     Relaxes a system according to the nudged elastic band method (Jonsson et al).
 
-    Input dictionary:
+    Input attributes:
         ref_job_full_path (str): Path to the pyiron job to use for evaluating forces and energies.
         structure_initial (Atoms): The starting structure for the elastic band.
         structure_final (Atoms): The final structure for the elastic band. Warning: must have the same number and
@@ -56,7 +55,7 @@ class NEB(CompoundVertex):
             is True)
         use_adagrad (bool): Whether to have the step size decay according to adagrad. (Default is False)
 
-    Output dictionary:
+    Output attributes:
         energy_pot (list[float]): Total potential energy of the system in eV.
         positions (list[numpy.ndarray]): Atomic positions in angstroms for each image.
         forces (list[numpy.ndarray]): Atomic forces in eV/angstrom for each image, including spring forces.

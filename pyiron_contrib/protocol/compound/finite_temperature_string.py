@@ -110,7 +110,7 @@ class FTSEvolution(CompoundVertex):
         id_.initial_positions = None
         id_.cutoff_factor = 0.4
         id_.mixing_fraction = 0.1
-        id_.relax_endpoints = True
+        id_.relax_endpoints = False
         id_.smooth_style = 'local'
         id_.nominal_smoothing = 0.1
         id_.divisor = 1

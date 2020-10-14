@@ -454,9 +454,8 @@ class CompoundVertex(Vertex):
             hdf (ProjectHDFio): HDF5 group object.
             group_name (str): HDF5 subgroup name - optional
         """
-        with hdf.open(self.vertex_name) as graph_hdf:
-            self.graph.to_hdf(hdf=graph_hdf, group_name="graph")
         super(CompoundVertex, self).to_hdf(hdf=hdf, group_name=group_name)
+        self.graph.to_hdf(hdf=hdf, group_name="graph")
 
     def from_hdf(self, hdf=None, group_name=None):
         """
@@ -466,8 +465,9 @@ class CompoundVertex(Vertex):
             hdf (ProjectHDFio): HDF5 group object - optional
             group_name (str): HDF5 subgroup name - optional
         """
-        super(CompoundVertex, self).from_hdf(hdf=hdf, group_name=group_name)
-        self.graph.from_hdf(hdf=hdf, group_name="graph")
+        super(CompoundVertex, self).from_hdf(hdf=hdf, group_name=group_name or self.vertex_name)
+        with hdf.open(self.vertex_name) as hdf5_server:
+            self.graph.from_hdf(hdf=hdf5_server, group_name="graph")
         self.define_information_flow()  # Rewire pointers
 
     def visualize(self, execution=True, dataflow=True):

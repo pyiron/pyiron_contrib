@@ -1072,7 +1072,7 @@ class CutoffDistance(PrimitiveVertex):
     """
 
     def command(self, structure, cutoff_factor=0.4):
-        nn_list = structure.get_neighbors(num_neighbors=1, exclude_self=True)
+        nn_list = structure.get_neighbors(num_neighbors=1)
         cutoff_distance = nn_list.distances[0] * cutoff_factor
 
         return {

@@ -360,7 +360,7 @@ class HarmonicTILD(TILDParent):
         g.fep_exp.input.n_children = ip.n_lambdas
         g.fep_exp.broadcast.u_diff = gp.addition.output.weighted_sum[-1]
         g.fep_exp.broadcast.delta_lambda = gp.build_lambdas.output.delta_lambdas[-1]
-        g.fep_exp.broadcast.temperature = gp.verlet_velocities.output.instant_temperature[-1]
+        g.fep_exp.direct.temperature = ip.temperature
 
         # average_fep_exp
         g.average_fep_exp.input.n_children = ip.n_lambdas
@@ -372,7 +372,7 @@ class HarmonicTILD(TILDParent):
         g.post.input.tild_std = gp.average_tild.output.std[-1]
         g.post.input.fep_exp_mean = gp.average_fep_exp.output.mean[-1]
         g.post.input.fep_exp_std = gp.average_fep_exp.output.std[-1]
-        g.post.input.temperature = gp.average_temp.output.mean[-1]
+        g.post.input.temperature = ip.temperature
         g.post.input.n_samples = gp.average_tild.output.n_samples[-1][-1]
 
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
@@ -1197,7 +1197,7 @@ class VacancyTILD(TILDParent):
         g.fep_exp.input.n_children = ip.n_lambdas
         g.fep_exp.broadcast.u_diff = gp.addition.output.weighted_sum[-1]
         g.fep_exp.broadcast.delta_lambda = gp.build_lambdas.output.delta_lambdas[-1]
-        g.fep_exp.broadcast.temperature = gp.verlet_velocities.output.instant_temperature[-1]
+        g.fep_exp.direct.temperature = ip.temperature
 
         # average_fep_exp
         g.average_fep_exp.input.n_children = ip.n_lambdas
@@ -1421,7 +1421,7 @@ class Decoupling(CompoundVertex):
 
         # fep_exp
         g.fep_exp.input.u_diff = gp.addition.output.weighted_sum[-1]
-        g.fep_exp.input.temperature = gp.verlet_velocities.output.instant_temperature[-1]
+        g.fep_exp.input.temperature = ip.temperature
         g.fep_exp.input.delta_lambda = ip.delta_lambdas
 
         # average_fep_exp

@@ -9,8 +9,8 @@ from pyiron import Atoms
 from pyiron.atomistics.job.atomistic import AtomisticGenericJob
 from pyiron.atomistics.job.sqs import SQSJob
 from pyiron_mpie.interactive.elastic import ElasticMatrixJob
-# import matplotlib.pyplot as plt
-# import seaborn as sns
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 """
 Calculate the elastic matrix for special quasi-random structures.
@@ -465,6 +465,79 @@ class SQSElasticConstantsList(ParallelMaster):
     @property
     def _ordered_children(self):
         return [self[self.child_names[n]] for n in np.sort(self.child_ids)]
+
+    def _get_species_fraction(self, symbol):
+        # return [chemistry[symbol] for chemistry in self.output.chemistries]
+        # InputList does not currently load in a friendly way, so look directly at the HDF
+        return [chemistry[symbol] for chemistry in self['output/data']['chemistries']]
+
+    def _get_species_fraction_range(self, symbol):
+        return (
+            np.amin(self._get_species_fraction(symbol)),
+            np.amax(self._get_species_fraction(symbol))
+        )
+
+    def _get_species_elastic_constant(self, symbol, indices):
+        # return self.output.elastic_matrices.mean[:, indices[0], indices[1]]
+        # InputList does not currently load in a friendly way, so look directly at the HDF
+        return np.mean(self['output/data']['_elastic_matrices'], axis=1)[:, indices[0], indices[1]]
+
+    def get_elastic_constant_data(self, symbol, indices):
+        return (
+            self._get_species_fraction(symbol),
+            self._get_species_elastic_constant(symbol, indices)
+        )
+
+    def get_elastic_constant_poly(self, symbol, indices, deg=2):
+        return np.poly1d(
+            np.polyfit(
+                *self.get_elastic_constant_data(symbol, indices),
+                deg=deg
+            )
+        )
+
+    def get_C11_poly(self, symbol, deg=2):
+        return self.get_elastic_constant_poly(symbol, (0, 0), deg=deg)
+
+    def get_C12_poly(self, symbol, deg=2):
+        return self.get_elastic_constant_poly(symbol, (0, 1), deg=deg)
+
+    def get_C44_poly(self, symbol, deg=2):
+        return self.get_elastic_constant_poly(symbol, (3, 3), deg=deg)
+
+    def get_C11_data(self, symbol):
+        return self.get_elastic_constant_data(symbol, (0, 0))
+
+    def get_C12_data(self, symbol):
+        return self.get_elastic_constant_data(symbol, (0, 1))
+
+    def get_C44_data(self, symbol):
+        return self.get_elastic_constant_data(symbol, (3, 3))
+
+    def plot(self, symbol, ax=None, deg=2):
+        if ax is None:
+            _, ax = plt.subplots()
+        concentration = np.linspace(*self._get_species_fraction_range(symbol), num=1000)
+        for label, color, data, poly in zip(
+                ['C11', 'C12', 'C44'],
+                sns.color_palette(n_colors=3),
+                [
+                    self.get_C11_data(symbol),
+                    self.get_C12_data(symbol),
+                    self.get_C44_data(symbol)
+                ],
+                [
+                    self.get_C11_poly(symbol, deg=deg),
+                    self.get_C12_poly(symbol, deg=deg),
+                    self.get_C44_poly(symbol, deg=deg)
+                ]
+        ):
+            ax.scatter(*data, label=label, color=color)
+            ax.plot(concentration, poly(concentration), color=color)
+        ax.legend()
+        ax.set_xlabel(symbol + ' Atomic fraction')
+        ax.set_ylabel('Elastic constants (GPa)')
+        return ax
 
 
 # Snippets for later:

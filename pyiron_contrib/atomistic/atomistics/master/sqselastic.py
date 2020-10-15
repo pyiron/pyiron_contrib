@@ -13,13 +13,13 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 """
-Calculate the elastic matrix for special quasi-random structures.
+Calculate the elastic matrices for special quasi-random structures.
 """
 
 __author__ = "Liam Huber"
 __copyright__ = "Copyright 2020, Max-Planck-Institut für Eisenforschung GmbH " \
                 "- Computational Materials Design (CM) Department"
-__version__ = "0.0"
+__version__ = "0.1"
 __maintainer__ = "Liam Huber"
 __email__ = "huber@mpie.de"
 __status__ = "development"
@@ -67,20 +67,25 @@ class StatsArray:
 
 
 def _as_stats_array(axis=0):
+    """
+    A decorator to wrap function output as a `StatsArray`. Ideal for use together with an `@property`.
+
+    Args:
+        axis (int): Which axis the `StatsArray` should calculate statistics over. (Default is 0.)
+    """
     def stats_array_wrapper(fnc):
-        """Wrap output as a `StatsArray`. Ideal for use together with an `@property`."""
         def decorated(*args, **kwargs):
             return StatsArray(fnc(*args, **kwargs), axis=axis)
         return decorated
     return stats_array_wrapper
 
 
-# This can't be a method, or FlexibleMaster throws an IndentationError when you try to load
+# TODO: FlexibleMaster throws an IndentationError when you try to load if this is a method of SQSElasticConstants
 def _sqs2minimization(sqs_job, min_job):
     min_job.structure_lst = sqs_job.list_structures()
 
 
-# This can't be a method, or FlexibleMaster throws an IndentationError when you try to load
+# TODO: FlexibleMaster throws an IndentationError when you try to load if this is a method of SQSElasticConstants
 def _minimization2elastic(min_job, elastic_job):
     elastic_job.structure_lst = [
         min_job['struct_{}'.format(int(i))].get_structure()
@@ -92,9 +97,9 @@ class SQSElasticConstants(FlexibleMaster):
     """
     Calculates the elastic constants for structures generated according to the special quasi-random structure scheme.
 
-    This job itself takes no input, but rather the input is passed in via the reference jobs, e.g. `ref_ham` handles
-    all input for the force/energy evaluations (e.g. emperical potential if a classical interpreter, kpoints, energy
-    cutoff, etc. for quantum interpreters...), `ref_sqs` handles the SQS input like the molar fractions and how many
+    This job itself takes no input, but rather the input is passed in via the reference jobs: `ref_ham` handles all
+    input for the force/energy evaluations (e.g. emperical potential if a classical interpreter, kpoints, energy cutoff,
+    etc. for quantum interpreters...), `ref_sqs` handles the SQS input like the molar fractions and how many
     structures to produce, and `ref_elastic` holds the input for evaluating the elastic constants, like what strain
     magnitude to apply. See the docstrings of these individual jobs for more details.
 
@@ -119,7 +124,7 @@ class SQSElasticConstants(FlexibleMaster):
         structures (list): The minimized structures.
         cells (StatsArray): The cells of the minimized structures.
         symbols (list): The chemical symbols (possibly including '0' for vacancy) in the SQS structures.
-        chemistries (dict): The actual chemical fraction of each species (including '0' for vacancy) in the structures.
+        compositions (dict): The actual chemical fraction of each species (including '0' for vacancy) in the structures.
 
     Methods:
         get_elastic_output: A function taking a string key for accessing other output from the `ElasticMatrixJob` as a
@@ -128,7 +133,7 @@ class SQSElasticConstants(FlexibleMaster):
     Note: The `StatsArray` class is a wrapper for numpy arrays that allows you to look at the `.array`, `.mean`,
         `.std` and `.sem` (standard error) with respect to the different SQS structures.
 
-    Warning: Initial relaxation is only isotropic with respect to cell shape.
+    Warning: Initial relaxation is only *isotropic* with respect to cell shape!
     """
     def __init__(self, project, job_name):
         super().__init__(project, job_name=job_name)
@@ -142,24 +147,28 @@ class SQSElasticConstants(FlexibleMaster):
 
         self.output = SQSElasticOutput(table_name='output', axis=0)
 
+        self._ham_ref_name_tail ='ham_ref'
+        self._sqs_ref_name_tail = 'sqs_ref'
         self._sqs_job_name_tail = 'sqs'
-        self._min_job_name_tail = 'min'
         self._min_ref_name_tail = 'min_ref'
+        self._min_job_name_tail = 'min'
         self._elastic_ref_ham_name_tail = 'el_ref'
         self._elastic_ref_single_name_tail = 'el_job'
         self._elastic_job_name_tail = 'elastic'
+        # TODO: Once creating/copying jobs as HDF children is sorted out, this attribute salad can probably be
+        #  refactored away
 
     @property
     def sqs_job_name(self):
-        return self._relative_name('sqs')
+        return self._relative_name(self._sqs_job_name_tail)
 
     @property
     def min_job_name(self):
-        return self._relative_name('min')
+        return self._relative_name(self._min_job_name_tail )
 
     @property
     def elastic_job_name(self):
-        return self._relative_name('elastic')
+        return self._relative_name(self._elastic_job_name_tail)
 
     def validate_ready_to_run(self):
         self._create_pipeline()
@@ -175,6 +184,7 @@ class SQSElasticConstants(FlexibleMaster):
     def _instantiate_sqs(self):
         # sqs_job = self.create_job(self._job_type.SQSJob, self._relative_name('sqs_job'))
         # sqs_job.input = self.ref_sqs.input
+        # TODO: Get the sqs job created as a proper child
         sqs_job = self._copy_job(self.ref_sqs, self._sqs_job_name_tail)
         sqs_job.input.mole_fractions = dict(sqs_job.input.mole_fractions)  # Input expects dict but gets InputList(dict)
         sqs_job.structure = self.ref_ham.structure.copy()
@@ -192,8 +202,10 @@ class SQSElasticConstants(FlexibleMaster):
 
     def _instantiate_minimization(self):
         min_ref = self._copy_job(self.ref_ham, self._min_ref_name_tail)
+        # TODO: Get the min ref saved as a proper HDF child
         min_ref.calc_minimize(pressure=0)
         # min_job = self.create_job(self._job_type.StructureListMaster, self._relative_name('min'))
+        # TODO: Get the min job created as a proper HDF child
         min_job = self._create_job(self._job_type.StructureListMaster, self._min_job_name_tail)
         min_job.ref_job = min_ref
         return min_job
@@ -206,6 +218,7 @@ class SQSElasticConstants(FlexibleMaster):
 
     def _instantiate_elastic(self):
         elastic_ref = self._copy_job(self.ref_ham, self._elastic_ref_ham_name_tail)
+        # TODO: Get the elastic ref saved as a proper HDF child
 
         # This should work, but doesn't maintain the elastic ref input and goes back to class defaults:
         # elastic_job = elastic_ref.create_job(self._job_type.ElasticMatrixJob, self._relative_name('el_job'))
@@ -214,6 +227,7 @@ class SQSElasticConstants(FlexibleMaster):
         # elastic_job = self._copy_job(self.ref_elastic, 'el_job')  # ValueError: Unknown item: se_el_ham_ref
 
         # elastic_job = self.create_job(self._job_type.ElasticMatrixJob, self._relative_name('el_job'))
+        # TODO: Get the elastic job created as a proper HDF child
         elastic_job = self._create_job(self._job_type.ElasticMatrixJob, self._elastic_ref_single_name_tail)
         elastic_job.input = self.ref_elastic.input
         elastic_job.ref_job = elastic_ref
@@ -252,17 +266,18 @@ class SQSElasticConstants(FlexibleMaster):
                 ))
 
     def _ensure_references_saved(self):
-        if self.ref_ham.job_name != self._relative_name('ham_ref'):
-            self.ref_ham = self._copy_job(self.ref_ham, 'ham_ref')
+        # TODO: Once creating subjobs as proper HDF children is sorted, perhaps this can all be removed
+        if self.ref_ham.job_name != self._relative_name(self._ham_ref_name_tail):
+            self.ref_ham = self._copy_job(self.ref_ham, self._ham_ref_name_tail)
 
-        if self.ref_sqs.job_name != self._relative_name('sqs_ref'):
-            self.ref_sqs = self._copy_job(self.ref_sqs, 'sqs_ref')
+        if self.ref_sqs.job_name != self._relative_name(self._sqs_ref_name_tail):
+            self.ref_sqs = self._copy_job(self.ref_sqs, self._sqs_ref_name_tail)
 
         if self.ref_elastic.ref_job is None \
-                or self.ref_elastic.ref_job.job_name != self._relative_name(self._elastic_ref_single_name_tail):
-            self.ref_elastic.ref_job = self._copy_job(self.ref_ham, self._elastic_ref_single_name_tail)
-        if self.ref_elastic.job_name != self._relative_name('el_ref'):
-            self.ref_elastic = self._copy_job(self.ref_elastic, 'el_ref')
+                or self.ref_elastic.ref_job.job_name != self._relative_name(self._elastic_ref_ham_name_tail):
+            self.ref_elastic.ref_job = self._copy_job(self.ref_ham, self._elastic_ref_ham_name_tail)
+        if self.ref_elastic.job_name != self._relative_name(self._elastic_ref_single_name_tail):
+            self.ref_elastic = self._copy_job(self.ref_elastic, self._elastic_ref_single_name_tail)
 
         for job in [self.ref_ham, self.ref_sqs, self.ref_elastic]:
             self._save_reference_if_new(job)
@@ -295,10 +310,10 @@ class SQSElasticConstants(FlexibleMaster):
         #     Atoms().from_hdf(self[self.min_job_name]['struct_{}/output'.format(n)])
         #     for n in np.arange(self.output.n_structures)
         # ]
-        # Saving a list of structures is not yet supported by InputList
+        # TODO: InputList does not yet handle saving a list of structures
 
         # self.output.cells = [structure.cell.array for structure in self.output.structures]
-        # Awaiting structures output
+        # TODO: Awaiting structures output
         self.output.cells = [
             self[self.min_job_name]['struct_{}/output/structure/cell/cell'.format(n)]
             for n in np.arange(self.output.n_structures)
@@ -306,9 +321,9 @@ class SQSElasticConstants(FlexibleMaster):
 
         self.output.symbols = list(self[self.sqs_job_name]['input/custom_dict/data']['mole_fractions'].keys())
 
-        # struct = self.output.structures[0]  # Awaiting structures output
+        # struct = self.output.structures[0]  # TODO: Awaiting structures output, then inline this below
         struct = Atoms().from_hdf(self[self.min_job_name]['struct_0/output'])
-        self.output.chemistries = {
+        self.output.compositions = {
             symbol: self._species_fraction(struct, symbol)
             for symbol in self.output.symbols
         }
@@ -323,6 +338,15 @@ class SQSElasticConstants(FlexibleMaster):
 
     @_as_stats_array()
     def get_elastic_output(self, key):
+        """
+        Collects output from the underlying elastic job.
+
+        Args:
+            key (str):
+
+        Returns:
+            (StatsArray): A sub-element from the elastic job output.
+        """
         try:
             return [
                 self[self.elastic_job_name]['struct_{}/output/elasticmatrix'.format(n)][key]
@@ -382,11 +406,11 @@ class SQSElasticOutput(InputList):
 
 
 class _SQSElasticConstantsGenerator(JobGenerator):
-    """Generates jobs with different chemistries."""
+    """Generates jobs with different compositions."""
 
     @property
     def parameter_list(self):
-        return self._job.input.chemistry
+        return self._job.input.compositions
 
     @staticmethod
     def job_name(parameter):
@@ -409,7 +433,7 @@ class SQSElasticConstantsList(ParallelMaster):
         output (SQSElasticOutput): Output collected from the various child jobs.
 
     Input:
-        chemistries (list): A list of dictionary items, each providing (key, value) pairs that are the chemical symbol
+        compositions (list): A list of dictionary items, each providing (key, value) pairs that are the chemical symbol
             and (approximate) fraction of the cell that should have that species. Following the standard of
             pyiron.atomistics.job.sqs.SQSJob, each dictionary should have fractions summing to 1 and '0' may be used as
             a key to indicate vacancies.
@@ -420,11 +444,15 @@ class SQSElasticConstantsList(ParallelMaster):
         # structures (list): The minimized structures of the children.
         cells (StatsArray): The cells of the minimized structures of the children.
         symbols (list): The chemical symbols (possibly including '0' for vacancy) in the SQS structures of the children.
-        chemistry (dict): The actual chemical fraction of each species (including '0' for vacancy) in the structures of
-            the children.
+        compositions (dict): The actual chemical fraction of each species (including '0' for vacancy) in the structures
+            of the children.
 
     Methods:
-
+        get_elastic_constant_data: Get an elastic constant and chemical fractions for a particular species.
+        get_elastic_constant_poly: Get a fit polynomial of an elastic constant for a particular species.
+        get_C11/12/44_data: Get the C11, 12, or 44 elastic constant and species fraction for a particular species.
+        get_C11/12/44_poly: Get the C11, 12, or 44 polynomial for a particular species.
+        plot: Visualize the concentration-dependent elastic constants vs a particular species' concentration.
     """
     def __init__(self, project, job_name):
         super().__init__(project, job_name=job_name)
@@ -433,7 +461,7 @@ class SQSElasticConstantsList(ParallelMaster):
         self.__hdf_version__ = "0.2.0"
 
         self.input = InputList(table_name='input')
-        self.input.chemistries = []
+        self.input.compositions = []
         self.output = SQSElasticOutput(table_name='output', axis=1)
 
         self._job_generator = _SQSElasticConstantsGenerator(self)
@@ -453,7 +481,7 @@ class SQSElasticConstantsList(ParallelMaster):
         self.output._cells = self._collect_output_from_children('_cells')
         self.output._elastic_matrices = self._collect_output_from_children('_elastic_matrices')
         self.output._residual_pressures = self._collect_output_from_children('_residual_pressures')
-        self.output.chemistries = self._collect_output_from_children('chemistries')
+        self.output.compositions = self._collect_output_from_children('compositions')
         self.output.n_sites = self._collect_output_from_children('n_sites')
         self.output.n_structures = self._collect_output_from_children('n_structures')
         self.output.symbols = self._collect_output_from_children('symbols')
@@ -467,9 +495,9 @@ class SQSElasticConstantsList(ParallelMaster):
         return [self[self.child_names[n]] for n in np.sort(self.child_ids)]
 
     def _get_species_fraction(self, symbol):
-        # return [chemistry[symbol] for chemistry in self.output.chemistries]
+        # return [composition[symbol] for composition in self.output.compositions]
         # InputList does not currently load in a friendly way, so look directly at the HDF
-        return [chemistry[symbol] for chemistry in self['output/data']['chemistries']]
+        return [composition[symbol] for composition in self['output/data']['compositions']]
 
     def _get_species_fraction_range(self, symbol):
         return (

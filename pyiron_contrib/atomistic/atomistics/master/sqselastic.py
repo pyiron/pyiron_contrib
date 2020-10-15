@@ -130,6 +130,8 @@ class SQSElasticConstants(FlexibleMaster):
         self.ref_sqs = None
         self.ref_elastic = None
 
+        self.output = _SQSElasticConstantsOutput(table_name='output')
+
         self._sqs_job_name_tail = 'sqs'
         self._min_job_name_tail = 'min'
         self._min_ref_name_tail = 'min_ref'
@@ -137,11 +139,17 @@ class SQSElasticConstants(FlexibleMaster):
         self._elastic_ref_single_name_tail = 'el_job'
         self._elastic_job_name_tail = 'elastic'
 
-        self.sqs_job_name = self._relative_name('sqs')
-        self.min_job_name = self._relative_name('min')
-        self.elastic_job_name = self._relative_name('elastic')
+    @property
+    def sqs_job_name(self):
+        return self._relative_name('sqs')
 
-        self.output = _SQSElasticConstantsOutput(table_name='output')
+    @property
+    def min_job_name(self):
+        return self._relative_name('min')
+
+    @property
+    def elastic_job_name(self):
+        return self._relative_name('elastic')
 
     def validate_ready_to_run(self):
         self._create_pipeline()
@@ -389,6 +397,7 @@ class SQSElasticConstantsList(ParallelMaster):
 
         self.input = InputList(table_name='input')
         self.input.chemistry = []
+        self.output = _SQSElasticConstantsListOutput(table_name='output')
 
         self._job_generator = _SQSElasticConstantsGenerator(self)
         self._python_only_job = True
@@ -396,13 +405,19 @@ class SQSElasticConstantsList(ParallelMaster):
     def to_hdf(self, hdf=None, group_name=None):
         super().to_hdf(hdf, group_name)
         self.input.to_hdf(self._hdf5)
+        self.output.to_hdf(self._hdf5)
 
     def from_hdf(self, hdf=None, group_name=None):
         super().from_hdf(hdf, group_name)
         self.input.from_hdf(self._hdf5)
+        self.output.from_hdf(self._hdf5)
 
     def collect_output(self):
         pass
+
+
+class _SQSElasticConstantsListOutput(InputList):
+    pass
 
 # Snippets for later:
 

@@ -147,7 +147,7 @@ class SQSElasticConstants(FlexibleMaster):
 
         self.output = SQSElasticOutput(table_name='output', axis=0)
 
-        self._ham_ref_name_tail ='ham_ref'
+        self._ham_ref_name_tail = 'ham_ref'
         self._sqs_ref_name_tail = 'sqs_ref'
         self._sqs_job_name_tail = 'sqs'
         self._min_ref_name_tail = 'min_ref'

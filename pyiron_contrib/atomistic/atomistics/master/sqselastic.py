@@ -26,13 +26,17 @@ __status__ = "development"
 __date__ = "Oct 2, 2020"
 
 
-class ChemicalArray:
+class StatsArray:
     """
-    A convenience class for wrapping arrays of SQS elastic data where the zeroth dimension spans across chemistry.
+    A convenience class for wrapping arrays of data where one of the dimensions spans across some statistical variation.
+
+    Attributes:
+        axis (int): The axis of the data over which to take statistical measures.
     """
 
-    def __init__(self, data):
+    def __init__(self, data, axis=0):
         self._data = np.array(data)
+        self.axis = axis
 
     @property
     def array(self):
@@ -40,15 +44,15 @@ class ChemicalArray:
 
     @property
     def mean(self):
-        return self._data.mean(axis=0)
+        return self._data.mean(axis=self.axis)
 
     @property
     def std(self):
-        return self._data.std(axis=0)
+        return self._data.std(axis=self.axis)
 
     @property
     def sem(self):
-        return self._data.std(axis=0) / len(self._data)
+        return self._data.std(axis=self.axis) / len(self._data)
 
     def __repr__(self):
         return str(self._data)
@@ -62,11 +66,13 @@ class ChemicalArray:
             self._data = hdf5['data']
 
 
-def _as_chemical_array(fnc):
-    """Wrap output as a `ChemicalArray`. Ideal for use together with an `@property`."""
-    def decorated(*args, **kwargs):
-        return ChemicalArray(fnc(*args, **kwargs))
-    return decorated
+def _as_stats_array(axis=0):
+    def stats_array_wrapper(fnc):
+        """Wrap output as a `StatsArray`. Ideal for use together with an `@property`."""
+        def decorated(*args, **kwargs):
+            return StatsArray(fnc(*args, **kwargs), axis=axis)
+        return decorated
+    return stats_array_wrapper
 
 
 # This can't be a method, or FlexibleMaster throws an IndentationError when you try to load
@@ -102,20 +108,24 @@ class SQSElasticConstants(FlexibleMaster):
             species in `ref_ham.structure` according to the molar fractions provided in its input.
         ref_elastic (pyiron_mpie.interactive.elastic.ElasticMatrixJob): Calculates elastic constants for each of the SQS
             structures.
+        output (SQSElasticOutput): Output collected from the various child jobs.
+        sqs_job_name (str): The name of the sqs child job.
+        min_job_name (str): The name of the minimiztion list child job.
+        elastic_job_name (str): The name of the elastic constants list child job.
 
     Output:
-        elastic_matrix (ChemicalArray): The six-component elastic matrix.
-        residual_pressures (ChemicalArray): The remaining pressure after minimization.
+        elastic_matrices (StatsArray): The six-component elastic matrices.
+        residual_pressures (StatsArray): The remaining pressures after minimization.
         structures (list): The minimized structures.
-        cells (ChemicalArray): The cells of the minimized structures.
+        cells (StatsArray): The cells of the minimized structures.
         symbols (list): The chemical symbols (possibly including '0' for vacancy) in the SQS structures.
-        chemistry (dict): The actual chemical fraction of each species (including '0' for vacancy) in the structures.
+        chemistries (dict): The actual chemical fraction of each species (including '0' for vacancy) in the structures.
 
     Methods:
         get_elastic_output: A function taking a string key for accessing other output from the `ElasticMatrixJob` as a
-            `ChemicalArray`. (If you ask for an invalid key, all the valid possibilities will be printed for you.)
+            `StatsArray`. (If you ask for an invalid key, all the valid possibilities will be printed for you.)
 
-    Note: The `ChemicalArray` class is a wrapper for numpy arrays that allows you to look at the `.array`, `.mean`,
+    Note: The `StatsArray` class is a wrapper for numpy arrays that allows you to look at the `.array`, `.mean`,
         `.std` and `.sem` (standard error) with respect to the different SQS structures.
 
     Warning: Initial relaxation is only isotropic with respect to cell shape.
@@ -130,7 +140,7 @@ class SQSElasticConstants(FlexibleMaster):
         self.ref_sqs = None
         self.ref_elastic = None
 
-        self.output = _SQSElasticConstantsOutput(table_name='output')
+        self.output = SQSElasticOutput(table_name='output', axis=0)
 
         self._sqs_job_name_tail = 'sqs'
         self._min_job_name_tail = 'min'
@@ -274,7 +284,7 @@ class SQSElasticConstants(FlexibleMaster):
 
         self.output.n_structures = len(self[self.min_job_name]['input/structures'].list_groups())
 
-        self.output.elastic_matrix = self.get_elastic_output('C').array
+        self.output.elastic_matrices = self.get_elastic_output('C').array
 
         self.output.residual_pressures = [
             self[self.min_job_name]['struct_{}/output/generic/pressures'.format(n)][-1]
@@ -298,7 +308,7 @@ class SQSElasticConstants(FlexibleMaster):
 
         # struct = self.output.structures[0]  # Awaiting structures output
         struct = Atoms().from_hdf(self[self.min_job_name]['struct_0/output'])
-        self.output.chemistry = {
+        self.output.chemistries = {
             symbol: self._species_fraction(struct, symbol)
             for symbol in self.output.symbols
         }
@@ -311,7 +321,7 @@ class SQSElasticConstants(FlexibleMaster):
         else:
             return np.sum(structure.get_chemical_symbols() == symbol) / self.output.n_sites
 
-    @_as_chemical_array
+    @_as_stats_array()
     def get_elastic_output(self, key):
         try:
             return [
@@ -323,34 +333,48 @@ class SQSElasticConstants(FlexibleMaster):
                            "{}.".format(key, list(self[self.elastic_job_name]['struct_0/output/elasticmatrix'].keys())))
 
 
-class _SQSElasticConstantsOutput(InputList):
-    """Powers up certain attributes as `ChemicalArray`"""
+class SQSElasticOutput(InputList):
+    """
+    Powers up certain attributes as `StatsArray` taking the average over a specified axis.
+
+    Attributes:
+        axis (int): The axis over which to take statistical measures, i.e. the axis that runs over SQS structures.
+            (Default is 0.)
+    """
+    def __new__(cls, *args, **kwargs):
+        instance = super().__new__(cls, *args, **kwargs)
+        object.__setattr__(instance, "axis", 0)
+        return instance
+
+    def __init__(self, *args, axis=0, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.axis = axis
+        self._elastic_matrices = None
+        self._residual_pressures = None
+        self._cells = None
 
     @property
-    @_as_chemical_array
-    def elastic_matrix(self):
-        """Six-component elastic matrix"""
-        return self._elastic_matrix
+    def elastic_matrices(self):
+        """Six-component elastic matrices"""
+        return StatsArray(self._elastic_matrices, axis=self.axis)
 
-    @elastic_matrix.setter
-    def elastic_matrix(self, em):
-        self._elastic_matrix = em
+    @elastic_matrices.setter
+    def elastic_matrices(self, em):
+        self._elastic_matrices = em
 
     @property
-    @_as_chemical_array
     def residual_pressures(self):
         """Pressures after minimization."""
-        return self._residual_pressures
+        return StatsArray(self._residual_pressures, axis=self.axis)
 
     @residual_pressures.setter
     def residual_pressures(self, rp):
         self._residual_pressures = rp
 
     @property
-    @_as_chemical_array
     def cells(self):
         """Minimized SQS cells"""
-        return self._cells
+        return StatsArray(self._cells, axis=self.axis)
 
     @cells.setter
     def cells(self, c):
@@ -358,6 +382,8 @@ class _SQSElasticConstantsOutput(InputList):
 
 
 class _SQSElasticConstantsGenerator(JobGenerator):
+    """Generates jobs with different chemistries."""
+
     @property
     def parameter_list(self):
         return self._job.input.chemistry
@@ -379,14 +405,25 @@ class SQSElasticConstantsList(ParallelMaster):
     Attributes:
         ref_job (SQSElasticConstants): The job over which to iterate different compositions. (Must in turn have all its
             own reference jobs set.)
+        input (InputList): Paremeters for controlling the run.
+        output (SQSElasticOutput): Output collected from the various child jobs.
 
     Input:
-        chemistry (list): A list of dictionary items, each providing (key, value) pairs that are the chemical symbol and
-            (approximate) fraction of the cell that should have that species. Following the standard of
+        chemistries (list): A list of dictionary items, each providing (key, value) pairs that are the chemical symbol
+            and (approximate) fraction of the cell that should have that species. Following the standard of
             pyiron.atomistics.job.sqs.SQSJob, each dictionary should have fractions summing to 1 and '0' may be used as
             a key to indicate vacancies.
 
     Output:
+        elastic_matrices (StatsArray): The six-component elastic matrices of the children.
+        residual_pressures (StatsArray): The remaining pressures after minimization of the children.
+        # structures (list): The minimized structures of the children.
+        cells (StatsArray): The cells of the minimized structures of the children.
+        symbols (list): The chemical symbols (possibly including '0' for vacancy) in the SQS structures of the children.
+        chemistry (dict): The actual chemical fraction of each species (including '0' for vacancy) in the structures of
+            the children.
+
+    Methods:
 
     """
     def __init__(self, project, job_name):
@@ -396,8 +433,8 @@ class SQSElasticConstantsList(ParallelMaster):
         self.__hdf_version__ = "0.2.0"
 
         self.input = InputList(table_name='input')
-        self.input.chemistry = []
-        self.output = _SQSElasticConstantsListOutput(table_name='output')
+        self.input.chemistries = []
+        self.output = SQSElasticOutput(table_name='output', axis=1)
 
         self._job_generator = _SQSElasticConstantsGenerator(self)
         self._python_only_job = True
@@ -414,9 +451,9 @@ class SQSElasticConstantsList(ParallelMaster):
 
     def collect_output(self):
         self.output._cells = self._collect_output_from_children('_cells')
-        self.output._elastic_matrices = self._collect_output_from_children('_elastic_matrix')
+        self.output._elastic_matrices = self._collect_output_from_children('_elastic_matrices')
         self.output._residual_pressures = self._collect_output_from_children('_residual_pressures')
-        self.output.chemistries = self._collect_output_from_children('chemistry')
+        self.output.chemistries = self._collect_output_from_children('chemistries')
         self.output.n_sites = self._collect_output_from_children('n_sites')
         self.output.n_structures = self._collect_output_from_children('n_structures')
         self.output.symbols = self._collect_output_from_children('symbols')
@@ -429,9 +466,6 @@ class SQSElasticConstantsList(ParallelMaster):
     def _ordered_children(self):
         return [self[self.child_names[n]] for n in np.sort(self.child_ids)]
 
-
-class _SQSElasticConstantsListOutput(InputList):
-    pass
 
 # Snippets for later:
 
@@ -456,7 +490,7 @@ class _SQSElasticConstantsListOutput(InputList):
     #     return fig, ax
 
 
-# class _SQSElasticConstantsOutput:
+# class SQSElasticOutput:
 #     def __init__(self, parent):
 #         self.parent = parent
 #

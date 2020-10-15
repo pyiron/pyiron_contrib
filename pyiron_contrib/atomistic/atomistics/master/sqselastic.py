@@ -413,7 +413,21 @@ class SQSElasticConstantsList(ParallelMaster):
         self.output.from_hdf(self._hdf5)
 
     def collect_output(self):
-        pass
+        self.output._cells = self._collect_output_from_children('_cells')
+        self.output._elastic_matrices = self._collect_output_from_children('_elastic_matrix')
+        self.output._residual_pressures = self._collect_output_from_children('_residual_pressures')
+        self.output.chemistries = self._collect_output_from_children('chemistry')
+        self.output.n_sites = self._collect_output_from_children('n_sites')
+        self.output.n_structures = self._collect_output_from_children('n_structures')
+        self.output.symbols = self._collect_output_from_children('symbols')
+        self.to_hdf()
+
+    def _collect_output_from_children(self, key):
+        return [job['output/data'][key] for job in self._ordered_children]
+
+    @property
+    def _ordered_children(self):
+        return [self[self.child_names[n]] for n in np.sort(self.child_ids)]
 
 
 class _SQSElasticConstantsListOutput(InputList):

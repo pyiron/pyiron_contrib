@@ -170,7 +170,7 @@ class AtomsComparer(Comparer):
         # https://github.com/pyiron/pyiron/blob/c447ffb4f1e003d0ebaced50a12def46beefab4f/pyiron/atomistics/job/interactive.py
         conditions = [
             len(self.object) == len(b),
-            Comparer(self.object.cell) == b.cell,
+            Comparer(self.object.cell.array) == b.cell.array,
             Comparer(self.object.get_scaled_positions()) == b.get_scaled_positions(),
             Comparer(self.object.get_initial_magnetic_moments()) == b.get_initial_magnetic_moments(),
             index_spec_mapping(self.object) == index_spec_mapping(b)

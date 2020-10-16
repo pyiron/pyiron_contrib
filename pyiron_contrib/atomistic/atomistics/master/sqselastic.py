@@ -15,6 +15,8 @@ import seaborn as sns
 """
 Calculate the elastic matrices for special quasi-random structures.
 """
+# TODO: Add citation information to the publication attribute
+# TODO: Add warnings to the warnings attribute (once it exists)
 
 __author__ = "Liam Huber"
 __copyright__ = "Copyright 2020, Max-Planck-Institut für Eisenforschung GmbH " \
@@ -58,14 +60,17 @@ class StatsArray:
         return str(self._data)
 
     def to_hdf(self, hdf, group_name):
+        # TODO: This is not actually ever used, but is useful if InputList started leaning on childrens' hdf methods
         with hdf.open(group_name) as hdf5:
             hdf5['data'] = self._data
 
     def from_hdf(self, hdf, group_name):
+        # TODO: This is not actually ever used, but is useful if InputList started leaning on childrens' hdf methods
         with hdf.open(group_name) as hdf5:
             self._data = hdf5['data']
 
 
+# TODO: Right now this decorator is only used in *one* place, so we could just get rid of it.
 def _as_stats_array(axis=0):
     """
     A decorator to wrap function output as a `StatsArray`. Ideal for use together with an `@property`.
@@ -156,7 +161,7 @@ class SQSElasticConstants(FlexibleMaster):
         self._elastic_ref_single_name_tail = 'el_job'
         self._elastic_job_name_tail = 'elastic'
         # TODO: Once creating/copying jobs as HDF children is sorted out, this attribute salad can probably be
-        #  refactored away
+        #  refactored away (or at least simplified)
 
     @property
     def sqs_job_name(self):
@@ -184,8 +189,13 @@ class SQSElasticConstants(FlexibleMaster):
     def _instantiate_sqs(self):
         # sqs_job = self.create_job(self._job_type.SQSJob, self._relative_name('sqs_job'))
         # sqs_job.input = self.ref_sqs.input
-        # TODO: Get the sqs job created as a proper child
+        # TODO: Get the sqs job created as a proper HDF child
         sqs_job = self._copy_job(self.ref_sqs, self._sqs_job_name_tail)
+        # sqs_job = self.ref_sqs.copy_to(
+        #     project=self._hdf5,
+        #     new_job_name=self._relative_name(self._sqs_job_name_tail),
+        #     new_database_entry=False
+        # )
         sqs_job.input.mole_fractions = dict(sqs_job.input.mole_fractions)  # Input expects dict but gets InputList(dict)
         sqs_job.structure = self.ref_ham.structure.copy()
         return sqs_job
@@ -194,6 +204,7 @@ class SQSElasticConstants(FlexibleMaster):
         return self.project.create_job(job_type, self._relative_name(name))
 
     def _relative_name(self, name):
+        # TODO: Once things are being created
         return '_'.join([self.job_name, name])
 
     @property
@@ -279,11 +290,30 @@ class SQSElasticConstants(FlexibleMaster):
         if self.ref_elastic.job_name != self._relative_name(self._elastic_ref_single_name_tail):
             self.ref_elastic = self._copy_job(self.ref_elastic, self._elastic_ref_single_name_tail)
 
+        # TODO: Once `copy_to` doesn't ignore new names when a new project is given, try this again:
+        # self.ref_ham = self._copy_to_self(self.ref_ham, self._ham_ref_name_tail)
+        # self.ref_sqs = self._copy_to_self(self.ref_sqs, self._sqs_ref_name_tail)
+        # self.ref_elastic = self._copy_to_self(self.ref_elastic, self._elastic_ref_single_name_tail)
+        # self.ref_elastic.ref_job = self._copy_to_parent(self.ref_ham, self.ref_elastic, self._elastic_ref_ham_name_tail)
+
         for job in [self.ref_ham, self.ref_sqs, self.ref_elastic]:
+            # TODO: It should be possible to wrap this whole routine in some sort of `if self.status.created` or
+            #  something so that we can just job.save() instead of being careful
+            #  Or maybe once the references are inside the self._hdf5 envelope we won't need this at all?
             self._save_reference_if_new(job)
 
+    @staticmethod
+    def _copy_to_parent(job, parent, name):
+        # TODO: Waiting for `copy_to` to get fixed to be useful
+        return job.copy_template(project=parent._hdf5, new_job_name=name)
+
+    def _copy_to_self(self, job, name):
+        # TODO: Waiting for `copy_to` to get fixed to be useful
+        return self._copy_to_parent(job, self, name)
+
     def _save_reference_if_new(self, job):
-        if job.name not in self.project.list_nodes():
+        # TODO: Rework your saving routine so this method is superfluous, then kill it
+        if job.job_name not in self.project.list_nodes():
             job.save()
         else:
             job.to_hdf()
@@ -365,6 +395,10 @@ class SQSElasticOutput(InputList):
         axis (int): The axis over which to take statistical measures, i.e. the axis that runs over SQS structures.
             (Default is 0.)
     """
+    # TODO: If InputList starts using the `to_hdf` and `from_hdf` methods of its children, we don't need to power up
+    #  certain fields by wrapping them as StatsArrays, because the StatsArrays will be directly saved and loaded.
+    #  At that point we could just directly use InputList (or IOList or whatever it's called by then) instead of
+    #  subclassing like this
     def __new__(cls, *args, **kwargs):
         instance = super().__new__(cls, *args, **kwargs)
         object.__setattr__(instance, "axis", 0)
@@ -496,7 +530,7 @@ class SQSElasticConstantsList(ParallelMaster):
 
     def _get_species_fraction(self, symbol):
         # return [composition[symbol] for composition in self.output.compositions]
-        # InputList does not currently load in a friendly way, so look directly at the HDF
+        # TODO: InputList does not currently load in a friendly way, so look directly at the HDF
         return [composition[symbol] for composition in self['output/data']['compositions']]
 
     def _get_species_fraction_range(self, symbol):
@@ -507,7 +541,7 @@ class SQSElasticConstantsList(ParallelMaster):
 
     def _get_species_elastic_constant(self, symbol, indices):
         # return self.output.elastic_matrices.mean[:, indices[0], indices[1]]
-        # InputList does not currently load in a friendly way, so look directly at the HDF
+        # TODO: InputList does not currently load in a friendly way, so look directly at the HDF
         return np.mean(self['output/data']['_elastic_matrices'], axis=1)[:, indices[0], indices[1]]
 
     def get_elastic_constant_data(self, symbol, indices):

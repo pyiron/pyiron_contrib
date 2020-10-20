@@ -1192,13 +1192,16 @@ class VerletPositionUpdate(VerletParent):
         time_step (float): MD time step in fs. (Default is 1 fs.)
         temperature (float): The target temperature. (Default is None, no thermostat is used.)
         damping_timescale (float): Damping timescale in fs. (Default is None, no thermostat is used.)
+        fix_com (bool): Whether the center of mass motion should be subtracted off of the position update.
+            (Default is True)
 
     Output attributes:
         positions (numpy.ndarray): The new positions on time step in the future.
         velocities (numpy.ndarray): The new velocities *half* a time step in the future.
     """
 
-    def command(self, positions, velocities, forces, masses, time_step, temperature, temperature_damping_timescale):
+    def command(self, positions, velocities, forces, masses, time_step, temperature, temperature_damping_timescale,
+                fix_com=True):
         masses = self.reshape_masses(masses)
         acceleration = self.convert_to_acceleration(forces, masses)
         vel_half = velocities + 0.5 * acceleration * time_step
@@ -1210,7 +1213,12 @@ class VerletPositionUpdate(VerletParent):
                 temperature_damping_timescale,
                 velocities
             )
-        pos_step = positions + vel_half * time_step
+        pos_change = vel_half * time_step
+        if fix_com:
+            total_mass = np.sum(masses)
+            com_change = np.sum(pos_change * masses, axis=0) / total_mass
+            pos_change -= com_change
+        pos_step = positions + pos_change
 
         return {
             'positions': pos_step,

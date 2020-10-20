@@ -1539,7 +1539,7 @@ class VacancyTILDParallel(VacancyTILD):
         g.make_edge(g.check_convergence, g.exit, 'true')
         g.make_edge(g.exit, g.check_steps, 'false')
         g.starting_vertex = g.create_vacancy
-        g.restarting_vertex = g.run_lambda_points
+        g.restarting_vertex = g.check_steps
 
     def define_information_flow(self):
         # Data flow

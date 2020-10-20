@@ -563,9 +563,6 @@ class HarmonicHamiltonian(PrimitiveVertex):
         if eq_energy is not None:
             energy += eq_energy
 
-        forces = [0., 0., 0.]
-        energy = 0.
-
         return {
             'energy_pot': energy,
             'forces': forces
@@ -1040,8 +1037,9 @@ class SphereReflectionPerAtom(PrimitiveVertex):
         id_.use_reflection = True
         id_.total_steps = 0
 
-    def command(self, reference_positions, positions, velocities, previous_positions, previous_velocities,
-                pbc, cell, cutoff_distance, use_reflection, total_steps):
+    def command(self, reference_positions, positions, positions_change, velocities, previous_positions,
+                previous_positions_change, previous_velocities, pbc, cell, cutoff_distance, use_reflection,
+                total_steps):
 
         total_steps += 1
         if use_reflection:
@@ -1054,6 +1052,7 @@ class SphereReflectionPerAtom(PrimitiveVertex):
 
         return {
             'positions': is_at_home * positions + is_away * previous_positions,
+            'positions_change': is_at_home * positions_change + is_away * previous_positions_change,
             'velocities': is_at_home * velocities + is_away * -previous_velocities,
             'reflected': is_away.astype(bool).flatten(),
             'total_steps': total_steps
@@ -1195,16 +1194,13 @@ class VerletPositionUpdate(VerletParent):
         time_step (float): MD time step in fs. (Default is 1 fs.)
         temperature (float): The target temperature. (Default is None, no thermostat is used.)
         damping_timescale (float): Damping timescale in fs. (Default is None, no thermostat is used.)
-        fix_com (bool): Whether the center of mass motion should be subtracted off of the position update.
-            (Default is True)
 
     Output attributes:
         positions (numpy.ndarray): The new positions on time step in the future.
         velocities (numpy.ndarray): The new velocities *half* a time step in the future.
     """
 
-    def command(self, positions, velocities, forces, masses, time_step, temperature, temperature_damping_timescale,
-                fix_com=True):
+    def command(self, positions, velocities, forces, masses, time_step, temperature, temperature_damping_timescale):
         masses = self.reshape_masses(masses)
         acceleration = self.convert_to_acceleration(forces, masses)
         vel_half = velocities + 0.5 * acceleration * time_step
@@ -1217,14 +1213,11 @@ class VerletPositionUpdate(VerletParent):
                 velocities
             )
         pos_change = vel_half * time_step
-        if fix_com:
-            total_mass = np.sum(masses)
-            com_change = np.sum(pos_change * masses, axis=0) / total_mass
-            pos_change -= com_change
         pos_step = positions + pos_change
 
         return {
             'positions': pos_step,
+            'positions_change': pos_change,
             'velocities': vel_half
         }
 
@@ -1583,4 +1576,25 @@ class BerendsenBarostat(PrimitiveVertex):
             'pressure': total_pressure,
             'structure': new_structure,
             'positions': new_structure.positions
+        }
+
+
+class FixCentreOfMass(PrimitiveVertex):
+    """
+
+    """
+
+    def command(self, masses, positions, positions_change, fix_com=True):
+        if len(np.array(masses).shape) == 1:
+            masses = np.array(masses)[:, np.newaxis]
+        if fix_com:
+            total_mass = np.sum(masses)
+            com_change = np.sum(positions_change * masses, axis=0) / total_mass
+            positions_change -= com_change
+            new_positions = positions + positions_change
+        else:
+            new_positions = positions
+
+        return {
+            'positions': new_positions
         }

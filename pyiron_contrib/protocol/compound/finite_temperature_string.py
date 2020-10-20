@@ -111,7 +111,7 @@ class FTSEvolution(CompoundVertex):
         id_.cutoff_factor = 0.4
         id_.mixing_fraction = 0.1
         id_.relax_endpoints = False
-        id_.smooth_style = 'local'
+        id_.smooth_style = 'global'
         id_.nominal_smoothing = 0.1
         id_.divisor = 1
         id_.use_reflection = True

@@ -1251,7 +1251,6 @@ class Decoupling(CompoundVertex):
         g.reflect = SphereReflectionPerAtom()
         g.calc_full = ExternalHamiltonian()
         g.slice_positions = Slice()
-        g.slice_positions_change = Slice()
         g.fix_com = FixCentreOfMass()
         g.calc_vac = ExternalHamiltonian()
         g.harmonic = HarmonicHamiltonian()
@@ -1278,7 +1277,6 @@ class Decoupling(CompoundVertex):
             g.reflect,
             g.calc_full,
             g.slice_positions,
-            g.slice_positions_change,
             g.fix_com,
             g.calc_vac,
             g.harmonic,
@@ -1325,16 +1323,13 @@ class Decoupling(CompoundVertex):
 
         # reflect
         g.reflect.input.default.previous_positions = ip.positions
-        g.reflect.input.default.previous_positions_change = ip.positions_change
         g.reflect.input.default.previous_velocities = ip.velocities
         g.reflect.input.default.total_steps = ip.total_steps
 
         g.reflect.input.reference_positions = ip.structure.positions
         g.reflect.input.positions = gp.verlet_positions.output.positions[-1]
-        g.reflect.input.positions_change = gp.verlet_positions.output.positions_change[-1]
         g.reflect.input.velocities = gp.verlet_positions.output.velocities[-1]
         g.reflect.input.previous_positions = gp.reflect.output.positions[-1]
-        g.reflect.input.previous_positions_change = gp.reflect.output.positions_change[-1]
         g.reflect.input.previous_velocities = gp.reflect.output.velocities[-1]
         g.reflect.input.pbc = ip.structure.pbc
         g.reflect.input.cell = ip.structure.cell.array
@@ -1352,14 +1347,9 @@ class Decoupling(CompoundVertex):
         g.slice_positions.input.vector = gp.reflect.output.positions[-1]
         g.slice_positions.input.mask = ip.shared_ids
 
-        # slice_positions_change
-        g.slice_positions_change.input.vector = gp.reflect.output.positions_change[-1]
-        g.slice_positions_change.input.mask = ip.shared_ids
-
         # fix_com
-        g.fix_com.input.masses = ip.vacancy_structure.get_masses
+        g.fix_com.input.structure = ip.vacancy_structure
         g.fix_com.input.positions = gp.slice_positions.output.sliced[-1]
-        g.fix_com.input.positions_change = gp.slice_positions_change.output.sliced[-1]
 
         # calc_vac
         g.calc_vac.input.structure = ip.vacancy_structure
@@ -1458,7 +1448,6 @@ class Decoupling(CompoundVertex):
             'temperature_std': ~gp.average_temp.output.std[-1],
             'temperature_n_samples': ~gp.average_temp.output.n_samples[-1],
             'positions': ~gp.reflect.output.positions[-1],
-            'positions_change': ~gp.reflect.output.positions_change[-1],
             'velocities': ~gp.verlet_velocities.output.velocities[-1],
             'forces': ~gp.mix.output.weighted_sum[-1],
             'total_steps': ~gp.reflect.output.total_steps[-1],
@@ -1628,13 +1617,10 @@ class VacancyTILDParallel(VacancyTILD):
         g.run_lambda_points.direct.structure = ip.structure
 
         g.run_lambda_points.direct.default.positions = ip.structure.positions
-        # Note: below is just a 3n-dimensional zero array!
-        g.run_lambda_points.direct.default.positions_change = gp.initial_forces.output.zeros[-1]
         g.run_lambda_points.broadcast.default.velocities = gp.initial_velocities.output.velocities[-1]
         g.run_lambda_points.direct.default.forces = gp.initial_forces.output.zeros[-1]
 
         g.run_lambda_points.broadcast.positions = gp.run_lambda_points.output.positions[-1]
-        g.run_lambda_points.broadcast.positions_change = gp.run_lambda_points.output.positions_change[-1]
         g.run_lambda_points.broadcast.velocities = gp.run_lambda_points.output.velocities[-1]
         g.run_lambda_points.broadcast.forces = gp.run_lambda_points.output.forces[-1]
 

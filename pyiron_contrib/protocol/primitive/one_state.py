@@ -1037,9 +1037,8 @@ class SphereReflectionPerAtom(PrimitiveVertex):
         id_.use_reflection = True
         id_.total_steps = 0
 
-    def command(self, reference_positions, positions, positions_change, velocities, previous_positions,
-                previous_positions_change, previous_velocities, pbc, cell, cutoff_distance, use_reflection,
-                total_steps):
+    def command(self, reference_positions, positions, velocities, previous_positions, previous_velocities,
+                pbc, cell, cutoff_distance, use_reflection, total_steps):
 
         total_steps += 1
         if use_reflection:
@@ -1052,7 +1051,6 @@ class SphereReflectionPerAtom(PrimitiveVertex):
 
         return {
             'positions': is_at_home * positions + is_away * previous_positions,
-            'positions_change': is_at_home * positions_change + is_away * previous_positions_change,
             'velocities': is_at_home * velocities + is_away * -previous_velocities,
             'reflected': is_away.astype(bool).flatten(),
             'total_steps': total_steps
@@ -1584,14 +1582,14 @@ class FixCentreOfMass(PrimitiveVertex):
 
     """
 
-    def command(self, masses, positions, positions_change, fix_com=True):
-        if len(np.array(masses).shape) == 1:
-            masses = np.array(masses)[:, np.newaxis]
+    def command(self, structure, positions, fix_com=True):
         if fix_com:
-            total_mass = np.sum(masses)
-            com_change = np.sum(positions_change * masses, axis=0) / total_mass
-            positions_change -= com_change
-            new_positions = positions + positions_change
+            old_cm = structure.get_center_of_mass()
+            new_structure = structure.copy()
+            new_structure.positions = positions
+            new_cm = new_structure.get_center_of_mass()
+            d = old_cm - new_cm
+            new_positions = positions + d
         else:
             new_positions = positions
 

@@ -563,6 +563,9 @@ class HarmonicHamiltonian(PrimitiveVertex):
         if eq_energy is not None:
             energy += eq_energy
 
+        forces = [0., 0., 0.]
+        energy = 0.
+
         return {
             'energy_pot': energy,
             'forces': forces

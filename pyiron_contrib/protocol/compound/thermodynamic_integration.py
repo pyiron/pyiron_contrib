@@ -1399,7 +1399,7 @@ class Decoupling(CompoundVertex):
         g.verlet_velocities.input.temperature_damping_timescale = ip.temperature_damping_timescale
 
         # check_thermalized
-        g.check_thermalized.input.target = gp.clock.output.n_counts[-1]
+        g.check_thermalized.input.target = gp.reflect.output.total_steps[-1]
         g.check_thermalized.input.threshold = ip.thermalization_steps
 
         # average_temp

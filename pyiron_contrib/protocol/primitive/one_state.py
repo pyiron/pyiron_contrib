@@ -1587,7 +1587,7 @@ class FixCentreOfMass(PrimitiveVertex):
 
     """
 
-    def command(self, masses, positions, positions_change, fix_com=True):
+    def command(self, masses, positions, positions_change, fix_com=False):
         if fix_com:
             masses = np.array(masses)[:, np.newaxis]
             total_mass = np.sum(masses)

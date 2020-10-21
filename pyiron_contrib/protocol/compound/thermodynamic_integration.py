@@ -1728,6 +1728,7 @@ class VacancyTILDParallel(VacancyTILD):
             'total_steps': ~o.total_steps[-1],
             'temperature_mean': ~o.temperature_mean[-1],
             'temperature_std': ~o.temperature_std[-1],
+            'temperature_n_samples': ~o.temperature_n_samples[-1],
             'integrands': ~o.mean_diff[-1],
             'integrands_std': ~o.std_diff[-1],
             'integrands_n_samples': ~o.n_samples[-1],

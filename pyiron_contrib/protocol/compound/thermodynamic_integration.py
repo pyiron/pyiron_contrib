@@ -1251,6 +1251,7 @@ class Decoupling(CompoundVertex):
         g.reflect = SphereReflectionPerAtom()
         g.calc_full = ExternalHamiltonian()
         g.slice_positions = Slice()
+        g.slice_positions_change = Slice()
         g.fix_com = FixCentreOfMass()
         g.calc_vac = ExternalHamiltonian()
         g.harmonic = HarmonicHamiltonian()
@@ -1277,6 +1278,7 @@ class Decoupling(CompoundVertex):
             g.reflect,
             g.calc_full,
             g.slice_positions,
+            g.slice_positions_change,
             g.fix_com,
             g.calc_vac,
             g.harmonic,
@@ -1347,9 +1349,14 @@ class Decoupling(CompoundVertex):
         g.slice_positions.input.vector = gp.reflect.output.positions[-1]
         g.slice_positions.input.mask = ip.shared_ids
 
+        # slice_positions_change
+        g.slice_positions_change.input.vector = gp.reflect.output.positions_change[-1]
+        g.slice_positions_change.input.mask = ip.shared_ids
+
         # fix_com
-        g.fix_com.input.structure = ip.vacancy_structure
+        g.fix_com.input.masses = ip.vacancy_structure.get_masses
         g.fix_com.input.positions = gp.slice_positions.output.sliced[-1]
+        g.fix_com.input.positions_change = gp.slice_positions_change.output.sliced[-1]
 
         # calc_vac
         g.calc_vac.input.structure = ip.vacancy_structure

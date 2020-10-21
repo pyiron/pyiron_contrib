@@ -1049,9 +1049,14 @@ class SphereReflectionPerAtom(PrimitiveVertex):
             is_at_home = np.ones(len(reference_positions))
             is_away = 1 - is_at_home
 
+        new_positions = is_at_home * positions + is_away * previous_positions
+        new_velocities = is_at_home * velocities + is_away * -previous_velocities
+        positions_change = previous_positions - new_positions
+
         return {
-            'positions': is_at_home * positions + is_away * previous_positions,
-            'velocities': is_at_home * velocities + is_away * -previous_velocities,
+            'positions': new_positions,
+            'positions_change': positions_change,
+            'velocities': new_velocities,
             'reflected': is_away.astype(bool).flatten(),
             'total_steps': total_steps
         }
@@ -1582,14 +1587,13 @@ class FixCentreOfMass(PrimitiveVertex):
 
     """
 
-    def command(self, structure, positions, fix_com=True):
+    def command(self, masses, positions, positions_change, fix_com=True):
         if fix_com:
-            old_cm = structure.get_center_of_mass()
-            new_structure = structure.copy()
-            new_structure.positions = positions
-            new_cm = new_structure.get_center_of_mass()
-            d = old_cm - new_cm
-            new_positions = positions + d
+            masses = np.array(masses)[:, np.newaxis]
+            total_mass = np.sum(masses)
+            com_change = np.sum(positions_change * masses, axis=0) / total_mass
+            positions_change -= com_change
+            new_positions = positions + positions_change
         else:
             new_positions = positions
 

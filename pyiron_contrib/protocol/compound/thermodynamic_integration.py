@@ -844,7 +844,7 @@ class HarmonicTILDParallel(HarmonicTILD):
         g.post.input.tild_std = gp.run_lambda_points.output.std_diff[-1]
         g.post.input.fep_exp_mean = gp.run_lambda_points.output.fep_exp_mean[-1]
         g.post.input.fep_exp_std = gp.run_lambda_points.output.fep_exp_std[-1]
-        g.post.input.temperature = gp.run_lambda_points.output.temperature_mean[-1]
+        g.post.input.temperature = ip.temperature
         g.post.input.n_samples = gp.run_lambda_points.output.n_samples[-1][-1]
 
         # exit

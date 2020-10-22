@@ -1482,7 +1482,6 @@ class TILDPostProcess(PrimitiveVertex):
         free_energy = 0
         free_energy_se = 0
         for (val, val_se) in zip(y, y_se):
-            print(temperature, unumpy.log(val))
             free_energy += -KB * temperature * unumpy.log(val)
             free_energy_se += -KB * temperature * unumpy.log(val_se)
         mean = unumpy.nominal_values(free_energy)

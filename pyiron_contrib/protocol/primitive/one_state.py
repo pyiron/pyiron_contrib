@@ -947,7 +947,8 @@ class RandomVelocity(PrimitiveVertex):
         energy_kin = 0.5 * np.sum(masses * vel * vel) * U_ANGSQ_PER_FSSQ_TO_EV
         return {
             'velocities': vel,
-            'energy_kin': energy_kin
+            'energy_kin': energy_kin,
+            'n_atoms': len(vel)
         }
 
 
@@ -1049,14 +1050,9 @@ class SphereReflectionPerAtom(PrimitiveVertex):
             is_at_home = np.ones(len(reference_positions))
             is_away = 1 - is_at_home
 
-        new_positions = is_at_home * positions + is_away * previous_positions
-        new_velocities = is_at_home * velocities + is_away * -previous_velocities
-        positions_change = previous_positions - new_positions
-
         return {
-            'positions': new_positions,
-            'positions_change': positions_change,
-            'velocities': new_velocities,
+            'positions': is_at_home * positions + is_away * previous_positions,
+            'velocities': is_at_home * velocities + is_away * -previous_velocities,
             'reflected': is_away.astype(bool).flatten(),
             'total_steps': total_steps
         }
@@ -1450,40 +1446,49 @@ class TILDPostProcess(PrimitiveVertex):
 
     def command(self, lambda_pairs, tild_mean, tild_std, fep_exp_mean, fep_exp_std, temperature, n_samples):
 
-        tild_mean, tild_std = self.get_tild_free_energy(lambda_pairs, tild_mean, tild_std)
-        fep_mean, fep_std = self.get_fep_free_energy(fep_exp_mean, fep_exp_std, temperature)
+        tild_fe_mean, tild_fe_std, tild_fe_se = self.get_tild_free_energy(lambda_pairs, tild_mean, tild_std,
+                                                                          n_samples)
+        fep_fe_mean, fep_fe_std, fep_fe_se = self.get_fep_free_energy(fep_exp_mean, fep_exp_std, n_samples,
+                                                                      temperature)
 
         return {
-            'tild_free_energy_mean': tild_mean,
-            'tild_free_energy_std': tild_std,
-            'tild_free_energy_se': tild_std / np.sqrt(n_samples),
-            'fep_free_energy_mean': fep_mean,
-            'fep_free_energy_std': fep_std,
-            'fep_free_energy_se': fep_std / np.sqrt(n_samples)
+            'tild_free_energy_mean': tild_fe_mean,
+            'tild_free_energy_std': tild_fe_std,
+            'tild_free_energy_se': tild_fe_se,
+            'fep_free_energy_mean': fep_fe_mean,
+            'fep_free_energy_std': fep_fe_std,
+            'fep_free_energy_se': fep_fe_se
 
         }
 
     @staticmethod
-    def get_tild_free_energy(lambda_pairs, tild_mean, tild_std):
+    def get_tild_free_energy(lambda_pairs, tild_mean, tild_std, n_samples):
         y = unumpy.uarray(tild_mean, tild_std)
         integral = np.trapz(x=lambda_pairs[:, 0], y=y)
         mean = unumpy.nominal_values(integral)
         std = unumpy.std_devs(integral)
-        return mean, std
+        tild_se = tild_std / np.sqrt(n_samples)
+        y_se = unumpy.uarray(tild_mean, tild_se)
+        integral_se = np.trapz(x=lambda_pairs[:, 0], y=y_se)
+        se = unumpy.std_devs(integral_se)
+
+        return float(mean), float(std), float(se)
 
     @staticmethod
-    def get_fep_free_energy(fep_exp_mean, fep_exp_std, temperature):
+    def get_fep_free_energy(fep_exp_mean, fep_exp_std, n_samples, temperature):
+        fep_exp_se = fep_exp_std / np.sqrt(n_samples)
         y = unumpy.uarray(fep_exp_mean, fep_exp_std)
+        y_se = unumpy.uarray(fep_exp_mean, fep_exp_se)
         free_energy = 0
-        if type(temperature) == float:
-            for val in y:
-                free_energy += -KB * temperature * unumpy.log(val)
-        elif type(temperature) == list:
-            for (val, temp) in zip(y, temperature):
-                free_energy += -KB * temp * unumpy.log(val)
+        free_energy_se = 0
+        for (val, val_se) in zip(y, y_se):
+            free_energy += -KB * temperature * unumpy.log(val)
+            free_energy_se += -KB * temperature * unumpy.log(val_se)
         mean = unumpy.nominal_values(free_energy)
         std = unumpy.std_devs(free_energy)
-        return mean, std
+        se = unumpy.std_devs(free_energy_se)
+
+        return float(mean), float(std), float(se)
 
 
 class BerendsenBarostat(PrimitiveVertex):
@@ -1582,21 +1587,23 @@ class BerendsenBarostat(PrimitiveVertex):
         }
 
 
-class FixCentreOfMass(PrimitiveVertex):
+class ComputeFormationEnergy(PrimitiveVertex):
+    """
     """
 
-    """
+    def command(self, n_atoms, eq_energy, harm_to_inter_mean, harm_to_inter_std, harm_to_inter_se, inter_to_vac_mean,
+                inter_to_vac_std, inter_to_vac_se):
 
-    def command(self, masses, positions, positions_change, fix_com=False):
-        if fix_com:
-            masses = np.array(masses)[:, np.newaxis]
-            total_mass = np.sum(masses)
-            com_change = np.sum(positions_change * masses, axis=0) / total_mass
-            positions_change -= com_change
-            new_positions = positions + positions_change
-        else:
-            new_positions = positions
+        harm_to_inter_fe = unumpy.uarray(harm_to_inter_mean, harm_to_inter_std)
+        harm_to_inter_fe_se = unumpy.uarray(harm_to_inter_mean, harm_to_inter_se)
+        inter_to_vac_fe = unumpy.uarray(inter_to_vac_mean, inter_to_vac_std)
+        inter_to_vac_fe_se = unumpy.uarray(inter_to_vac_mean, inter_to_vac_se)
+
+        fe = ((eq_energy + harm_to_inter_fe) / n_atoms) + inter_to_vac_fe
+        fe_se = ((eq_energy + harm_to_inter_fe_se) / n_atoms) + inter_to_vac_fe_se
 
         return {
-            'positions': new_positions
+            'formation_energy_mean': float(unumpy.nominal_values(fe)),
+            'formation_energy_std': float(unumpy.std_devs(fe)),
+            'formation_energy_se': float(unumpy.std_devs(fe_se))
         }

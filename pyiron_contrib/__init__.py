@@ -13,6 +13,7 @@ JOB_CLASS_DICT['ProtocolHarmonicTILD'] = 'pyiron_contrib.protocol.compound.therm
 JOB_CLASS_DICT['ProtocolHarmonicTILDParallel'] = 'pyiron_contrib.protocol.compound.thermodynamic_integration'
 JOB_CLASS_DICT['ProtocolVacancyTILD'] = 'pyiron_contrib.protocol.compound.thermodynamic_integration'
 JOB_CLASS_DICT['ProtocolVacancyTILDParallel'] = 'pyiron_contrib.protocol.compound.thermodynamic_integration'
+JOB_CLASS_DICT['ProtocolVacancyFormation'] = 'pyiron_contrib.protocol.compound.thermodynamic_integration'
 JOB_CLASS_DICT['ProtocolFTSEvolution'] = 'pyiron_contrib.protocol.compound.finite_temperature_string'
 JOB_CLASS_DICT['ProtocolFTSEvolutionParallel'] = 'pyiron_contrib.protocol.compound.finite_temperature_string'
 

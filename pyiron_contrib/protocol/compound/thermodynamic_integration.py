@@ -13,8 +13,8 @@ from scipy.constants import physical_constants
 from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
 from pyiron_contrib.protocol.list import SerialList, ParallelList
 from pyiron_contrib.protocol.utils import Pointer
-from pyiron_contrib.protocol.primitive.one_state import BuildMixingPairs, Counter, CreateJob, CutoffDistance, \
-    DeleteAtom, ExternalHamiltonian, FEPExponential, FixCentreOfMass, HarmonicHamiltonian, MinimizeReferenceJob, \
+from pyiron_contrib.protocol.primitive.one_state import BuildMixingPairs, ComputeFormationEnergy, Counter, CreateJob,\
+    CutoffDistance, DeleteAtom, ExternalHamiltonian, FEPExponential, HarmonicHamiltonian, MinimizeReferenceJob, \
     Overwrite, RemoveJob, RandomVelocity, Slice, SphereReflectionPerAtom, TILDPostProcess, Transpose, \
     VerletPositionUpdate, VerletVelocityUpdate, WeightedSum, WelfordOnline, Zeros
 from pyiron_contrib.protocol.primitive.two_state import ExitProtocol, IsGEq, IsLEq, ModIsZero
@@ -644,6 +644,10 @@ class HarmonicTILDParallel(HarmonicTILD):
         std (float): Initialize default standard deviation for WelfordOnline. (Default is None.)
         n_samples (float): Initialize default number of samples for WelfordOnline. (Default is None.)
 
+    Output attributes:
+        total_steps (list): The total number of steps up for each integration point, up to convergence, or max
+            steps.
+
     For inherited input and output attributes, refer the `HarmonicTILD` protocol.
 
     """
@@ -1251,8 +1255,6 @@ class Decoupling(CompoundVertex):
         g.reflect = SphereReflectionPerAtom()
         g.calc_full = ExternalHamiltonian()
         g.slice_positions = Slice()
-        g.slice_positions_change = Slice()
-        g.fix_com = FixCentreOfMass()
         g.calc_vac = ExternalHamiltonian()
         g.harmonic = HarmonicHamiltonian()
         g.write_vac_forces = Overwrite()
@@ -1278,8 +1280,6 @@ class Decoupling(CompoundVertex):
             g.reflect,
             g.calc_full,
             g.slice_positions,
-            g.slice_positions_change,
-            g.fix_com,
             g.calc_vac,
             g.harmonic,
             g.write_vac_forces,
@@ -1349,20 +1349,11 @@ class Decoupling(CompoundVertex):
         g.slice_positions.input.vector = gp.reflect.output.positions[-1]
         g.slice_positions.input.mask = ip.shared_ids
 
-        # slice_positions_change
-        g.slice_positions_change.input.vector = gp.reflect.output.positions_change[-1]
-        g.slice_positions_change.input.mask = ip.shared_ids
-
-        # fix_com
-        g.fix_com.input.masses = ip.vacancy_structure.get_masses
-        g.fix_com.input.positions = gp.slice_positions.output.sliced[-1]
-        g.fix_com.input.positions_change = gp.slice_positions_change.output.sliced[-1]
-
         # calc_vac
         g.calc_vac.input.structure = ip.vacancy_structure
         g.calc_vac.input.project_path = ip.project_path_vac
         g.calc_vac.input.job_name = ip.vac_job_name
-        g.calc_vac.input.positions = gp.fix_com.output.positions[-1]
+        g.calc_vac.input.positions = gp.slice_positions.output.sliced[-1]
 
         # harmonic
         g.harmonic.input.spring_constant = ip.spring_constant
@@ -1487,6 +1478,10 @@ class VacancyTILDParallel(VacancyTILD):
         std (float): Initialize default standard deviation for WelfordOnline. (Default is None.)
         n_samples (float): Initialize default number of samples for WelfordOnline. (Default is None.)
 
+    Output attributes:
+        total_steps (list): The total number of steps up for each integration point, up to convergence, or max
+            steps.
+
     For inherited input and output attributes, refer the `HarmonicTILD` protocol.
     """
     # DefaultWhitelist = {
@@ -1498,15 +1493,15 @@ class VacancyTILDParallel(VacancyTILD):
         id_ = self.input.default
         # Default values
         # The remainder of the default values are inherited from HarmonicTILD
-        id_.sleep_time = 0  # A delay for database access of results. For sqlite, a non-zero delay maybe required.
-        id_.project_path = None  # Initialize default project path
-        id_.job_name = None  # Initialize default job name
-        id_.convergence_check_steps = 10  # Check for convergence once every `convergence_check_steps'.
-        id_.default_free_energy_se = 1  # Initialize default free energy standard error
-        id_.fe_tol = 0.01  # Free energy tolerance. This is the convergence criterion in eV
-        id_.mean = None  # Initialize default mean for WelfordOnline
-        id_.std = None  # Initialize default std for WelfordOnline
-        id_.n_samples = None  # Initialize default n_samples for WelfordOnline
+        id_.sleep_time = 0
+        id_.project_path = None
+        id_.job_name = None
+        id_.convergence_check_steps = 10
+        id_.default_free_energy_se = 1
+        id_.fe_tol = 0.01
+        id_.mean = None
+        id_.std = None
+        id_.n_samples = None
 
     def define_vertices(self):
         # Graph components
@@ -1728,7 +1723,6 @@ class VacancyTILDParallel(VacancyTILD):
             'total_steps': ~o.total_steps[-1],
             'temperature_mean': ~o.temperature_mean[-1],
             'temperature_std': ~o.temperature_std[-1],
-            'temperature_n_samples': ~o.temperature_n_samples[-1],
             'integrands': ~o.mean_diff[-1],
             'integrands_std': ~o.std_diff[-1],
             'integrands_n_samples': ~o.n_samples[-1],
@@ -1746,4 +1740,452 @@ class VacancyTILDParallel(VacancyTILD):
 
 
 class ProtocolVacancyTILDParallel(Protocol, VacancyTILDParallel, ABC):
+    pass
+
+
+class VacancyFormation(VacancyTILDParallel):
+    """
+    A protocol which combines HarmonicTILD and VacancyTILD to give the Helmholtz free energy of vacancy formation
+        directly. The formation energy is computed via thermodynamic integration, as well as free energy
+        perturbation. A formation energy standard error convergence criterion can be applied.
+
+    Input attributes:
+        fe_tol (float): The formation energy standard error tolerance. This is the convergence criterion in eV.
+            The default is set low, in case maximum number of steps need to be run. (Default is 1e-8 eV.)
+        force_constants_harm_to_inter (NxN matrix): The Hessian matrix, obtained from, for ex. Phonopy, for use in
+            harmonic to interacting TILD. (Default is None, treat the atoms as independent harmonic oscillators
+            (Einstein atoms.).) Note, that another input, force_constants also exists. But that is only used in
+            interacting to vacancy TILD.
+        harmonic_to_interacting_lambdas (list): Specify the set of lambda values as input for harmonic to
+            interacting TILD. (Default is None.)
+        interacting_to_vacancy_lambdas (list): Specify the set of lambda values as input for interacting to
+            vacancy TILD. (Default is None.)
+        default_formation_energy_se (float): Initialize default free energy standard error to pass into the child
+            protocol. (Default is None.)
+
+    Output attributes:
+        formation_energy_tild (float): The Helmholtz free energy of vacancy formation computed from thermodynamic
+            integration.
+        formation_energy_tild_std (float): The tild standard deviation.
+        formation_energy_tild_se (float): The tild standard error of the mean.
+        formation_energy_fep (float): The Helmholtz free energy of vacancy formation computed from free energy
+            perturbation.
+        formation_energy_fep_std (float): The fep standard deviation.
+        formation_energy_fep_se (float): The fep standard error of the mean.
+
+    For inherited input and output attributes, refer the `VacancyTILDParallel` protocol.
+    """
+    # DefaultWhitelist = {
+    # }
+
+    def __init__(self, **kwargs):
+        super(VacancyFormation, self).__init__(**kwargs)
+
+        id_ = self.input.default
+        # Default values
+        # The remainder of the default values are inherited from VacancyTILD
+        id_.fe_tol = 1e-8
+        id_.force_constants_harm_to_inter = None
+        id_.harmonic_to_interacting_lambdas = None
+        id_.interacting_to_vacancy_lambdas = None
+        id_.default_formation_energy_se = 1
+
+    def define_vertices(self):
+        # Graph components
+        g = self.graph
+        ip = Pointer(self.input)
+        g.create_vacancy = DeleteAtom()
+        g.build_lambdas_harm_to_inter = BuildMixingPairs()
+        g.build_lambdas_inter_to_vac = BuildMixingPairs()
+        g.initial_forces = Zeros()
+        g.initial_velocities = SerialList(RandomVelocity)
+        g.cutoff = CutoffDistance()
+        g.minimize_job = MinimizeReferenceJob()
+        g.check_steps = IsGEq()
+        g.check_convergence = IsLEq()
+        g.remove_jobs_inter = RemoveJob()
+        g.remove_jobs_inter_vac = RemoveJob()
+        g.remove_jobs_vac = RemoveJob()
+        g.create_jobs_inter = CreateJob()
+        g.create_jobs_inter_vac = CreateJob()
+        g.create_jobs_vac = CreateJob()
+        g.run_harm_to_inter = ParallelList(HarmonicallyCoupled, sleep_time=ip.sleep_time)
+        g.run_inter_to_vac = ParallelList(Decoupling, sleep_time=ip.sleep_time)
+        g.clock = Counter()
+        g.post_harm_to_inter = TILDPostProcess()
+        g.post_inter_to_vac = TILDPostProcess()
+        g.formation_energy_tild = ComputeFormationEnergy()
+        g.formation_energy_fep = ComputeFormationEnergy()
+        g.exit = ExitProtocol()
+
+    def define_execution_flow(self):
+        # Execution flow
+        g = self.graph
+        g.make_pipeline(
+            g.create_vacancy,
+            g.build_lambdas_harm_to_inter,
+            g.build_lambdas_inter_to_vac,
+            g.initial_forces,
+            g.initial_velocities,
+            g.cutoff,
+            g.minimize_job,
+            g.check_steps, 'false',
+            g.check_convergence, 'false',
+            g.remove_jobs_inter,
+            g.remove_jobs_inter_vac,
+            g.remove_jobs_vac,
+            g.create_jobs_inter,
+            g.create_jobs_inter_vac,
+            g.create_jobs_vac,
+            g.run_harm_to_inter,
+            g.run_inter_to_vac,
+            g.clock,
+            g.post_harm_to_inter,
+            g.post_inter_to_vac,
+            g.formation_energy_tild,
+            g.formation_energy_fep,
+            g.exit
+        )
+        g.make_edge(g.check_steps, g.exit, 'true')
+        g.make_edge(g.check_convergence, g.exit, 'true')
+        g.make_edge(g.exit, g.check_steps, 'false')
+        g.starting_vertex = g.create_vacancy
+        g.restarting_vertex = g.check_steps
+
+    def define_information_flow(self):
+        # Data flow
+        g = self.graph
+        gp = Pointer(self.graph)
+        ip = Pointer(self.input)
+
+        # create_vacancy
+        g.create_vacancy.input.structure = ip.structure
+        g.create_vacancy.input.atom_id = ip.vacancy_id
+
+        # build_lambdas_harm_to_inter
+        g.build_lambdas_harm_to_inter.input.n_lambdas = ip.n_lambdas
+        g.build_lambdas_harm_to_inter.input.custom_lambdas = ip.harmonic_to_interacting_lambdas
+
+        # build_lambdas_inter_to_vac
+        g.build_lambdas_inter_to_vac.input.n_lambdas = ip.n_lambdas
+        g.build_lambdas_inter_to_vac.input.custom_lambdas = ip.interacting_to_vacancy_lambdas
+
+        # initial_forces
+        g.initial_forces.input.shape = ip.structure.positions.shape
+
+        # initial_velocities
+        g.initial_velocities.input.n_children = ip.n_lambdas
+        g.initial_velocities.direct.temperature = ip.temperature
+        g.initial_velocities.direct.masses = ip.structure.get_masses
+        g.initial_velocities.direct.overheat_fraction = ip.overheat_fraction
+
+        # cutoff
+        g.cutoff.input.structure = ip.structure
+        g.cutoff.input.cutoff_factor = ip.cutoff_factor
+
+        # minimize_job
+        g.minimize_job.input.structure = ip.structure
+        g.minimize_job.input.ref_job_full_path = ip.ref_job_full_path
+
+        # check_steps
+        g.check_steps.input.target = gp.clock.output.n_counts[-1]
+        g.check_steps.input.threshold = ip.n_steps
+
+        # check_convergence
+        g.check_convergence.input.default.target = ip.default_formation_energy_se
+        g.check_convergence.input.target = gp.formation_energy_fep.output.formation_energy_se[-1]
+        g.check_convergence.input.threshold = ip.fe_tol
+
+        # remove_jobs_inter
+        g.remove_jobs_inter.input.default.project_path = ip.project_path
+        g.remove_jobs_inter.input.default.job_names = ip.job_name
+
+        g.remove_jobs_inter.input.project_path = gp.create_jobs_inter.output.project_path[-1][-1]
+        g.remove_jobs_inter.input.job_names = gp.create_jobs_inter.output.job_names[-1]
+
+        # remove_jobs_inter_vac
+        g.remove_jobs_inter_vac.input.default.project_path = ip.project_path
+        g.remove_jobs_inter_vac.input.default.job_names = ip.job_name
+
+        g.remove_jobs_inter_vac.input.project_path = gp.create_jobs_inter_vac.output.project_path[-1][-1]
+        g.remove_jobs_inter_vac.input.job_names = gp.create_jobs_inter_vac.output.job_names[-1]
+
+        # remove_jobs_vac
+        g.remove_jobs_vac.input.default.project_path = ip.project_path
+        g.remove_jobs_vac.input.default.job_names = ip.job_name
+
+        g.remove_jobs_vac.input.project_path = gp.create_jobs_vac.output.project_path[-1][-1]
+        g.remove_jobs_vac.input.job_names = gp.create_jobs_vac.output.job_names[-1]
+
+        # create_jobs_inter
+        g.create_jobs_inter.input.n_images = ip.n_lambdas
+        g.create_jobs_inter.input.ref_job_full_path = ip.ref_job_full_path
+        g.create_jobs_inter.input.structure = ip.structure
+
+        # create_jobs_inter_vac
+        g.create_jobs_inter_vac.input.n_images = ip.n_lambdas
+        g.create_jobs_inter_vac.input.ref_job_full_path = ip.ref_job_full_path
+        g.create_jobs_inter_vac.input.structure = ip.structure
+
+        # create_jobs_vac
+        g.create_jobs_vac.input.n_images = ip.n_lambdas
+        g.create_jobs_vac.input.ref_job_full_path = ip.ref_job_full_path
+        g.create_jobs_vac.input.structure = gp.create_vacancy.output.structure[-1]
+
+        # run_harm_to_inter - initialize
+        g.run_harm_to_inter.input.n_children = ip.n_lambdas
+
+        # run_harm_to_inter - verlet_positions
+        g.run_harm_to_inter.direct.time_step = ip.time_step
+        g.run_harm_to_inter.direct.temperature = ip.temperature
+        g.run_harm_to_inter.direct.temperature_damping_timescale = ip.temperature_damping_timescale
+        g.run_harm_to_inter.direct.structure = ip.structure
+
+        g.run_harm_to_inter.direct.default.positions = ip.structure.positions
+        g.run_harm_to_inter.broadcast.default.velocities = gp.initial_velocities.output.velocities[-1]
+        g.run_harm_to_inter.direct.default.forces = gp.initial_forces.output.zeros[-1]
+
+        g.run_harm_to_inter.broadcast.positions = gp.run_harm_to_inter.output.positions[-1]
+        g.run_harm_to_inter.broadcast.velocities = gp.run_harm_to_inter.output.velocities[-1]
+        g.run_harm_to_inter.broadcast.forces = gp.run_harm_to_inter.output.forces[-1]
+
+        # run_harm_to_inter - reflect
+        g.run_harm_to_inter.direct.default.total_steps = ip.total_steps
+        g.run_harm_to_inter.broadcast.total_steps = gp.run_harm_to_inter.output.total_steps[-1]
+        g.run_harm_to_inter.direct.cutoff_distance = gp.cutoff.output.cutoff_distance[-1]
+
+        # run_harm_to_inter - calc_static
+        g.run_harm_to_inter.broadcast.project_path = gp.create_jobs_inter.output.project_path[-1]
+        g.run_harm_to_inter.broadcast.job_name = gp.create_jobs_inter.output.job_names[-1]
+
+        # run_harm_to_inter - harmonic
+        g.run_harm_to_inter.direct.spring_constant = ip.spring_constant
+        g.run_harm_to_inter.direct.force_constants = ip.force_constants_harm_to_inter
+        g.run_harm_to_inter.direct.eq_energy = gp.minimize_job.output.energy_pot[-1]
+
+        # run_harm_to_inter - mix
+        g.run_harm_to_inter.broadcast.coupling_weights = gp.build_lambdas_harm_to_inter.output.lambda_pairs[-1]
+
+        # run_harm_to_inter - verlet_velocities
+        # takes inputs already specified
+
+        # run_harm_to_inter - check_thermalized
+        g.run_harm_to_inter.direct.thermalization_steps = ip.thermalization_steps
+
+        # run_harm_to_inter - check_sampling_period
+        g.run_harm_to_inter.direct.sampling_period = ip.sampling_period
+
+        # run_harm_to_inter - average_temp
+        g.run_harm_to_inter.direct.default.average_temp_mean = ip.mean
+        g.run_harm_to_inter.direct.default.average_temp_std = ip.std
+        g.run_harm_to_inter.direct.default.average_temp_n_samples = ip.n_samples
+        g.run_harm_to_inter.broadcast.average_temp_mean = gp.run_harm_to_inter.output.temperature_mean[-1]
+        g.run_harm_to_inter.broadcast.average_temp_std = gp.run_harm_to_inter.output.temperature_std[-1]
+        g.run_harm_to_inter.broadcast.average_temp_n_samples = gp.run_harm_to_inter.output.temperature_n_samples[-1]
+
+        # run_harm_to_inter - addition
+        # no parent inputs
+
+        # run_harm_to_inter - average_tild
+        g.run_harm_to_inter.direct.default.average_tild_mean = ip.mean
+        g.run_harm_to_inter.direct.default.average_tild_std = ip.std
+        g.run_harm_to_inter.direct.default.average_tild_n_samples = ip.n_samples
+        g.run_harm_to_inter.broadcast.average_tild_mean = gp.run_harm_to_inter.output.mean_diff[-1]
+        g.run_harm_to_inter.broadcast.average_tild_std = gp.run_harm_to_inter.output.std_diff[-1]
+        g.run_harm_to_inter.broadcast.average_tild_n_samples = gp.run_harm_to_inter.output.n_samples[-1]
+
+        # run_harm_to_inter - fep_exp
+        g.run_harm_to_inter.broadcast.delta_lambdas = gp.build_lambdas_harm_to_inter.output.delta_lambdas[-1]
+
+        # run_harm_to_inter - average_fep_exp
+        g.run_harm_to_inter.direct.default.average_fep_exp_mean = ip.mean
+        g.run_harm_to_inter.direct.default.average_fep_exp_std = ip.std
+        g.run_harm_to_inter.direct.default.average_fep_exp_n_samples = ip.n_samples
+        g.run_harm_to_inter.broadcast.average_fep_exp_mean = gp.run_harm_to_inter.output.fep_exp_mean[-1]
+        g.run_harm_to_inter.broadcast.average_fep_exp_std = gp.run_harm_to_inter.output.fep_exp_std[-1]
+        g.run_harm_to_inter.broadcast.average_fep_exp_n_samples = gp.run_harm_to_inter.output.n_samples[-1]
+
+        # run_harm_to_inter - clock
+        g.run_harm_to_inter.direct.n_sub_steps = ip.convergence_check_steps
+
+        # run_inter_to_vac - initialize
+        g.run_inter_to_vac.input.n_children = ip.n_lambdas
+
+        # run_inter_to_vac - verlet_positions
+        g.run_inter_to_vac.direct.time_step = ip.time_step
+        g.run_inter_to_vac.direct.temperature = ip.temperature
+        g.run_inter_to_vac.direct.temperature_damping_timescale = ip.temperature_damping_timescale
+        g.run_inter_to_vac.direct.structure = ip.structure
+
+        g.run_inter_to_vac.direct.default.positions = ip.structure.positions
+        g.run_inter_to_vac.broadcast.default.velocities = gp.initial_velocities.output.velocities[-1]
+        g.run_inter_to_vac.direct.default.forces = gp.initial_forces.output.zeros[-1]
+
+        g.run_inter_to_vac.broadcast.positions = gp.run_inter_to_vac.output.positions[-1]
+        g.run_inter_to_vac.broadcast.velocities = gp.run_inter_to_vac.output.velocities[-1]
+        g.run_inter_to_vac.broadcast.forces = gp.run_inter_to_vac.output.forces[-1]
+
+        # run_inter_to_vac - reflect
+        g.run_inter_to_vac.direct.default.total_steps = ip.total_steps
+        g.run_inter_to_vac.broadcast.total_steps = gp.run_inter_to_vac.output.total_steps[-1]
+        g.run_inter_to_vac.direct.cutoff_distance = gp.cutoff.output.cutoff_distance[-1]
+
+        # run_inter_to_vac - calc_full
+        g.run_inter_to_vac.broadcast.project_path_full = gp.create_jobs_inter_vac.output.project_path[-1]
+        g.run_inter_to_vac.broadcast.full_job_name = gp.create_jobs_inter_vac.output.job_names[-1]
+
+        # run_inter_to_vac - slice_positions
+        g.run_inter_to_vac.direct.shared_ids = gp.create_vacancy.output.mask[-1]
+
+        # run_inter_to_vac - calc_vac
+        g.run_inter_to_vac.broadcast.project_path_vac = gp.create_jobs_vac.output.project_path[-1]
+        g.run_inter_to_vac.broadcast.vac_job_name = gp.create_jobs_vac.output.job_names[-1]
+        g.run_inter_to_vac.direct.vacancy_structure = gp.create_vacancy.output.structure[-1]
+
+        # run_inter_to_vac - harmonic
+        g.run_inter_to_vac.direct.spring_constant = ip.spring_constant
+        g.run_inter_to_vac.direct.force_constants = ip.force_constants
+        g.run_inter_to_vac.direct.vacancy_id = ip.vacancy_id
+
+        # run_inter_to_vac - write_vac_forces -  takes inputs already specified
+
+        # run_inter_to_vac - write_harmonic_forces -  takes inputs already specified
+
+        # run_inter_to_vac - mix
+        g.run_inter_to_vac.broadcast.coupling_weights = gp.build_lambdas_inter_to_vac.output.lambda_pairs[-1]
+
+        # run_inter_to_vac - verlet_velocities - takes inputs already specified
+
+        # run_inter_to_vac - check_thermalized
+        g.run_inter_to_vac.direct.thermalization_steps = ip.thermalization_steps
+
+        # run_inter_to_vac - check_sampling_period
+        g.run_inter_to_vac.direct.sampling_period = ip.sampling_period
+
+        # run_inter_to_vac - average_temp
+        g.run_inter_to_vac.direct.default.average_temp_mean = ip.mean
+        g.run_inter_to_vac.direct.default.average_temp_std = ip.std
+        g.run_inter_to_vac.direct.default.average_temp_n_samples = ip.n_samples
+        g.run_inter_to_vac.broadcast.average_temp_mean = gp.run_inter_to_vac.output.temperature_mean[-1]
+        g.run_inter_to_vac.broadcast.average_temp_std = gp.run_inter_to_vac.output.temperature_std[-1]
+        g.run_inter_to_vac.broadcast.average_temp_n_samples = gp.run_inter_to_vac.output.temperature_n_samples[-1]
+
+        # run_inter_to_vac - addition
+        # no parent inputs
+
+        # run_inter_to_vac - average_tild
+        g.run_inter_to_vac.direct.default.average_tild_mean = ip.mean
+        g.run_inter_to_vac.direct.default.average_tild_std = ip.std
+        g.run_inter_to_vac.direct.default.average_tild_n_samples = ip.n_samples
+        g.run_inter_to_vac.broadcast.average_tild_mean = gp.run_inter_to_vac.output.mean_diff[-1]
+        g.run_inter_to_vac.broadcast.average_tild_std = gp.run_inter_to_vac.output.std_diff[-1]
+        g.run_inter_to_vac.broadcast.average_tild_n_samples = gp.run_inter_to_vac.output.n_samples[-1]
+
+        # run_inter_to_vac - fep_exp
+        g.run_inter_to_vac.broadcast.delta_lambdas = gp.build_lambdas_inter_to_vac.output.delta_lambdas[-1]
+
+        # run_inter_to_vac - average_fep_exp
+        g.run_inter_to_vac.direct.default.average_fep_exp_mean = ip.mean
+        g.run_inter_to_vac.direct.default.average_fep_exp_std = ip.std
+        g.run_inter_to_vac.direct.default.average_fep_exp_n_samples = ip.n_samples
+        g.run_inter_to_vac.broadcast.average_fep_exp_mean = gp.run_inter_to_vac.output.fep_exp_mean[-1]
+        g.run_inter_to_vac.broadcast.average_fep_exp_std = gp.run_inter_to_vac.output.fep_exp_std[-1]
+        g.run_inter_to_vac.broadcast.average_fep_exp_n_samples = gp.run_inter_to_vac.output.n_samples[-1]
+
+        # run_inter_to_vac - clock
+        g.run_inter_to_vac.direct.n_sub_steps = ip.convergence_check_steps
+
+        # clock
+        g.clock.input.add_counts = ip.convergence_check_steps
+
+        # post_harm_to_inter
+        g.post_harm_to_inter.input.lambda_pairs = gp.build_lambdas_harm_to_inter.output.lambda_pairs[-1]
+        g.post_harm_to_inter.input.tild_mean = gp.run_harm_to_inter.output.mean_diff[-1]
+        g.post_harm_to_inter.input.tild_std = gp.run_harm_to_inter.output.std_diff[-1]
+        g.post_harm_to_inter.input.fep_exp_mean = gp.run_harm_to_inter.output.fep_exp_mean[-1]
+        g.post_harm_to_inter.input.fep_exp_std = gp.run_harm_to_inter.output.fep_exp_std[-1]
+        g.post_harm_to_inter.input.temperature = ip.temperature
+        g.post_harm_to_inter.input.n_samples = gp.run_harm_to_inter.output.n_samples[-1][-1]
+
+        # post_inter_to_vac
+        g.post_inter_to_vac.input.lambda_pairs = gp.build_lambdas_inter_to_vac.output.lambda_pairs[-1]
+        g.post_inter_to_vac.input.tild_mean = gp.run_inter_to_vac.output.mean_diff[-1]
+        g.post_inter_to_vac.input.tild_std = gp.run_inter_to_vac.output.std_diff[-1]
+        g.post_inter_to_vac.input.fep_exp_mean = gp.run_inter_to_vac.output.fep_exp_mean[-1]
+        g.post_inter_to_vac.input.fep_exp_std = gp.run_inter_to_vac.output.fep_exp_std[-1]
+        g.post_inter_to_vac.input.temperature = ip.temperature
+        g.post_inter_to_vac.input.n_samples = gp.run_inter_to_vac.output.n_samples[-1][-1]
+
+        # formation_energy_tild
+        g.formation_energy_tild.input.n_atoms = gp.initial_velocities.output.n_atoms[-1][-1]
+        g.formation_energy_tild.input.eq_energy = gp.minimize_job.output.energy_pot[-1]
+        g.formation_energy_tild.input.harm_to_inter_mean = gp.post_harm_to_inter.output.tild_free_energy_mean[-1]
+        g.formation_energy_tild.input.harm_to_inter_std = gp.post_harm_to_inter.output.tild_free_energy_std[-1]
+        g.formation_energy_tild.input.harm_to_inter_se = gp.post_harm_to_inter.output.tild_free_energy_se[-1]
+        g.formation_energy_tild.input.inter_to_vac_mean = gp.post_inter_to_vac.output.tild_free_energy_mean[-1]
+        g.formation_energy_tild.input.inter_to_vac_std = gp.post_inter_to_vac.output.tild_free_energy_std[-1]
+        g.formation_energy_tild.input.inter_to_vac_se = gp.post_inter_to_vac.output.tild_free_energy_se[-1]
+
+        # formation_energy_fep
+        g.formation_energy_fep.input.n_atoms = gp.initial_velocities.output.n_atoms[-1][-1]
+        g.formation_energy_fep.input.eq_energy = gp.minimize_job.output.energy_pot[-1]
+        g.formation_energy_fep.input.harm_to_inter_mean = gp.post_harm_to_inter.output.fep_free_energy_mean[-1]
+        g.formation_energy_fep.input.harm_to_inter_std = gp.post_harm_to_inter.output.fep_free_energy_std[-1]
+        g.formation_energy_fep.input.harm_to_inter_se = gp.post_harm_to_inter.output.fep_free_energy_se[-1]
+        g.formation_energy_fep.input.inter_to_vac_mean = gp.post_inter_to_vac.output.fep_free_energy_mean[-1]
+        g.formation_energy_fep.input.inter_to_vac_std = gp.post_inter_to_vac.output.fep_free_energy_std[-1]
+        g.formation_energy_fep.input.inter_to_vac_se = gp.post_inter_to_vac.output.fep_free_energy_se[-1]
+
+        # exit
+        g.exit.input.vertices = [
+            gp.check_steps.vertex_state,
+            gp.check_convergence.vertex_state
+        ]
+
+        self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
+
+    def get_output(self):
+        gp = Pointer(self.graph)
+        o = Pointer(self.graph.run_harm_to_inter.output)
+        p = Pointer(self.graph.run_inter_to_vac.output)
+        return {
+            'total_steps': ~o.total_steps[-1],
+            'temperature_mean_harm_to_inter': ~o.temperature_mean[-1],
+            'temperature_std_harm_to_inter': ~o.temperature_std[-1],
+            'integrands_harm_to_inter': ~o.mean_diff[-1],
+            'integrands_std_harm_to_inter': ~o.std_diff[-1],
+            'integrands_n_samples_harm_to_inter': ~o.n_samples[-1],
+            'temperature_mean_inter_to_vac': ~p.temperature_mean[-1],
+            'temperature_std_inter_to_vac': ~p.temperature_std[-1],
+            'integrands_inter_to_vac': ~p.mean_diff[-1],
+            'integrands_std_inter_to_vac': ~p.std_diff[-1],
+            'integrands_n_samples_inter_to_vac': ~p.n_samples[-1],
+            'formation_energy_tild': ~gp.formation_energy_tild.output.formation_energy_mean[-1],
+            'formation_energy_tild_std': ~gp.formation_energy_tild.output.formation_energy_std[-1],
+            'formation_energy_tild_se': ~gp.formation_energy_tild.output.formation_energy_se[-1],
+            'formation_energy_fep': ~gp.formation_energy_fep.output.formation_energy_mean[-1],
+            'formation_energy_fep_std': ~gp.formation_energy_fep.output.formation_energy_std[-1],
+            'formation_energy_fep_se': ~gp.formation_energy_fep.output.formation_energy_se[-1]
+        }
+
+    def get_lambdas(self, integrands='harm_to_inter'):
+        if integrands == 'harm_to_inter':
+            vertex = self.graph.build_lambdas_harm_to_inter.output
+        elif integrands == 'inter_to_vac':
+            vertex = self.graph.build_lambdas_inter_to_vac.output
+        else:
+            raise KeyError('The value of `integrands` can only be \'harm_to_inter\' or \'inter_to_vac\'')
+        return vertex.lambda_pairs[-1][:, 0]
+
+    def get_tild_integrands(self, integrands='harm_to_inter'):
+        if integrands == 'harm_to_inter':
+            vertex = self.graph.run_harm_to_inter.output
+        elif integrands == 'inter_to_vac':
+            vertex = self.graph.run_inter_to_vac.output
+        else:
+            raise KeyError('The value of `integrands` can only be \'harm_to_inter\' or \'inter_to_vac\'')
+        return np.array(vertex.mean_diff[-1]), vertex.std_diff[-1] / np.sqrt(vertex.n_samples[-1])
+
+
+class ProtocolVacancyFormation(Protocol, VacancyFormation, ABC):
     pass

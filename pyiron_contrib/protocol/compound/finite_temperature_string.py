@@ -468,7 +468,7 @@ class ConstrainedMD(CompoundVertex):
         g.reflect_string.input.positions = gp.verlet_positions.output.positions[-1]
         g.reflect_string.input.velocities = gp.verlet_positions.output.velocities[-1]
         g.reflect_string.input.previous_positions = gp.reflect_atoms.output.positions[-1]
-        g.reflect_string.input.previous_velocities = gp.reflect_atoms.output.velocities[-1]
+        g.reflect_string.input.previous_velocities = gp.verlet_velocities.output.velocities[-1]
         g.reflect_string.input.pbc = ip.structure.pbc
         g.reflect_string.input.cell = ip.structure.cell.array
 
@@ -481,7 +481,7 @@ class ConstrainedMD(CompoundVertex):
         g.reflect_atoms.input.positions = gp.reflect_string.output.positions[-1]
         g.reflect_atoms.input.velocities = gp.reflect_string.output.velocities[-1]
         g.reflect_atoms.input.previous_positions = gp.reflect_atoms.output.positions[-1]
-        g.reflect_atoms.input.previous_velocities = gp.reflect_atoms.output.velocities[-1]
+        g.reflect_atoms.input.previous_velocities = gp.verlet_velocities.output.velocities[-1]
         g.reflect_atoms.input.pbc = ip.structure.pbc
         g.reflect_atoms.input.cell = ip.structure.cell.array
         g.reflect_atoms.input.cutoff_distance = ip.cutoff_distance

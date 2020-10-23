@@ -1043,7 +1043,10 @@ class SphereReflectionPerAtom(PrimitiveVertex):
 
         total_steps += 1
         if use_reflection:
+            print(type(reference_positions), type(positions), type(cell), type(pbc))
+            print('reaches here')
             distance = find_mic(reference_positions - positions, cell=cell, pbc=pbc)[1]
+            print('but not here')
             is_at_home = (distance < cutoff_distance)[:, np.newaxis]
             is_away = 1 - is_at_home
         else:

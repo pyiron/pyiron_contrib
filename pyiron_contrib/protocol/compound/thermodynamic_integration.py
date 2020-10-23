@@ -108,8 +108,8 @@ class HarmonicTILD(TILDParent):
         force_constants (NxN matrix): The Hessian matrix, obtained from, for ex. Phonopy. (Default is None, treat
             the atoms as independent harmonic oscillators (Einstein atoms.).)
         cutoff_factor (float): The cutoff is obtained by taking the first nearest neighbor distance and multiplying
-            it by the cutoff factor. A default value of 0.4 is chosen, because taking a cutoff factor of ~0.5
-            sometimes let certain reflections off the hook, and we do not want that to happen. (Default is 0.4.)
+            it by the cutoff factor. A default value of 0.45 is chosen, because taking a cutoff factor of ~0.5
+            sometimes let certain reflections off the hook, and we do not want that to happen. (Default is 0.45.)
         use_reflection (boolean): Turn on or off `SphereReflectionPerAtom` (Default is True.)
         total_steps (int): The total number of times `SphereReflectionPerAtom` is called so far. (Default is 0.)
 
@@ -158,7 +158,7 @@ class HarmonicTILD(TILDParent):
         id_.custom_lambdas = None
         id_.force_constants = None
         id_.spring_constant = 1.0
-        id_.cutoff_factor = 0.4
+        id_.cutoff_factor = 0.45
         id_.use_reflection = True
         id_.total_steps = 0
 
@@ -519,7 +519,7 @@ class HarmonicallyCoupled(CompoundVertex):
         g.reflect.input.positions = gp.verlet_positions.output.positions[-1]
         g.reflect.input.velocities = gp.verlet_positions.output.velocities[-1]
         g.reflect.input.previous_positions = gp.reflect.output.positions[-1]
-        g.reflect.input.previous_velocities = gp.reflect.output.velocities[-1]
+        g.reflect.input.previous_velocities = gp.verlet_velocities.output.velocities[-1]
         g.reflect.input.pbc = ip.structure.pbc
         g.reflect.input.cell = ip.structure.cell.array
         g.reflect.input.cutoff_distance = ip.cutoff_distance
@@ -591,7 +591,7 @@ class HarmonicallyCoupled(CompoundVertex):
 
         # fep_exp
         g.fep_exp.input.u_diff = gp.addition.output.weighted_sum[-1]
-        g.fep_exp.input.temperature = gp.verlet_velocities.output.instant_temperature[-1]
+        g.fep_exp.input.temperature = ip.temperature
         g.fep_exp.input.delta_lambda = ip.delta_lambdas
 
         # average_fep_exp
@@ -780,6 +780,7 @@ class HarmonicTILDParallel(HarmonicTILD):
         g.run_lambda_points.direct.default.total_steps = ip.total_steps
         g.run_lambda_points.broadcast.total_steps = gp.run_lambda_points.output.total_steps[-1]
         g.run_lambda_points.direct.cutoff_distance = gp.cutoff.output.cutoff_distance[-1]
+        g.run_lambda_points.direct.use_reflection = ip.use_reflection
 
         # run_lambda_points - calc_static
         g.run_lambda_points.broadcast.project_path = gp.create_jobs.output.project_path[-1]
@@ -808,7 +809,7 @@ class HarmonicTILDParallel(HarmonicTILD):
         g.run_lambda_points.direct.default.average_temp_n_samples = ip.n_samples
         g.run_lambda_points.broadcast.average_temp_mean = gp.run_lambda_points.output.temperature_mean[-1]
         g.run_lambda_points.broadcast.average_temp_std = gp.run_lambda_points.output.temperature_std[-1]
-        g.run_lambda_points.broadcast.average_temp_n_samples= gp.run_lambda_points.output.temperature_n_samples[-1]
+        g.run_lambda_points.broadcast.average_temp_n_samples = gp.run_lambda_points.output.temperature_n_samples[-1]
 
         # run_lambda_points - addition
         # no parent inputs
@@ -919,8 +920,8 @@ class VacancyTILD(TILDParent):
         force_constants (NxN matrix): The Hessian matrix, obtained from, for ex. Phonopy. (Default is None, treat
             the atoms as independent harmonic oscillators (Einstein atoms.).)
         cutoff_factor (float): The cutoff is obtained by taking the first nearest neighbor distance and multiplying
-            it by the cutoff factor. A default value of 0.4 is chosen, because taking a cutoff factor of ~0.5
-            sometimes let certain reflections off the hook, and we do not want that to happen. (Default is 0.4.)
+            it by the cutoff factor. A default value of 0.45 is chosen, because taking a cutoff factor of ~0.5
+            sometimes let certain reflections off the hook, and we do not want that to happen. (Default is 0.45.)
         use_reflection (boolean): Turn on or off `SphereReflectionPerAtom` (Default is True.)
         total_steps (int): The total number of times `SphereReflectionPerAtom` is called so far. (Default is 0.)
 
@@ -957,7 +958,7 @@ class VacancyTILD(TILDParent):
         id_.custom_lambdas = None
         id_.spring_constant = 1.0
         id_.force_constants = None
-        id_.cutoff_factor = 0.3
+        id_.cutoff_factor = 0.45
         id_.use_reflection = True
         id_.total_steps = 0
         id_.ensure_iterable_mask = True
@@ -1332,7 +1333,7 @@ class Decoupling(CompoundVertex):
         g.reflect.input.positions = gp.verlet_positions.output.positions[-1]
         g.reflect.input.velocities = gp.verlet_positions.output.velocities[-1]
         g.reflect.input.previous_positions = gp.reflect.output.positions[-1]
-        g.reflect.input.previous_velocities = gp.reflect.output.velocities[-1]
+        g.reflect.input.previous_velocities = gp.verlet_velocities.output.velocities[-1]
         g.reflect.input.pbc = ip.structure.pbc
         g.reflect.input.cell = ip.structure.cell.array
         g.reflect.input.cutoff_distance = ip.cutoff_distance
@@ -1630,6 +1631,7 @@ class VacancyTILDParallel(VacancyTILD):
         g.run_lambda_points.direct.default.total_steps = ip.total_steps
         g.run_lambda_points.broadcast.total_steps = gp.run_lambda_points.output.total_steps[-1]
         g.run_lambda_points.direct.cutoff_distance = gp.cutoff.output.cutoff_distance[-1]
+        g.run_lambda_points.direct.use_reflection = ip.use_reflection
 
         # run_lambda_points - calc_full
         g.run_lambda_points.broadcast.project_path_full = gp.create_full_jobs.output.project_path[-1]

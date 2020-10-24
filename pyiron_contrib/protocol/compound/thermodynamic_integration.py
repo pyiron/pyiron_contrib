@@ -15,7 +15,7 @@ from pyiron_contrib.protocol.list import SerialList, ParallelList
 from pyiron_contrib.protocol.utils import Pointer
 from pyiron_contrib.protocol.primitive.one_state import BuildMixingPairs, ComputeFormationEnergy, Counter, CreateJob,\
     CutoffDistance, DeleteAtom, ExternalHamiltonian, FEPExponential, HarmonicHamiltonian, MinimizeReferenceJob, \
-    Overwrite, RemoveJob, RandomVelocity, Slice, SphereReflectionPerAtom, TILDPostProcess, Transpose, \
+    Overwrite, RemoveJob, RandomVelocity, Slice, SphereReflection, TILDPostProcess, Transpose, \
     VerletPositionUpdate, VerletVelocityUpdate, WeightedSum, WelfordOnline, Zeros
 from pyiron_contrib.protocol.primitive.two_state import ExitProtocol, IsGEq, IsLEq, ModIsZero
 
@@ -110,8 +110,8 @@ class HarmonicTILD(TILDParent):
         cutoff_factor (float): The cutoff is obtained by taking the first nearest neighbor distance and multiplying
             it by the cutoff factor. A default value of 0.45 is chosen, because taking a cutoff factor of ~0.5
             sometimes let certain reflections off the hook, and we do not want that to happen. (Default is 0.45.)
-        use_reflection (boolean): Turn on or off `SphereReflectionPerAtom` (Default is True.)
-        total_steps (int): The total number of times `SphereReflectionPerAtom` is called so far. (Default is 0.)
+        use_reflection (boolean): Turn on or off `SphereReflection` (Default is True.)
+        total_steps (int): The total number of times `SphereReflection` is called so far. (Default is 0.)
 
     Output attributes:
         temperature_mean (list): Mean output temperature for each integration point.
@@ -173,7 +173,7 @@ class HarmonicTILD(TILDParent):
         g.minimize_job = MinimizeReferenceJob()
         g.check_steps = IsGEq()
         g.verlet_positions = SerialList(VerletPositionUpdate)
-        g.reflect = SerialList(SphereReflectionPerAtom)
+        g.reflect = SerialList(SphereReflection)
         g.calc_static = SerialList(ExternalHamiltonian)
         g.harmonic = SerialList(HarmonicHamiltonian)
         g.transpose_forces = Transpose()
@@ -447,7 +447,7 @@ class HarmonicallyCoupled(CompoundVertex):
         g = self.graph
         g.check_steps = IsGEq()
         g.verlet_positions = VerletPositionUpdate()
-        g.reflect = SphereReflectionPerAtom()
+        g.reflect = SphereReflection()
         g.calc_static = ExternalHamiltonian()
         g.harmonic = HarmonicHamiltonian()
         g.mix = WeightedSum()
@@ -922,8 +922,8 @@ class VacancyTILD(TILDParent):
         cutoff_factor (float): The cutoff is obtained by taking the first nearest neighbor distance and multiplying
             it by the cutoff factor. A default value of 0.45 is chosen, because taking a cutoff factor of ~0.5
             sometimes let certain reflections off the hook, and we do not want that to happen. (Default is 0.45.)
-        use_reflection (boolean): Turn on or off `SphereReflectionPerAtom` (Default is True.)
-        total_steps (int): The total number of times `SphereReflectionPerAtom` is called so far. (Default is 0.)
+        use_reflection (boolean): Turn on or off `SphereReflection` (Default is True.)
+        total_steps (int): The total number of times `SphereReflection` is called so far. (Default is 0.)
 
     Output attributes:
         temperature_mean (list): Mean output temperature for each integration point.
@@ -975,7 +975,7 @@ class VacancyTILD(TILDParent):
         g.cutoff = CutoffDistance()
         g.check_steps = IsGEq()
         g.verlet_positions = SerialList(VerletPositionUpdate)
-        g.reflect = SerialList(SphereReflectionPerAtom)
+        g.reflect = SerialList(SphereReflection)
         g.calc_full = SerialList(ExternalHamiltonian)
         g.slice_positions = SerialList(Slice)
         g.calc_vac = SerialList(ExternalHamiltonian)
@@ -1253,7 +1253,7 @@ class Decoupling(CompoundVertex):
         g = self.graph
         g.check_steps = IsGEq()
         g.verlet_positions = VerletPositionUpdate()
-        g.reflect = SphereReflectionPerAtom()
+        g.reflect = SphereReflection()
         g.calc_full = ExternalHamiltonian()
         g.slice_positions = Slice()
         g.calc_vac = ExternalHamiltonian()

@@ -8,7 +8,7 @@ from abc import ABC
 
 from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
 from pyiron_contrib.protocol.primitive.one_state import BerendsenBarostat, Counter, CutoffDistance, \
-    ExternalHamiltonian, HarmonicHamiltonian, RandomVelocity, SphereReflectionPerAtom, VerletPositionUpdate, \
+    ExternalHamiltonian, HarmonicHamiltonian, RandomVelocity, SphereReflection, VerletPositionUpdate, \
     VerletVelocityUpdate, Zeros
 from pyiron_contrib.protocol.primitive.two_state import IsGEq
 from pyiron_contrib.protocol.utils import Pointer
@@ -226,8 +226,8 @@ class ConfinedMD(MolecularDynamics):
         cutoff_factor (float): The cutoff is obtained by taking the first nearest neighbor distance and multiplying
             it by the cutoff factor. A default value of 0.4 is chosen, because taking a cutoff factor of ~0.5
             sometimes let certain reflections off the hook, and we do not want that to happen. (Default is 0.4.)
-        use_reflection (boolean): Turn on or off `SphereReflectionPerAtom` (Default is True.)
-        total_steps (int): The total number of times `SphereReflectionPerAtom` is called so far. (Default is 0.)
+        use_reflection (boolean): Turn on or off `SphereReflection` (Default is True.)
+        total_steps (int): The total number of times `SphereReflection` is called so far. (Default is 0.)
 
     For inherited input and output attributes, refer the `MolecularDynamics` protocol.
     """
@@ -255,7 +255,7 @@ class ConfinedMD(MolecularDynamics):
         g.clock = Counter()
         g.barostat = BerendsenBarostat()
         g.verlet_positions = VerletPositionUpdate()
-        g.reflect_atoms = SphereReflectionPerAtom()
+        g.reflect_atoms = SphereReflection()
         g.calc_static = ExternalHamiltonian()
         g.verlet_velocities = VerletVelocityUpdate()
 
@@ -526,8 +526,8 @@ class ConfinedHarmonicMD(HarmonicMD):
         cutoff_factor (float): The cutoff is obtained by taking the first nearest neighbor distance and multiplying
             it by the cutoff factor. A default value of 0.4 is chosen, because taking a cutoff factor of ~0.5
             sometimes let certain reflections off the hook, and we do not want that to happen. (Default is 0.4.)
-        use_reflection (boolean): Turn on or off `SphereReflectionPerAtom` (Default is True.)
-        total_steps (int): The total number of times `SphereReflectionPerAtom` is called so far. (Default is 0.)
+        use_reflection (boolean): Turn on or off `SphereReflection` (Default is True.)
+        total_steps (int): The total number of times `SphereReflection` is called so far. (Default is 0.)
 
     For inherited input and output attributes, refer the `HarmonicMD` protocol.
     """
@@ -553,7 +553,7 @@ class ConfinedHarmonicMD(HarmonicMD):
         g.check_steps = IsGEq()
         g.clock = Counter()
         g.verlet_positions = VerletPositionUpdate()
-        g.reflect_atoms = SphereReflectionPerAtom()
+        g.reflect_atoms = SphereReflection()
         g.calc_harmonic = HarmonicHamiltonian()
         g.verlet_velocities = VerletVelocityUpdate()
 

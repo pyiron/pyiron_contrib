@@ -12,7 +12,7 @@ from abc import ABC
 
 from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
 from pyiron_contrib.protocol.primitive.one_state import CreateJob, Counter, CutoffDistance, ExternalHamiltonian, \
-    InitialPositions, RemoveJob, RandomVelocity, SphereReflectionPerAtom, VerletPositionUpdate, \
+    InitialPositions, RemoveJob, RandomVelocity, SphereReflection, VerletPositionUpdate, \
     VerletVelocityUpdate, Zeros
 from pyiron_contrib.protocol.primitive.two_state import IsGEq, ModIsZero
 from pyiron_contrib.protocol.primitive.fts_vertices import CentroidsRunningAverageMix, CentroidsReparameterization, \
@@ -73,8 +73,8 @@ class FTSEvolution(CompoundVertex):
             not effected). The actual smoothing is the product of this nominal value, the number of images, and the
             mixing fraction, ala Vanden-Eijnden and Venturoli (2009). (Default is 0.1.)
         divisor (int): Necessary for calculation of the running average. (Default is 1.)
-        use_reflection (boolean): Turn on or off `SphereReflectionPerAtom` (Default is True.)
-        total_steps (int): The total number of times `SphereReflectionPerAtom` is called so far. (Default is 0.)
+        use_reflection (boolean): Turn on or off `SphereReflection` (Default is True.)
+        total_steps (int): The total number of times `SphereReflection` is called so far. (Default is 0.)
         project_path (string): Initialize default project path to pass into the child protocol. (Default is None.)
         job_name (string): Initialize default job name to pass into the child protocol. (Default is None.)
 
@@ -108,7 +108,7 @@ class FTSEvolution(CompoundVertex):
         id_.thermalization_steps = 10
         id_.n_images = 5
         id_.initial_positions = None
-        id_.cutoff_factor = 0.4
+        id_.cutoff_factor = 0.45
         id_.mixing_fraction = 0.1
         id_.relax_endpoints = False
         id_.smooth_style = 'global'
@@ -131,7 +131,7 @@ class FTSEvolution(CompoundVertex):
         g.check_steps = IsGEq()
         g.verlet_positions = SerialList(VerletPositionUpdate)
         g.reflect_string = SerialList(StringReflect)
-        g.reflect_atoms = SerialList(SphereReflectionPerAtom)
+        g.reflect_atoms = SerialList(SphereReflection)
         g.calc_static_images = SerialList(ExternalHamiltonian)
         g.verlet_velocities = SerialList(VerletVelocityUpdate)
         g.running_average_pos = SerialList(PositionsRunningAverage)
@@ -413,7 +413,7 @@ class ConstrainedMD(CompoundVertex):
         g.check_steps = IsGEq()
         g.verlet_positions = VerletPositionUpdate()
         g.reflect_string = StringReflect()
-        g.reflect_atoms = SphereReflectionPerAtom()
+        g.reflect_atoms = SphereReflection()
         g.calc_static = ExternalHamiltonian()
         g.verlet_velocities = VerletVelocityUpdate()
         g.running_average_pos = PositionsRunningAverage()

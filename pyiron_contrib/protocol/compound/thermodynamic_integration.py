@@ -158,7 +158,7 @@ class HarmonicTILD(TILDParent):
         id_.custom_lambdas = None
         id_.force_constants = None
         id_.spring_constant = 1.0
-        id_.cutoff_factor = 0.45
+        id_.cutoff_factor = 0.5
         id_.use_reflection = True
         id_.total_steps = 0
 
@@ -958,7 +958,7 @@ class VacancyTILD(TILDParent):
         id_.custom_lambdas = None
         id_.spring_constant = 1.0
         id_.force_constants = None
-        id_.cutoff_factor = 0.45
+        id_.cutoff_factor = 0.5
         id_.use_reflection = True
         id_.total_steps = 0
         id_.ensure_iterable_mask = True
@@ -1342,6 +1342,7 @@ class Decoupling(CompoundVertex):
 
         # calc_full
         g.calc_full.input.structure = ip.structure
+        g.calc_full.input.cell = ip.structure.cell.array
         g.calc_full.input.project_path = ip.project_path_full
         g.calc_full.input.job_name = ip.full_job_name
         g.calc_full.input.positions = gp.reflect.output.positions[-1]
@@ -1352,6 +1353,7 @@ class Decoupling(CompoundVertex):
 
         # calc_vac
         g.calc_vac.input.structure = ip.vacancy_structure
+        g.calc_vac.input.cell = ip.vacancy_structure.cell.array
         g.calc_vac.input.project_path = ip.project_path_vac
         g.calc_vac.input.job_name = ip.vac_job_name
         g.calc_vac.input.positions = gp.slice_positions.output.sliced[-1]

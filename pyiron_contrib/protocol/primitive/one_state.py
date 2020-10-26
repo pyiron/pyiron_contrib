@@ -68,13 +68,12 @@ class BuildMixingPairs(PrimitiveVertex):
         else:
             lambdas = np.linspace(0, 1, num=n_lambdas)
 
-        lambda_pairs = np.array([lambdas, 1 - lambdas]).T
         delta_lambdas = np.gradient(lambdas)
         delta_lambdas[0] = delta_lambdas[0] / 2
         delta_lambdas[-1] = delta_lambdas[-1] / 2
 
         return {
-                'lambda_pairs': lambda_pairs,
+                'lambda_pairs': np.array([lambdas, 1 - lambdas]).T,
                 'delta_lambdas': delta_lambdas
             }
 

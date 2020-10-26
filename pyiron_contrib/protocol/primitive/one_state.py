@@ -393,6 +393,7 @@ class MinimizeReferenceJob(ExternalHamiltonian):
                                                   self._fast_lammps_mode, name)
         pr = Project(path=project_path)
         job = pr.load(job_name)
+        job.structure = structure
         job.calc_minimize(pressure=pressure)
         job.run()
 

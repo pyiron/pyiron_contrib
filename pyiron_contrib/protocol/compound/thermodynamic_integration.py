@@ -519,7 +519,7 @@ class HarmonicallyCoupled(CompoundVertex):
         g.reflect.input.positions = gp.verlet_positions.output.positions[-1]
         g.reflect.input.velocities = gp.verlet_positions.output.velocities[-1]
         g.reflect.input.previous_positions = gp.reflect.output.positions[-1]
-        g.reflect.input.previous_velocities = gp.verlet_velocities.output.velocities[-1]
+        g.reflect.input.previous_velocities = gp.reflect.output.velocities[-1]
         g.reflect.input.pbc = ip.structure.pbc
         g.reflect.input.cell = ip.structure.cell.array
         g.reflect.input.cutoff_distance = ip.cutoff_distance
@@ -1333,7 +1333,7 @@ class Decoupling(CompoundVertex):
         g.reflect.input.positions = gp.verlet_positions.output.positions[-1]
         g.reflect.input.velocities = gp.verlet_positions.output.velocities[-1]
         g.reflect.input.previous_positions = gp.reflect.output.positions[-1]
-        g.reflect.input.previous_velocities = gp.verlet_velocities.output.velocities[-1]
+        g.reflect.input.previous_velocities = gp.reflect.output.velocities[-1]
         g.reflect.input.pbc = ip.structure.pbc
         g.reflect.input.cell = ip.structure.cell.array
         g.reflect.input.cutoff_distance = ip.cutoff_distance
@@ -1404,7 +1404,7 @@ class Decoupling(CompoundVertex):
         g.average_temp.input.sample = gp.verlet_velocities.output.instant_temperature[-1]
 
         # check_sampling_period
-        g.check_sampling_period.input.target = gp.clock.output.n_counts[-1]
+        g.check_sampling_period.input.target = gp.reflect.output.total_steps[-1]
         g.check_sampling_period.input.default.mod = ip.sampling_period
 
         # addition

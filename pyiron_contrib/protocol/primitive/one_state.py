@@ -6,7 +6,6 @@ from __future__ import print_function
 from pyiron_contrib.protocol.generic import PrimitiveVertex
 from pyiron_contrib.protocol.utils import Pointer
 import numpy as np
-from uncertainties import unumpy
 from pyiron.atomistics.job.interactive import GenericInteractive
 from pyiron.lammps.lammps import LammpsInteractive
 from scipy.constants import physical_constants
@@ -16,8 +15,7 @@ from pyiron_contrib.protocol.utils import ensure_iterable
 from os.path import split
 from abc import ABC, abstractmethod
 from pyiron_contrib.protocol.math import welford_online
-
-# TODO: Rely on pyiron units instead of hard-coding in scipy's Boltzmann constant in eV/K.
+import matplotlib.pylab as plt
 
 KB = physical_constants['Boltzmann constant in eV/K'][0]
 EV_TO_U_ANGSQ_PER_FSSQ = 0.00964853322
@@ -28,6 +26,8 @@ GPA_TO_BAR = 1e4
 
 """
 Primitive vertices which have only one outbound execution edge.
+
+TODO: Rely on pyiron units instead of hard-coding in scipy's Boltzmann constant in eV/K.
 """
 
 __author__ = "Liam Huber, Raynol Dsouza, Dominik Noeger"
@@ -42,73 +42,59 @@ __date__ = "20 July, 2019"
 
 class BuildMixingPairs(PrimitiveVertex):
     """
-    Builds an array of mixing parameters [lambda, (1-lambda)], and also finds the deltas between consecutive
-        lambdas.
+    Builds an array of mixing parameters [lambda, (1-lambda)].
 
     Input attributes:
-        n_lambdas (int): How many mixing pairs to create. (Default is 5.)
-        custom_lambdas (list/numpy.ndarray): The individual lambda values to use for the first member of each pair.
-            (Default is None.)
+        n_lambdas (int): How many mixing pairs to create.
+        lambdas (list/numpy.ndarray): The individual lambda values to use for the first member of each pair.
+
+    Note:
+        Exactly one of `n_lambdas` or `lambdas` must be provided.
 
     Output attributes:
         lambda_pairs (numpy.ndarray): The (`n_lambdas`, 2)-shaped array of mixing pairs.
-        delta_lambdas (numpy.ndarray): The delta between two consecutive lambdas. The end deltas are
-            halved.
     """
 
     def __init__(self, name=None):
         super(BuildMixingPairs, self).__init__(name=name)
-        self.input.default.n_lambdas = 5
+        self.input.default.n_lambdas = None
         self.input.default.custom_lambdas = None
 
     def command(self, n_lambdas, custom_lambdas):
-
         if custom_lambdas is not None:
             lambdas = np.array(custom_lambdas)
         else:
             lambdas = np.linspace(0, 1, num=n_lambdas)
-
-        delta_lambdas = np.gradient(lambdas)
-        delta_lambdas[0] = delta_lambdas[0] / 2
-        delta_lambdas[-1] = delta_lambdas[-1] / 2
-
         return {
-                'lambda_pairs': np.array([lambdas, 1 - lambdas]).T,
-                'delta_lambdas': delta_lambdas
-            }
+            'lambda_pairs': np.array([lambdas, 1 - lambdas]).T
+        }
 
 
 class Counter(PrimitiveVertex):
     """
     Increments by one at each execution. Can be made to increment from a specific value.
 
-    Input attributes:
-        add_counts (int): A specific value from which to increment. (Default is 0.)
-
     Output attributes:
         n_counts (int): How many executions have passed. (Default is 0.)
+        add_counts (int): Add counts to n_counts. (Default is 0.)
     """
 
     def __init__(self, name=None):
         super(Counter, self).__init__(name=name)
         self.input.default.add_counts = 0
-        self.output.n_counts = [self.input.default.add_counts]
+        self.output.n_counts = [0]
 
     def command(self, add_counts):
-        if add_counts != 0:
+        if add_counts > 0:
             count = self.output.n_counts[-1] + add_counts
         else:
             count = self.output.n_counts[-1] + 1
-
         return {
             'n_counts': count
         }
 
 
 class Compute(PrimitiveVertex):
-    """
-
-    """
 
     def __init__(self, name=None):
         super(Compute, self).__init__(name=name)
@@ -118,45 +104,24 @@ class Compute(PrimitiveVertex):
         return function_(*args, **kwargs)
 
 
-class Zeros(PrimitiveVertex):
-    """
-    A numpy vector of zeros that is pointer-compatible.
-
-    Input attributes:
-        shape (int/tuple): The shape of the array.
-
-    Output attributes:
-        zeros (numpy.ndarray): An array of numpy.float64 zeros.
-    """
-
-    def command(self, shape):
-        return {
-            'zeros': np.zeros(shape)
-        }
-
-
 class DeleteAtom(PrimitiveVertex):
     """
     Given a structure, deletes one of the atoms.
 
     Input attributes:
         structure (Atoms): The structure to delete an atom of.
-        atom_id (int): Which atom to delete. (Default is 0, the 0th atom.)
+        id (int): Which atom to delete.
 
     Output attributes:
         structure (Atoms): The new, modified structure.
         mask (numpy.ndarray): The integer ids shared by both the old and new structure.
     """
 
-    def __init__(self, name=None):
-        super(DeleteAtom, self).__init__(name=name)
-        self.input.default.atom_id = 0
-
-    def command(self, structure, atom_id):
+    def command(self, structure, id):
         vacancy_structure = structure.copy()
-        vacancy_structure.pop(atom_id)
-        mask = np.delete(np.arange(len(structure)).astype(int), atom_id)
-
+        vacancy_structure.pop(id)
+        mask = np.delete(np.arange(len(structure)).astype(int), id)
+        # mask = np.arange(len(structure)).astype(int)
         return {
             'structure': vacancy_structure,
             'mask': mask
@@ -166,56 +131,42 @@ class DeleteAtom(PrimitiveVertex):
 class ExternalHamiltonian(PrimitiveVertex):
     """
     Manages calls to an external interpreter (e.g. Lammps, Vasp, Sphinx...) to produce energies, forces,
-        and possibly other properties. The collected output can be expanded beyond forces and energies
-        (e.g. to magnetic properties or whatever else the interpreting code produces) by modifying the
-        `interesting_keys` in the input. The property must have a corresponding interactive getter for
-        this property.
+    and possibly other properties.
+
+    The collected output can be expanded beyond forces and energies (e.g. to magnetic properties or whatever
+    else the interpreting code produces) by modifying the `interesting_keys` in the input. The property must
+    have a corresponding interactive getter for this property.
 
     Input attributes:
         ref_job_full_path (string): The full path to the hdf5 file of the job to use as a reference template.
-            (Default is None.)
-        project_path (string): The path of the project. To be specified ONLY when the jobs are already
-            initialized outside of this vertex. If `project_path` is specified, `ref_job_full_path` must
-            be set to None. (Default is None.)
-        job_name (string): The name of the job. This is specified only when the jobs are already
-            initialized outside of this vertex. (Default is None.)
         structure (Atoms): The structure for initializing the external Hamiltonian. Overwrites the reference
-            job structure when provided. (Default is None, the reference job needs to have its structure set.)
+        job structure when provided. (Default is None, the reference job needs to have its structure set.)
+        interesting_keys (list[str]): String codes for output properties of the underlying job to collect. (
+        Default iscd ['forces', 'energy_pot'].)
         positions (numpy.ndarray): New positions to evaluate. Shape must match the shape of the structure.
-            (Default is None, only necessary if positions are being updated.)
-        cell (numpy.ndarray): The cell, if not same as that in the specified structure. (Default is None,
-            same cell as in the structure.)
-        interesting_keys (list[str]): String codes for output properties of the underlying job to collect.
-            (Default is ['positions', 'forces', 'energy_pot', 'pressures', 'volume', 'cell'].)
-
-    Output attributes:
-        keys (list/numpy.ndarray): The output corresponding to the interesting keys.
+        (Not set by default, only necessary if positions are being updated.)
     """
 
     def __init__(self, name=None):
         super(ExternalHamiltonian, self).__init__(name=name)
         self._fast_lammps_mode = True  # Set to false only to intentionally be slow for comparison purposes
+
         self._job_project_path = None
         self._job = None
         self._job_name = None
-        id_ = self.input.default
-        id_.ref_job_full_path = None
-        id_.project_path = None
-        id_.job_name = None
-        id_.structure = None
-        id_.positions = None
-        id_.cell = None
-        id_.interesting_keys = ['positions', 'forces', 'energy_pot', 'pressures', 'volume', 'cell']
+        self.input.default.ref_job_full_path = None
+        self.input.default.project_path = None
+        self.input.default.job_name = None
+        self.input.default.structure = None
+        self.input.default.positions = None
+        self.input.default.cell = None
+        self.input.default.interesting_keys = ['positions', 'forces', 'energy_pot', 'pressures', 'volume', 'cells']
 
     def command(self, ref_job_full_path, project_path, job_name, structure, positions, cell, interesting_keys):
 
         if self._job_project_path is None:
             if project_path is None and ref_job_full_path is not None:
-                self._job_project_path, self._job_name = self._initialize(self.get_graph_location(),
-                                                                          ref_job_full_path,
-                                                                          structure,
-                                                                          self._fast_lammps_mode
-                                                                          )
+                self._initialize(ref_job_full_path, structure)
             elif project_path is not None and ref_job_full_path is None:
                 self._job_project_path = project_path
                 self._job_name = job_name
@@ -230,11 +181,13 @@ class ExternalHamiltonian(PrimitiveVertex):
             self._job.interactive_initialize_interface()
 
         if isinstance(self._job, LammpsInteractive) and self._fast_lammps_mode:
+            # Run Lammps 'efficiently'
             if positions is not None:
                 self._job.interactive_positions_setter(positions)
             if cell is not None:
                 self._job.interactive_cells_setter(cell)
             self._job._interactive_lib_command(self._job._interactive_run_command)
+
         elif isinstance(self._job, GenericInteractive):
             # DFT codes are slow enough that we can run them the regular way and not care
             # Also we might intentionally run Lammps slowly for comparison purposes
@@ -242,20 +195,17 @@ class ExternalHamiltonian(PrimitiveVertex):
                 self._job.structure.positions = positions
             if cell is not None:
                 self._job.structure.cell = cell
+
             self._job.calc_static()
             self._job.run()
         else:
             raise TypeError('Job of class {} is not compatible.'.format(self._job.__class__))
 
-        return {key: self._get_interactive_value(key) for key in interesting_keys}
+        return {key: self.get_interactive_value(key) for key in interesting_keys}
 
-    @staticmethod
-    def _initialize(graph_location, ref_job_full_path, structure, fast_lammps_mode, name=None):
-        """
-        Initialize / create the interactive job and save it.
-        """
-        if name is None:
-            name = graph_location + '_job'
+    def _initialize(self, ref_job_full_path, structure):
+        loc = self.get_graph_location()
+        name = loc + '_job'
         project_path, ref_job_path = split(ref_job_full_path)
         pr = Project(path=project_path)
         ref_job = pr.load(ref_job_path)
@@ -265,34 +215,40 @@ class ExternalHamiltonian(PrimitiveVertex):
             input_only=True,
             new_database_entry=True
         )
+
         if structure is not None:
             job.structure = structure
+
         if isinstance(job, GenericInteractive):
             job.interactive_open()
-            if isinstance(job, LammpsInteractive) and fast_lammps_mode:
+
+            if isinstance(job, LammpsInteractive) and self._fast_lammps_mode:
                 # Note: This might be done by default at some point in LammpsInteractive,
                 # and could then be removed here
                 job.interactive_flush_frequency = 10 ** 10
                 job.interactive_write_frequency = 10 ** 10
-            job.save()
+                self._disable_lmp_output = True
+
+            job.calc_static()
+            job.run(run_again=True)
+            # TODO: Running is fine for Lammps, but wasteful for DFT codes! Get the much cheaper interface
+            #  initialization working -- right now it throws a (passive) TypeError due to database issues
         else:
             raise TypeError('Job of class {} is not compatible.'.format(ref_job.__class__))
 
-        return job.project.path, job.job_name
+        self._job = job
+        self._job_name = job.job_name
+        self._job_project_path = job.project.path
 
     def _reload(self):
-        """
-        Reload a saved job from its `project_path` and `job_name`.
-        """
         pr = Project(path=self._job_project_path)
         self._job = pr.load(self._job_name)
         self._job.interactive_open()
         self._job.interactive_initialize_interface()
+        # self._job.calc_static()
+        # self._job.run(run_again=True)
 
-    def _get_interactive_value(self, key):
-        """
-        Get output corresponding to the `interesting_keys` from interactive job.
-        """
+    def get_interactive_value(self, key):
         if key == 'positions':
             val = np.array(self._job.interactive_positions_getter())
         elif key == 'forces':
@@ -303,119 +259,89 @@ class ExternalHamiltonian(PrimitiveVertex):
             val = np.array(self._job.interactive_pressures_getter())
         elif key == 'volume':
             val = self._job.interactive_volume_getter()
-        elif key == 'cell':
+        elif key == 'cells':
             val = np.array(self._job.interactive_cells_getter())
         else:
             raise NotImplementedError
         return val
 
     def finish(self):
-        """
-        Close the interactive job.
-        """
         super(ExternalHamiltonian, self).finish()
         if self._job is not None:
             self._job.interactive_close()
 
+    # def to_hdf(self, hdf=None, group_name=None):
+    #     super(ExternalHamiltonian, self).to_hdf(hdf=hdf, group_name=group_name)
+    #     hdf[group_name]["fastlammpsmode"] = self._fast_lammps_mode
+    #     hdf[group_name]["jobname"] = self._job_name
+    #     hdf[group_name]["jobprojectpath"] = self._job_project_path
+    #
+    # def from_hdf(self, hdf=None, group_name=None):
+    #     super(ExternalHamiltonian, self).from_hdf(hdf=hdf, group_name=group_name)
+    #     self._fast_lammps_mode = hdf[group_name]["fastlammpsmode"]
+    #     self._job_name = hdf[group_name]["jobname"]
+    #     self._job_project_path = hdf[group_name]["jobprojectpath"]
 
-class CreateJob(ExternalHamiltonian):
+
+class CreateJob(PrimitiveVertex):
     """
-    Creates a job of an external interpreter (e.g. Lammps, Vasp, Sphinx...) outside of the `ExternalHamiltonian`.
-        This vertex does not run the interpreter, but only creates the job and saves it.
 
-    Input attributes:
-        ref_job_full_path (string): The full path to the hdf5 file of the job to use as a reference template.
-            (Default is None.)
-        n_images (int): Number of jobs to create. (Default is 5.)
-        structure (Atoms): The structure for initializing the external Hamiltonian. Overwrites the reference
-            job structure when provided. (Default is None, the reference job needs to have its structure set.)
-
-    Output attributes:
-        project_path (list/string): The path of the project.
-        job_names (list/string): The name of the job.
     """
 
     def __init__(self, name=None):
         super(CreateJob, self).__init__(name=name)
+        self.job_names = None
+        self.project_path = None
         self._fast_lammps_mode = True
-        id_ = self.input.default
-        id_.ref_job_full_path = None
-        id_.n_images = 5
-        id_.structure = None
 
-    def command(self, ref_job_full_path, n_images, structure, *args, **kwargs):
-        graph_location = self.get_graph_location()
-        job_names = []
-        project_path = []
-        for i in np.arange(n_images):
-            name = graph_location + '_' + str(i)
-            output = self._initialize(graph_location, ref_job_full_path, structure,
-                                      self._fast_lammps_mode, name)
-            project_path.append(output[0])
-            job_names.append(output[1])
-
-        return {
-            'project_path': project_path,
-            'job_names': job_names
-        }
-
-
-class MinimizeReferenceJob(ExternalHamiltonian):
-    """
-    Minimizes a job using an external interpreter (e.g. Lammps, Vasp, Sphinx...) outside of the `ExternalHamiltonian`.
-        This vertex minimizes the job at constant volume or constant pressure.
-
-    Input attributes:
-        ref_job_full_path (string): The full path to the hdf5 file of the job to use as a reference template.
-            (Default is None.)
-        pressure (float): Pressure of the system. (Default is None.)
-        structure (Atoms): The structure for initializing the external Hamiltonian. Overwrites the reference
-            job structure when provided. (Default is None, the reference job needs to have its structure set.)
-
-    Output attributes:
-        energy_pot (float): The evaluated potential energy.
-        forces (numpy.ndarray): The evaluated forces.
-    """
-
-    def __init__(self, name=None):
-        super(MinimizeReferenceJob, self).__init__(name=name)
-        self._fast_lammps_mode = True
-        id_ = self.input.default
-        id_.ref_job_full_path = None
-        id_.pressure = None
-        id_.structure = None
-
-    def command(self, ref_job_full_path, structure, pressure=None, *args, **kwargs):
-        graph_location = self.get_graph_location()
-        name = 'minimize_ref_job'
-        project_path, job_name = self._initialize(graph_location, ref_job_full_path, structure,
-                                                  self._fast_lammps_mode, name)
+    def command(self, ref_job_full_path, n_images, structure):
+        loc = self.get_graph_location()
+        project_path, ref_job_path = split(ref_job_full_path)
         pr = Project(path=project_path)
-        job = pr.load(job_name)
-        job.structure = structure
-        job.calc_minimize(pressure=pressure)
-        job.run()
+        ref_job = pr.load(ref_job_path)
+        self.job_names = []
+        self.project_path = []
+        for i in np.arange(n_images):
+            name = loc + '_' + str(i)
+            job = ref_job.copy_to(
+                project=pr,
+                new_job_name=name,
+                input_only=True,
+                new_database_entry=True
+            )
+
+            if structure is not None:
+                job.structure = structure
+
+            if isinstance(job, GenericInteractive):
+                job.interactive_open()
+
+                if isinstance(job, LammpsInteractive) and self._fast_lammps_mode:
+                    # Note: This might be done by default at some point in LammpsInteractive,
+                    # and could then be removed here
+                    job.interactive_flush_frequency = 10 ** 10
+                    job.interactive_write_frequency = 10 ** 10
+
+                # job.calc_static()
+                job.save()
+            else:
+                raise TypeError('Job of class {} is not compatible.'.format(ref_job.__class__))
+
+            self.job_names.append(job.job_name)
+            self.project_path.append(job.project.path)
 
         return {
-            'energy_pot': job.output.energy_pot[-1],
-            'forces': job.output.forces[-1]
+            'job_names': self.job_names,
+            'project_path': self.project_path
         }
 
 
 class RemoveJob(PrimitiveVertex):
     """
-    Remove an existing job/s from a project path.
 
-    Input attributes:
-        project_path (string): The path of the project. (Default is None.)
-        job_names (string): The names of the jobs to be removed. (Default is None.)
     """
-    def __init__(self, name=None):
-        super(RemoveJob, self).__init__(name=name)
-        self.input.default.project_path = None
-        self.input.default.job_names = None
 
-    def command(self, project_path, job_names):
+    def command(self, project_path=None, job_names=None):
         if all(v is not None for v in [project_path, job_names]):
             pr = Project(path=project_path)
             for name in job_names:
@@ -425,34 +351,27 @@ class RemoveJob(PrimitiveVertex):
 class GradientDescent(PrimitiveVertex):
     """
     Simple gradient descent update for positions in `flex_output` and structure.
-
     Input attributes:
         gamma0 (float): Initial step size as a multiple of the force. (Default is 0.1.)
-        fix_com (bool): Whether the center of mass motion should be subtracted off of the position update.
-            (Default is True)
+        fix_com (bool): Whether the center of mass motion should be subtracted off of the position update. (Default is
+            True)
         use_adagrad (bool): Whether to have the step size decay according to adagrad. (Default is False)
         output_displacements (bool): Whether to return the per-atom displacement vector in the output dictionary.
-
-    Output attributes:
-        positions (numpy.ndarray): The updated positions.
-        displacements (numpy.ndarray): The displacements, if `output_displacements` is True.
-
-    TODO: Fix adagrad bug when GradientDescent is passed as a Serial vertex
+    TODO:
+        Fix adagrad bug when GradientDescent is passed as a Serial vertex
     """
 
     def __init__(self, name=None):
         super(GradientDescent, self).__init__(name=name)
+        self.input.default.gamma0 = 0.1
+        self.input.default.fix_com = True
+        self.input.default.use_adagrad = False
         self._accumulated_force = 0
-        id_ = self.input.default
-        id_.gamma0 = 0.1
-        id_.fix_com = True
-        id_.use_adagrad = False
 
     def command(self, positions, forces, gamma0, use_adagrad, fix_com, mask=None, masses=None,
                 output_displacements=True):
         positions = np.array(positions)
         forces = np.array(forces)
-        unmasked_positions = None
 
         if mask is not None:
             masked = True
@@ -500,102 +419,71 @@ class GradientDescent(PrimitiveVertex):
                 'positions': new_pos
             }
 
+    # def to_hdf(self, hdf=None, group_name=None):
+    #     super(GradientDescent, self).to_hdf(hdf=hdf, group_name=group_name)
+    #     hdf[group_name]["accumulatedforce"] = self._accumulated_force
+    #
+    # def from_hdf(self, hdf=None, group_name=None):
+    #     super(GradientDescent, self).from_hdf(hdf=hdf, group_name=group_name)
+    #     self._accumulated_force = hdf[group_name]["accumulatedforce"]
+
 
 class HarmonicHamiltonian(PrimitiveVertex):
     """
-    Treat the atoms in the structure as harmonic oscillators and calculate the forces on each atom, and the total
-        potential energy of the structure. If the spring constant is specified, the atoms act as Einstein atoms
-        (independent of each other). If the Hessian / force constant matrix is specified, the atoms act as Debye
-        atoms.
 
-    Input attributes:
-        positions (numpy.ndarray): Current positions of the atoms.
-        reference_positions (numpy.ndarray): Equilibrium positions of the atoms.
-        spring_constant (float): A single spring / force constant that is used to compute the restoring forces
-            on each atom. (Default is 1.)
-        force_constants (NxN matrix): The Hessian matrix, obtained from, for ex. Phonopy. (Default is None, treat
-            the atoms as independent harmonic oscillators (Einstein atoms).
-        cell (numpy.ndarray): The 3x3 cell vectors for pbcs.
-        pbc (numpy.array): Three booleans declaring which dimensions have periodic boundary conditions for finding
-            the minimum distance convention.
-        mask (numpy.array): Which of the atoms to consider. The other atoms are ignored. (Default is None, consider
-            all atoms.)
-        eq_energy (float): The equilibrium energy of the structure.
-
-    Output attributes:
-        energy_pot (float): The harmonic potential energy.
-        forces (numpy.ndarray): The harmonic forces.
     """
 
-    def __init__(self, name=None):
-        super(HarmonicHamiltonian, self).__init__(name=name)
-        id_ = self.input.default
-        id_.spring_constant = 1.0
-        id_.force_constants = None
+    def command(self, positions, home_positions, cell, pbc, spring_constant=None, force_constants=None,
+                mask=None):
 
-    def command(self, positions, reference_positions, spring_constant, force_constants, cell, pbc,
-                mask=None, eq_energy=None):
-
-        dr = find_mic(positions - reference_positions, cell, pbc)[0]
-        if force_constants is None:
-            forces = -spring_constant * dr
+        dr = find_mic(positions - home_positions, cell, pbc)[0]
+        if spring_constant is not None and force_constants is None:
             if mask is not None:
-                energy = 0.5 * np.dot(-forces[mask], dr[mask])
-                forces = forces[mask]
+                energy = 0.5 * np.sum(spring_constant * dr[mask] * dr[mask])
+                forces = -spring_constant * dr[mask]
             else:
-                energy = 0.5 * np.tensordot(-forces, dr)
+                energy = 0.5 * np.sum(spring_constant * dr * dr)
+                forces = -spring_constant * dr
 
-        elif force_constants is not None:
+        elif force_constants is not None and spring_constant is None:
             transformed_force_constants = self.transform_force_constants(force_constants)
             transformed_displacements = self.transform_displacements(dr)
             transformed_forces = -np.dot(transformed_force_constants, transformed_displacements)
             retransformed_forces = self.retransform_forces(transformed_forces, dr)
             if mask is not None:
-                energy = 0.5 * np.dot(-retransformed_forces[mask], dr[mask])
                 forces = retransformed_forces[mask]
+                energy = 0.5 * np.dot(-forces, dr[mask])
             else:
-                energy = 0.5 * np.tensordot(-retransformed_forces, dr)
                 forces = retransformed_forces
+                energy = 0.5 * np.tensordot(-forces, dr)
 
         else:
             raise TypeError('Please specify either a spring constant or the force constant matrix')
 
-        if eq_energy is not None:
-            energy += eq_energy
-
         return {
-            'energy_pot': energy,
-            'forces': forces
+            'forces': forces,
+            'energy_pot': energy
         }
 
     @staticmethod
     def transform_force_constants(force_constants):
-        """
-        Helper function to transform the force constants.
-        """
         force_shape = np.shape(force_constants)
         force_reshape = force_shape[0] * force_shape[2]
         return np.transpose(force_constants, (0, 2, 1, 3)).reshape((force_reshape, force_reshape))
 
     @staticmethod
     def transform_displacements(displacements):
-        """
-        Helper function to transform the displacements.
-        """
         return displacements.reshape(displacements.shape[0] * displacements.shape[1])
 
     @staticmethod
     def retransform_forces(transformed_forces, displacements):
-        """
-        Helper function to re-transform the forces.
-        """
         return transformed_forces.reshape(displacements.shape)
 
 
 class InitialPositions(PrimitiveVertex):
     """
     Assigns initial positions. If no initial positions are specified, interpolates between the positions of the
-        initial and the final structures.
+    initial and the final structures.
 
     Input attributes:
         initial_positions (list/numpy.ndarray): The initial positions (Default is None)
@@ -654,11 +542,11 @@ class LangevinThermostat(PrimitiveVertex):
 
     def __init__(self, name=None):
         super(LangevinThermostat, self).__init__(name=name)
-        id_ = self.input.default
-        id_.temperature = 0.
-        id_.damping_timescale = 100.
-        id_.time_step = 1.
-        id_.fix_com = True
+        id = self.input.default
+        id.temperature = 0.
+        id.damping_timescale = 100.
+        id.time_step = 1.
+        id.fix_com = True
 
     def command(self, velocities, masses, temperature, damping_timescale, time_step, fix_com):
         # Ensure that masses are a commensurate shape
@@ -679,8 +567,11 @@ class LangevinThermostat(PrimitiveVertex):
 
 class Max(PrimitiveVertex):
     """
-    Numpy's amax (except no `out` option). Docstrings directly copied from the `numpy docs`_. The `initial`
-    field is renamed `initial_val` to not conflict with the input dictionary.
+    Numpy's amax (except no `out` option).
+
+    Docstrings directly copied from the `numpy docs`_. The `initial` field is renamed `initial_val` to not conflict with
+    the input dictionary.
+
     _`numpy docs`: https://docs.scipy.org/doc/numpy/reference/generated/numpy.amax.html
 
     Input attributes:
@@ -698,15 +589,14 @@ class Max(PrimitiveVertex):
         amax (numpy.ndarray/scalar): Maximum of *a*. If axis is None, the result is a scalar value. If axis is given,
             the result is an array of dimension `a.ndim - 1`.
 
-    Note: This misses the new argument `initial` in the latest version of Numpy.
+    Note: This misses the new argument ``initial`` in the latest version of Numpy.
     """
 
     def __init__(self, name=None):
         super(Max, self).__init__(name=name)
-        id_ = self.input.default
-        id_.axis = None
-        id_.keepdims = False
-        id_.initial_val = None
+        self.input.default.axis = None
+        self.input.default.keepdims = False
+        self.input.default.initial_val = None
 
     def command(self, a, axis, keepdims, initial_val):
         return {
@@ -717,18 +607,19 @@ class Max(PrimitiveVertex):
 class NEBForces(PrimitiveVertex):
     """
     Given a list of positions, forces, and energies for each image along some transition, calculates the tangent
-        direction along the transition path for each image and returns new forces which have their original value
-        perpendicular to this tangent, and 'spring' forces parallel to the tangent. Endpoints forces are set to
-        zero, so start with relaxed endpoint structures.
+    direction along the transition path for each image and returns new forces which have their original value
+    perpendicular to this tangent, and 'spring' forces parallel to the tangent. Endpoints forces are set to zero, so
+    start with relaxed endpoint structures.
+
     Note:
         All images must use the same cell and contain the same number of atoms.
 
     Input attributes:
-        positions (list/numpy.ndarray): The positions of the images. Each element should have the same shape, and
+        positions_list (list/numpy.ndarray): The positions of the images. Each element should have the same shape, and
             the order of the images is relevant!
         energies (list/numpy.ndarray): The potential energies associated with each set of positions. (Not always
             needed.)
-        force (list/numpy.ndarray): The forces from the underlying energy landscape on which the NEB is being run.
+        force_list (list/numpy.ndarray): The forces from the underlying energy landscape on which the NEB is being run.
             Must have the same shape as `positions_list`. (Not always needed.)
         cell (numpy.ndarray): The cell matrix the positions live in. All positions must share the same cell.
         pbc (list/numpy.ndarray): Three bools declaring the presence of periodic boundary conditions along the three
@@ -737,10 +628,9 @@ class NEBForces(PrimitiveVertex):
         tangent_style ('plain'/'improved'/'upwinding'): How to calculate the image tangent in 3N-dimensional space.
             (Default is 'upwinding', which requires energies to be set.)
         use_climbing_image (bool): Whether to replace the force with one that climbs along the tangent direction for
-            the job with the highest energy. (Default is True, which requires energies and a list of forces to
-            be set.)
-        smoothing (float): Strength of the smoothing spring when consecutive images form an angle. (Default is None,
-            do not apply such a force.)
+            the job with the highest energy. (Default is True, which requires energies and a list of forces to be set.)
+        smoothing (float): Strength of the smoothing spring when consecutive images form an angle. (Default is None, do
+            not apply such a force.)
 
     Output attributes:
         forces_list (list): The forces after applying nudged elastic band method.
@@ -757,23 +647,23 @@ class NEBForces(PrimitiveVertex):
         self.input.default.use_climbing_image = True
         self.input.default.smoothing = None
 
-    def command(self, positions, energies, forces, cell, pbc, spring_constant, tangent_style, smoothing,
-                use_climbing_image):
+    def command(self, positions_list, energies, forces_list, cell, pbc,
+                spring_constant, tangent_style, smoothing, use_climbing_image):
         if use_climbing_image:
             climbing_image_index = np.argmax(energies)
         else:
             climbing_image_index = None
 
-        n_images = len(positions)
+        n_images = len(positions_list)
         neb_forces = []
-        for i, pos in enumerate(positions):
+        for i, pos in enumerate(positions_list):
             if i == 0 or i == n_images - 1:
                 neb_forces.append(np.zeros(pos.shape))
                 continue
 
             # Otherwise calculate the spring forces
-            pos_left = positions[i - 1]
-            pos_right = positions[i + 1]
+            pos_left = positions_list[i - 1]
+            pos_right = positions_list[i + 1]
 
             # Get displacement to adjacent images
             dr_left = find_mic(pos - pos_left, cell, pbc)[0]
@@ -804,7 +694,7 @@ class NEBForces(PrimitiveVertex):
                 force_smoothing = 0
 
             # Decompose the original forces
-            input_force = forces[i]
+            input_force = forces_list[i]
             input_force_parallel = np.sum(input_force * tau) * tau
             input_force_perpendicular = input_force - input_force_parallel
 
@@ -818,13 +708,14 @@ class NEBForces(PrimitiveVertex):
                 neb_forces.append(input_force_perpendicular + force_spring + force_smoothing)
 
         return {
-            'forces': neb_forces
+            'forces_list': neb_forces
         }
 
     def _get_upwinding_tau(self, tau_left, tau_right, en_left, en, en_right):
         """
         Take direction to the higher-energy image.
         """
+
         # Find the relative energies
         den_left = en - en_left
         den_right = en - en_right
@@ -843,9 +734,6 @@ class NEBForces(PrimitiveVertex):
 
     @staticmethod
     def normalize(vec):
-        """
-        Normalize the input vector.
-        """
         l1 = np.linalg.norm(vec)
         if l1 == 0:
             return vec
@@ -855,7 +743,7 @@ class NEBForces(PrimitiveVertex):
     def saturating_angle_control(dr_left, dr_right):
         """
         Return 0 when displacement to left and right neighbours is parallel, and run smoothly to 1
-            then saturate at this value when these displacement vectors form an acute angle.
+        then saturate at this value when these displacement vectors form an acute angle.
         """
         dr_left_mag = np.linalg.norm(dr_left)
         dr_right_mag = np.linalg.norm(dr_right)
@@ -865,7 +753,10 @@ class NEBForces(PrimitiveVertex):
 
 class Norm(PrimitiveVertex):
     """
-    Numpy's linalg norm. Docstrings directly copied from the `numpy docs`_.
+    Numpy's linalg norm.
+
+    Docstrings directly copied from the `numpy docs`_.
+
     _`numpy docs`: https://docs.scipy.org/doc/numpy/reference/generated/numpy.linalg.norm.html
 
     Input attributes:
@@ -885,10 +776,9 @@ class Norm(PrimitiveVertex):
 
     def __init__(self, name=None):
         super(Norm, self).__init__(name=name)
-        id_ = self.input.default
-        id_.ord = 2
-        id_.axis = None
-        id_.keepdims = False
+        self.input.default.ord = 2
+        self.input.default.axis = None
+        self.input.default.keepdims = False
 
     def command(self, x, ord, axis, keepdims):
         return {
@@ -898,16 +788,9 @@ class Norm(PrimitiveVertex):
 
 class Overwrite(PrimitiveVertex):
     """
-    Overwrite particular entries of an array with new values.
-
-    Input attributes:
-        target (numpy.ndarray): The target array.
-        mask (numpy.array): The indices of the target that will be replaced.
-        new_values (numpy.ndarray): The targeted indices will be replaced by these values.
-
-    Output attributes:
-        overwritten (numpy.ndarray): The overwritten array.
+    Overwrite particular entries of an array with new values
     """
+
     def command(self, target, mask, new_values):
         overwritten = np.array(target)
         overwritten[mask] = new_values
@@ -919,7 +802,7 @@ class Overwrite(PrimitiveVertex):
 class RandomVelocity(PrimitiveVertex):
     """
     Generates a set of random velocities which (on average) have give the requested temperature.
-        Hard-coded for 3D systems.
+    Hard-coded for 3D systems.
 
     Input attributes:
         temperature (float): The temperature of the velocities (in Kelvin).
@@ -947,19 +830,19 @@ class RandomVelocity(PrimitiveVertex):
         energy_kin = 0.5 * np.sum(masses * vel * vel) * U_ANGSQ_PER_FSSQ_TO_EV
         return {
             'velocities': vel,
-            'energy_kin': energy_kin,
-            'n_atoms': len(vel)
+            'energy_kin': energy_kin
         }
 
 
 class SphereReflection(PrimitiveVertex):
     """
-    Checks whether each atom in a structure is within a cutoff radius of its reference position; if not, reverts
-        the positions and velocities of *all atoms* to an earlier state and reverses those earlier velocities.
-        Forces from the current and previous time step can be provided optionally.
+    Checks whether each atom in a structure is within a cutoff radius of its reference position; if not, reverts the
+    positions and velocities of *all atoms* to an earlier state and reverses those earlier velocities. Forces from the
+    current and previous time step can be provided optionally.
 
     Input attributes:
         reference_positions (numpy.ndarray): The reference positions to check the distances from.
+        cutoff (float): The cutoff distance from the reference position to trigger reflection.
         positions (numpy.ndarray): The positions to check.
         velocities (numpy.ndarray): The velocities corresponding to the positions at this time.
         previous_positions (numpy.ndarray): The previous positions to revert to.
@@ -967,53 +850,49 @@ class SphereReflection(PrimitiveVertex):
         pbc (numpy.ndarray/list): Three booleans declaring which dimensions have periodic boundary conditions for
             finding the minimum distance convention.
         cell (numpy.ndarray): The 3x3 cell vectors for pbcs.
-        cutoff_distance (float): The cutoff distance from the reference position to trigger reflection.
-        use_reflection (boolean): Turn on or off `SphereReflection`
-        total_steps (int): The total number of times `SphereReflection` is called so far.
+        forces (numpy.ndarray): The forces corresponding to the positions at this time. (Default is None.)
+        previous_forces (numpy.ndarray): The forces at the `previous_positions` to revert to. (Default is None.)
+        atom_reflect_switch (boolean): Turn on or off Sphere Reflection
 
     Output attributes:
         positions (numpy.ndarray): The (possibly reverted) positions.
         velocities (numpy.ndarray): The (possibly reverted and reversed) velocities.
+        forces (numpy.ndarray/None): The (possibly reverted) forces, if force input was provided, else None.
         reflected_mask (bool): Whether or not reflection occurred.
-        total_steps (int): The total number of times `SphereReflection` is called.
     """
 
     def __init__(self, name=None):
         super(SphereReflection, self).__init__(name=name)
-        id_ = self.input.default
-        id_.use_reflection = True
-        id_.total_steps = 0
+        self.input.default.atom_reflect_switch = True
 
-    def command(self, reference_positions, positions, velocities, previous_positions, previous_velocities,
-                pbc, cell, cutoff_distance, use_reflection, total_steps):
-        total_steps += 1
-        distance = find_mic(reference_positions - positions, cell=cell, pbc=pbc)[1]
+    def command(self, reference_positions, cutoff_distance, positions, velocities, previous_positions,
+                previous_velocities, pbc, cell, atom_reflect_switch):
+        distance = np.linalg.norm(find_mic(reference_positions - positions, cell=cell, pbc=pbc)[0], axis=-1)
         is_at_home = (distance < cutoff_distance)[:, np.newaxis]
 
-        if np.all(is_at_home) or use_reflection is False:
+        if np.all(is_at_home) or atom_reflect_switch is False:
             return {
                 'positions': positions,
                 'velocities': velocities,
-                'reflected': False,
-                'total_steps': total_steps
+                'reflected': False
             }
         else:
             return {
                 'positions': previous_positions,
                 'velocities': -previous_velocities,
-                'reflected': True,
-                'total_steps': total_steps
+                'reflected': True
             }
 
 
 class SphereReflectionPerAtom(PrimitiveVertex):
     """
-    Checks whether each atom in a structure is within a cutoff radius of its reference position; if not, reverts
-        the positions and velocities of *the violating atoms* to an earlier state and reverses those earlier
-        velocities. The remaining atoms are unaffected.
+    Checks whether each atom in a structure is within a cutoff radius of its reference position; if not, reverts the
+    positions and velocities of *the violating atoms* to an earlier state and reverses those earlier velocities. The
+    remaining atoms are unaffected.
 
     Input attributes:
         reference_positions (numpy.ndarray): The reference positions to check the distances from.
+        cutoff (float): The cutoff distance from the reference position to trigger reflection.
         positions (numpy.ndarray): The positions to check.
         velocities (numpy.ndarray): The velocities corresponding to the positions at this time.
         previous_positions (numpy.ndarray): The previous positions to revert to.
@@ -1021,81 +900,30 @@ class SphereReflectionPerAtom(PrimitiveVertex):
         pbc (numpy.ndarray/list): Three booleans declaring which dimensions have periodic boundary conditions for
             finding the minimum distance convention.
         cell (numpy.ndarray): The 3x3 cell vectors for pbcs.
-        cutoff_distance (float): The cutoff distance from the reference position to trigger reflection.
-        use_reflection (boolean): Turn on or off `SphereReflectionPerAtom`
-        total_steps (int): The total number of times `SphereReflectionPerAtom` is called so far.
 
     Output attributes:
         positions (numpy.ndarray): The (possibly reverted) positions.
         velocities (numpy.ndarray): The (possibly reverted and reversed) velocities.
         reflected_mask (numpy.ndarray): A boolean mask that is true for each atom who was reflected.
-        total_steps (int): The total number of times `SphereReflectionPerAtom` is called.
     """
 
     def __init__(self, name=None):
         super(SphereReflectionPerAtom, self).__init__(name=name)
-        id_ = self.input.default
-        id_.use_reflection = True
-        id_.total_steps = 0
 
-    def command(self, reference_positions, positions, velocities, previous_positions, previous_velocities,
-                pbc, cell, cutoff_distance, use_reflection, total_steps):
-
-        total_steps += 1
-        if use_reflection:
-            print(type(reference_positions), type(positions), type(cell), type(pbc))
-            print('reaches here')
-            distance = find_mic(reference_positions - positions, cell=cell, pbc=pbc)[1]
-            print('but not here')
-            is_at_home = (distance < cutoff_distance)[:, np.newaxis]
-            is_away = 1 - is_at_home
-        else:
-            is_at_home = np.ones(len(reference_positions))
-            is_away = 1 - is_at_home
+    def command(self, reference_positions, cutoff_distance, positions, velocities, previous_positions,
+                previous_velocities, pbc, cell):
+        distance = np.linalg.norm(find_mic(reference_positions - positions, cell=cell, pbc=pbc)[0], axis=-1)
+        is_at_home = (distance < cutoff_distance)[:, np.newaxis]
+        is_away = 1 - is_at_home
 
         return {
             'positions': is_at_home * positions + is_away * previous_positions,
             'velocities': is_at_home * velocities + is_away * -previous_velocities,
-            'reflected': is_away.astype(bool).flatten(),
-            'total_steps': total_steps
-        }
-
-
-class CutoffDistance(PrimitiveVertex):
-    """
-    Compute the cutoff distance for SphereReflection.
-
-    Input attributes:
-        structure (Atoms): The input structure.
-        cutoff_factor (float): The cutoff is obtained by taking the first nearest neighbor distance and multiplying
-            it by the cutoff factor. A default value of 0.4 is chosen, because taking a cutoff factor of ~0.5
-            sometimes let certain reflections off the hook, and we do not want that to happen.
-
-    Output attributes:
-        cutoff_distance (float): The cutoff distance.
-    """
-
-    def command(self, structure, cutoff_factor=0.4):
-        nn_list = structure.get_neighbors(num_neighbors=1)
-        cutoff_distance = nn_list.distances[0] * cutoff_factor
-
-        return {
-            'cutoff_distance': cutoff_distance[-1]
+            'reflected': is_away.astype(bool).flatten()
         }
 
 
 class Slice(PrimitiveVertex):
-    """
-    Slices off the masked positions from the input vector.
-
-    Input attributes:
-        vector (numpy.ndarray): The input vector.
-        mask (numpy.ndarray): The integer ids shared by both the old and new structure.
-        ensure_interable mask (bool):
-
-    Output attributes:
-        sliced (numpy.ndarray): The sliced vector.
-    """
     def __init__(self, name=None):
         super(Slice, self).__init__(name=name)
         self.input.default.ensure_iterable_mask = False
@@ -1110,13 +938,6 @@ class Slice(PrimitiveVertex):
 
 class Transpose(PrimitiveVertex):
     """
-    Transposes the input matrix.
-
-    Input attributes:
-        matrix (numpy.ndarray): The input matrix.
-
-    Output attributes:
-        matrix_transpose (numpy.ndarray): The transposed matrix.
     """
 
     def command(self, matrix):
@@ -1128,19 +949,14 @@ class Transpose(PrimitiveVertex):
 
 class VerletParent(PrimitiveVertex, ABC):
     """
-    A parent class for holding code which is shared between both position and velocity updates in two-step
-        Velocity Verlet.
-
-    Input attributes:
-        time_step (float): MD time step in fs. (Default is 1 fs.)
-        temperature (float): The target temperature. (Default is None, no thermostat is used.)
-        damping_timescale (float): Damping timescale in fs. (Default is None, no thermostat is used.)
+    A parent class for holding code which is shared between both position and velocity updates in two-step Velocity
+    Verlet.
 
     TODO: VerletVelocityUpdate should *always* have its velocity input wired to the velocity outupt of
           VerletPositionUpdate. This implies to me that we need some structure *other* than two fully independent
-          nodes. It would also be nice to syncronize, e.g. the thermostat and timestep input which is also the same
-          for both. However, I haven't figured out how to do that in the confines of the current graph traversal
-          and hdf5 setup.
+          nodes. It would also be nice to syncronize, e.g. the thermostat and timestep input which is also the same for
+          both. However, I haven't figured out how to do that in the confines of the current graph traversal and hdf5
+          setup.
     """
 
     def __init__(self, name=None):
@@ -1168,12 +984,14 @@ class VerletParent(PrimitiveVertex, ABC):
     def langevin_delta_v(temperature, time_step, masses, damping_timescale, velocities):
         """
         Velocity changes due to the Langevin thermostat.
+
         Args:
             temperature (float): The target temperature in K.
             time_step (float): The MD time step in fs.
             masses (numpy.ndarray): Per-atom masses in u with a shape (N_atoms, 1).
             damping_timescale (float): The characteristic timescale of the thermostat in fs.
             velocities (numpy.ndarray): Per-atom velocities in angstrom/fs.
+
         Returns:
             (numpy.ndarray): Per atom accelerations to use for changing velocities.
         """
@@ -1188,7 +1006,7 @@ class VerletPositionUpdate(VerletParent):
     """
     First half of Velocity Verlet, where positions are updated and velocities are set to their half-step value.
 
-    Input attributes:
+    Input dictionary:
         positions (numpy.ndarray): The per-atom positions in angstroms.
         velocities (numpy.ndarray): The per-atom velocities in angstroms/fs.
         forces (numpy.ndarray): The per-atom forces in eV/angstroms.
@@ -1197,7 +1015,7 @@ class VerletPositionUpdate(VerletParent):
         temperature (float): The target temperature. (Default is None, no thermostat is used.)
         damping_timescale (float): Damping timescale in fs. (Default is None, no thermostat is used.)
 
-    Output attributes:
+    Output dictionary:
         positions (numpy.ndarray): The new positions on time step in the future.
         velocities (numpy.ndarray): The new velocities *half* a time step in the future.
     """
@@ -1214,32 +1032,30 @@ class VerletPositionUpdate(VerletParent):
                 temperature_damping_timescale,
                 velocities
             )
-        pos_change = vel_half * time_step
-        pos_step = positions + pos_change
+        pos_step = positions + vel_half * time_step
 
         return {
             'positions': pos_step,
-            'positions_change': pos_change,
             'velocities': vel_half
         }
 
 
 class VerletVelocityUpdate(VerletParent):
     """
-    Second half of Velocity Verlet, where velocities are updated. Forces should be updated between the position
-        and velocity updates
+    Second half of Velocity Verlet, where velocities are updated. Forces should be updated between the position and
+    velocity updates
 
-    Input attributes:
-        velocities (numpy.ndarray): The per-atom velocities in angstroms/fs. These should be the half-step
-            velocities output by `VerletPositionUpdate`.
-        forces (numpy.ndarray): The per-atom forces in eV/angstroms. These should be updated since the last call
-            of `VerletPositionUpdate`.
+    Input dictionary:
+        velocities (numpy.ndarray): The per-atom velocities in angstroms/fs. These should be the half-step velocities
+            output by `VerletPositionUpdate`.
+        forces (numpy.ndarray): The per-atom forces in eV/angstroms. These should be updated since the last call of
+            `VerletPositionUpdate`.
         masses (numpy.ndarray): The per-atom masses in atomic mass units.
         time_step (float): MD time step in fs. (Default is 1 fs.)
         temperature (float): The target temperature. (Default is None, no thermostat is used.)
         damping_timescale (float): Damping timescale in fs. (Default is None, no thermostat is used.)
 
-    Output attributes:
+    Output dictionary:
         velocities (numpy.ndarray): The new velocities *half* a time step in the future.
         energy_kin (float): The total kinetic energy of the system in eV
     """
@@ -1258,19 +1074,17 @@ class VerletVelocityUpdate(VerletParent):
                 velocities
             )
         kinetic_energy = 0.5 * np.sum(masses * vel_step * vel_step) / EV_TO_U_ANGSQ_PER_FSSQ
-        instant_temperature = (kinetic_energy * 2) / (3 * KB * len(velocities))
 
         return {
             'velocities': vel_step,
-            'energy_kin': kinetic_energy,
-            'instant_temperature': instant_temperature
+            'energy_kin': kinetic_energy
         }
 
 
 class VoronoiReflection(PrimitiveVertex):
     """
-    Checks whether each atom in a structure is closest to its own reference site; if not, reverts the positions
-        and velocities to an earlier state and reverses those earlier velocities.
+    Checks whether each atom in a structure is closest to its own reference site; if not, reverts the positions and
+    velocities to an earlier state and reverses those earlier velocities.
 
     Input attributes:
         reference_positions (numpy.ndarray): The reference positions to check the distances from.
@@ -1286,9 +1100,10 @@ class VoronoiReflection(PrimitiveVertex):
         positions (numpy.ndarray): The (possibly reverted) positions.
         velocities (numpy.ndarray): The (possibly reverted and reversed) velocities.
         reflected_mask (numpy.ndarray): A boolean mask that is true for each atom who was reflected.
-
-    WARNING: Outdated.
     """
+
+    def __init__(self, name=None):
+        super(VoronoiReflection, self).__init__(name=name)
 
     def command(self, reference_positions, positions, velocities, previous_positions, previous_velocities, pbc, cell):
         _, distance_matrix = get_distances(p1=reference_positions, p2=positions, cell=cell, pbc=pbc)
@@ -1304,18 +1119,18 @@ class VoronoiReflection(PrimitiveVertex):
 
 class WeightedSum(PrimitiveVertex):
     """
-    Given a list of vectors of with the same shape, calculates a weighted sum of the vectors. By default the
-        weights are the inverse of the number of elements and the sum is just the mean.
+    Given a list of vectors of with the same shape, calculates a weighted sum of the vectors. By default the weights are
+    the inverse of the number of elements and the sum is just the mean.
 
     Input attributes:
         vectors (list/numpy.ndarray): The vectors to sum. (Masked) vectors must all be of the same length. If the
             the vectors are already in a numpy array, the 0th index should determine the vector.
-        weights (list/numpy.ndarray): A 1D list of coefficients (floats) with the same length as `vectors`.
-            (Default is None, which gives the simple mean.)
+        weights (list/numpy.ndarray): A 1D list of coefficients (floats) with the same length as ``vectors``. (Default
+            is None, which gives the simple mean.)
         masks (list): If not None, a mask must be passed for each vector to extract a sub-vector. The resulting
-            collection of vectors and sub-vectors must all have the same length. If the mask for a given vector
-            is `None`, all elements are retained. Otherwise the mask must be integer-like or boolean. (Default is
-            None, do not mask any of the vectors.)
+            collection of vectors and sub-vectors must all have the same length. If the mask for a given vector is
+            `None`, all elements are retained. Otherwise the mask must be integer-like or boolean. (Default is None,
+            do not mask any of the vectors.)
 
     Output attributes:
         weighted_sum (numpy.ndarray): The weighted sum, having the same shape as a (masked) input vector.
@@ -1332,8 +1147,7 @@ class WeightedSum(PrimitiveVertex):
             n = len(vectors)
             weights = np.ones() / n
         elif len(weights) != len(vectors):
-            raise ValueError('The length of the weights and vectors must be comensurate, \
-                             but were {} and {}'.format(
+            raise ValueError('The length of the weights and vectors must be comensurate, but were {} and {}'.format(
                 len(weights), len(vectors)))
 
         # Mask vectors
@@ -1362,29 +1176,11 @@ class WeightedSum(PrimitiveVertex):
 
 
 class WelfordOnline(PrimitiveVertex):
-    """
-    Computes the cumulative mean and standard deviation.
-
-    Note: The standard deviation calculated is for the population (ddof=0). For the sample (ddof=1) it would
-        to be extended.
-
-    Input attributes:
-        sample (float/numpy.ndarray): The new sample. (Default is None.)
-        mean (float/numpy.ndarray): The mean so far. (Default is None.)
-        std (float/numpy.ndarray): The standard deviation so far. (Default is None.)
-        n_samples (int): How many samples were used to calculate the existing `mean` and `std`.
-
-    Output attributes:
-        mean (float/numpy.ndarray): The new mean.
-        std (float/numpy.ndarray): The new standard deviation.
-        n_samples (int): The new number of samples.
-    """
     def __init__(self, name=None):
         super(WelfordOnline, self).__init__(name=name)
-        id_ = self.input.default
-        id_.mean = None
-        id_.std = None
-        id_.n_samples = None
+        self.input.default.mean = None
+        self.input.default.std = None
+        self.input.default.n_samples = None
 
         op = Pointer(self.output)
         self.input.mean = op.mean[-1]
@@ -1405,93 +1201,72 @@ class WelfordOnline(PrimitiveVertex):
         }
 
 
-class FEPExponential(PrimitiveVertex):
+class Zeros(PrimitiveVertex):
     """
-    Compute the free energy perturbation exponential difference.
+    A numpy vector of zeros that is pointer-compatible.
 
     Input attributes:
-        u_diff (float): The energy difference between system B and system A.
-        delta_lambda (float): The delta for the lambdas for the two systems A and B.
-        temperature (float): The instantaneous temperature.
+        shape (int/tuple): The shape of the array.
 
     Output attributes:
-        exponential_difference (float): The exponential difference.
+        zeros (numpy.ndarray): An array of numpy.float64 zeros.
     """
 
-    def command(self, u_diff, delta_lambda, temperature):
+    def command(self, shape):
         return {
-            'exponential_difference': np.exp(-u_diff * delta_lambda / (KB * temperature))
+            'zeros': np.zeros(shape)
+        }
+
+
+class Nones(PrimitiveVertex):
+    """
+    A list of 'None's that is pointer-compatible.
+
+    Input attributes:
+        shape (int/tuple): The shape of the array.
+
+    Output attributes:
+        nones (list): A list of 'None's.
+    """
+
+    def command(self, shape):
+        return {
+            'nones': [None] * shape
         }
 
 
 class TILDPostProcess(PrimitiveVertex):
     """
     Post processing for the Harmonic and Vacancy TILD protocols, to remove the necessity to load interactive
-        jobs after they have been closed, once the protocol has been executed.
-
-    Input attributes:
-        lambda_pairs (numpy.ndarray): The (`n_lambdas`, 2)-shaped array of mixing pairs.
-        tild_mean (list): The mean of the computed integration points.
-        tild_std (list): The standard deviation of the computed integration points.
-        fep_exp_mean (list): The mean of the free energy perturbation exponential differences.
-        fep_exp_mean (list): The standard deviation of the free energy perturbation exponential differences.
-        temperature (float): The simulated temperature in K.
-        n_samples (int): Number of samples used to calculate the means.
-
-    Output attributes:
-        tild_free_energy_mean (float): The mean calculated via thermodynamic integration.
-        tild_free_energy_std (float): The standard deviation calculated via thermodynamic integration.
-        tild_free_energy_se (float): The standard error calculated via thermodynamic integration.
-        fep_free_energy_mean (float): The mean calculated via free energy perturbation.
-        fep_free_energy_std (float): The standard deviation calculated via free energy perturbation.
-        fep_free_energy_se (float): The standard error calculated via free energy perturbation.
+    jobs after they have been closed, once the protocol has been executed
     """
 
-    def command(self, lambda_pairs, tild_mean, tild_std, fep_exp_mean, fep_exp_std, temperature, n_samples):
+    def __init__(self, name=None):
+        super(TILDPostProcess, self).__init__(name=name)
+        self.input.default.plot = True
 
-        tild_fe_mean, tild_fe_std, tild_fe_se = self.get_tild_free_energy(lambda_pairs, tild_mean, tild_std,
-                                                                          n_samples)
-        fep_fe_mean, fep_fe_std, fep_fe_se = self.get_fep_free_energy(fep_exp_mean, fep_exp_std, n_samples,
-                                                                      temperature)
+    def command(self, lambda_pairs, n_samples, mean, std, plot=True):
+        if plot is True:
+            self.plot_integrand(lambda_pairs, n_samples, mean, std)
 
         return {
-            'tild_free_energy_mean': tild_fe_mean,
-            'tild_free_energy_std': tild_fe_std,
-            'tild_free_energy_se': tild_fe_se,
-            'fep_free_energy_mean': fep_fe_mean,
-            'fep_free_energy_std': fep_fe_std,
-            'fep_free_energy_se': fep_fe_se
-
+            'free_energy_change': self.get_free_energy_change(lambda_pairs, mean)
         }
 
     @staticmethod
-    def get_tild_free_energy(lambda_pairs, tild_mean, tild_std, n_samples):
-        y = unumpy.uarray(tild_mean, tild_std)
-        integral = np.trapz(x=lambda_pairs[:, 0], y=y)
-        mean = unumpy.nominal_values(integral)
-        std = unumpy.std_devs(integral)
-        tild_se = tild_std / np.sqrt(n_samples)
-        y_se = unumpy.uarray(tild_mean, tild_se)
-        integral_se = np.trapz(x=lambda_pairs[:, 0], y=y_se)
-        se = unumpy.std_devs(integral_se)
-
-        return float(mean), float(std), float(se)
+    def plot_integrand(lambda_pairs, n_samples, mean, std):
+        fig, ax = plt.subplots()
+        lambdas = lambda_pairs[:, 0]
+        thermal_average, standard_error = mean, std / np.sqrt(n_samples)
+        ax.plot(lambdas, thermal_average, marker='o')
+        ax.fill_between(lambdas, thermal_average - standard_error, thermal_average + standard_error, alpha=0.3)
+        ax.set_xlabel("Lambda")
+        ax.set_ylabel("dF/dLambda")
+        return fig, ax
 
     @staticmethod
-    def get_fep_free_energy(fep_exp_mean, fep_exp_std, n_samples, temperature):
-        fep_exp_se = fep_exp_std / np.sqrt(n_samples)
-        y = unumpy.uarray(fep_exp_mean, fep_exp_std)
-        y_se = unumpy.uarray(fep_exp_mean, fep_exp_se)
-        free_energy = 0
-        free_energy_se = 0
-        for (val, val_se) in zip(y, y_se):
-            free_energy += -KB * temperature * unumpy.log(val)
-            free_energy_se += -KB * temperature * unumpy.log(val_se)
-        mean = unumpy.nominal_values(free_energy)
-        std = unumpy.std_devs(free_energy)
-        se = unumpy.std_devs(free_energy_se)
-
-        return float(mean), float(std), float(se)
+    def get_free_energy_change(lambda_pairs, mean):
+        return np.trapz(x=lambda_pairs[:, 0], y=mean)
 
 
 class BerendsenBarostat(PrimitiveVertex):
@@ -1503,7 +1278,7 @@ class BerendsenBarostat(PrimitiveVertex):
     The barostat only modifies the cell of the input structure, and scales the positions. Positions
     and velocities will only be updated by the thermostat.
 
-    Input attributes:
+    Input dictionary:
         pressure (float): The pressure in GPa to be simulated (Default is None GPa)
         temperature (float): The temperature in K (Default is 0. K)
         box_pressures (numpy.ndarray): The pressure tensor in GPa generated per step by Lammps
@@ -1514,9 +1289,8 @@ class BerendsenBarostat(PrimitiveVertex):
         structure (Atoms): The structure whose cell and positions are to be scaled.
         positions (numpy.ndarray): The updated positions from `VerletPositionUpdate`.
         previous_volume (float): The volume of the cell from the previous step in Ang3 (Default is None)
-        pressure_style (string): 'isotorpic' or 'anisotropic'. (Default is 'anisotropic')
 
-    Output attributes:
+    Output dictionary:
         pressure (float): The isotropic pressure in GPa
         volume (float): The volume of the cell in Ang3
         structure (Atoms): The scaled structure, corresponding to the simulated volume
@@ -1525,18 +1299,18 @@ class BerendsenBarostat(PrimitiveVertex):
 
     def __init__(self, name=None):
         super(BerendsenBarostat, self).__init__(name=name)
-        id_ = self.input.default
-        id_.pressure = 0.
-        id_.temperature = 0.
-        id_.pressure_damping_timescale = 1000.
-        id_.time_step = 1.
-        id_.compressibility = 4.57e-5  # compressibility of water in bar^-1
-        id_.pressure_style = 'anisotropic'
+        id = self.input.default
+        id.pressure = 0.
+        id.temperature = 0.
+        id.pressure_damping_timescale = 1000.
+        id.time_step = 1.
+        id.compressibility = 4.57e-5  # compressibility of water in bar^-1
+        id.style = 'isotropic'
 
     def command(self, pressure, temperature, box_pressure, energy_kin, time_step, positions,
-                pressure_damping_timescale, compressibility, structure, previous_volume, pressure_style):
+                pressure_damping_timescale, compressibility, structure, previous_volume, style):
 
-        if pressure_style != 'isotropic' and pressure_style != 'anisotropic':
+        if style != 'isotropic' and style != 'anisotropic':
             raise TypeError('style can only be \'isotropic\' or \'anisotropic\'')
 
         n_atoms = len(structure.positions)
@@ -1552,7 +1326,7 @@ class BerendsenBarostat(PrimitiveVertex):
         if pressure is None:
             new_structure = structure.copy()
             total_pressure = isotropic_pressure
-        elif pressure is not None and pressure_style == 'isotropic':
+        elif pressure is not None and style == 'isotropic':
             new_structure = structure.copy()
             new_structure.positions = positions
             first_term = ((2 * energy_kin) / (3 * previous_volume)) * EV_PER_ANGCUB_TO_GPA
@@ -1561,7 +1335,7 @@ class BerendsenBarostat(PrimitiveVertex):
             eta = 1 - (tau * (pressure - total_pressure) * GPA_TO_BAR)
             new_cell = new_structure.cell * eta
             new_structure.set_cell(new_cell, scale_atoms=True)
-        elif pressure is not None and pressure_style == 'anisotropic':
+        elif pressure is not None and style == 'anisotropic':
             new_structure = structure.copy()
             new_structure.positions = positions
             first_term = ((2 * energy_kin) / (3 * previous_volume)) * EV_PER_ANGCUB_TO_GPA
@@ -1587,26 +1361,4 @@ class BerendsenBarostat(PrimitiveVertex):
             'pressure': total_pressure,
             'structure': new_structure,
             'positions': new_structure.positions
-        }
-
-
-class ComputeFormationEnergy(PrimitiveVertex):
-    """
-    """
-
-    def command(self, n_atoms, eq_energy, harm_to_inter_mean, harm_to_inter_std, harm_to_inter_se, inter_to_vac_mean,
-                inter_to_vac_std, inter_to_vac_se):
-
-        harm_to_inter_fe = unumpy.uarray(harm_to_inter_mean, harm_to_inter_std)
-        harm_to_inter_fe_se = unumpy.uarray(harm_to_inter_mean, harm_to_inter_se)
-        inter_to_vac_fe = unumpy.uarray(inter_to_vac_mean, inter_to_vac_std)
-        inter_to_vac_fe_se = unumpy.uarray(inter_to_vac_mean, inter_to_vac_se)
-
-        fe = ((eq_energy + harm_to_inter_fe) / n_atoms) + inter_to_vac_fe
-        fe_se = ((eq_energy + harm_to_inter_fe_se) / n_atoms) + inter_to_vac_fe_se
-
-        return {
-            'formation_energy_mean': float(unumpy.nominal_values(fe)),
-            'formation_energy_std': float(unumpy.std_devs(fe)),
-            'formation_energy_se': float(unumpy.std_devs(fe_se))
         }

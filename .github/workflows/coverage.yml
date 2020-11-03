@@ -16,6 +16,7 @@ jobs:
     env: 
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       CODACY_PROJECT_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
+      CONDA_PREFIX: /usr/share/miniconda/
 
     steps:
     - uses: actions/checkout@v2

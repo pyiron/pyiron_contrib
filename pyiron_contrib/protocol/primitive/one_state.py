@@ -92,10 +92,10 @@ class Counter(PrimitiveVertex):
     def __init__(self, name=None):
         super(Counter, self).__init__(name=name)
         self.input.default.add_counts = 0
-        self.output.n_counts = [self.input.default.add_counts]
+        self.output.n_counts = [0]
 
     def command(self, add_counts):
-        if add_counts != 0:
+        if add_counts > 0:
             count = self.output.n_counts[-1] + add_counts
         else:
             count = self.output.n_counts[-1] + 1
@@ -538,12 +538,12 @@ class HarmonicHamiltonian(PrimitiveVertex):
 
         dr = find_mic(positions - reference_positions, cell, pbc)[0]
         if force_constants is None:
-            forces = -spring_constant * dr
             if mask is not None:
-                energy = 0.5 * np.dot(-forces[mask], dr[mask])
-                forces = forces[mask]
+                energy = 0.5 * np.sum(spring_constant * dr[mask] * dr[mask])
+                forces = -spring_constant * dr[mask]
             else:
-                energy = 0.5 * np.tensordot(-forces, dr)
+                energy = 0.5 * np.sum(spring_constant * dr * dr)
+                forces = -spring_constant * dr
 
         elif force_constants is not None:
             transformed_force_constants = self.transform_force_constants(force_constants)
@@ -551,11 +551,11 @@ class HarmonicHamiltonian(PrimitiveVertex):
             transformed_forces = -np.dot(transformed_force_constants, transformed_displacements)
             retransformed_forces = self.retransform_forces(transformed_forces, dr)
             if mask is not None:
-                energy = 0.5 * np.dot(-retransformed_forces[mask], dr[mask])
                 forces = retransformed_forces[mask]
+                energy = 0.5 * np.dot(-forces, dr[mask])
             else:
-                energy = 0.5 * np.tensordot(-retransformed_forces, dr)
                 forces = retransformed_forces
+                energy = 0.5 * np.tensordot(-forces, dr)
 
         else:
             raise TypeError('Please specify either a spring constant or the force constant matrix')
@@ -987,7 +987,7 @@ class SphereReflection(PrimitiveVertex):
     def command(self, reference_positions, positions, velocities, previous_positions, previous_velocities,
                 pbc, cell, cutoff_distance, use_reflection, total_steps):
         total_steps += 1
-        distance = find_mic(reference_positions - positions, cell=cell, pbc=pbc)[1]
+        distance = np.linalg.norm(find_mic(reference_positions - positions, cell=cell, pbc=pbc)[0], axis=-1)
         is_at_home = (distance < cutoff_distance)[:, np.newaxis]
 
         if np.all(is_at_home) or use_reflection is False:
@@ -1043,10 +1043,7 @@ class SphereReflectionPerAtom(PrimitiveVertex):
 
         total_steps += 1
         if use_reflection:
-            print(type(reference_positions), type(positions), type(cell), type(pbc))
-            print('reaches here')
-            distance = find_mic(reference_positions - positions, cell=cell, pbc=pbc)[1]
-            print('but not here')
+            distance = np.linalg.norm(find_mic(reference_positions - positions, cell=cell, pbc=pbc)[0], axis=-1)
             is_at_home = (distance < cutoff_distance)[:, np.newaxis]
             is_away = 1 - is_at_home
         else:
@@ -1075,7 +1072,7 @@ class CutoffDistance(PrimitiveVertex):
         cutoff_distance (float): The cutoff distance.
     """
 
-    def command(self, structure, cutoff_factor=0.4):
+    def command(self, structure, cutoff_factor=0.5):
         nn_list = structure.get_neighbors(num_neighbors=1)
         cutoff_distance = nn_list.distances[0] * cutoff_factor
 

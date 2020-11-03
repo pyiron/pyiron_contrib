@@ -860,6 +860,7 @@ class HarmonicTILDParallel(HarmonicTILD):
         gp = Pointer(self.graph)
         o = Pointer(self.graph.run_lambda_points.output)
         return {
+            'eq_energy': ~gp.minimize_job.output.energy_pot[-1],
             'total_steps': ~o.total_steps[-1],
             'temperature_mean': ~o.temperature_mean[-1],
             'temperature_std': ~o.temperature_std[-1],

@@ -6,7 +6,7 @@ def main():
     top_level_path = current_path.replace('\\', '/')
     resource_path = os.path.join(current_path, "tests", "static").replace('\\', '/')
     pyiron_config = os.path.expanduser('~/.pyiron').replace('\\', '/')
-    conda_dir = os.path.expanduser('~/miniconda/share/pyiron').replace('\\', '/')
+    conda_dir = os.path.expanduser('/usr/share/miniconda/share/pyiron').replace('\\', '/')
     if not os.path.exists(pyiron_config):
         with open(pyiron_config, 'w') as f:
             f.writelines(['[DEFAULT]\n',

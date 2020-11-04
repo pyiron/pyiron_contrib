@@ -1316,6 +1316,11 @@ class WelfordOnline(PrimitiveVertex):
         id_.std = None
         id_.n_samples = None
 
+        op = Pointer(self.output)
+        self.input.mean = op.mean[-1]
+        self.input.std = op.std[-1]
+        self.input.n_samples = op.n_samples[-1]
+
     def command(self, sample, mean, std, n_samples):
         if n_samples is None:
             new_mean = sample

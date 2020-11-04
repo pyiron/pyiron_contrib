@@ -262,7 +262,8 @@ class ExternalHamiltonian(PrimitiveVertex):
                 job.interactive_write_frequency = 10 ** 10
                 self._disable_lmp_output = True
 
-            job.save()
+            job.calc_static()
+            job.run(run_again=True)
         else:
             raise TypeError('Job of class {} is not compatible.'.format(ref_job.__class__))
 
@@ -350,7 +351,8 @@ class CreateJob(PrimitiveVertex):
                     job.interactive_flush_frequency = 10 ** 10
                     job.interactive_write_frequency = 10 ** 10
 
-                job.save()
+                job.calc_static()
+                job.run(run_again=True)
             else:
                 raise TypeError('Job of class {} is not compatible.'.format(ref_job.__class__))
 

@@ -628,7 +628,7 @@ class LangevinThermostat(PrimitiveVertex):
         # Ensure that masses are a commensurate shape
         masses = np.array(masses)[:, np.newaxis]
         gamma = masses / damping_timescale
-
+        np.random.seed()
         noise = np.sqrt(2 * (gamma / time_step) * KB * temperature) * np.random.randn(*velocities.shape)
         drag = -gamma * velocities
         thermostat_forces = noise + drag
@@ -893,6 +893,7 @@ class RandomVelocity(PrimitiveVertex):
     def command(self, temperature, masses, overheat_fraction):
         masses = np.array(masses)[:, np.newaxis]
         vel_scale = np.sqrt(EV_TO_U_ANGSQ_PER_FSSQ * KB * temperature / masses) * np.sqrt(overheat_fraction)
+        np.random.seed(0)
         vel_dir = np.random.randn(len(masses), 3)
         vel = vel_scale * vel_dir
         vel -= np.mean(vel, axis=0)
@@ -1116,6 +1117,7 @@ class VerletParent(PrimitiveVertex, ABC):
             (numpy.ndarray): Per atom accelerations to use for changing velocities.
         """
         drag = -0.5 * time_step * velocities / damping_timescale
+        np.random.seed()
         noise = np.sqrt(EV_TO_U_ANGSQ_PER_FSSQ * KB * temperature * time_step / (masses * damping_timescale)) \
                 * np.random.randn(*velocities.shape)
         noise -= np.mean(noise, axis=0)
@@ -1309,14 +1311,10 @@ class WelfordOnline(PrimitiveVertex):
 
     def __init__(self, name=None):
         super(WelfordOnline, self).__init__(name=name)
-        self.input.default.mean = None
-        self.input.default.std = None
-        self.input.default.n_samples = None
-
-        op = Pointer(self.output)
-        self.input.mean = op.mean[-1]
-        self.input.std = op.std[-1]
-        self.input.n_samples = op.n_samples[-1]
+        id_ = self.input.default
+        id_.mean = None
+        id_.std = None
+        id_.n_samples = None
 
     def command(self, sample, mean, std, n_samples):
         if n_samples is None:

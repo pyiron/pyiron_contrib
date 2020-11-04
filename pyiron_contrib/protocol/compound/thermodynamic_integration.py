@@ -283,7 +283,7 @@ class HarmonicTILD(TILDParent):
 
         g.reflect.direct.reference_positions = ip.structure.positions
         g.reflect.broadcast.positions = gp.verlet_positions.output.positions[-1]
-        g.reflect.broadcast.velocities = gp.verlet_positions.output.velocities[-1]
+        g.reflect.broadcast.velocities = gp.verlet_velocities.output.velocities[-1]
         g.reflect.broadcast.previous_positions = gp.reflect.output.positions[-1]
         g.reflect.broadcast.previous_velocities = gp.reflect.output.velocities[-1]
         g.reflect.direct.pbc = ip.structure.pbc
@@ -519,7 +519,7 @@ class HarmonicallyCoupled(CompoundVertex):
         g.reflect.input.positions = gp.verlet_positions.output.positions[-1]
         g.reflect.input.velocities = gp.verlet_positions.output.velocities[-1]
         g.reflect.input.previous_positions = gp.reflect.output.positions[-1]
-        g.reflect.input.previous_velocities = gp.reflect.output.velocities[-1]
+        g.reflect.input.previous_velocities = gp.verlet_velocities.output.velocities[-1]
         g.reflect.input.pbc = ip.structure.pbc
         g.reflect.input.cell = ip.structure.cell.array
         g.reflect.input.cutoff_distance = ip.cutoff_distance
@@ -1102,7 +1102,7 @@ class VacancyTILD(TILDParent):
         g.reflect.broadcast.positions = gp.verlet_positions.output.positions[-1]
         g.reflect.broadcast.velocities = gp.verlet_positions.output.velocities[-1]
         g.reflect.broadcast.previous_positions = gp.reflect.output.positions[-1]
-        g.reflect.broadcast.previous_velocities = gp.reflect.output.velocities[-1]
+        g.reflect.broadcast.previous_velocities = gp.verlet_velocities.output.velocities[-1]
         g.reflect.direct.pbc = ip.structure.pbc
         g.reflect.direct.cell = ip.structure.cell.array
         g.reflect.direct.cutoff_distance = gp.cutoff.output.cutoff_distance[-1]
@@ -1334,7 +1334,7 @@ class Decoupling(CompoundVertex):
         g.reflect.input.positions = gp.verlet_positions.output.positions[-1]
         g.reflect.input.velocities = gp.verlet_positions.output.velocities[-1]
         g.reflect.input.previous_positions = gp.reflect.output.positions[-1]
-        g.reflect.input.previous_velocities = gp.reflect.output.velocities[-1]
+        g.reflect.input.previous_velocities = gp.verlet_velocities.output.velocities[-1]
         g.reflect.input.pbc = ip.structure.pbc
         g.reflect.input.cell = ip.structure.cell.array
         g.reflect.input.cutoff_distance = ip.cutoff_distance

@@ -3,21 +3,21 @@
 # Distributed under the terms of "New BSD License", see the LICENSE file.
 
 from __future__ import print_function
-from abc import ABC
+
 import numpy as np
 import matplotlib.pyplot as plt
+
+from abc import ABC
+from scipy.constants import physical_constants
 
 from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
 from pyiron_contrib.protocol.list import SerialList, ParallelList
 from pyiron_contrib.protocol.utils import Pointer
-from pyiron_contrib.protocol.primitive.one_state import Counter, BuildMixingPairs, DeleteAtom, \
-    ExternalHamiltonian, HarmonicHamiltonian, CreateJob, Overwrite, RandomVelocity, Slice, SphereReflection, \
-    TILDPostProcess, Transpose, VerletPositionUpdate, VerletVelocityUpdate, WeightedSum, \
-    WelfordOnline, Zeros
-from pyiron_contrib.protocol.primitive.two_state import IsGEq, ModIsZero
-from pyiron_contrib.protocol.primitive.fts_vertices import PositionsRunningAverage
-
-from scipy.constants import physical_constants
+from pyiron_contrib.protocol.primitive.one_state import BuildMixingPairs, Counter, CreateJob,\
+    CutoffDistance, DeleteAtom, ExternalHamiltonian, FEPExponential, HarmonicHamiltonian, MinimizeReferenceJob, \
+    Overwrite, RemoveJob, RandomVelocity, Slice, SphereReflection, TILDPostProcess, Transpose, \
+    VerletPositionUpdate, VerletVelocityUpdate, WeightedSum, WelfordOnline, Zeros
+from pyiron_contrib.protocol.primitive.two_state import ExitProtocol, IsGEq, IsLEq, ModIsZero
 
 KB = physical_constants['Boltzmann constant in eV/K'][0]
 HBAR = physical_constants['Planck constant over 2 pi in eV s'][0]
@@ -110,6 +110,7 @@ class HarmonicTILD(TILDParent):
         id_.thermalized = False
         id_.total_steps = 0
         id_.divisor = 1
+        id_.cutoff_factor = 0.5
 
     def define_vertices(self):
         # Graph components
@@ -643,8 +644,10 @@ class ProtoVacancyTILD(Protocol, VacancyTILD, ABC):
 
 class HarmonicallyCoupled(CompoundVertex):
     """
-    A sub-protocol for HarmonicTILDParallel that is executed in parallel using ParallelList.
+    A sub-protocol for HarmonicTILDParallel for the evolution of each integration point. This sub-protocol is
+        executed in parallel over multiple cores using ParallelList.
     """
+
     DefaultWhitelist = {
     }
 
@@ -659,9 +662,12 @@ class HarmonicallyCoupled(CompoundVertex):
         g.mix = WeightedSum()
         g.verlet_velocities = VerletVelocityUpdate()
         g.check_thermalized = IsGEq()
+        g.average_temp = WelfordOnline()
         g.check_sampling_period = ModIsZero()
         g.addition = WeightedSum()
-        g.average = WelfordOnline()
+        g.average_tild = WelfordOnline()
+        g.fep_exp = FEPExponential()
+        g.average_fep_exp = WelfordOnline()
         g.clock = Counter()
 
     def define_execution_flow(self):
@@ -677,9 +683,12 @@ class HarmonicallyCoupled(CompoundVertex):
             g.mix,
             g.verlet_velocities,
             g.check_thermalized, 'true',
+            g.average_temp,
             g.check_sampling_period, 'true',
             g.addition,
-            g.average,
+            g.average_tild,
+            g.fep_exp,
+            g.average_fep_exp,
             g.check_steps
         )
         g.make_edge(g.check_thermalized, g.check_steps, 'false')
@@ -695,7 +704,7 @@ class HarmonicallyCoupled(CompoundVertex):
 
         # check_steps
         g.check_steps.input.target = gp.clock.output.n_counts[-1]
-        g.check_steps.input.threshold = ip.n_steps
+        g.check_steps.input.threshold = ip.n_sub_steps
 
         # verlet_positions
         g.verlet_positions.input.default.positions = ip.structure.positions
@@ -740,7 +749,7 @@ class HarmonicallyCoupled(CompoundVertex):
         g.harmonic.input.home_positions = ip.structure.positions
         g.harmonic.input.cell = ip.structure.cell.array
         g.harmonic.input.pbc = ip.structure.pbc
-
+        g.harmonic.input.eq_energy = ip.eq_energy
         g.harmonic.input.positions = gp.reflect.output.positions[-1]
 
         # mix
@@ -763,6 +772,15 @@ class HarmonicallyCoupled(CompoundVertex):
         g.check_thermalized.input.target = gp.clock.output.n_counts[-1]
         g.check_thermalized.input.threshold = ip.thermalization_steps
 
+        # average_temp
+        g.average_temp.input.default.mean = ip.average_temp_mean
+        g.average_temp.input.default.std = ip.average_temp_std
+        g.average_temp.input.default.n_samples = ip.average_temp_n_samples
+        g.average_temp.input.mean = gp.average_temp.output.mean[-1]
+        g.average_temp.input.std = gp.average_temp.output.std[-1]
+        g.average_temp.input.n_samples = gp.average_temp.output.n_samples[-1]
+        g.average_temp.input.sample = gp.verlet_velocities.output.instant_temperature[-1]
+
         # check_sampling_period
         g.check_sampling_period.input.target = gp.clock.output.n_counts[-1]
         g.check_sampling_period.input.default.mod = ip.sampling_period
@@ -774,62 +792,133 @@ class HarmonicallyCoupled(CompoundVertex):
         ]
         g.addition.input.weights = [1, -1]
 
-        # average
-        g.average.input.sample = gp.addition.output.weighted_sum[-1]
+        # average_tild
+        g.average_tild.input.default.mean = ip.average_tild_mean
+        g.average_tild.input.default.std = ip.average_tild_std
+        g.average_tild.input.default.n_samples = ip.average_tild_n_samples
+        g.average_tild.input.mean = gp.average_tild.output.mean[-1]
+        g.average_tild.input.std = gp.average_tild.output.std[-1]
+        g.average_tild.input.n_samples = gp.average_tild.output.n_samples[-1]
+        g.average_tild.input.sample = gp.addition.output.weighted_sum[-1]
 
-        self.archive.clock = gp.clock.output.n_counts[-1]
+        # fep_exp
+        g.fep_exp.input.u_diff = gp.addition.output.weighted_sum[-1]
+        g.fep_exp.input.temperature = ip.temperature
+        g.fep_exp.input.delta_lambda = ip.delta_lambdas
+
+        # average_fep_exp
+        g.average_fep_exp.input.default.mean = ip.average_fep_exp_mean
+        g.average_fep_exp.input.default.std = ip.average_fep_exp_std
+        g.average_fep_exp.input.default.n_samples = ip.average_fep_exp_n_samples
+        g.average_fep_exp.input.mean = gp.average_fep_exp.output.mean[-1]
+        g.average_fep_exp.input.std = gp.average_fep_exp.output.std[-1]
+        g.average_fep_exp.input.n_samples = gp.average_fep_exp.output.n_samples[-1]
+        g.average_fep_exp.input.sample = gp.fep_exp.output.exponential_difference[-1]
+
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
 
     def get_output(self):
         gp = Pointer(self.graph)
         return {
-            'job_energy_pot': ~gp.calc_static.output.energy_pot[-1],
-            'harmonic_energy_pot': ~gp.harmonic.output.energy_pot[-1],
-            'energy_kin': ~gp.verlet_velocities.output.energy_kin[-1],
+            'temperature_mean': ~gp.average_temp.output.mean[-1],
+            'temperature_std': ~gp.average_temp.output.std[-1],
+            'temperature_n_samples': ~gp.average_temp.output.n_samples[-1],
             'positions': ~gp.reflect.output.positions[-1],
             'velocities': ~gp.verlet_velocities.output.velocities[-1],
             'forces': ~gp.mix.output.weighted_sum[-1],
-            'harmonic_forces': ~gp.harmonic.output.forces[-1],
-            'clock': ~gp.clock.output.n_counts[-1],
-            'mean': ~gp.average.output.mean[-1],
-            'std': ~gp.average.output.std[-1],
-            'n_samples': ~gp.average.output.n_samples[-1]
+            'total_steps': ~gp.reflect.output.total_steps[-1],
+            'mean_diff': ~gp.average_tild.output.mean[-1],
+            'std_diff': ~gp.average_tild.output.std[-1],
+            'fep_exp_mean': ~gp.average_fep_exp.output.mean[-1],
+            'fep_exp_std': ~gp.average_fep_exp.output.std[-1],
+            'n_samples': ~gp.average_tild.output.n_samples[-1]
         }
 
 
 class HarmonicTILDParallel(HarmonicTILD):
     """
-    A version of HarmonicTILD where the lambda jobs are executed in parallel, thus giving a substantial speed-up.
+    A version of HarmonicTILD where the evolution of each integration point is executed in parallel, thus giving a
+        substantial speed-up. A free energy perturbation standard error convergence exit criterion can be applied,
+        that is unavailable in the serial version of the HarmonicTILD protocol.
+    Input attributes:
+        sleep_time (float): A delay in seconds for database access of results. For sqlite, a non-zero delay maybe
+            required. (Default is 0 seconds, no delay.)
+        project_path (string): Initialize default project path to pass into the child protocol. (Default is None.)
+        job_name (string): Initialize default job name to pass into the child protocol. (Default is None.)
+        convergence_check_steps (int): Check for convergence once every `convergence_check_steps'. (Default is
+            once every 10 steps.)
+        default_free_energy_se (float): Initialize default free energy standard error to pass into the child
+            protocol. (Default is None.)
+        fe_tol (float): The free energy standard error tolerance. This is the convergence criterion in eV. (Default
+            is 0.01 eV)
+        mean (float): Initialize default mean for WelfordOnline. (Default is None.)
+        std (float): Initialize default standard deviation for WelfordOnline. (Default is None.)
+        n_samples (float): Initialize default number of samples for WelfordOnline. (Default is None.)
+    Output attributes:
+        total_steps (list): The total number of steps up for each integration point, up to convergence, or max
+            steps.
+    For inherited input and output attributes, refer the `HarmonicTILD` protocol.
     """
     DefaultWhitelist = {
     }
+
+    def __init__(self, **kwargs):
+        super(HarmonicTILDParallel, self).__init__(**kwargs)
+
+        id_ = self.input.default
+        # Default values
+        id_.sleep_time = 0
+        id_.project_path = None
+        id_.job_name = None
+        id_.convergence_check_steps = 10
+        id_.default_free_energy_se = 1
+        id_.fe_tol = 0.01
+        id_.mean = None
+        id_.std = None
+        id_.n_samples = None
 
     def define_vertices(self):
         # Graph components
         g = self.graph
         ip = Pointer(self.input)
         g.build_lambdas = BuildMixingPairs()
-        g.initialize_jobs = CreateJob()
+        g.initial_forces = Zeros()
         g.initial_velocities = SerialList(RandomVelocity)
-        g.initial_forces = SerialList(Zeros)
+        g.cutoff = CutoffDistance()
+        g.minimize_job = MinimizeReferenceJob()
+        g.initialize_jobs = CreateJob()
+        g.check_steps = IsGEq()
+        g.check_convergence = IsLEq()
+        g.remove_jobs = RemoveJob()
+        g.create_jobs = CreateJob()
         g.run_lambda_points = ParallelList(HarmonicallyCoupled, sleep_time=ip.sleep_time)
         g.clock = Counter()
         g.post = TILDPostProcess()
+        g.exit = ExitProtocol()
 
     def define_execution_flow(self):
         # Execution flow
         g = self.graph
         g.make_pipeline(
             g.build_lambdas,
-            g.initialize_jobs,
-            g.initial_velocities,
             g.initial_forces,
+            g.initial_velocities,
+            g.cutoff,
+            g.minimize_job,
+            g.check_steps, 'false',
+            g.check_convergence, 'false',
+            g.remove_jobs,
+            g.create_jobs,
             g.run_lambda_points,
             g.clock,
-            g.post
+            g.post,
+            g.exit
         )
+        g.make_edge(g.check_steps, g.exit, 'true')
+        g.make_edge(g.check_convergence, g.exit, 'true')
+        g.make_edge(g.exit, g.check_steps, 'false')
         g.starting_vertex = g.build_lambdas
-        g.restarting_vertex = g.run_lambda_points
+        g.restarting_vertex = g.check_steps
 
     def define_information_flow(self):
         # Data flow
@@ -841,10 +930,8 @@ class HarmonicTILDParallel(HarmonicTILD):
         g.build_lambdas.input.n_lambdas = ip.n_lambdas
         g.build_lambdas.input.custom_lambdas = ip.custom_lambdas
 
-        # initialize_integration_points
-        g.initialize_jobs.input.n_images = ip.n_lambdas
-        g.initialize_jobs.input.ref_job_full_path = ip.ref_job_full_path
-        g.initialize_jobs.input.structure = ip.structure
+        # initial_forces
+        g.initial_forces.input.shape = ip.structure.positions.shape
 
         # initial_velocities
         g.initial_velocities.input.n_children = ip.n_lambdas
@@ -852,9 +939,34 @@ class HarmonicTILDParallel(HarmonicTILD):
         g.initial_velocities.direct.masses = ip.structure.get_masses
         g.initial_velocities.direct.overheat_fraction = ip.overheat_fraction
 
-        # initial_forces
-        g.initial_forces.input.n_children = ip.n_lambdas
-        g.initial_forces.direct.shape = ip.structure.positions.shape
+        # cutoff
+        g.cutoff.input.structure = ip.structure
+        g.cutoff.input.cutoff_factor = ip.cutoff_factor
+
+        # minimize_job
+        g.minimize_job.input.structure = ip.structure
+        g.minimize_job.input.ref_job_full_path = ip.ref_job_full_path
+
+        # check_steps
+        g.check_steps.input.target = gp.clock.output.n_counts[-1]
+        g.check_steps.input.threshold = ip.n_steps
+
+        # check_convergence
+        g.check_convergence.input.default.target = ip.default_free_energy_se
+        g.check_convergence.input.target = gp.post.output.fep_free_energy_se[-1]
+        g.check_convergence.input.threshold = ip.fe_tol
+
+        # remove_jobs
+        g.remove_jobs.input.default.project_path = ip.project_path
+        g.remove_jobs.input.default.job_names = ip.job_name
+
+        g.remove_jobs.input.project_path = gp.create_jobs.output.project_path[-1][-1]
+        g.remove_jobs.input.job_names = gp.create_jobs.output.job_names[-1]
+
+        # create_jobs
+        g.create_jobs.input.n_images = ip.n_lambdas
+        g.create_jobs.input.ref_job_full_path = ip.ref_job_full_path
+        g.create_jobs.input.structure = ip.structure
 
         # run_lambda_points - initialize
         g.run_lambda_points.input.n_children = ip.n_lambdas
@@ -865,20 +977,28 @@ class HarmonicTILDParallel(HarmonicTILD):
         g.run_lambda_points.direct.temperature_damping_timescale = ip.temperature_damping_timescale
         g.run_lambda_points.direct.structure = ip.structure
 
-        g.run_lambda_points.broadcast.velocities = gp.initial_velocities.output.velocities[-1]
-        g.run_lambda_points.broadcast.forces = gp.initial_forces.output.zeros[-1]
+        g.run_lambda_points.direct.default.positions = ip.structure.positions
+        g.run_lambda_points.broadcast.default.velocities = gp.initial_velocities.output.velocities[-1]
+        g.run_lambda_points.direct.default.forces = gp.initial_forces.output.zeros[-1]
+
+        g.run_lambda_points.broadcast.positions = gp.run_lambda_points.output.positions[-1]
+        g.run_lambda_points.broadcast.velocities = gp.run_lambda_points.output.velocities[-1]
+        g.run_lambda_points.broadcast.forces = gp.run_lambda_points.output.forces[-1]
 
         # run_lambda_points - reflect
+        g.run_lambda_points.direct.default.total_steps = ip.total_steps
+        g.run_lambda_points.broadcast.total_steps = gp.run_lambda_points.output.total_steps[-1]
+        g.run_lambda_points.direct.cutoff_distance = gp.cutoff.output.cutoff_distance[-1]
         g.run_lambda_points.direct.use_reflection = ip.use_reflection
-        g.run_lambda_points.direct.cutoff_distance = ip.cutoff_distance
 
         # run_lambda_points - calc_static
-        g.run_lambda_points.broadcast.project_path = gp.initialize_jobs.output.project_path[-1]
-        g.run_lambda_points.broadcast.job_name = gp.initialize_jobs.output.job_names[-1]
+        g.run_lambda_points.broadcast.project_path = gp.create_jobs.output.project_path[-1]
+        g.run_lambda_points.broadcast.job_name = gp.create_jobs.output.job_names[-1]
 
         # run_lambda_points - harmonic
         g.run_lambda_points.direct.spring_constant = ip.spring_constant
         g.run_lambda_points.direct.force_constants = ip.force_constants
+        g.run_lambda_points.direct.eq_energy = gp.minimize_job.output.energy_pot[-1]
 
         # run_lambda_points - mix
         g.run_lambda_points.broadcast.coupling_weights = gp.build_lambdas.output.lambda_pairs[-1]
@@ -889,27 +1009,59 @@ class HarmonicTILDParallel(HarmonicTILD):
         # run_lambda_points - check_thermalized
         g.run_lambda_points.direct.thermalization_steps = ip.thermalization_steps
 
+        # run_lambda_points - average_temp
+        g.run_lambda_points.direct.default.average_temp_mean = ip.mean
+        g.run_lambda_points.direct.default.average_temp_std = ip.std
+        g.run_lambda_points.direct.default.average_temp_n_samples = ip.n_samples
+        g.run_lambda_points.broadcast.average_temp_mean = gp.run_lambda_points.output.temperature_mean[-1]
+        g.run_lambda_points.broadcast.average_temp_std = gp.run_lambda_points.output.temperature_std[-1]
+        g.run_lambda_points.broadcast.average_temp_n_samples = gp.run_lambda_points.output.temperature_n_samples[-1]
+
         # run_lambda_points - check_sampling_period
         g.run_lambda_points.direct.sampling_period = ip.sampling_period
 
         # run_lambda_points - addition
         # no inputs
 
-        # run_lambda_points - average
-        # no inputs
+        # run_lambda_points - average_tild
+        g.run_lambda_points.direct.default.average_tild_mean = ip.mean
+        g.run_lambda_points.direct.default.average_tild_std = ip.std
+        g.run_lambda_points.direct.default.average_tild_n_samples = ip.n_samples
+        g.run_lambda_points.broadcast.average_tild_mean = gp.run_lambda_points.output.mean_diff[-1]
+        g.run_lambda_points.broadcast.average_tild_std = gp.run_lambda_points.output.std_diff[-1]
+        g.run_lambda_points.broadcast.average_tild_n_samples = gp.run_lambda_points.output.n_samples[-1]
+
+        # run_lambda_points - fep_exp
+        g.run_lambda_points.broadcast.delta_lambdas = gp.build_lambdas.output.delta_lambdas[-1]
+
+        # run_lambda_points - average_fep_exp
+        g.run_lambda_points.direct.default.average_fep_exp_mean = ip.mean
+        g.run_lambda_points.direct.default.average_fep_exp_std = ip.std
+        g.run_lambda_points.direct.default.average_fep_exp_n_samples = ip.n_samples
+        g.run_lambda_points.broadcast.average_fep_exp_mean = gp.run_lambda_points.output.fep_exp_mean[-1]
+        g.run_lambda_points.broadcast.average_fep_exp_std = gp.run_lambda_points.output.fep_exp_std[-1]
+        g.run_lambda_points.broadcast.average_fep_exp_n_samples = gp.run_lambda_points.output.n_samples[-1]
 
         # run_lambda_points - clock
-        g.run_lambda_points.direct.n_steps = ip.n_steps
+        g.run_lambda_points.direct.n_sub_steps = ip.convergence_check_steps
 
         # clock
-        g.clock.input.add_counts = gp.run_lambda_points.output.clock[-1][-1]
+        g.clock.input.add_counts = ip.convergence_check_steps
 
         # post_processing
         g.post.input.lambda_pairs = gp.build_lambdas.output.lambda_pairs[-1]
-        g.post.input.n_samples = gp.run_lambda_points.output.n_samples[-1]
-        g.post.input.mean = gp.run_lambda_points.output.mean[-1]
-        g.post.input.std = gp.run_lambda_points.output.std[-1]
-        g.post.input.plot = ip.plot
+        g.post.input.tild_mean = gp.run_lambda_points.output.mean_diff[-1]
+        g.post.input.tild_std = gp.run_lambda_points.output.std_diff[-1]
+        g.post.input.fep_exp_mean = gp.run_lambda_points.output.fep_exp_mean[-1]
+        g.post.input.fep_exp_std = gp.run_lambda_points.output.fep_exp_std[-1]
+        g.post.input.temperature = ip.temperature
+        g.post.input.n_samples = gp.run_lambda_points.output.n_samples[-1][-1]
+
+        # exit
+        g.exit.input.vertices = [
+            gp.check_steps.vertex_state,
+            gp.check_convergence.vertex_state
+        ]
 
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
 
@@ -917,22 +1069,23 @@ class HarmonicTILDParallel(HarmonicTILD):
         gp = Pointer(self.graph)
         o = Pointer(self.graph.run_lambda_points.output)
         return {
-            'job_energy_pot': ~o.job_energy_pot[-1],
-            'harmonic_energy_pot': ~o.harmonic_energy_pot[-1],
-            'energy_kin': ~o.energy_kin[-1],
-            'positions': ~o.positions[-1],
-            'velocities': ~o.velocities[-1],
-            'forces': ~o.forces[-1],
-            'harmonic_forces': ~o.harmonic_forces[-1],
-            'integrands': ~o.mean[-1],
-            'integrands_std': ~o.std[-1],
+            'eq_energy': ~gp.minimize_job.output.energy_pot[-1],
+            'temperature_mean': ~o.temperature_mean[-1],
+            'temperature_std': ~o.temperature_std[-1],
+            'integrands': ~o.mean_diff[-1],
+            'integrands_std': ~o.std_diff[-1],
             'integrands_n_samples': ~o.n_samples[-1],
-            'free_energy_change': ~gp.post.output.free_energy_change[-1]
+            'tild_free_energy_mean': ~gp.post.output.tild_free_energy_mean[-1],
+            'tild_free_energy_std': ~gp.post.output.tild_free_energy_std[-1],
+            'tild_free_energy_se': ~gp.post.output.tild_free_energy_se[-1],
+            'fep_free_energy_mean': ~gp.post.output.fep_free_energy_mean[-1],
+            'fep_free_energy_std': ~gp.post.output.fep_free_energy_std[-1],
+            'fep_free_energy_se': ~gp.post.output.fep_free_energy_se[-1]
         }
 
-    def get_integrand(self):
+    def get_tild_integrands(self):
         o = Pointer(self.graph.run_lambda_points.output)
-        return ~o.mean[-1], ~o.std[-1] / np.sqrt(~o.n_samples[-1])
+        return np.array(~o.mean_diff[-1]), ~o.std_diff[-1] / np.sqrt(~o.n_samples[-1])
 
 
 class ProtoHarmonicTILDParallel(Protocol, HarmonicTILDParallel, ABC):

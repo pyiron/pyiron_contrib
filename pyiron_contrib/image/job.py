@@ -184,14 +184,12 @@ class ImageJob(GenericJob):
             group_name (str): HDF5 subgroup name - optional
         """
         super(ImageJob, self).to_hdf(hdf=hdf, group_name=group_name)
-        if hdf is None:
-            hdf = self.project_hdf5
-        self.input.to_hdf(hdf=hdf, group_name=None)
-        self.output.to_hdf(hdf=hdf, group_name=None)
-        with hdf.open("images") as hdf5_server:
+        self.input.to_hdf(hdf=self._hdf5, group_name=None)
+        self.output.to_hdf(hdf=self._hdf5, group_name=None)
+        with self._hdf5.open("images") as hdf5_server:
             for n, image in enumerate(self.images):
                 image.to_hdf(hdf=hdf5_server, group_name="img{}".format(n))
-        hdf["n_images"] = n + 1
+        self._hdf5["n_images"] = n + 1
 
     def from_hdf(self, hdf=None, group_name=None):
         """
@@ -202,8 +200,6 @@ class ImageJob(GenericJob):
             group_name (str): HDF5 subgroup name - optional
         """
         super(ImageJob, self).from_hdf(hdf=hdf, group_name=group_name)
-        if hdf is None:
-            hdf = self.project_hdf5
         self.input.from_hdf(hdf=self._hdf5, group_name=None)
         self.output.from_hdf(hdf=self._hdf5, group_name=None)
         with self._hdf5.open("images") as hdf5_server:

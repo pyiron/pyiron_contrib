@@ -28,7 +28,6 @@ jobs:
     - name: Setup
       shell: bash -l {0}
       run: |
-        python .ci_support/pyironconfig.py
         pip install --pre pyiron pyiron_base
         pip install -e .
     - name: Test

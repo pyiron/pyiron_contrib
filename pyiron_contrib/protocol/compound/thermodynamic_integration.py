@@ -283,9 +283,9 @@ class HarmonicTILD(TILDParent):
 
         g.reflect.direct.reference_positions = ip.structure.positions
         g.reflect.broadcast.positions = gp.verlet_positions.output.positions[-1]
-        g.reflect.broadcast.velocities = gp.verlet_velocities.output.velocities[-1]
+        g.reflect.broadcast.velocities = gp.verlet_positions.output.velocities[-1]
         g.reflect.broadcast.previous_positions = gp.reflect.output.positions[-1]
-        g.reflect.broadcast.previous_velocities = gp.reflect.output.velocities[-1]
+        g.reflect.broadcast.previous_velocities = gp.verlet_velocities.output.velocities[-1]
         g.reflect.direct.pbc = ip.structure.pbc
         g.reflect.direct.cell = ip.structure.cell.array
         g.reflect.direct.cutoff_distance = gp.cutoff.output.cutoff_distance[-1]

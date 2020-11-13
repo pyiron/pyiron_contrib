@@ -263,7 +263,7 @@ class ExternalHamiltonian(PrimitiveVertex):
                 job.interactive_flush_frequency = 10 ** 10
                 job.interactive_write_frequency = 10 ** 10
             job.calc_static()
-            job.run(run_again=True)
+            job.run()
         else:
             raise TypeError('Job of class {} is not compatible.'.format(ref_job.__class__))
 
@@ -379,7 +379,7 @@ class MinimizeReferenceJob(ExternalHamiltonian):
         job = pr.load(job_name)
         job.structure = structure
         job.calc_minimize(pressure=pressure)
-        job.run(run_again=True)
+        job.run(delete_existing_job=True)
 
         return {
             'energy_pot': job.output.energy_pot[-1],
@@ -689,8 +689,8 @@ class NEBForces(PrimitiveVertex):
             the order of the images is relevant!
         energies (list/numpy.ndarray): The potential energies associated with each set of positions. (Not always
             needed.)
-        force (list/numpy.ndarray): The forces from the underlying energy landscape on which the NEB is being run.
-            Must have the same shape as `positions_list`. (Not always needed.)
+        forces (list/numpy.ndarray): The forces from the underlying energy landscape on which the NEB is being run.
+            Must have the same shape as `positions`. (Not always needed.)
         cell (numpy.ndarray): The cell matrix the positions live in. All positions must share the same cell.
         pbc (list/numpy.ndarray): Three bools declaring the presence of periodic boundary conditions along the three
             vectors of the cell.
@@ -703,7 +703,7 @@ class NEBForces(PrimitiveVertex):
         smoothing (float): Strength of the smoothing spring when consecutive images form an angle. (Default is None,
             do not apply such a force.)
     Output attributes:
-        forces_list (list): The forces after applying nudged elastic band method.
+        forces (list): The forces after applying nudged elastic band method.
     TODO:
         Add references to papers (Jonsson and others)
         Implement Sheppard's equations for variable cell shape
@@ -717,23 +717,24 @@ class NEBForces(PrimitiveVertex):
         id_.use_climbing_image = True
         id_.smoothing = None
 
-    def command(self, positions_list, energies, forces_list, cell, pbc,
-                spring_constant, tangent_style, smoothing, use_climbing_image):
+    def command(self, positions, energies, forces, cell, pbc, spring_constant, tangent_style, smoothing,
+                use_climbing_image):
+
         if use_climbing_image:
             climbing_image_index = np.argmax(energies)
         else:
             climbing_image_index = None
 
-        n_images = len(positions_list)
+        n_images = len(positions)
         neb_forces = []
-        for i, pos in enumerate(positions_list):
+        for i, pos in enumerate(positions):
             if i == 0 or i == n_images - 1:
                 neb_forces.append(np.zeros(pos.shape))
                 continue
 
             # Otherwise calculate the spring forces
-            pos_left = positions_list[i - 1]
-            pos_right = positions_list[i + 1]
+            pos_left = positions[i - 1]
+            pos_right = positions[i + 1]
 
             # Get displacement to adjacent images
             dr_left = find_mic(pos - pos_left, cell, pbc)[0]
@@ -764,7 +765,7 @@ class NEBForces(PrimitiveVertex):
                 force_smoothing = 0
 
             # Decompose the original forces
-            input_force = forces_list[i]
+            input_force = forces[i]
             input_force_parallel = np.sum(input_force * tau) * tau
             input_force_perpendicular = input_force - input_force_parallel
 
@@ -778,7 +779,7 @@ class NEBForces(PrimitiveVertex):
                 neb_forces.append(input_force_perpendicular + force_spring + force_smoothing)
 
         return {
-            'forces_list': neb_forces
+            'forces': neb_forces
         }
 
     def _get_upwinding_tau(self, tau_left, tau_right, en_left, en, en_right):

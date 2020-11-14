@@ -1020,7 +1020,11 @@ class CutoffDistance(PrimitiveVertex):
     """
 
     def command(self, structure, cutoff_factor=0.5):
-        nn_list = structure.get_neighbors(num_neighbors=1)
+        try:
+            nn_list = structure.get_neighbors(num_neighbors=1)
+        except ValueError:
+            nn_list = structure.get_neighbors(num_neighbors=1)
+
         cutoff_distance = nn_list.distances[0] * cutoff_factor
 
         return {

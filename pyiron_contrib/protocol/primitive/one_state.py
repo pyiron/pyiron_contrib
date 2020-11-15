@@ -9,6 +9,7 @@ from os.path import split
 from abc import ABC, abstractmethod
 from uncertainties import unumpy
 from scipy.constants import physical_constants
+from scipy.integrate import simps
 from ase.geometry import find_mic, get_distances
 
 from pyiron import Project
@@ -1398,12 +1399,12 @@ class TILDPostProcess(PrimitiveVertex):
     @staticmethod
     def get_tild_free_energy(lambda_pairs, tild_mean, tild_std, n_samples):
         y = unumpy.uarray(tild_mean, tild_std)
-        integral = np.trapz(x=lambda_pairs[:, 0], y=y)
+        integral = simps(x=lambda_pairs[:, 0], y=y)
         mean = unumpy.nominal_values(integral)
         std = unumpy.std_devs(integral)
         tild_se = tild_std / np.sqrt(n_samples)
         y_se = unumpy.uarray(tild_mean, tild_se)
-        integral_se = np.trapz(x=lambda_pairs[:, 0], y=y_se)
+        integral_se = simps(x=lambda_pairs[:, 0], y=y_se)
         se = unumpy.std_devs(integral_se)
 
         return float(mean), float(std), float(se)

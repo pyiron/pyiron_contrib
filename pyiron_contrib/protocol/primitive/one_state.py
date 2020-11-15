@@ -506,9 +506,7 @@ class InitialPositions(PrimitiveVertex):
         if initial_positions is None:
             pos_i = structure_initial.positions
             pos_f = structure_final.positions
-            cell = structure_initial.cell
-            pbc = structure_initial.pbc
-            displacement = find_mic(pos_f - pos_i, cell, pbc)[0]
+            displacement = structure_initial.find_mic(pos_f - pos_i)
 
             initial_positions = []
             for n, mix in enumerate(np.linspace(0, 1, n_images)):
@@ -553,10 +551,10 @@ class HarmonicHamiltonian(PrimitiveVertex):
         id_.spring_constant = 1.0
         id_.force_constants = None
 
-    def command(self, positions, reference_positions, cell, pbc, spring_constant=None, force_constants=None,
+    def command(self, positions, reference_positions, structure, spring_constant=None, force_constants=None,
                 mask=None, eq_energy=None):
 
-        dr = find_mic(positions - reference_positions, cell, pbc)[0]
+        dr = structure.find_mic(positions - reference_positions)
         if spring_constant is not None and force_constants is None:
             if mask is not None:
                 energy = 0.5 * np.sum(spring_constant * dr[mask] * dr[mask])
@@ -718,7 +716,7 @@ class NEBForces(PrimitiveVertex):
         id_.use_climbing_image = True
         id_.smoothing = None
 
-    def command(self, positions, energies, forces, cell, pbc, spring_constant, tangent_style, smoothing,
+    def command(self, positions, energies, forces, structure, spring_constant, tangent_style, smoothing,
                 use_climbing_image):
 
         if use_climbing_image:
@@ -738,8 +736,8 @@ class NEBForces(PrimitiveVertex):
             pos_right = positions[i + 1]
 
             # Get displacement to adjacent images
-            dr_left = find_mic(pos - pos_left, cell, pbc)[0]
-            dr_right = find_mic(pos_right - pos, cell, pbc)[0]
+            dr_left = structure.find_mic(pos - pos_left)
+            dr_right = structure.find_mic(pos_right - pos)
 
             # Get unit vectors to adjacent images
             tau_left = dr_left / np.linalg.norm(dr_left)
@@ -939,9 +937,9 @@ class SphereReflection(PrimitiveVertex):
         id_.total_steps = 0
 
     def command(self, reference_positions, cutoff_distance, positions, velocities, previous_positions,
-                previous_velocities, pbc, cell, use_reflection, total_steps):
+                previous_velocities, structure, use_reflection, total_steps):
         total_steps += 1
-        distance = np.linalg.norm(find_mic(reference_positions - positions, cell=cell, pbc=pbc)[0], axis=-1)
+        distance = np.linalg.norm(structure.find_mic(reference_positions - positions), axis=-1)
         is_at_home = (distance < cutoff_distance)[:, np.newaxis]
         if np.all(is_at_home) or use_reflection is False:
             return {
@@ -990,10 +988,10 @@ class SphereReflectionPerAtom(PrimitiveVertex):
         id_.total_steps = 0
 
     def command(self, reference_positions, cutoff_distance, positions, velocities, previous_positions,
-                previous_velocities, pbc, cell, use_reflection, total_steps):
+                previous_velocities, structure, use_reflection, total_steps):
         total_steps += 1
         if use_reflection:
-            distance = np.linalg.norm(find_mic(reference_positions - positions, cell=cell, pbc=pbc)[0], axis=-1)
+            distance = np.linalg.norm(structure.find_mic(reference_positions - positions), axis=-1)
             is_at_home = (distance < cutoff_distance)[:, np.newaxis]
             is_away = 1 - is_at_home
         else:

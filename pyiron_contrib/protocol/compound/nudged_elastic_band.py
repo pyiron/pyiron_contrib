@@ -148,8 +148,7 @@ class NEB(CompoundVertex):
         g.neb_forces.input.positions = gp.gradient_descent.output.positions[-1]
         g.neb_forces.input.energies = gp.calc_static.output.energy_pot[-1]
         g.neb_forces.input.forces = gp.calc_static.output.forces[-1]
-        g.neb_forces.input.cell = ip.structure_initial.cell.array
-        g.neb_forces.input.pbc = ip.structure_initial.pbc
+        g.neb_forces.input.structure = ip.structure_initial
         g.neb_forces.input.spring_constant = ip.spring_constant
         g.neb_forces.input.tangent_style = ip.tangent_style
         g.neb_forces.input.use_climbing_image = ip.use_climbing_image

@@ -1461,12 +1461,12 @@ class BerendsenBarostat(PrimitiveVertex):
         id_.pressure_damping_timescale = 1000.
         id_.time_step = 1.
         id_.compressibility = 4.57e-5  # compressibility of water in bar^-1
-        id_.style = 'isotropic'
+        id_.pressure_style = 'isotropic'
 
     def command(self, pressure, temperature, box_pressure, energy_kin, time_step, positions,
-                pressure_damping_timescale, compressibility, structure, previous_volume, style):
+                pressure_damping_timescale, compressibility, structure, previous_volume, pressure_style):
 
-        if style != 'isotropic' and style != 'anisotropic':
+        if pressure_style != 'isotropic' and pressure_style != 'anisotropic':
             raise TypeError('style can only be \'isotropic\' or \'anisotropic\'')
 
         n_atoms = len(structure.positions)
@@ -1482,7 +1482,7 @@ class BerendsenBarostat(PrimitiveVertex):
         if pressure is None:
             new_structure = structure.copy()
             total_pressure = isotropic_pressure
-        elif pressure is not None and style == 'isotropic':
+        elif pressure is not None and pressure_style == 'isotropic':
             new_structure = structure.copy()
             new_structure.positions = positions
             first_term = ((2 * energy_kin) / (3 * previous_volume)) * EV_PER_ANGCUB_TO_GPA
@@ -1491,7 +1491,7 @@ class BerendsenBarostat(PrimitiveVertex):
             eta = 1 - (tau * (pressure - total_pressure) * GPA_TO_BAR)
             new_cell = new_structure.cell * eta
             new_structure.set_cell(new_cell, scale_atoms=True)
-        elif pressure is not None and style == 'anisotropic':
+        elif pressure is not None and pressure_style == 'anisotropic':
             new_structure = structure.copy()
             new_structure.positions = positions
             first_term = ((2 * energy_kin) / (3 * previous_volume)) * EV_PER_ANGCUB_TO_GPA

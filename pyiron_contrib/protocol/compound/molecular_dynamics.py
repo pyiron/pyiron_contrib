@@ -345,8 +345,7 @@ class ConfinedMD(MolecularDynamics):
         g.reflect_atoms.input.velocities = gp.verlet_positions.output.velocities[-1]
         g.reflect_atoms.input.previous_positions = gp.barostat.output.positions[-1]
         g.reflect_atoms.input.previous_velocities = gp.reflect_atoms.output.velocities[-1]
-        g.reflect_atoms.input.pbc = ip.structure.pbc
-        g.reflect_atoms.input.cell = ip.structure.cell.array
+        g.reflect_atoms.input.structure = ip.structure
         g.reflect_atoms.input.cutoff_distance = gp.cutoff.output.cutoff_distance[-1]
         g.reflect_atoms.input.use_reflection = ip.use_reflection
         g.reflect_atoms.input.total_steps = gp.reflect_atoms.output.total_steps[-1]
@@ -417,7 +416,7 @@ class HarmonicMD(CompoundVertex):
         id_.temperature_damping_timescale = 100.
         id_.time_step = 1.
         id_.overheat_fraction = 2
-        id_.spring_constant = 1.0
+        id_.spring_constant = None
         id_.force_constants = None
 
     def define_vertices(self):
@@ -488,8 +487,7 @@ class HarmonicMD(CompoundVertex):
         g.calc_harmonic.input.force_constants = ip.force_constants
         g.calc_harmonic.input.reference_positions = ip.structure.positions
         g.calc_harmonic.input.positions = gp.verlet_positions.output.positions[-1]
-        g.calc_harmonic.input.cell = ip.structure.cell.array
-        g.calc_harmonic.input.pbc = ip.structure.pbc
+        g.calc_harmonic.input.structure = ip.structure
 
         # verlet_velocities
         g.verlet_velocities.input.velocities = gp.verlet_positions.output.velocities[-1]
@@ -513,138 +511,4 @@ class HarmonicMD(CompoundVertex):
 
 
 class ProtocolHarmonicMD(Protocol, HarmonicMD, ABC):
-    pass
-
-
-class ConfinedHarmonicMD(HarmonicMD):
-    """
-    Similar to MolecularDynamics protocol, ConfinedHarmonicMD performs harmonic MD on a structure. The difference,
-        is that the atoms are confined to their lattice sites. This is especially helpful when vacancies are present
-        in the structure, and atoms diffuse via the vacancies. This protocol prevents this diffusion from happening.
-
-    Input attributes:
-        cutoff_factor (float): The cutoff is obtained by taking the first nearest neighbor distance and multiplying
-            it by the cutoff factor. A default value of 0.4 is chosen, because taking a cutoff factor of ~0.5
-            sometimes let certain reflections off the hook, and we do not want that to happen. (Default is 0.4.)
-        use_reflection (boolean): Turn on or off `SphereReflection` (Default is True.)
-        total_steps (int): The total number of times `SphereReflection` is called so far. (Default is 0.)
-
-    For inherited input and output attributes, refer the `HarmonicMD` protocol.
-    """
-
-    # DefaultWhitelist = {
-    # }
-
-    def __init__(self, **kwargs):
-        super(ConfinedHarmonicMD, self).__init__(**kwargs)
-
-        # Protocol defaults
-        id_ = self.input.default
-        id_.cutoff_factor = 0.4  # This factor times the 1NN distance is the reflection cutoff.
-        id_.use_reflection = True  # Whether or not to use reflection.
-        id_.total_steps = 0  # The total number of md steps that have been performed so far.
-
-    def define_vertices(self):
-        # Graph components
-        g = self.graph
-        g.initial_velocities = RandomVelocity()
-        g.initial_forces = Zeros()
-        g.cutoff = CutoffDistance()
-        g.check_steps = IsGEq()
-        g.clock = Counter()
-        g.verlet_positions = VerletPositionUpdate()
-        g.reflect_atoms = SphereReflection()
-        g.calc_harmonic = HarmonicHamiltonian()
-        g.verlet_velocities = VerletVelocityUpdate()
-
-    def define_execution_flow(self):
-        # Execution flow
-        g = self.graph
-        g.make_pipeline(
-            g.initial_velocities,
-            g.initial_forces,
-            g.cutoff,
-            g.check_steps, 'false',
-            g.verlet_positions,
-            g.reflect_atoms,
-            g.calc_harmonic,
-            g.verlet_velocities,
-            g.clock,
-            g.check_steps
-        )
-        g.starting_vertex = g.initial_velocities
-        g.restarting_vertex = g.check_steps
-
-    def define_information_flow(self):
-        # Data flow
-        g = self.graph
-        gp = Pointer(self.graph)
-        ip = Pointer(self.input)
-
-        # initial_velocities
-        g.initial_velocities.input.temperature = ip.temperature
-        g.initial_velocities.input.masses = ip.structure.get_masses
-        g.initial_velocities.input.overheat_fraction = ip.overheat_fraction
-
-        # initial_forces
-        g.initial_forces.input.shape = ip.structure.positions.shape
-
-        # cutoff
-        g.cutoff.input.structure = ip.structure
-        g.cutoff.input.cutoff_factor = ip.cutoff_factor
-
-        # check_steps
-        g.check_steps.input.target = gp.clock.output.n_counts[-1]
-        g.check_steps.input.threshold = ip.n_steps
-
-        # verlet_positions
-        g.verlet_positions.input.default.positions = ip.structure.positions
-        g.verlet_positions.input.default.velocities = gp.initial_velocities.output.velocities[-1]
-        g.verlet_positions.input.default.forces = gp.initial_forces.output.zeros[-1]
-
-        g.verlet_positions.input.positions = gp.reflect_atoms.output.positions[-1]
-        g.verlet_positions.input.velocities = gp.verlet_velocities.output.velocities[-1]
-        g.verlet_positions.input.forces = gp.calc_harmonic.output.forces[-1]
-        g.verlet_positions.input.masses = ip.structure.get_masses
-        g.verlet_positions.input.time_step = ip.time_step
-        g.verlet_positions.input.temperature = ip.temperature
-        g.verlet_positions.input.temperature_damping_timescale = ip.temperature_damping_timescale
-
-        # reflect individual atoms which stray too far
-        g.reflect_atoms.input.default.previous_positions = ip.structure.positions
-        g.reflect_atoms.input.default.previous_velocities = gp.initial_velocities.output.velocities[-1]
-        g.reflect_atoms.input.default.total_steps = ip.total_steps
-
-        g.reflect_atoms.input.reference_positions = ip.structure.positions
-        g.reflect_atoms.input.positions = gp.verlet_positions.output.positions[-1]
-        g.reflect_atoms.input.velocities = gp.verlet_positions.output.velocities[-1]
-        g.reflect_atoms.input.previous_positions = gp.reflect_atoms.output.positions[-1]
-        g.reflect_atoms.input.previous_velocities = gp.reflect_atoms.output.velocities[-1]
-        g.reflect_atoms.input.cutoff_distance = ip.reflection_cutoff_distance
-        g.reflect_atoms.input.pbc = ip.structure.pbc
-        g.reflect_atoms.input.cell = ip.structure.cell.array
-        g.reflect_atoms.input.cutoff_distance = gp.cutoff.output.cutoff_distance[-1]
-        g.reflect_atoms.input.use_reflection = ip.use_reflection
-        g.reflect_atoms.input.total_steps = gp.reflect_atoms.output.total_steps[-1]
-
-        # calc_harmonic
-        g.calc_harmonic.input.spring_constant = ip.spring_constant
-        g.calc_harmonic.input.force_constants = ip.force_constants
-        g.calc_harmonic.input.reference_positions = ip.structure.positions
-        g.calc_harmonic.input.positions = gp.reflect_atoms.output.positions[-1]
-        g.calc_harmonic.input.cell = ip.structure.cell.array
-        g.calc_harmonic.input.pbc = ip.structure.pbc
-
-        # verlet_velocities
-        g.verlet_velocities.input.velocities = gp.reflect_atoms.output.velocities[-1]
-        g.verlet_velocities.input.forces = gp.calc_harmonic.output.forces[-1]
-        g.verlet_velocities.input.masses = ip.structure.get_masses
-        g.verlet_velocities.input.time_step = ip.time_step
-        g.verlet_velocities.input.temperature = ip.temperature
-        g.verlet_velocities.input.temperature_damping_timescale = ip.temperature_damping_timescale
-
-        self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
-
-
-class ProtocolConfinedHarmonicMD(Protocol, ConfinedHarmonicMD, ABC):
     pass

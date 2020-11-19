@@ -104,7 +104,7 @@ class HarmonicTILD(TILDParent):
         n_lambdas (int): How many mixing pairs to create. (Default is 5.)
         custom_lambdas (list): Specify the set of lambda values as input. (Default is None.)
         spring_constant (float): A single spring / force constant that is used to compute the restoring forces
-            on each atom. (Default is 1.)
+            on each atom. (Default is None.)
         force_constants (NxN matrix): The Hessian matrix, obtained from, for ex. Phonopy. (Default is None, treat
             the atoms as independent harmonic oscillators (Einstein atoms.).)
         cutoff_factor (float): The cutoff is obtained by taking the first nearest neighbor distance and multiplying
@@ -157,7 +157,7 @@ class HarmonicTILD(TILDParent):
         id_.n_lambdas = 5
         id_.custom_lambdas = None
         id_.force_constants = None
-        id_.spring_constant = 1.0
+        id_.spring_constant = None
         id_.cutoff_factor = 0.5
         id_.use_reflection = True
         id_.total_steps = 0
@@ -913,7 +913,7 @@ class VacancyTILD(TILDParent):
         n_lambdas (int): How many mixing pairs to create. (Default is 5.)
         custom_lambdas (list): Specify the set of lambda values as input. (Default is None.)
         spring_constant (float): A single spring / force constant that is used to compute the restoring forces
-            on each atom. (Default is 1.)
+            on each atom. (Default is None.)
         force_constants (NxN matrix): The Hessian matrix, obtained from, for ex. Phonopy. (Default is None, treat
             the atoms as independent harmonic oscillators (Einstein atoms.).)
         cutoff_factor (float): The cutoff is obtained by taking the first nearest neighbor distance and multiplying
@@ -953,7 +953,7 @@ class VacancyTILD(TILDParent):
         id_.thermalization_steps = 10
         id_.n_lambdas = 5
         id_.custom_lambdas = None
-        id_.spring_constant = 1.0
+        id_.spring_constant = None
         id_.force_constants = None
         id_.cutoff_factor = 0.5
         id_.use_reflection = True

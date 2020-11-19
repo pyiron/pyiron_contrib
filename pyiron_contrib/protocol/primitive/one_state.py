@@ -381,6 +381,8 @@ class MinimizeReferenceJob(ExternalHamiltonian):
         job.structure = structure
         job.calc_minimize(pressure=pressure)
         job.run(delete_existing_job=True)
+        if isinstance(job, GenericInteractive):
+            job.interactive_close()
 
         return {
             'energy_pot': job.output.energy_pot[-1],
@@ -548,7 +550,7 @@ class HarmonicHamiltonian(PrimitiveVertex):
     def __init__(self, name=None):
         super(HarmonicHamiltonian, self).__init__(name=name)
         id_ = self.input.default
-        id_.spring_constant = 1.0
+        id_.spring_constant = None
         id_.force_constants = None
 
     def command(self, positions, reference_positions, structure, spring_constant=None, force_constants=None,

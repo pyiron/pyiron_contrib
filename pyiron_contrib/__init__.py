@@ -1,3 +1,6 @@
+__version__ = "0.1"
+__all__ = []
+
 from pyiron import Project
 from pyiron_base import JOB_CLASS_DICT
 
@@ -16,18 +19,10 @@ JOB_CLASS_DICT['ProtocolVacancyTILDParallel'] = 'pyiron_contrib.protocol.compoun
 JOB_CLASS_DICT['ProtocolVacancyFormation'] = 'pyiron_contrib.protocol.compound.thermodynamic_integration'
 JOB_CLASS_DICT['ProtocolFTSEvolution'] = 'pyiron_contrib.protocol.compound.finite_temperature_string'
 JOB_CLASS_DICT['ProtocolFTSEvolutionParallel'] = 'pyiron_contrib.protocol.compound.finite_temperature_string'
+JOB_CLASS_DICT['ImageJob'] = 'pyiron_contrib.image.job'
+JOB_CLASS_DICT['RandSpg'] = 'pyiron_contrib.atomistic.atomistics.structures.randspg'
 
-# Backwards compatibility
-JOB_CLASS_DICT['GenericMaster'] = 'pyiron.base.master.generic'
-JOB_CLASS_DICT['ListMaster'] = 'pyiron.base.master.list'
-JOB_CLASS_DICT['ParallelMaster'] = 'pyiron.base.master.parallel'
-JOB_CLASS_DICT['VaspInt'] = 'pyiron_mpie.backwards.back'
-JOB_CLASS_DICT['VaspInt2'] = 'pyiron_mpie.backwards.back'
-JOB_CLASS_DICT['LammpsInt'] = 'pyiron_mpie.backwards.back'
-JOB_CLASS_DICT['LammpsInt2'] = 'pyiron_mpie.backwards.back'
-JOB_CLASS_DICT['PhonopyMaster'] = 'pyiron_mpie.backwards.back'
-JOB_CLASS_DICT['PhonopyMaster2'] = 'pyiron_mpie.backwards.back'
-JOB_CLASS_DICT['MurnaghanInt'] = 'pyiron_mpie.backwards.back'
-JOB_CLASS_DICT['SphinxEx'] = 'pyiron_mpie.backwards.back'
-JOB_CLASS_DICT['SphinxInt'] = 'pyiron_mpie.backwards.back'
-JOB_CLASS_DICT['SphinxInt2'] = 'pyiron_mpie.backwards.back'
+from ._version import get_versions
+
+__version__ = get_versions()["version"]
+del get_versions

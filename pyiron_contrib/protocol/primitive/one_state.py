@@ -434,6 +434,7 @@ class GradientDescent(PrimitiveVertex):
 
     def command(self, positions, forces, gamma0, use_adagrad, fix_com, mask=None, masses=None,
                 output_displacements=True):
+
         positions = np.array(positions)
         forces = np.array(forces)
         unmasked_positions = None

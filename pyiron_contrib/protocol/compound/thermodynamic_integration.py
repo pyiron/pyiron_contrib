@@ -566,7 +566,7 @@ class HarmonicallyCoupled(CompoundVertex):
         g.average_temp.input.sample = gp.verlet_velocities.output.instant_temperature[-1]
 
         # check_sampling_period
-        g.check_sampling_period.input.target = gp.clock.output.n_counts[-1]
+        g.check_sampling_period.input.target = gp.reflect.output.total_steps[-1]
         g.check_sampling_period.input.default.mod = ip.sampling_period
 
         # addition
@@ -1336,7 +1336,6 @@ class Decoupling(CompoundVertex):
 
         # calc_full
         g.calc_full.input.structure = ip.structure
-        g.calc_full.input.cell = ip.structure.cell.array
         g.calc_full.input.project_path = ip.project_path_full
         g.calc_full.input.job_name = ip.full_job_name
         g.calc_full.input.positions = gp.reflect.output.positions[-1]
@@ -1347,7 +1346,6 @@ class Decoupling(CompoundVertex):
 
         # calc_vac
         g.calc_vac.input.structure = ip.vacancy_structure
-        g.calc_vac.input.cell = ip.vacancy_structure.cell.array
         g.calc_vac.input.project_path = ip.project_path_vac
         g.calc_vac.input.job_name = ip.vac_job_name
         g.calc_vac.input.positions = gp.slice_positions.output.sliced[-1]

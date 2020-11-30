@@ -8,8 +8,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
-from abc import ABC
-
 from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
 from pyiron_contrib.protocol.primitive.one_state import CreateJob, Counter, CutoffDistance, ExternalHamiltonian, \
     InitialPositions, RemoveJob, RandomVelocity, SphereReflection, VerletPositionUpdate, \
@@ -38,12 +36,13 @@ class FTSEvolution(CompoundVertex):
     """
     A serial Finite Temperature String (FTS) protocol to compute migration barriers between two stable system.
 
-    NOTE: 1. This protocol is as of now untested with DFT pseudopotentials, and only works for sure, with LAMMPS-
-        based potentials.
-          2. Convergence criterion is NOT implemented for this protocol, because it runs serially (and would take
+    NOTE: 1. This protocol is as of now untested with DFT-type reference jobs, and only works for sure, with
+        Lammps-type reference jobs.
+          2. Convergence criterion is NOT implemented for this protocol, because it runs serially, and would take
         a VERY long time to achieve a good convergence.
 
     Input attributes:
+        TODO: add a vertex to check if all the necessary inputs are provided.
         ref_job_full_path (string): The path to the saved reference job to use for calculating forces and energies.
         structure_initial (Atoms): The initial structure.
         structure_initial (Atoms): The final structure.
@@ -68,15 +67,15 @@ class FTSEvolution(CompoundVertex):
         mixing_fraction (float): How much of the images' running average of position to mix into the centroid positions
             each time the mixer is called. (Default is 0.1.)
         relax_endpoints (bool): Whether or not to relax the endpoints of the string. (Default is False.)
-        smooth_style (string): Apply 'global' or 'local' smoothing. (Default is 'global'.)
+        smooth_style (string): Apply 'global' or 'local' smoothing. 'global' smoothing considers an array of n_images
+            terms while applying smoothing to each image, while 'local' smoothing only considers the left and right
+            neighbor of that image. (Default is 'global'.)
         nominal_smoothing (float): How much smoothing to apply to the updating centroid positions (endpoints are
             not effected). The actual smoothing is the product of this nominal value, the number of images, and the
             mixing fraction, ala Vanden-Eijnden and Venturoli (2009). (Default is 0.1.)
-        divisor (int): Necessary for calculation of the running average. (Default is 1.)
-        use_reflection (boolean): Turn on or off `SphereReflection` (Default is True.)
-        total_steps (int): The total number of times `SphereReflection` is called so far. (Default is 0.)
-        project_path (string): Initialize default project path to pass into the child protocol. (Default is None.)
-        job_name (string): Initialize default job name to pass into the child protocol. (Default is None.)
+        use_reflection (boolean): Turn on or off `SphereReflection`. Using sphere reflection restricts each atom
+            in the simulation cell to evolve within the Wigner-Seitz cell of its reference position. This is
+            helpful to restrict atom-hopping in the presence of a vacancy at higher temperatures. (Default is True.)
 
     Output attributes:
         energy_pot (list[float]): Total potential energy of the system in eV.
@@ -113,11 +112,11 @@ class FTSEvolution(CompoundVertex):
         id_.relax_endpoints = False
         id_.smooth_style = 'global'
         id_.nominal_smoothing = 0.1
-        id_.divisor = 1
         id_.use_reflection = True
-        id_.total_steps = 0
-        id_.project_path = None
-        id_.job_name = None
+        id_._divisor = 1
+        id_._total_steps = 0
+        id_._project_path = None
+        id_._job_name = None
 
     def define_vertices(self):
         # Graph components
@@ -242,8 +241,7 @@ class FTSEvolution(CompoundVertex):
         g.reflect_string.broadcast.previous_velocities = gp.reflect_atoms.output.velocities[-1]
         g.reflect_string.broadcast.positions = gp.verlet_positions.output.positions[-1]
         g.reflect_string.broadcast.velocities = gp.verlet_positions.output.velocities[-1]
-        g.reflect_string.direct.cell = ip.structure_initial.cell.array
-        g.reflect_string.direct.pbc = ip.structure_initial.pbc
+        g.reflect_string.direct.structure = ip.structure_initial
 
         # reflect_atoms
         g.reflect_atoms.input.n_children = ip.n_images
@@ -259,8 +257,7 @@ class FTSEvolution(CompoundVertex):
         g.reflect_atoms.broadcast.velocities = gp.reflect_string.output.velocities[-1]
         g.reflect_atoms.broadcast.previous_positions = gp.recenter.output.positions[-1]
         g.reflect_atoms.broadcast.previous_velocities = gp.reflect_atoms.output.velocities[-1]
-        g.reflect_atoms.direct.pbc = ip.structure_initial.pbc
-        g.reflect_atoms.direct.cell = ip.structure_initial.cell.array
+        g.reflect_atoms.direct.structure = ip.structure_initial
         g.reflect_atoms.direct.cutoff_distance = gp.cutoff.output.cutoff_distance[-1]
         g.reflect_atoms.direct.use_reflection = ip.use_reflection
         g.reflect_atoms.broadcast.total_steps = gp.reflect_atoms.output.total_steps[-1]
@@ -294,8 +291,7 @@ class FTSEvolution(CompoundVertex):
         g.running_average_pos.broadcast.running_average_positions = \
             gp.running_average_pos.output.running_average_positions[-1]
         g.running_average_pos.broadcast.positions = gp.reflect_atoms.output.positions[-1]
-        g.running_average_pos.direct.cell = ip.structure_initial.cell.array
-        g.running_average_pos.direct.pbc = ip.structure_initial.pbc
+        g.running_average_pos.direct.structure = ip.structure_initial
 
         # check_sampling_period
         g.check_sampling_period.input.target = gp.clock.output.n_counts[-1]
@@ -307,21 +303,18 @@ class FTSEvolution(CompoundVertex):
         g.mix.input.mixing_fraction = ip.mixing_fraction
         g.mix.input.relax_endpoints = ip.relax_endpoints
         g.mix.input.running_average_positions = gp.running_average_pos.output.running_average_positions[-1]
-        g.mix.input.cell = ip.structure_initial.cell.array
-        g.mix.input.pbc = ip.structure_initial.pbc
+        g.mix.input.structure = ip.structure_initial
 
         # smooth
         g.smooth.input.kappa = ip.nominal_smoothing
         g.smooth.input.dtau = ip.mixing_fraction
-        g.smooth.input.cell = ip.structure_initial.cell.array
-        g.smooth.input.pbc = ip.structure_initial.pbc
+        g.smooth.input.structure = ip.structure_initial
         g.smooth.input.smooth_style = ip.smooth_style
         g.smooth.input.centroids_pos_list = gp.mix.output.centroids_pos_list[-1]
 
         # reparameterize
         g.reparameterize.input.centroids_pos_list = gp.smooth.output.centroids_pos_list[-1]
-        g.reparameterize.input.cell = ip.structure_initial.cell.array
-        g.reparameterize.input.pbc = ip.structure_initial.pbc
+        g.reparameterize.input.structure= ip.structure_initial
 
         # calc_static_centroids
         g.calc_static_centroids.input.n_children = ip.n_images
@@ -341,8 +334,7 @@ class FTSEvolution(CompoundVertex):
         g.recenter.broadcast.centroid_forces = gp.calc_static_centroids.output.forces[-1]
         g.recenter.broadcast.positions = gp.reflect_atoms.output.positions[-1]
         g.recenter.broadcast.forces = gp.calc_static_images.output.forces[-1]
-        g.recenter.direct.cell = ip.structure_initial.cell.array
-        g.recenter.direct.pbc = ip.structure_initial.pbc
+        g.recenter.direct.structure= ip.structure_initial
 
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
 
@@ -361,6 +353,15 @@ class FTSEvolution(CompoundVertex):
             return self.graph.calc_static_centroids.archive.output.energy_pot.data[frame]
 
     def plot_string(self, ax=None, frame=None, plot_kwargs=None):
+        """
+        Plot the string at an input frame. Here, frame is a dump of a step in the run. The number of dumps
+            can be specified by the user while submitting the job, as:
+
+        <job_name>.set_output_whitelist(**{'calc_static_centroids': {'energy_pot': <dump every these many steps>}}).
+
+            Default is plot the string at the final frame, as only the final dump is recorded (unless specified
+            otherwise by the user!)
+        """
         if ax is None:
             _, ax = plt.subplots()
         if plot_kwargs is None:
@@ -374,38 +375,49 @@ class FTSEvolution(CompoundVertex):
         ax.xaxis.set_major_locator(MaxNLocator(integer=True))
         return ax
 
-    def get_forward_barrier(self, frame=None):
+    def _get_directional_barrier(self, frame=None, anchor_element=0, use_minima=False):
+        energies = self._get_energies(frame=frame)
+        if use_minima:
+            reference = energies.min()
+        else:
+            reference = energies[anchor_element]
+        return energies.max() - reference
+
+    def get_forward_barrier(self, frame=None, use_minima=False):
         """
         Get the energy barrier from the 0th image to the highest energy (saddle state).
         """
-        energies = self._get_energies(frame=frame)
-        return np.amax(energies) - energies[0]
+        return self._get_directional_barrier(frame=frame, use_minima=use_minima)
 
-    def get_reverse_barrier(self, frame=None):
+    def get_reverse_barrier(self, frame=None, use_minima=False):
         """
         Get the energy barrier from the final image to the highest energy (saddle state).
         """
-        energies = self._get_energies(frame=frame)
-        return np.amax(energies) - energies[-1]
+        return self._get_directional_barrier(frame=frame, anchor_element=-1, use_minima=use_minima)
 
-    def get_barrier(self, frame=None):
-        return self.get_forward_barrier(frame=frame)
+    def get_barrier(self, frame=None, use_minima=True):
+        self.get_barrier.__doc__ = self.get_forward_barrier.__doc__
+        return self.get_forward_barrier(frame=frame, use_minima=use_minima)
 
 
-class ProtocolFTSEvolution(Protocol, FTSEvolution, ABC):
+class ProtocolFTSEvolution(Protocol, FTSEvolution):
     pass
 
 
 class ConstrainedMD(CompoundVertex):
     """
-    A sub-protocol for FTSEvolutionParallel for the evolution of each image. This sub-protocol is
-        executed in parallel over multiple cores using ParallelList.
+    A sub-protocol for FTSEvolutionParallel for the evolution of each image. The MD is 'Constrained' as the atoms in
+        the cells of each image evolve with the following constrains:
+
+            a. If an image gets closer to a centroid which is NOT its parent centroid, reverse the velocities of
+            all the atoms in that image, such that the image remains in the Voronoi cell of the parent centroid.
+            b. If any atom in an image moves out of its Wigner-Seitz cell, reverse the velocities of all the atoms
+            in that image.
+
+    This sub-protocol is executed in parallel over multiple cores using ParallelList.
 
     NOTE: Presently for use only with Finite Temperature String (FTS) related protocols.
-
     """
-    # DefaultWhitelist = {
-    # }
 
     def define_vertices(self):
         # Graph components
@@ -482,8 +494,7 @@ class ConstrainedMD(CompoundVertex):
         g.reflect_atoms.input.velocities = gp.reflect_string.output.velocities[-1]
         g.reflect_atoms.input.previous_positions = gp.reflect_atoms.output.positions[-1]
         g.reflect_atoms.input.previous_velocities = gp.verlet_velocities.output.velocities[-1]
-        g.reflect_atoms.input.pbc = ip.structure.pbc
-        g.reflect_atoms.input.cell = ip.structure.cell.array
+        g.reflect_atoms.input.structure = ip.structure
         g.reflect_atoms.input.cutoff_distance = ip.cutoff_distance
         g.reflect_atoms.input.use_reflection = ip.use_reflection
         g.reflect_atoms.input.total_steps = gp.reflect_atoms.output.total_steps[-1]
@@ -513,8 +524,7 @@ class ConstrainedMD(CompoundVertex):
         g.running_average_pos.input.running_average_positions = \
             gp.running_average_pos.output.running_average_positions[-1]
         g.running_average_pos.input.positions = gp.reflect_atoms.output.positions[-1]
-        g.running_average_pos.input.cell = ip.structure.cell.array
-        g.running_average_pos.input.pbc = ip.structure.pbc
+        g.running_average_pos.input.structure= ip.structure
 
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
 
@@ -534,14 +544,15 @@ class ConstrainedMD(CompoundVertex):
 class FTSEvolutionParallel(FTSEvolution):
     """
     A version of FTSEvolution where the evolution of each image is executed in parallel, thus giving a
-        substantial speed-up.
+        substantial speed-up. Maximum efficiency for parallelization can be achieved by setting the number of cores
+        the job can use to the number of images, ie., cores / images = 1. Setting the number of cores greater than
+        the number of images gives zero gain, and is wasteful if cores % images != 0.
 
     Input attributes:
       sleep_time (float): A delay in seconds for database access of results. For sqlite, a non-zero delay maybe
             required. (Default is 0 seconds, no delay.)
 
     For inherited input and output attributes, refer the `FTSEvolution` protocol.
-
     """
 
     def __init__(self, **kwargs):
@@ -707,21 +718,18 @@ class FTSEvolutionParallel(FTSEvolution):
         g.mix.input.mixing_fraction = ip.mixing_fraction
         g.mix.input.relax_endpoints = ip.relax_endpoints
         g.mix.input.running_average_positions = gp.constrained_evo.output.running_average_positions[-1]
-        g.mix.input.cell = ip.structure_initial.cell.array
-        g.mix.input.pbc = ip.structure_initial.pbc
+        g.mix.input.structure = ip.structure_initial
 
         # smooth
         g.smooth.input.kappa = ip.nominal_smoothing
         g.smooth.input.dtau = ip.mixing_fraction
-        g.smooth.input.cell = ip.structure_initial.cell.array
-        g.smooth.input.pbc = ip.structure_initial.pbc
+        g.smooth.input.structure = ip.structure_initial
         g.smooth.input.smooth_style = ip.smooth_style
         g.smooth.input.centroids_pos_list = gp.mix.output.centroids_pos_list[-1]
 
         # reparameterize
         g.reparameterize.input.centroids_pos_list = gp.smooth.output.centroids_pos_list[-1]
-        g.reparameterize.input.cell = ip.structure_initial.cell.array
-        g.reparameterize.input.pbc = ip.structure_initial.pbc
+        g.reparameterize.input.structure = ip.structure_initial
 
         # calc_static_centroids
         g.calc_static_centroids.input.n_children = ip.n_images
@@ -741,11 +749,10 @@ class FTSEvolutionParallel(FTSEvolution):
         g.recenter.broadcast.centroid_forces = gp.calc_static_centroids.output.forces[-1]
         g.recenter.broadcast.positions = gp.constrained_evo.output.positions[-1]
         g.recenter.broadcast.forces = gp.constrained_evo.output.forces[-1]
-        g.recenter.direct.cell = ip.structure_initial.cell.array
-        g.recenter.direct.pbc = ip.structure_initial.pbc
+        g.recenter.direct.structure = ip.structure_initial
 
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
 
 
-class ProtocolFTSEvolutionParallel(Protocol, FTSEvolutionParallel, ABC):
+class ProtocolFTSEvolutionParallel(Protocol, FTSEvolutionParallel):
     pass

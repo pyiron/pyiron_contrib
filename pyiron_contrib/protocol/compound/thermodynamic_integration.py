@@ -7,7 +7,6 @@ from __future__ import print_function
 import numpy as np
 import matplotlib.pyplot as plt
 
-from abc import ABC
 from scipy.constants import physical_constants
 
 from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
@@ -17,7 +16,7 @@ from pyiron_contrib.protocol.primitive.one_state import BuildMixingPairs, Comput
     CutoffDistance, DeleteAtom, ExternalHamiltonian, FEPExponential, HarmonicHamiltonian, MinimizeReferenceJob, \
     Overwrite, RemoveJob, RandomVelocity, Slice, SphereReflection, TILDPostProcess, Transpose, \
     VerletPositionUpdate, VerletVelocityUpdate, WeightedSum, WelfordOnline, Zeros
-from pyiron_contrib.protocol.primitive.two_state import ExitProtocol, IsGEq, IsLEq, ModIsZero
+from pyiron_contrib.protocol.primitive.two_state import AnyVertex, IsGEq, IsLEq, ModIsZero
 
 # Define physical constants that will be used in this script
 KB = physical_constants['Boltzmann constant in eV/K'][0]
@@ -39,7 +38,7 @@ __status__ = "development"
 __date__ = "24 July, 2019"
 
 
-class TILDParent(CompoundVertex, ABC):
+class _TILDParent(CompoundVertex):
     """
     A parent class for thermodynamic integration by langevin dynamics. Mostly just to avoid duplicate code in
     `HarmonicTILD` and `VacancyTILD`.
@@ -51,17 +50,25 @@ class TILDParent(CompoundVertex, ABC):
     WARNING: The methods in this parent class require loading of the finished interactive jobs that run within the
     child protocol. Since reloading jobs is (at times) time consuming, I add a TILDPostProcessing vertex at the end
     of the child protocol. That makes the methods defined in this parent class redundant. -Raynol
-
     """
 
     def get_lambdas(self):
+        """
+        Get the lambda values.
+        """
         return self.graph.build_lambdas.output.lambda_pairs[-1][:, 0]
 
     def get_tild_integrands(self):
+        """
+        Get the integrand values from the TILD run.
+        """
         integrand = self.graph.average_tild.output
         return np.array(integrand.mean[-1]), integrand.std[-1] / np.sqrt(integrand.n_samples[-1])
 
     def plot_tild_integrands(self):
+        """
+        Plot the integrand values with their standard errors against the lambda values.
+        """
         fig, ax = plt.subplots()
         lambdas = self.get_lambdas()
         thermal_average, standard_error = self.get_tild_integrands()
@@ -75,7 +82,7 @@ class TILDParent(CompoundVertex, ABC):
         return np.trapz(x=self.get_lambdas(), y=self.get_tild_integrands()[0])
 
 
-class HarmonicTILD(TILDParent):
+class HarmonicTILD(_TILDParent):
     """
     A serial TILD protocol to compute the free energy change when the system changes from a set of harmonically
         oscillating atoms, to a fully interacting system of atoms. The interactions are described by an
@@ -111,7 +118,6 @@ class HarmonicTILD(TILDParent):
             it by the cutoff factor. A default value of 0.45 is chosen, because taking a cutoff factor of ~0.5
             sometimes let certain reflections off the hook, and we do not want that to happen. (Default is 0.45.)
         use_reflection (boolean): Turn on or off `SphereReflection` (Default is True.)
-        total_steps (int): The total number of times `SphereReflection` is called so far. (Default is 0.)
 
     Output attributes:
         temperature_mean (list): Mean output temperature for each integration point.
@@ -125,7 +131,6 @@ class HarmonicTILD(TILDParent):
         fep_free_energy_mean (float): Mean calculated via free energy perturbation.
         fep_free_energy_std (float): Standard deviation calculated via free energy perturbation.
         fep_free_energy_se (float): Standard error calculated via free energy perturbation.
-
     """
     # DefaultWhitelist sets the output which will be stored every `archive period' in the final hdf5 file.
 
@@ -160,7 +165,7 @@ class HarmonicTILD(TILDParent):
         id_.spring_constant = None
         id_.cutoff_factor = 0.5
         id_.use_reflection = True
-        id_.total_steps = 0
+        id_._total_steps = 0
 
     def define_vertices(self):
         # Graph components
@@ -279,7 +284,7 @@ class HarmonicTILD(TILDParent):
         g.reflect.input.n_children = ip.n_lambdas
         g.reflect.direct.default.previous_positions = ip.structure.positions
         g.reflect.broadcast.default.previous_velocities = gp.initial_velocities.output.velocities[-1]
-        g.reflect.direct.default.total_steps = ip.total_steps
+        g.reflect.direct.default.total_steps = ip._total_steps
 
         g.reflect.direct.reference_positions = ip.structure.positions
         g.reflect.broadcast.positions = gp.verlet_positions.output.positions[-1]
@@ -398,7 +403,6 @@ class HarmonicTILD(TILDParent):
 
         Returns:
             float/np.ndarray: The sum of the free energy of each atom.
-
         """
         if temperatures is None:
             temperatures = self.input.temperature
@@ -414,7 +418,6 @@ class HarmonicTILD(TILDParent):
 
         Returns:
             float/np.ndarray: The sum of the free energy of each atom.
-
         """
         if temperatures is None:
             temperatures = self.input.temperature
@@ -427,18 +430,15 @@ class HarmonicTILD(TILDParent):
         return f
 
 
-class ProtocolHarmonicTILD(Protocol, HarmonicTILD, ABC):
+class ProtocolHarmonicTILD(Protocol, HarmonicTILD):
     pass
 
 
-class HarmonicallyCoupled(CompoundVertex):
+class _HarmonicallyCoupled(CompoundVertex):
     """
     A sub-protocol for HarmonicTILDParallel for the evolution of each integration point. This sub-protocol is
         executed in parallel over multiple cores using ParallelList.
-
     """
-    # DefaultWhitelist = {
-    # }
 
     def define_vertices(self):
         # Graph components
@@ -625,6 +625,10 @@ class HarmonicTILDParallel(HarmonicTILD):
         substantial speed-up. A free energy perturbation standard error convergence exit criterion can be applied,
         that is unavailable in the serial version of the HarmonicTILD protocol.
 
+        Maximum efficiency for parallelization can be achieved by setting the number of cores the job can use to
+        the number of lambdas, ie., cores / lambdas = 1. Setting the number of cores greater than the number of
+        lambdas gives zero gain, and is wasteful if cores % lambdas != 0.
+
     Input attributes:
         sleep_time (float): A delay in seconds for database access of results. For sqlite, a non-zero delay maybe
             required. (Default is 0 seconds, no delay.)
@@ -645,10 +649,7 @@ class HarmonicTILDParallel(HarmonicTILD):
             steps.
 
     For inherited input and output attributes, refer the `HarmonicTILD` protocol.
-
     """
-    # DefaultWhitelist = {
-    # }
 
     def __init__(self, **kwargs):
         super(HarmonicTILDParallel, self).__init__(**kwargs)
@@ -656,14 +657,14 @@ class HarmonicTILDParallel(HarmonicTILD):
         id_ = self.input.default
         # Default values
         id_.sleep_time = 0
-        id_.project_path = None
-        id_.job_name = None
         id_.convergence_check_steps = 10
         id_.default_free_energy_se = 1
         id_.fe_tol = 0.01
-        id_.mean = None
-        id_.std = None
-        id_.n_samples = None
+        id_._project_path = None
+        id_._job_name = None
+        id_._mean = None
+        id_._std = None
+        id_._n_samples = None
 
     def define_vertices(self):
         # Graph components
@@ -678,10 +679,10 @@ class HarmonicTILDParallel(HarmonicTILD):
         g.check_convergence = IsLEq()
         g.remove_jobs = RemoveJob()
         g.create_jobs = CreateJob()
-        g.run_lambda_points = ParallelList(HarmonicallyCoupled, sleep_time=ip.sleep_time)
+        g.run_lambda_points = ParallelList(_HarmonicallyCoupled, sleep_time=ip.sleep_time)
         g.clock = Counter()
         g.post = TILDPostProcess()
-        g.exit = ExitProtocol()
+        g.exit = AnyVertex()
 
     def define_execution_flow(self):
         # Execution flow
@@ -744,8 +745,8 @@ class HarmonicTILDParallel(HarmonicTILD):
         g.check_convergence.input.threshold = ip.fe_tol
 
         # remove_jobs
-        g.remove_jobs.input.default.project_path = ip.project_path
-        g.remove_jobs.input.default.job_names = ip.job_name
+        g.remove_jobs.input.default.project_path = ip._project_path
+        g.remove_jobs.input.default.job_names = ip._job_name
 
         g.remove_jobs.input.project_path = gp.create_jobs.output.project_path[-1][-1]
         g.remove_jobs.input.job_names = gp.create_jobs.output.job_names[-1]
@@ -773,7 +774,7 @@ class HarmonicTILDParallel(HarmonicTILD):
         g.run_lambda_points.broadcast.forces = gp.run_lambda_points.output.forces[-1]
 
         # run_lambda_points - reflect
-        g.run_lambda_points.direct.default.total_steps = ip.total_steps
+        g.run_lambda_points.direct.default.total_steps = ip._total_steps
         g.run_lambda_points.broadcast.total_steps = gp.run_lambda_points.output.total_steps[-1]
         g.run_lambda_points.direct.cutoff_distance = gp.cutoff.output.cutoff_distance[-1]
         g.run_lambda_points.direct.use_reflection = ip.use_reflection
@@ -800,9 +801,9 @@ class HarmonicTILDParallel(HarmonicTILD):
         g.run_lambda_points.direct.sampling_period = ip.sampling_period
 
         # run_lambda_points - average_temp
-        g.run_lambda_points.direct.default.average_temp_mean = ip.mean
-        g.run_lambda_points.direct.default.average_temp_std = ip.std
-        g.run_lambda_points.direct.default.average_temp_n_samples = ip.n_samples
+        g.run_lambda_points.direct.default.average_temp_mean = ip._mean
+        g.run_lambda_points.direct.default.average_temp_std = ip._std
+        g.run_lambda_points.direct.default.average_temp_n_samples = ip._n_samples
         g.run_lambda_points.broadcast.average_temp_mean = gp.run_lambda_points.output.temperature_mean[-1]
         g.run_lambda_points.broadcast.average_temp_std = gp.run_lambda_points.output.temperature_std[-1]
         g.run_lambda_points.broadcast.average_temp_n_samples = gp.run_lambda_points.output.temperature_n_samples[-1]
@@ -811,9 +812,9 @@ class HarmonicTILDParallel(HarmonicTILD):
         # no parent inputs
 
         # run_lambda_points - average_tild
-        g.run_lambda_points.direct.default.average_tild_mean = ip.mean
-        g.run_lambda_points.direct.default.average_tild_std = ip.std
-        g.run_lambda_points.direct.default.average_tild_n_samples = ip.n_samples
+        g.run_lambda_points.direct.default.average_tild_mean = ip._mean
+        g.run_lambda_points.direct.default.average_tild_std = ip._std
+        g.run_lambda_points.direct.default.average_tild_n_samples = ip._n_samples
         g.run_lambda_points.broadcast.average_tild_mean = gp.run_lambda_points.output.mean_diff[-1]
         g.run_lambda_points.broadcast.average_tild_std = gp.run_lambda_points.output.std_diff[-1]
         g.run_lambda_points.broadcast.average_tild_n_samples = gp.run_lambda_points.output.n_samples[-1]
@@ -822,9 +823,9 @@ class HarmonicTILDParallel(HarmonicTILD):
         g.run_lambda_points.broadcast.delta_lambdas = gp.build_lambdas.output.delta_lambdas[-1]
 
         # run_lambda_points - average_fep_exp
-        g.run_lambda_points.direct.default.average_fep_exp_mean = ip.mean
-        g.run_lambda_points.direct.default.average_fep_exp_std = ip.std
-        g.run_lambda_points.direct.default.average_fep_exp_n_samples = ip.n_samples
+        g.run_lambda_points.direct.default.average_fep_exp_mean = ip._mean
+        g.run_lambda_points.direct.default.average_fep_exp_std = ip._std
+        g.run_lambda_points.direct.default.average_fep_exp_n_samples = ip._n_samples
         g.run_lambda_points.broadcast.average_fep_exp_mean = gp.run_lambda_points.output.fep_exp_mean[-1]
         g.run_lambda_points.broadcast.average_fep_exp_std = gp.run_lambda_points.output.fep_exp_std[-1]
         g.run_lambda_points.broadcast.average_fep_exp_n_samples = gp.run_lambda_points.output.n_samples[-1]
@@ -848,6 +849,10 @@ class HarmonicTILDParallel(HarmonicTILD):
         g.exit.input.vertices = [
             gp.check_steps.vertex_state,
             gp.check_convergence.vertex_state
+        ]
+        g.exit.input.print_strings = [
+            'Maximum steps reached',
+            'Convergence reached'
         ]
 
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
@@ -876,11 +881,11 @@ class HarmonicTILDParallel(HarmonicTILD):
         return np.array(~o.mean_diff[-1]), ~o.std_diff[-1] / np.sqrt(~o.n_samples[-1])
 
 
-class ProtocolHarmonicTILDParallel(Protocol, HarmonicTILDParallel, ABC):
+class ProtocolHarmonicTILDParallel(Protocol, HarmonicTILDParallel):
     pass
 
 
-class VacancyTILD(TILDParent):
+class VacancyTILD(_TILDParent):
     """
     A serial TILD protocol to compute the free energy change when the system changes from a fully interacting
         system of atoms to the same system with a single vacancy. This is done by 'decoupling' one of the atoms of
@@ -920,7 +925,6 @@ class VacancyTILD(TILDParent):
             it by the cutoff factor. A default value of 0.45 is chosen, because taking a cutoff factor of ~0.5
             sometimes let certain reflections off the hook, and we do not want that to happen. (Default is 0.45.)
         use_reflection (boolean): Turn on or off `SphereReflection` (Default is True.)
-        total_steps (int): The total number of times `SphereReflection` is called so far. (Default is 0.)
 
     Output attributes:
         temperature_mean (list): Mean output temperature for each integration point.
@@ -936,8 +940,6 @@ class VacancyTILD(TILDParent):
         fep_free_energy_se (float): Standard error calculated via free energy perturbation.
 
     """
-    # DefaultWhitelist = {
-    # }
 
     def __init__(self, **kwargs):
         super(VacancyTILD, self).__init__(**kwargs)
@@ -957,8 +959,7 @@ class VacancyTILD(TILDParent):
         id_.force_constants = None
         id_.cutoff_factor = 0.5
         id_.use_reflection = True
-        id_.total_steps = 0
-        id_.ensure_iterable_mask = True
+        id_._total_steps = 0
 
     def define_vertices(self):
         # Graph components
@@ -1092,7 +1093,7 @@ class VacancyTILD(TILDParent):
         g.reflect.input.n_children = ip.n_lambdas
         g.reflect.direct.default.previous_positions = ip.structure.positions
         g.reflect.broadcast.default.previous_velocities = gp.initial_velocities.output.velocities[-1]
-        g.reflect.direct.default.total_steps = ip.total_steps
+        g.reflect.direct.default.total_steps = ip._total_steps
 
         g.reflect.direct.reference_positions = ip.structure.positions
         g.reflect.broadcast.positions = gp.verlet_positions.output.positions[-1]
@@ -1231,17 +1232,15 @@ class VacancyTILD(TILDParent):
         }
 
 
-class ProtocolVacancyTILD(Protocol, VacancyTILD, ABC):
+class ProtocolVacancyTILD(Protocol, VacancyTILD):
     pass
 
 
-class Decoupling(CompoundVertex):
+class _Decoupling(CompoundVertex):
     """
     A sub-protocol for VacancyTILDParallel for the evolution of each integration point. This sub-protocol is
         executed in parallel over multiple cores using ParallelList.
     """
-    # DefaultWhitelist = {
-    # }
 
     def define_vertices(self):
         # Graph components
@@ -1457,20 +1456,19 @@ class VacancyTILDParallel(VacancyTILD):
         substantial speed-up. A free energy perturbation standard error convergence exit criterion can be applied,
         that is unavailable in the serial version of the VacancyTILD protocol.
 
+        Maximum efficiency for parallelization can be achieved by setting the number of cores the job can use to
+        the number of lambdas, ie., cores / lambdas = 1. Setting the number of cores greater than the number of
+        lambdas gives zero gain, and is wasteful if cores % lambdas != 0.
+
     Input attributes:
         sleep_time (float): A delay in seconds for database access of results. For sqlite, a non-zero delay maybe
             required. (Default is 0 seconds, no delay.)
-        project_path (string): Initialize default project path to pass into the child protocol. (Default is None.)
-        job_name (string): Initialize default job name to pass into the child protocol. (Default is None.)
         convergence_check_steps (int): Check for convergence once every `convergence_check_steps'. (Default is
             once every 10 steps.)
         default_free_energy_se (float): Initialize default free energy standard error to pass into the child
             protocol. (Default is None.)
         fe_tol (float): The free energy standard error tolerance. This is the convergence criterion in eV. (Default
             is 0.01 eV)
-        mean (float): Initialize default mean for WelfordOnline. (Default is None.)
-        std (float): Initialize default standard deviation for WelfordOnline. (Default is None.)
-        n_samples (float): Initialize default number of samples for WelfordOnline. (Default is None.)
 
     Output attributes:
         total_steps (list): The total number of steps up for each integration point, up to convergence, or max
@@ -1478,8 +1476,6 @@ class VacancyTILDParallel(VacancyTILD):
 
     For inherited input and output attributes, refer the `HarmonicTILD` protocol.
     """
-    # DefaultWhitelist = {
-    # }
 
     def __init__(self, **kwargs):
         super(VacancyTILDParallel, self).__init__(**kwargs)
@@ -1488,14 +1484,14 @@ class VacancyTILDParallel(VacancyTILD):
         # Default values
         # The remainder of the default values are inherited from HarmonicTILD
         id_.sleep_time = 0
-        id_.project_path = None
-        id_.job_name = None
         id_.convergence_check_steps = 10
         id_.default_free_energy_se = 1
         id_.fe_tol = 0.01
-        id_.mean = None
-        id_.std = None
-        id_.n_samples = None
+        id_._project_path = None
+        id_._job_name = None
+        id_._mean = None
+        id_._std = None
+        id_._n_samples = None
 
     def define_vertices(self):
         # Graph components
@@ -1512,10 +1508,10 @@ class VacancyTILDParallel(VacancyTILD):
         g.remove_vac_jobs = RemoveJob()
         g.create_full_jobs = CreateJob()
         g.create_vac_jobs = CreateJob()
-        g.run_lambda_points = ParallelList(Decoupling, sleep_time=ip.sleep_time)
+        g.run_lambda_points = ParallelList(_Decoupling, sleep_time=ip.sleep_time)
         g.clock = Counter()
         g.post = TILDPostProcess()
-        g.exit = ExitProtocol()
+        g.exit = AnyVertex()
 
     def define_execution_flow(self):
         # Execution flow
@@ -1580,15 +1576,15 @@ class VacancyTILDParallel(VacancyTILD):
         g.check_convergence.input.threshold = ip.fe_tol
 
         # remove_full_jobs
-        g.remove_full_jobs.input.default.project_path = ip.project_path
-        g.remove_full_jobs.input.default.job_names = ip.job_name
+        g.remove_full_jobs.input.default.project_path = ip._project_path
+        g.remove_full_jobs.input.default.job_names = ip._job_name
 
         g.remove_full_jobs.input.project_path = gp.create_full_jobs.output.project_path[-1][-1]
         g.remove_full_jobs.input.job_names = gp.create_full_jobs.output.job_names[-1]
 
         # remove_vac_jobs
-        g.remove_vac_jobs.input.default.project_path = ip.project_path
-        g.remove_vac_jobs.input.default.job_names = ip.job_name
+        g.remove_vac_jobs.input.default.project_path = ip._project_path
+        g.remove_vac_jobs.input.default.job_names = ip._job_name
 
         g.remove_vac_jobs.input.project_path = gp.create_vac_jobs.output.project_path[-1][-1]
         g.remove_vac_jobs.input.job_names = gp.create_vac_jobs.output.job_names[-1]
@@ -1659,9 +1655,9 @@ class VacancyTILDParallel(VacancyTILD):
         g.run_lambda_points.direct.sampling_period = ip.sampling_period
 
         # run_lambda_points - average_temp
-        g.run_lambda_points.direct.default.average_temp_mean = ip.mean
-        g.run_lambda_points.direct.default.average_temp_std = ip.std
-        g.run_lambda_points.direct.default.average_temp_n_samples = ip.n_samples
+        g.run_lambda_points.direct.default.average_temp_mean = ip._mean
+        g.run_lambda_points.direct.default.average_temp_std = ip._std
+        g.run_lambda_points.direct.default.average_temp_n_samples = ip._n_samples
         g.run_lambda_points.broadcast.average_temp_mean = gp.run_lambda_points.output.temperature_mean[-1]
         g.run_lambda_points.broadcast.average_temp_std = gp.run_lambda_points.output.temperature_std[-1]
         g.run_lambda_points.broadcast.average_temp_n_samples = gp.run_lambda_points.output.temperature_n_samples[-1]
@@ -1670,9 +1666,9 @@ class VacancyTILDParallel(VacancyTILD):
         # no parent inputs
 
         # run_lambda_points - average_tild
-        g.run_lambda_points.direct.default.average_tild_mean = ip.mean
-        g.run_lambda_points.direct.default.average_tild_std = ip.std
-        g.run_lambda_points.direct.default.average_tild_n_samples = ip.n_samples
+        g.run_lambda_points.direct.default.average_tild_mean = ip._mean
+        g.run_lambda_points.direct.default.average_tild_std = ip._std
+        g.run_lambda_points.direct.default.average_tild_n_samples = ip._n_samples
         g.run_lambda_points.broadcast.average_tild_mean = gp.run_lambda_points.output.mean_diff[-1]
         g.run_lambda_points.broadcast.average_tild_std = gp.run_lambda_points.output.std_diff[-1]
         g.run_lambda_points.broadcast.average_tild_n_samples = gp.run_lambda_points.output.n_samples[-1]
@@ -1681,9 +1677,9 @@ class VacancyTILDParallel(VacancyTILD):
         g.run_lambda_points.broadcast.delta_lambdas = gp.build_lambdas.output.delta_lambdas[-1]
 
         # run_lambda_points - average_fep_exp
-        g.run_lambda_points.direct.default.average_fep_exp_mean = ip.mean
-        g.run_lambda_points.direct.default.average_fep_exp_std = ip.std
-        g.run_lambda_points.direct.default.average_fep_exp_n_samples = ip.n_samples
+        g.run_lambda_points.direct.default.average_fep_exp_mean = ip._mean
+        g.run_lambda_points.direct.default.average_fep_exp_std = ip._std
+        g.run_lambda_points.direct.default.average_fep_exp_n_samples = ip._n_samples
         g.run_lambda_points.broadcast.average_fep_exp_mean = gp.run_lambda_points.output.fep_exp_mean[-1]
         g.run_lambda_points.broadcast.average_fep_exp_std = gp.run_lambda_points.output.fep_exp_std[-1]
         g.run_lambda_points.broadcast.average_fep_exp_n_samples = gp.run_lambda_points.output.n_samples[-1]
@@ -1708,6 +1704,10 @@ class VacancyTILDParallel(VacancyTILD):
             gp.check_steps.vertex_state,
             gp.check_convergence.vertex_state
         ]
+        g.exit.input.print_strings = [
+            'Maximum steps reached',
+            'Convergence reached'
+        ]
 
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
 
@@ -1730,11 +1730,14 @@ class VacancyTILDParallel(VacancyTILD):
         }
 
     def get_tild_integrands(self):
+        """
+        Get the integrand values from the TILD run.
+        """
         o = Pointer(self.graph.run_lambda_points.output)
         return np.array(~o.mean_diff[-1]), ~o.std_diff[-1] / np.sqrt(~o.n_samples[-1])
 
 
-class ProtocolVacancyTILDParallel(Protocol, VacancyTILDParallel, ABC):
+class ProtocolVacancyTILDParallel(Protocol, VacancyTILDParallel):
     pass
 
 
@@ -1770,8 +1773,6 @@ class VacancyFormation(VacancyTILDParallel):
 
     For inherited input and output attributes, refer the `VacancyTILDParallel` protocol.
     """
-    # DefaultWhitelist = {
-    # }
 
     def __init__(self, **kwargs):
         super(VacancyFormation, self).__init__(**kwargs)
@@ -1804,14 +1805,14 @@ class VacancyFormation(VacancyTILDParallel):
         g.create_jobs_inter = CreateJob()
         g.create_jobs_inter_vac = CreateJob()
         g.create_jobs_vac = CreateJob()
-        g.run_harm_to_inter = ParallelList(HarmonicallyCoupled, sleep_time=ip.sleep_time)
-        g.run_inter_to_vac = ParallelList(Decoupling, sleep_time=ip.sleep_time)
+        g.run_harm_to_inter = ParallelList(_HarmonicallyCoupled, sleep_time=ip.sleep_time)
+        g.run_inter_to_vac = ParallelList(_Decoupling, sleep_time=ip.sleep_time)
         g.clock = Counter()
         g.post_harm_to_inter = TILDPostProcess()
         g.post_inter_to_vac = TILDPostProcess()
         g.formation_energy_tild = ComputeFormationEnergy()
         g.formation_energy_fep = ComputeFormationEnergy()
-        g.exit = ExitProtocol()
+        g.exit = AnyVertex()
 
     def define_execution_flow(self):
         # Execution flow
@@ -1892,22 +1893,22 @@ class VacancyFormation(VacancyTILDParallel):
         g.check_convergence.input.threshold = ip.fe_tol
 
         # remove_jobs_inter
-        g.remove_jobs_inter.input.default.project_path = ip.project_path
-        g.remove_jobs_inter.input.default.job_names = ip.job_name
+        g.remove_jobs_inter.input.default.project_path = ip._project_path
+        g.remove_jobs_inter.input.default.job_names = ip._job_name
 
         g.remove_jobs_inter.input.project_path = gp.create_jobs_inter.output.project_path[-1][-1]
         g.remove_jobs_inter.input.job_names = gp.create_jobs_inter.output.job_names[-1]
 
         # remove_jobs_inter_vac
-        g.remove_jobs_inter_vac.input.default.project_path = ip.project_path
-        g.remove_jobs_inter_vac.input.default.job_names = ip.job_name
+        g.remove_jobs_inter_vac.input.default.project_path = ip._project_path
+        g.remove_jobs_inter_vac.input.default.job_names = ip._job_name
 
         g.remove_jobs_inter_vac.input.project_path = gp.create_jobs_inter_vac.output.project_path[-1][-1]
         g.remove_jobs_inter_vac.input.job_names = gp.create_jobs_inter_vac.output.job_names[-1]
 
         # remove_jobs_vac
-        g.remove_jobs_vac.input.default.project_path = ip.project_path
-        g.remove_jobs_vac.input.default.job_names = ip.job_name
+        g.remove_jobs_vac.input.default.project_path = ip._project_path
+        g.remove_jobs_vac.input.default.job_names = ip._job_name
 
         g.remove_jobs_vac.input.project_path = gp.create_jobs_vac.output.project_path[-1][-1]
         g.remove_jobs_vac.input.job_names = gp.create_jobs_vac.output.job_names[-1]
@@ -1945,7 +1946,7 @@ class VacancyFormation(VacancyTILDParallel):
         g.run_harm_to_inter.broadcast.forces = gp.run_harm_to_inter.output.forces[-1]
 
         # run_harm_to_inter - reflect
-        g.run_harm_to_inter.direct.default.total_steps = ip.total_steps
+        g.run_harm_to_inter.direct.default.total_steps = ip._total_steps
         g.run_harm_to_inter.broadcast.total_steps = gp.run_harm_to_inter.output.total_steps[-1]
         g.run_harm_to_inter.direct.cutoff_distance = gp.cutoff.output.cutoff_distance[-1]
 
@@ -1971,9 +1972,9 @@ class VacancyFormation(VacancyTILDParallel):
         g.run_harm_to_inter.direct.sampling_period = ip.sampling_period
 
         # run_harm_to_inter - average_temp
-        g.run_harm_to_inter.direct.default.average_temp_mean = ip.mean
-        g.run_harm_to_inter.direct.default.average_temp_std = ip.std
-        g.run_harm_to_inter.direct.default.average_temp_n_samples = ip.n_samples
+        g.run_harm_to_inter.direct.default.average_temp_mean = ip._mean
+        g.run_harm_to_inter.direct.default.average_temp_std = ip._std
+        g.run_harm_to_inter.direct.default.average_temp_n_samples = ip._n_samples
         g.run_harm_to_inter.broadcast.average_temp_mean = gp.run_harm_to_inter.output.temperature_mean[-1]
         g.run_harm_to_inter.broadcast.average_temp_std = gp.run_harm_to_inter.output.temperature_std[-1]
         g.run_harm_to_inter.broadcast.average_temp_n_samples = gp.run_harm_to_inter.output.temperature_n_samples[-1]
@@ -1982,9 +1983,9 @@ class VacancyFormation(VacancyTILDParallel):
         # no parent inputs
 
         # run_harm_to_inter - average_tild
-        g.run_harm_to_inter.direct.default.average_tild_mean = ip.mean
-        g.run_harm_to_inter.direct.default.average_tild_std = ip.std
-        g.run_harm_to_inter.direct.default.average_tild_n_samples = ip.n_samples
+        g.run_harm_to_inter.direct.default.average_tild_mean = ip._mean
+        g.run_harm_to_inter.direct.default.average_tild_std = ip._std
+        g.run_harm_to_inter.direct.default.average_tild_n_samples = ip._n_samples
         g.run_harm_to_inter.broadcast.average_tild_mean = gp.run_harm_to_inter.output.mean_diff[-1]
         g.run_harm_to_inter.broadcast.average_tild_std = gp.run_harm_to_inter.output.std_diff[-1]
         g.run_harm_to_inter.broadcast.average_tild_n_samples = gp.run_harm_to_inter.output.n_samples[-1]
@@ -1993,9 +1994,9 @@ class VacancyFormation(VacancyTILDParallel):
         g.run_harm_to_inter.broadcast.delta_lambdas = gp.build_lambdas_harm_to_inter.output.delta_lambdas[-1]
 
         # run_harm_to_inter - average_fep_exp
-        g.run_harm_to_inter.direct.default.average_fep_exp_mean = ip.mean
-        g.run_harm_to_inter.direct.default.average_fep_exp_std = ip.std
-        g.run_harm_to_inter.direct.default.average_fep_exp_n_samples = ip.n_samples
+        g.run_harm_to_inter.direct.default.average_fep_exp_mean = ip._mean
+        g.run_harm_to_inter.direct.default.average_fep_exp_std = ip._std
+        g.run_harm_to_inter.direct.default.average_fep_exp_n_samples = ip._n_samples
         g.run_harm_to_inter.broadcast.average_fep_exp_mean = gp.run_harm_to_inter.output.fep_exp_mean[-1]
         g.run_harm_to_inter.broadcast.average_fep_exp_std = gp.run_harm_to_inter.output.fep_exp_std[-1]
         g.run_harm_to_inter.broadcast.average_fep_exp_n_samples = gp.run_harm_to_inter.output.n_samples[-1]
@@ -2021,7 +2022,7 @@ class VacancyFormation(VacancyTILDParallel):
         g.run_inter_to_vac.broadcast.forces = gp.run_inter_to_vac.output.forces[-1]
 
         # run_inter_to_vac - reflect
-        g.run_inter_to_vac.direct.default.total_steps = ip.total_steps
+        g.run_inter_to_vac.direct.default.total_steps = ip._total_steps
         g.run_inter_to_vac.broadcast.total_steps = gp.run_inter_to_vac.output.total_steps[-1]
         g.run_inter_to_vac.direct.cutoff_distance = gp.cutoff.output.cutoff_distance[-1]
 
@@ -2058,9 +2059,9 @@ class VacancyFormation(VacancyTILDParallel):
         g.run_inter_to_vac.direct.sampling_period = ip.sampling_period
 
         # run_inter_to_vac - average_temp
-        g.run_inter_to_vac.direct.default.average_temp_mean = ip.mean
-        g.run_inter_to_vac.direct.default.average_temp_std = ip.std
-        g.run_inter_to_vac.direct.default.average_temp_n_samples = ip.n_samples
+        g.run_inter_to_vac.direct.default.average_temp_mean = ip._mean
+        g.run_inter_to_vac.direct.default.average_temp_std = ip._std
+        g.run_inter_to_vac.direct.default.average_temp_n_samples = ip._n_samples
         g.run_inter_to_vac.broadcast.average_temp_mean = gp.run_inter_to_vac.output.temperature_mean[-1]
         g.run_inter_to_vac.broadcast.average_temp_std = gp.run_inter_to_vac.output.temperature_std[-1]
         g.run_inter_to_vac.broadcast.average_temp_n_samples = gp.run_inter_to_vac.output.temperature_n_samples[-1]
@@ -2069,9 +2070,9 @@ class VacancyFormation(VacancyTILDParallel):
         # no parent inputs
 
         # run_inter_to_vac - average_tild
-        g.run_inter_to_vac.direct.default.average_tild_mean = ip.mean
-        g.run_inter_to_vac.direct.default.average_tild_std = ip.std
-        g.run_inter_to_vac.direct.default.average_tild_n_samples = ip.n_samples
+        g.run_inter_to_vac.direct.default.average_tild_mean = ip._mean
+        g.run_inter_to_vac.direct.default.average_tild_std = ip._std
+        g.run_inter_to_vac.direct.default.average_tild_n_samples = ip._n_samples
         g.run_inter_to_vac.broadcast.average_tild_mean = gp.run_inter_to_vac.output.mean_diff[-1]
         g.run_inter_to_vac.broadcast.average_tild_std = gp.run_inter_to_vac.output.std_diff[-1]
         g.run_inter_to_vac.broadcast.average_tild_n_samples = gp.run_inter_to_vac.output.n_samples[-1]
@@ -2080,9 +2081,9 @@ class VacancyFormation(VacancyTILDParallel):
         g.run_inter_to_vac.broadcast.delta_lambdas = gp.build_lambdas_inter_to_vac.output.delta_lambdas[-1]
 
         # run_inter_to_vac - average_fep_exp
-        g.run_inter_to_vac.direct.default.average_fep_exp_mean = ip.mean
-        g.run_inter_to_vac.direct.default.average_fep_exp_std = ip.std
-        g.run_inter_to_vac.direct.default.average_fep_exp_n_samples = ip.n_samples
+        g.run_inter_to_vac.direct.default.average_fep_exp_mean = ip._mean
+        g.run_inter_to_vac.direct.default.average_fep_exp_std = ip._std
+        g.run_inter_to_vac.direct.default.average_fep_exp_n_samples = ip._n_samples
         g.run_inter_to_vac.broadcast.average_fep_exp_mean = gp.run_inter_to_vac.output.fep_exp_mean[-1]
         g.run_inter_to_vac.broadcast.average_fep_exp_std = gp.run_inter_to_vac.output.fep_exp_std[-1]
         g.run_inter_to_vac.broadcast.average_fep_exp_n_samples = gp.run_inter_to_vac.output.n_samples[-1]
@@ -2136,6 +2137,10 @@ class VacancyFormation(VacancyTILDParallel):
             gp.check_steps.vertex_state,
             gp.check_convergence.vertex_state
         ]
+        g.exit.input.print_strings = [
+            'Maximum steps reached',
+            'Convergence reached'
+        ]
 
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
 
@@ -2164,6 +2169,9 @@ class VacancyFormation(VacancyTILDParallel):
         }
 
     def get_lambdas(self, integrands='harm_to_inter'):
+        """
+        Get the lambda values.
+        """
         if integrands == 'harm_to_inter':
             vertex = self.graph.build_lambdas_harm_to_inter.output
         elif integrands == 'inter_to_vac':
@@ -2173,6 +2181,9 @@ class VacancyFormation(VacancyTILDParallel):
         return vertex.lambda_pairs[-1][:, 0]
 
     def get_tild_integrands(self, integrands='harm_to_inter'):
+        """
+        Get the integrand values from the TILD run.
+        """
         if integrands == 'harm_to_inter':
             vertex = self.graph.run_harm_to_inter.output
         elif integrands == 'inter_to_vac':
@@ -2182,5 +2193,5 @@ class VacancyFormation(VacancyTILDParallel):
         return np.array(vertex.mean_diff[-1]), vertex.std_diff[-1] / np.sqrt(vertex.n_samples[-1])
 
 
-class ProtocolVacancyFormation(Protocol, VacancyFormation, ABC):
+class ProtocolVacancyFormation(Protocol, VacancyFormation):
     pass

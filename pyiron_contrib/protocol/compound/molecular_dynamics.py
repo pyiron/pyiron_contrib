@@ -4,8 +4,6 @@
 
 from __future__ import print_function
 
-from abc import ABC
-
 from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
 from pyiron_contrib.protocol.primitive.one_state import BerendsenBarostat, Counter, CutoffDistance, \
     ExternalHamiltonian, HarmonicHamiltonian, RandomVelocity, SphereReflection, VerletPositionUpdate, \
@@ -45,7 +43,7 @@ class MolecularDynamics(CompoundVertex):
             case equipartition of energy tells us that the kinetic energy should be initialized to double the
             desired value. (Default is 2.0, assume energy equipartition is a good idea.)
         pressure (float): The pressure in GPa to be simulated (Default is None GPa)
-        pressure_style (string): 'isotorpic' or 'anisotropic'. (Default is 'anisotropic')
+        pressure_style (string): 'isotropic' or 'anisotropic'. (Default is 'anisotropic')
         pressure_damping_timescale (float): Damping timescale in fs. (Default is None, no barostat is used.)
         compressibility (float): The compressibility of water in bar-1 (Default is 4.57e-5 bar-1)
         previous_volume (float): The default volume. (Defaults is None.)
@@ -96,9 +94,9 @@ class MolecularDynamics(CompoundVertex):
         id_.pressure = None
         id_.pressure_style = 'anisotropic'
         id_.pressure_damping_timescale = 1000.
-        id_.compressibility = 4.57e-5  # bar^-1
-        id_.previous_volume = None
-        id_.energy_kin = None
+        id_._compressibility = 4.57e-5  # bar^-1
+        id_._previous_volume = None
+        id_._energy_kin = None
 
     def define_vertices(self):
         # Graph components
@@ -155,8 +153,8 @@ class MolecularDynamics(CompoundVertex):
         # barostat
         g.barostat.input.default.box_pressure = gp.initial_pressures.output.zeros[-1]
         g.barostat.input.default.structure = ip.structure
-        g.barostat.input.default.energy_kin = ip.energy_kin
-        g.barostat.input.default.previous_volume = ip.previous_volume
+        g.barostat.input.default.energy_kin = ip._energy_kin
+        g.barostat.input.default.previous_volume = ip._previous_volume
         g.barostat.input.default.positions = ip.structure.positions
 
         g.barostat.input.box_pressure = gp.calc_static.output.pressures[-1]
@@ -168,7 +166,7 @@ class MolecularDynamics(CompoundVertex):
         g.barostat.input.temperature = ip.temperature
         g.barostat.input.time_step = ip.time_step
         g.barostat.input.pressure_damping_timescale = ip.pressure_damping_timescale
-        g.barostat.input.compressibility = ip.compressibility
+        g.barostat.input.compressibility = ip._compressibility
         g.barostat.input.pressure_style = ip.pressure_style
 
         # verelt_positions
@@ -212,7 +210,7 @@ class MolecularDynamics(CompoundVertex):
         }
 
 
-class ProtocolMD(Protocol, MolecularDynamics, ABC):
+class ProtocolMD(Protocol, MolecularDynamics):
     pass
 
 
@@ -231,9 +229,6 @@ class ConfinedMD(MolecularDynamics):
 
     For inherited input and output attributes, refer the `MolecularDynamics` protocol.
     """
-
-    # DefaultWhitelist = {
-    # }
 
     def __init__(self, **kwargs):
         super(ConfinedMD, self).__init__(**kwargs)
@@ -367,7 +362,7 @@ class ConfinedMD(MolecularDynamics):
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
 
 
-class ProtocolConfinedMD(Protocol, ConfinedMD, ABC):
+class ProtocolConfinedMD(Protocol, ConfinedMD):
     pass
 
 
@@ -402,9 +397,6 @@ class HarmonicMD(CompoundVertex):
         forces (numpy.ndarray): Atomic forces in eV/angstrom. Note: These are the potential gradient forces; thermostat
             forces (if any) are not saved.
     """
-
-    # DefaultWhitelist = {
-    # }
 
     def __init__(self, **kwargs):
         super(HarmonicMD, self).__init__(**kwargs)
@@ -510,5 +502,5 @@ class HarmonicMD(CompoundVertex):
         }
 
 
-class ProtocolHarmonicMD(Protocol, HarmonicMD, ABC):
+class ProtocolHarmonicMD(Protocol, HarmonicMD):
     pass

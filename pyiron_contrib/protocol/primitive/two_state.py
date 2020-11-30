@@ -83,24 +83,35 @@ class ModIsZero(BoolVertex):
             self.vertex_state = "false"
 
 
-class ExitProtocol(BoolVertex):
+class AnyVertex(BoolVertex):
+    """
+    Checks if any of the vertices in the list are true, and prints a custom string for any vertex that is true.
+
+    Input attributes:
+        vertices (list): The list of vertices.
+        print_strings (list): The list of strings to print should the associated vertex be true.
     """
 
-    """
-
-    def command(self, vertices):
+    def command(self, vertices, print_strings):
         bool_list = []
         for i in vertices:
-            if i == "true":
-                bool_list.append(1)
+            if isinstance(i, PrimitiveVertex):
+                if i == "true":
+                    bool_list.append(1)
+                else:
+                    bool_list.append(0)
             else:
-                bool_list.append(0)
+                raise TypeError(str(i) + ' is not an instance of PrimitiveVertex.')
+
+        print_condition = (len(print_strings) != len(vertices))
 
         if np.any(bool_list):
             if bool_list[0]:
-                print('Maximum steps reached')
+                if print_condition:
+                    print(print_strings[0])
             elif bool_list[1]:
-                print('Convergence reached')
+                if print_condition:
+                    print(print_strings[1])
             self.vertex_state = "true"
         else:
             self.vertex_state = "false"

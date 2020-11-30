@@ -4,8 +4,6 @@
 
 from __future__ import print_function
 
-from abc import ABC
-
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
@@ -182,6 +180,15 @@ class NEB(CompoundVertex):
             return self.graph.calc_static.archive.output.energy_pot.data[frame]
 
     def plot_elastic_band(self, ax=None, frame=None, plot_kwargs=None):
+        """
+        Plot the string at an input frame. Here, frame is a dump of a step in the run. The number of dumps
+            can be specified by the user while submitting the job, as:
+
+        <job_name>.set_output_whitelist(**{'calc_static': {'energy_pot': <dump every these many steps>}}).
+
+            Default is plot the string at the final frame, as only the final dump is recorded (unless specified
+            otherwise by the user!)
+        """
         if ax is None:
             _, ax = plt.subplots()
         if plot_kwargs is None:
@@ -195,23 +202,30 @@ class NEB(CompoundVertex):
         ax.xaxis.set_major_locator(MaxNLocator(integer=True))
         return ax
 
-    def get_forward_barrier(self, frame=None):
+    def _get_directional_barrier(self, frame=None, anchor_element=0, use_minima=False):
+        energies = self._get_energies(frame=frame)
+        if use_minima:
+            reference = energies.min()
+        else:
+            reference = energies[anchor_element]
+        return energies.max() - reference
+
+    def get_forward_barrier(self, frame=None, use_minima=False):
         """
         Get the energy barrier from the 0th image to the highest energy (saddle state).
         """
-        energies = self._get_energies(frame=frame)
-        return np.amax(energies) - energies[0]
+        return self._get_directional_barrier(frame=frame, use_minima=use_minima)
 
-    def get_reverse_barrier(self, frame=None):
+    def get_reverse_barrier(self, frame=None, use_minima=False):
         """
         Get the energy barrier from the final image to the highest energy (saddle state).
         """
-        energies = self._get_energies(frame=frame)
-        return np.amax(energies) - energies[-1]
+        return self._get_directional_barrier(frame=frame, anchor_element=-1, use_minima=use_minima)
 
-    def get_barrier(self, frame=None):
-        return self.get_forward_barrier(frame=frame)
+    def get_barrier(self, frame=None, use_minima=True):
+        self.get_barrier.__doc__ = self.get_forward_barrier.__doc__
+        return self.get_forward_barrier(frame=frame, use_minima=use_minima)
 
 
-class ProtocolNEB(Protocol, NEB, ABC):
+class ProtocolNEB(Protocol, NEB):
     pass

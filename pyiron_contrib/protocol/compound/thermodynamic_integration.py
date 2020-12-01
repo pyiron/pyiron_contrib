@@ -847,8 +847,8 @@ class HarmonicTILDParallel(HarmonicTILD):
 
         # exit
         g.exit.input.vertices = [
-            gp.check_steps.vertex_state,
-            gp.check_convergence.vertex_state
+            gp.check_steps,
+            gp.check_convergence
         ]
         g.exit.input.print_strings = [
             'Maximum steps reached',
@@ -1701,8 +1701,8 @@ class VacancyTILDParallel(VacancyTILD):
 
         # exit
         g.exit.input.vertices = [
-            gp.check_steps.vertex_state,
-            gp.check_convergence.vertex_state
+            gp.check_steps,
+            gp.check_convergence
         ]
         g.exit.input.print_strings = [
             'Maximum steps reached',
@@ -2134,8 +2134,8 @@ class VacancyFormation(VacancyTILDParallel):
 
         # exit
         g.exit.input.vertices = [
-            gp.check_steps.vertex_state,
-            gp.check_convergence.vertex_state
+            gp.check_steps,
+            gp.check_convergence
         ]
         g.exit.input.print_strings = [
             'Maximum steps reached',

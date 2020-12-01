@@ -96,14 +96,14 @@ class AnyVertex(BoolVertex):
         bool_list = []
         for i in vertices:
             if isinstance(i, PrimitiveVertex):
-                if i == "true":
+                if i.vertex_state == "true":
                     bool_list.append(1)
                 else:
                     bool_list.append(0)
             else:
                 raise TypeError(str(i) + ' is not an instance of PrimitiveVertex.')
 
-        print_condition = (len(print_strings) != len(vertices))
+        print_condition = (len(print_strings) == len(vertices))
 
         if np.any(bool_list):
             if bool_list[0]:

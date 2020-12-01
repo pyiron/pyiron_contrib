@@ -213,17 +213,43 @@ class NEB(CompoundVertex):
     def get_forward_barrier(self, frame=None, use_minima=False):
         """
         Get the energy barrier from the 0th image to the highest energy (saddle state).
+
+        Args:
+            frame (int): A particular dump. (Default is None, the final dump.)
+            use_minima (bool): Whether to use the minima of the energies to compute tha barrier. (Default is
+                False, use the 0th value.)
+
+        Returns:
+            (float): the forward migration barrier.
         """
         return self._get_directional_barrier(frame=frame, use_minima=use_minima)
 
     def get_reverse_barrier(self, frame=None, use_minima=False):
         """
         Get the energy barrier from the final image to the highest energy (saddle state).
+
+        Args:
+            frame (int): A particular dump. (Default is None, the final dump.)
+            use_minima (bool): Whether to use the minima of the energies to compute tha barrier. (Default is
+                False, use the nth value.)
+
+        Returns:
+            (float): the backward migration barrier.
         """
         return self._get_directional_barrier(frame=frame, anchor_element=-1, use_minima=use_minima)
 
     def get_barrier(self, frame=None, use_minima=True):
-        self.get_barrier.__doc__ = self.get_forward_barrier.__doc__
+        """
+        Get the energy barrier from the 0th image to the highest energy (saddle state).
+
+        Args:
+            frame (int): A particular dump. (Default is None, the final dump.)
+            use_minima (bool): Whether to use the minima of the energies to compute tha barrier. (Default is
+                False, use the 0th value.)
+
+        Returns:
+            (float): the migration barrier.
+        """
         return self.get_forward_barrier(frame=frame, use_minima=use_minima)
 
 

@@ -13,7 +13,7 @@ from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
 from pyiron_contrib.protocol.list import SerialList, ParallelList
 from pyiron_contrib.protocol.utils import Pointer
 from pyiron_contrib.protocol.primitive.one_state import BuildMixingPairs, ComputeFormationEnergy, Counter, CreateJob,\
-    CutoffDistance, DeleteAtom, ExternalHamiltonian, FEPExponential, HarmonicHamiltonian, MinimizeReferenceJob, \
+    CutoffDistance, DeleteAtom, ExternalHamiltonian, FEPExponential, HarmonicHamiltonian, \
     Overwrite, RemoveJob, RandomVelocity, Slice, SphereReflection, TILDPostProcess, Transpose, \
     VerletPositionUpdate, VerletVelocityUpdate, WeightedSum, WelfordOnline, Zeros
 from pyiron_contrib.protocol.primitive.two_state import AnyVertex, IsGEq, IsLEq, ModIsZero
@@ -111,15 +111,18 @@ class HarmonicTILD(_TILDParent):
         n_lambdas (int): How many mixing pairs to create. (Default is 5.)
         custom_lambdas (list): Specify the set of lambda values as input. (Default is None.)
         spring_constant (float): A single spring / force constant that is used to compute the restoring forces
-            on each atom. (Default is None.)
+            on each atom, thus treating every atom as an independent harmonic oscillator (Einstein atom).
+            (Default is None.)
         force_constants (NxN matrix): The Hessian matrix, obtained from, for ex. Phonopy. (Default is None, treat
             the atoms as independent harmonic oscillators (Einstein atoms.).)
         cutoff_factor (float): The cutoff is obtained by taking the first nearest neighbor distance and multiplying
             it by the cutoff factor. A default value of 0.45 is chosen, because taking a cutoff factor of ~0.5
             sometimes let certain reflections off the hook, and we do not want that to happen. (Default is 0.45.)
         use_reflection (boolean): Turn on or off `SphereReflection` (Default is True.)
+        zero_k_energy (float): The zero Kelvin potential energy of the structure. (Default is None.)
 
     Output attributes:
+        total_steps (list): The total number of steps for each integration point, up to convergence, or max steps.
         temperature_mean (list): Mean output temperature for each integration point.
         temperature_std (list): Standard deviation of the output temperature for each integration point.
         integrands_mean (list): Mean of the integrands from TILD.
@@ -151,6 +154,7 @@ class HarmonicTILD(_TILDParent):
         id_.spring_constant = None
         id_.cutoff_factor = 0.5
         id_.use_reflection = True
+        id_.zero_k_energy = None
         id_._total_steps = 0
 
     def define_vertices(self):
@@ -161,7 +165,6 @@ class HarmonicTILD(_TILDParent):
         g.initial_forces = Zeros()
         g.initial_velocities = SerialList(RandomVelocity)
         g.cutoff = CutoffDistance()
-        g.minimize_job = MinimizeReferenceJob()
         g.check_steps = IsGEq()
         g.verlet_positions = SerialList(VerletPositionUpdate)
         g.reflect = SerialList(SphereReflection)
@@ -190,7 +193,6 @@ class HarmonicTILD(_TILDParent):
             g.initial_forces,
             g.initial_velocities,
             g.cutoff,
-            g.minimize_job,
             g.check_steps, 'false',
             g.clock,
             g.verlet_positions,
@@ -244,10 +246,6 @@ class HarmonicTILD(_TILDParent):
         g.cutoff.input.structure = ip.structure
         g.cutoff.input.cutoff_factor = ip.cutoff_factor
 
-        # minimize_job
-        g.minimize_job.input.structure = ip.structure
-        g.minimize_job.input.ref_job_full_path = ip.ref_job_full_path
-
         # check_steps
         g.check_steps.input.target = gp.clock.output.n_counts[-1]
         g.check_steps.input.threshold = ip.n_steps
@@ -296,7 +294,7 @@ class HarmonicTILD(_TILDParent):
         g.harmonic.direct.reference_positions = ip.structure.positions
         g.harmonic.broadcast.positions = gp.reflect.output.positions[-1]
         g.harmonic.direct.structure = ip.structure
-        g.harmonic.direct.eq_energy = gp.minimize_job.output.energy_pot[-1]
+        g.harmonic.direct.eq_energy = ip.zero_k_energy
 
         # transpose_forces
         g.transpose_forces.input.matrix = [
@@ -369,6 +367,7 @@ class HarmonicTILD(_TILDParent):
     def get_output(self):
         gp = Pointer(self.graph)
         return {
+            'total_steps': ~gp.reflect.output.total_steps[-1],
             'temperature_mean': ~gp.average_temp.output.mean[-1],
             'temperature_std': ~gp.average_temp.output.std[-1],
             'integrands': ~gp.average_tild.output.mean[-1],
@@ -618,21 +617,14 @@ class HarmonicTILDParallel(HarmonicTILD):
     Input attributes:
         sleep_time (float): A delay in seconds for database access of results. For sqlite, a non-zero delay maybe
             required. (Default is 0 seconds, no delay.)
-        project_path (string): Initialize default project path to pass into the child protocol. (Default is None.)
-        job_name (string): Initialize default job name to pass into the child protocol. (Default is None.)
         convergence_check_steps (int): Check for convergence once every `convergence_check_steps'. (Default is
             once every 10 steps.)
         default_free_energy_se (float): Initialize default free energy standard error to pass into the child
             protocol. (Default is None.)
         fe_tol (float): The free energy standard error tolerance. This is the convergence criterion in eV. (Default
             is 0.01 eV)
-        mean (float): Initialize default mean for WelfordOnline. (Default is None.)
-        std (float): Initialize default standard deviation for WelfordOnline. (Default is None.)
-        n_samples (float): Initialize default number of samples for WelfordOnline. (Default is None.)
 
     Output attributes:
-        total_steps (list): The total number of steps up for each integration point, up to convergence, or max
-            steps.
 
     For inherited input and output attributes, refer the `HarmonicTILD` protocol.
     """
@@ -660,7 +652,6 @@ class HarmonicTILDParallel(HarmonicTILD):
         g.initial_forces = Zeros()
         g.initial_velocities = SerialList(RandomVelocity)
         g.cutoff = CutoffDistance()
-        g.minimize_job = MinimizeReferenceJob()
         g.check_steps = IsGEq()
         g.check_convergence = IsLEq()
         g.remove_jobs = RemoveJob()
@@ -678,7 +669,6 @@ class HarmonicTILDParallel(HarmonicTILD):
             g.initial_forces,
             g.initial_velocities,
             g.cutoff,
-            g.minimize_job,
             g.check_steps, 'false',
             g.check_convergence, 'false',
             g.remove_jobs,
@@ -716,10 +706,6 @@ class HarmonicTILDParallel(HarmonicTILD):
         # cutoff
         g.cutoff.input.structure = ip.structure
         g.cutoff.input.cutoff_factor = ip.cutoff_factor
-
-        # minimize_job
-        g.minimize_job.input.structure = ip.structure
-        g.minimize_job.input.ref_job_full_path = ip.ref_job_full_path
 
         # check_steps
         g.check_steps.input.target = gp.clock.output.n_counts[-1]
@@ -772,7 +758,7 @@ class HarmonicTILDParallel(HarmonicTILD):
         # run_lambda_points - harmonic
         g.run_lambda_points.direct.spring_constant = ip.spring_constant
         g.run_lambda_points.direct.force_constants = ip.force_constants
-        g.run_lambda_points.direct.eq_energy = gp.minimize_job.output.energy_pot[-1]
+        g.run_lambda_points.direct.eq_energy = ip.zero_k_energy
 
         # run_lambda_points - mix
         g.run_lambda_points.broadcast.coupling_weights = gp.build_lambdas.output.lambda_pairs[-1]
@@ -847,7 +833,6 @@ class HarmonicTILDParallel(HarmonicTILD):
         gp = Pointer(self.graph)
         o = Pointer(self.graph.run_lambda_points.output)
         return {
-            'eq_energy': ~gp.minimize_job.output.energy_pot[-1],
             'total_steps': ~o.total_steps[-1],
             'temperature_mean': ~o.temperature_mean[-1],
             'temperature_std': ~o.temperature_std[-1],
@@ -913,6 +898,7 @@ class VacancyTILD(_TILDParent):
         use_reflection (boolean): Turn on or off `SphereReflection` (Default is True.)
 
     Output attributes:
+        total_steps (list): The total number of steps for each integration point, up to convergence, or max steps.
         temperature_mean (list): Mean output temperature for each integration point.
         temperature_std (list): Standard deviation of the output temperature for each integration point.
         integrands_mean (list): Mean of the integrands from TILD.
@@ -1204,6 +1190,7 @@ class VacancyTILD(_TILDParent):
     def get_output(self):
         gp = Pointer(self.graph)
         return {
+            'total_steps': ~gp.reflect.output.total_steps[-1],
             'temperature_mean': ~gp.average_temp.output.mean[-1],
             'temperature_std': ~gp.average_temp.output.std[-1],
             'integrands_mean': ~gp.average_tild.output.mean[-1],
@@ -1457,8 +1444,6 @@ class VacancyTILDParallel(VacancyTILD):
             is 0.01 eV)
 
     Output attributes:
-        total_steps (list): The total number of steps up for each integration point, up to convergence, or max
-            steps.
 
     For inherited input and output attributes, refer the `HarmonicTILD` protocol.
     """
@@ -1782,7 +1767,6 @@ class VacancyFormation(VacancyTILDParallel):
         g.initial_forces = Zeros()
         g.initial_velocities = SerialList(RandomVelocity)
         g.cutoff = CutoffDistance()
-        g.minimize_job = MinimizeReferenceJob()
         g.check_steps = IsGEq()
         g.check_convergence = IsLEq()
         g.remove_jobs_inter = RemoveJob()
@@ -1810,7 +1794,6 @@ class VacancyFormation(VacancyTILDParallel):
             g.initial_forces,
             g.initial_velocities,
             g.cutoff,
-            g.minimize_job,
             g.check_steps, 'false',
             g.check_convergence, 'false',
             g.remove_jobs_inter,
@@ -1864,10 +1847,6 @@ class VacancyFormation(VacancyTILDParallel):
         # cutoff
         g.cutoff.input.structure = ip.structure
         g.cutoff.input.cutoff_factor = ip.cutoff_factor
-
-        # minimize_job
-        g.minimize_job.input.structure = ip.structure
-        g.minimize_job.input.ref_job_full_path = ip.ref_job_full_path
 
         # check_steps
         g.check_steps.input.target = gp.clock.output.n_counts[-1]
@@ -1943,7 +1922,7 @@ class VacancyFormation(VacancyTILDParallel):
         # run_harm_to_inter - harmonic
         g.run_harm_to_inter.direct.spring_constant = ip.spring_constant
         g.run_harm_to_inter.direct.force_constants = ip.force_constants_harm_to_inter
-        g.run_harm_to_inter.direct.eq_energy = gp.minimize_job.output.energy_pot[-1]
+        g.run_harm_to_inter.direct.eq_energy = ip.zero_k_energy
 
         # run_harm_to_inter - mix
         g.run_harm_to_inter.broadcast.coupling_weights = gp.build_lambdas_harm_to_inter.output.lambda_pairs[-1]

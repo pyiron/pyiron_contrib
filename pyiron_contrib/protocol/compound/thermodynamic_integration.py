@@ -385,7 +385,7 @@ class HarmonicTILD(_TILDParent):
         return {
             'temperature_mean': ~gp.average_temp.output.mean[-1],
             'temperature_std': ~gp.average_temp.output.std[-1],
-            'integrands_mean': ~gp.average_tild.output.mean[-1],
+            'integrands': ~gp.average_tild.output.mean[-1],
             'integrands_std': ~gp.average_tild.output.std[-1],
             'integrands_n_samples': ~gp.average_tild.output.n_samples[-1],
             'tild_free_energy_mean': ~gp.post.output.tild_free_energy_mean[-1],

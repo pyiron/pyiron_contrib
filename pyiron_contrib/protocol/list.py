@@ -173,12 +173,11 @@ class ParallelList(ListVertex):
         start_time = time.time()
         sleep_time = ~self.sleep_time
 
-        manager = Manager()
-        return_dict = manager.dict()
+        all_child_output = Manager().dict()
 
         jobs = []
         for i, child in enumerate(self.children):
-            job = Process(target=child.execute_parallel, args=(i, return_dict))
+            job = Process(target=child.execute_parallel, args=(i, all_child_output))
             job.start()
             time.sleep(sleep_time)
             jobs.append(job)
@@ -187,18 +186,18 @@ class ParallelList(ListVertex):
             job.join()
             time.sleep(sleep_time)
 
-        print(return_dict.keys())
+        print(all_child_output.keys())
 
-        rearranged_dict = dict.fromkeys(range(len(return_dict)))
-        for i in range(len(return_dict)):
-            rearranged_dict[i] = return_dict[i]
+        ordered_child_output = dict.fromkeys(range(len(all_child_output)))
+        for i in range(len(all_child_output)):
+            ordered_child_output[i] = all_child_output[i]
 
-        output_keys = list(rearranged_dict[0].keys())  # Assumes that all the children are the same...
+        output_keys = list(ordered_child_output[0].keys())  # Assumes that all the children are the same...
         if len(output_keys) > 0:
             output_data = {}
             for key in output_keys:
                 values = []
-                for child in rearranged_dict.values():
+                for child in ordered_child_output.values():
                     values.append(child[key])
                 output_data[key] = values
         else:

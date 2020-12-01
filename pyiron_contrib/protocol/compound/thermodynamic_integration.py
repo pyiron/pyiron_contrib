@@ -132,20 +132,6 @@ class HarmonicTILD(_TILDParent):
         fep_free_energy_std (float): Standard deviation calculated via free energy perturbation.
         fep_free_energy_se (float): Standard error calculated via free energy perturbation.
     """
-    # DefaultWhitelist sets the output which will be stored every `archive period' in the final hdf5 file.
-
-    # DefaultWhitelist = {
-    #     'reflect': {
-    #         'output': {
-    #             'positions': 1000,
-    #         },
-    #     },
-    #     'calc_static': {
-    #         'output': {
-    #             'energy_pot': 1,
-    #         },
-    #     },
-    # }
 
     def __init__(self, **kwargs):
         super(HarmonicTILD, self).__init__(**kwargs)

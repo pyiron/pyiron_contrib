@@ -83,16 +83,6 @@ class FTSEvolution(CompoundVertex):
         forces (list[numpy.ndarray]): Atomic forces in eV/angstrom for each centroid.
     """
 
-    # DefaultWhitelist sets the output which will be stored every `archive period' in the final hdf5 file.
-
-    # DefaultWhitelist = {
-    #     'calc_static_centroids': {
-    #         'output': {
-    #             'energy_pot': 1,
-    #         }
-    #     }
-    # }
-
     def __init__(self, **kwargs):
         super(FTSEvolution, self).__init__(**kwargs)
 
@@ -412,25 +402,15 @@ class FTSEvolution(CompoundVertex):
         return self._get_directional_barrier(frame=frame, anchor_element=-1, use_minima=use_minima)
 
     def get_barrier(self, frame=None, use_minima=True):
-        """
-        Get the energy barrier from the 0th image to the highest energy (saddle state).
-
-        Args:
-            frame (int): A particular dump. (Default is None, the final dump.)
-            use_minima (bool): Whether to use the minima of the energies to compute tha barrier. (Default is
-                False, use the 0th value.)
-
-        Returns:
-            (float): the migration barrier.
-        """
         return self.get_forward_barrier(frame=frame, use_minima=use_minima)
+    get_barrier.__doc__ = get_forward_barrier.__doc__
 
 
 class ProtocolFTSEvolution(Protocol, FTSEvolution):
     pass
 
 
-class ConstrainedMD(CompoundVertex):
+class _ConstrainedMD(CompoundVertex):
     """
     A sub-protocol for FTSEvolutionParallel for the evolution of each image. The MD is 'Constrained' as the atoms in
         the cells of each image evolve with the following constrains:
@@ -601,7 +581,7 @@ class FTSEvolutionParallel(FTSEvolution):
         g.check_steps = IsGEq()
         g.remove_images = RemoveJob()
         g.create_images = CreateJob()
-        g.constrained_evo = ParallelList(ConstrainedMD, sleep_time=ip.sleep_time)
+        g.constrained_evo = ParallelList(_ConstrainedMD, sleep_time=ip.sleep_time)
         g.check_thermalized = IsGEq()
         g.mix = CentroidsRunningAverageMix()
         g.smooth = CentroidsSmoothing()

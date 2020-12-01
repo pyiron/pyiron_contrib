@@ -60,16 +60,6 @@ class NEB(CompoundVertex):
 
     """
 
-    # DefaultWhitelist sets the output which will be stored every `archive period' in the final hdf5 file.
-
-    # DefaultWhitelist = {
-    #     'calc_static': {
-    #         'output': {
-    #             'energy_pot': 1,
-    #         },
-    #     },
-    # }
-
     def __init__(self, **kwargs):
         super(NEB, self).__init__(**kwargs)
 

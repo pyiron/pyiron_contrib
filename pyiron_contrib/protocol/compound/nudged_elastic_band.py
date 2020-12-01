@@ -206,7 +206,7 @@ class NEB(CompoundVertex):
 
         Args:
             frame (int): A particular dump. (Default is None, the final dump.)
-            use_minima (bool): Whether to use the minima of the energies to compute tha barrier. (Default is
+            use_minima (bool): Whether to use the minima of the energies to compute the barrier. (Default is
                 False, use the 0th value.)
 
         Returns:
@@ -220,7 +220,7 @@ class NEB(CompoundVertex):
 
         Args:
             frame (int): A particular dump. (Default is None, the final dump.)
-            use_minima (bool): Whether to use the minima of the energies to compute tha barrier. (Default is
+            use_minima (bool): Whether to use the minima of the energies to compute the barrier. (Default is
                 False, use the nth value.)
 
         Returns:

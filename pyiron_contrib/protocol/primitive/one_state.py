@@ -338,6 +338,8 @@ class CreateJob(ExternalHamiltonian):
     def __init__(self, name=None):
         super(CreateJob, self).__init__(name=name)
         self._fast_lammps_mode = True
+        self._project_path = None
+        self._job_names = None
         id_ = self.input.default
         id_.ref_job_full_path = None
         id_.n_images = 5
@@ -353,11 +355,26 @@ class CreateJob(ExternalHamiltonian):
                                       self._fast_lammps_mode, name)
             project_path.append(output[0])
             job_names.append(output[1])
+        self._project_path = project_path
+        self._job_names = job_names
 
         return {
             'project_path': project_path,
             'job_names': job_names
         }
+
+    def finish(self):
+        """
+        Close the interactive job.
+        """
+        super(CreateJob, self).finish()
+        if all(v is not None for v in [self._project_path, self._job_names]):
+            pr = Project(path=self._project_path[-1])
+            for jn in self._job_names:
+                job = pr.load(jn)
+                if isinstance(job, GenericInteractive):
+                    job.interactive_close()
+                    job.status.finished = True
 
 
 class MinimizeReferenceJob(ExternalHamiltonian):

@@ -579,23 +579,23 @@ class HarmonicHamiltonian(PrimitiveVertex):
         dr = structure.find_mic(positions - reference_positions)
         if spring_constant is not None and force_constants is None:
             if mask is not None:
-                energy = 0.5 * np.sum(spring_constant * dr[mask] * dr[mask])
                 forces = -spring_constant * dr[mask]
+                energy = -0.5 * np.dot(dr[mask], forces)
             else:
-                energy = 0.5 * np.sum(spring_constant * dr * dr)
                 forces = -spring_constant * dr
+                energy = -0.5 * np.dot(dr[mask], forces)
 
         elif force_constants is not None and spring_constant is None:
-            transformed_force_constants = self.transform_force_constants(force_constants)
+            transformed_force_constants = self.transform_force_constants(force_constants, len(structure.positions))
             transformed_displacements = self.transform_displacements(dr)
             transformed_forces = -np.dot(transformed_force_constants, transformed_displacements)
             retransformed_forces = self.retransform_forces(transformed_forces, dr)
             if mask is not None:
                 forces = retransformed_forces[mask]
-                energy = 0.5 * np.dot(-forces, dr[mask])
+                energy = -0.5 * np.dot(forces, dr[mask])
             else:
                 forces = retransformed_forces
-                energy = 0.5 * np.tensordot(-forces, dr)
+                energy = -0.5 * np.tensordot(forces, dr)
 
         else:
             raise TypeError('Please specify either a spring constant or the force constant matrix')
@@ -609,10 +609,18 @@ class HarmonicHamiltonian(PrimitiveVertex):
         }
 
     @staticmethod
-    def transform_force_constants(force_constants):
+    def transform_force_constants(force_constants, n_atoms):
         force_shape = np.shape(force_constants)
-        force_reshape = force_shape[0] * force_shape[2]
-        return np.transpose(force_constants, (0, 2, 1, 3)).reshape((force_reshape, force_reshape))
+        if force_shape[2] == 3 and force_shape[3] == 3:
+            force_reshape = force_shape[0] * force_shape[2]
+            transformed_force_constants = np.transpose(
+                force_constants,
+                (0, 2, 1, 3)
+            ).reshape((force_reshape, force_reshape))
+        elif force_shape[1] == 3 and force_shape[3] == 3:
+            transformed_force_constants = np.array(force_constants).reshape(3 * n_atoms, 3 * n_atoms)
+
+        return transformed_force_constants
 
     @staticmethod
     def transform_displacements(displacements):

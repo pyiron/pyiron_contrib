@@ -1588,7 +1588,7 @@ class VacancyTILDParallel(VacancyTILD):
         g.run_lambda_points.broadcast.forces = gp.run_lambda_points.output.forces[-1]
 
         # run_lambda_points - reflect
-        g.run_lambda_points.direct.default.total_steps = ip.total_steps
+        g.run_lambda_points.direct.default.total_steps = ip._total_steps
         g.run_lambda_points.broadcast.total_steps = gp.run_lambda_points.output.total_steps[-1]
         g.run_lambda_points.direct.cutoff_distance = gp.cutoff.output.cutoff_distance[-1]
         g.run_lambda_points.direct.use_reflection = ip.use_reflection

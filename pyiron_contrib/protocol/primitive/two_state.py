@@ -97,9 +97,9 @@ class AnyVertex(BoolVertex):
         for i in vertices:
             if isinstance(i, PrimitiveVertex):
                 if i.vertex_state == "true":
-                    bool_list.append(1)
+                    bool_list.append(True)
                 else:
-                    bool_list.append(0)
+                    bool_list.append(False)
             else:
                 raise TypeError(str(i) + ' is not an instance of PrimitiveVertex.')
 

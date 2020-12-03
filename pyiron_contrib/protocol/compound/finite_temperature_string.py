@@ -344,12 +344,15 @@ class FTSEvolution(CompoundVertex):
 
     def plot_string(self, ax=None, frame=None, plot_kwargs=None):
         """
-        Plot the string at an input frame. Here, frame is a dump of a step in the run. The number of dumps
-            can be specified by the user while submitting the job, as:
+        Plot the string at an input frame. Here, frame is a dump of a step in the run. If `fts_job´ is the name
+            of the fts job, the number of dumps can be specified by the user while submitting the job, as:
 
-        <job_name>.set_output_whitelist(**{'calc_static_centroids': {'energy_pot': <dump every these many steps>}}).
+        >>> fts_job.set_output_whitelist(**{'calc_static_centroids': {'energy_pot': 20}})
 
-            Default is plot the string at the final frame, as only the final dump is recorded (unless specified
+        and run the job. Here, it dumps (or records a frame) of `energy_pot´ from the `calc_static_centroids´ vertex
+            once every 20 steps.
+
+        Default is plot the string at the final frame, as only the final dump is recorded. (unless specified
             otherwise by the user!)
         """
         if ax is None:

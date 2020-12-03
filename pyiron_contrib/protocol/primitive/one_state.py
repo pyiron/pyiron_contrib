@@ -1522,7 +1522,8 @@ class BerendsenBarostat(PrimitiveVertex):
         energy_kin (float): The kinetic energy of the system in eV (Default is None)
         time_step (float): MD time step in fs. (Default is 1 fs.)
         pressure_damping_timescale (float): Damping timescale in fs. (Default is None, no barostat is used.)
-        compressibility (float): The compressibility of water in bar-1 (Default is 4.57e-5 bar-1)
+        compressibility (float): The compressibility of water in bar-1. More information here:
+            http://www.sklogwiki.org/SklogWiki/index.php/Berendsen_barostat (Default is 4.57e-5 bar-1)
         structure (Atoms): The structure whose cell and positions are to be scaled.
         positions (numpy.ndarray): The updated positions from `VerletPositionUpdate`.
         previous_volume (float): The volume of the cell from the previous step in Ang3 (Default is None)

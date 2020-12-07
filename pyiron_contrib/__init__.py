@@ -13,6 +13,7 @@ JOB_CLASS_DICT['ProtocolHarmonicTILD'] = 'pyiron_contrib.protocol.compound.tild'
 JOB_CLASS_DICT['ProtocolHarmonicTILDParallel'] = 'pyiron_contrib.protocol.compound.tild'
 JOB_CLASS_DICT['ImageJob'] = 'pyiron_contrib.image.job'
 JOB_CLASS_DICT['RandSpg'] = 'pyiron_contrib.atomistic.atomistics.structures.randspg'
+JOB_CLASS_DICT['fenics'] = 'pyiron_contrib.continuum.FEniCS.fenics_job'
 
 from ._version import get_versions
 

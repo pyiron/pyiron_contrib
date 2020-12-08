@@ -200,8 +200,9 @@ class fenics(PythonTemplateJob):
         return FEN.dx
     
 
-    #def define_expression(expression,dictionary):
-
+    def Expression(self,*args, **kwargs):
+        return FEN.Expression(*args, **kwargs)
+        
 
     def mesh_gen_default(self, intervals, typ='P', order=1):
         """

@@ -1,7 +1,5 @@
 from __future__ import print_function
-import matplotlib.pyplot as plt
 import mshr as mshr
-import fenics as FEN
 from pyiron_base import PythonTemplateJob
 
 

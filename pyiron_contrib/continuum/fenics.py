@@ -166,10 +166,10 @@ class Fenics(GenericJob):
         self.status.running = True
         self._u = FEN.Function(self.V)
         FEN.solve(self.LHS == self.RHS, self.u, self.BC)
-        self.collect_output()
+        self.status.collect = True
+        self.run()
 
     def collect_output(self):
-        self.status.collect = True
         self.output.u = self.u.compute_vertex_values(self.mesh)
         self.write_vtk()
         self.to_hdf()

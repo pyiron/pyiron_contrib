@@ -4,38 +4,40 @@ import mshr as mshr
 import fenics as FEN
 from pyiron_base import PythonTemplateJob
 
+
 class fenics(PythonTemplateJob):
     def __init__(self, project, job_name):
         super(fenics, self).__init__(project, job_name)
-        self.input['LHS']= '' ## the left hand side of the equation; FEniCS function
-        self.input['RHS'] = '' ## the right hand side of the equation; FEniCS function
-        self._LHS=None 
-        self._RHS=None
-        self.input['vtk_filename']=project.name+'/output.pvd'
+        self.input['LHS'] = ''  # the left hand side of the equation; FEniCS function
+        self.input['RHS'] = ''  # the right hand side of the equation; FEniCS function
+        self._LHS = None
+        self._RHS = None
+        self.input['vtk_filename'] = project.name+'/output.pvd'
         self._vtk_filename = str(job_name)+'/output.pvd'
         self.input['mesh'] = None
         self._mesh = None
         self._BC = None
-        self.input['BC']=None
-        self.input['V']=None ## finite element volume space
+        self.input['BC'] = None
+        self.input['V'] = None  # finite element volume space
         self._V = None
-        self._u = None # u is the unkown function 
-        self._v = None # the test function
+        self._u = None  # u is the unkown function
+        self._v = None  # the test function
         self.input['u']
         self.input['v'] 
-        self._domain = None ## the domain
-
+        self._domain = None  # the domain
 
     @property
     def domain(self):
         return self._domain
+
     @domain.setter
     def domain(self, dmn):
         self._domain = dmn
 
     @property
     def RHS(self):
-        return self._RHS  
+        return self._RHS
+
     @RHS.setter
     def RHS(self, expression):
         self.input['RHS'] = expression
@@ -108,7 +110,7 @@ class fenics(PythonTemplateJob):
         """
         return a spatial point as fenics object, based on the given coordinate
         """
-        return FEN.Point(x,y)
+        return FEN.Point(x, y)
 
     def grad(self, arg):
         """
@@ -116,19 +118,18 @@ class fenics(PythonTemplateJob):
         """
         return FEN.grad(arg)
 
-    def Circle(self,center, rad):
+    def Circle(self, center, rad):
         """
         create a mesh on a circular domain with a radius equal to rad
         """
         return mshr.Circle(center, rad)
     
-    def dxProd(self,A):
+    def dxProd(self, A):
         """
         It returns the product of A and dx
         Here dx is an object from FEniCS library.
         """
         return A*FEN.dx
-
 
     def generate_mesh(self, typ, order, resolution):
         """
@@ -145,7 +146,6 @@ class fenics(PythonTemplateJob):
         self.input['V'] = self._V
         self._u = FEN.TrialFunction(self._V)
         self._v = FEN.TestFunction(self._V)
-        
 
     def FunctionSpace(self, typ, order):
         """
@@ -164,7 +164,6 @@ class fenics(PythonTemplateJob):
         value (float), is the value for the constant function.
         """
         return FEN.Constant(value)
-    
 
     def DirichletBC(self, expression, boundary):
         """
@@ -198,11 +197,9 @@ class fenics(PythonTemplateJob):
         It returns the FEniCS dx object.
         """
         return FEN.dx
-    
 
-    def Expression(self,*args, **kwargs):
+    def Expression(self, *args, **kwargs):
         return FEN.Expression(*args, **kwargs)
-        
 
     def mesh_gen_default(self, intervals, typ='P', order=1):
         """
@@ -217,13 +214,11 @@ class fenics(PythonTemplateJob):
         self._u = FEN.TrialFunction(self._V)
         self._v = FEN.TestFunction(self._V)
 
-
-    def BC_default(self,x,on_boundary):
+    def BC_default(self, x, on_boundary):
         """
         return the geometrical boundary 
         """
         return on_boundary
-
 
     def write_vtk(self):
         """
@@ -237,20 +232,20 @@ class fenics(PythonTemplateJob):
         solve a PDE based on 'LHS=RHS' using u and v as trial and test function respectively
         u is the desired unknown and RHS is the known part.
         """
-        if self._mesh == None:
+        if self._mesh is None:
             print("Fatal error: no mesh is defined")
-        if self._RHS == None:
+        if self._RHS is None:
             print("Fatal error: the bilinear form (RHS) is not defined")
-        if self._LHS == None:
+        if self._LHS is None:
             print("Fatal error: the linear form (LHS) is not defined")
-        if self._V == None:
+        if self._V is None:
             print("Fatal error: the volume is not defined; no V defined")
-        if self._BC == None:
+        if self._BC is None:
             print("Fatal error: the BC is not defined")
         self._u = FEN.Function(self._V)
         FEN.solve(self._LHS == self._RHS, self._u, self._BC)
-        with self.project_hdf5.open("output/generic") as h5out: 
-             h5out["u"] = self._u.compute_vertex_values(self._mesh)
+        with self.project_hdf5.open("output/generic") as h5out:
+            h5out["u"] = self._u.compute_vertex_values(self._mesh)
         self.write_vtk()
         self.status.finished = True
     
@@ -259,10 +254,9 @@ class fenics(PythonTemplateJob):
         plots the unknown u.
         """
         FEN.plot(self._u)
-        #FEN.plot(self._mesh)
+
     def plot_mesh(self):
         """
         plots the mesh.
         """
         FEN.plot(self._mesh)
-        #FEN.plot(self._mesh)

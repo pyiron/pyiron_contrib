@@ -1,5 +1,6 @@
 from __future__ import print_function
-import mshr as mshr
+import fenics as FEN
+import mshr
 from pyiron_base import PythonTemplateJob
 
 

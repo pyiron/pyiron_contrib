@@ -6,6 +6,10 @@ from pyiron_base import PythonTemplateJob
 
 
 class fenics(PythonTemplateJob):
+    """
+    A job class for using the FEniCS library to solve a finite element method (FEM) problem.
+    """
+
     def __init__(self, project, job_name):
         super(fenics, self).__init__(project, job_name)
         self.input['LHS'] = ''  # the left hand side of the equation; FEniCS function
@@ -108,39 +112,40 @@ class fenics(PythonTemplateJob):
 
     def point(self, x, y):
         """
-        return a spatial point as fenics object, based on the given coordinate
+        Returns a spatial point as fenics object, based on the given coordinate.
         """
         return FEN.Point(x, y)
 
     def grad(self, arg):
         """
-        it return gradient of a given argument.
+        Returns the gradient of the given argument.
         """
         return FEN.grad(arg)
 
     def Circle(self, center, rad):
         """
-        create a mesh on a circular domain with a radius equal to rad
+        Create a mesh on a circular domain with a radius equal to rad.
         """
         return mshr.Circle(center, rad)
     
     def dxProd(self, A):
         """
-        It returns the product of A and dx
-        Here dx is an object from FEniCS library.
+        Returns the product of A and the FEniCS library's dx object.
         """
         return A*FEN.dx
 
     def generate_mesh(self, typ, order, resolution):
         """
-        This function generate the mesh based on the resolution and the job.domain
-        Additionally, it creates the finite element volume "V" with the given type and order
-        Moreover, the u (unknown function) and v (the test function) is initialized here.
-        Arguments:
-        type (str) and order (int) are the order and type of element
-        resolution (int) is the resolution of the mesh 
+        Generate a mesh based on the resolution and the job's `domain` attribute and assigns it to the `mesh` attribute.
+        Additionally, it creates and assigns as an attribute the finite element volume `V` with the given type and
+        order, as well as the unknown trial function `u` and test function `v`.
+
+        Args:
+            type (str): Type of the elements making up the mesh.
+            order (int): Order of the elements.
+            resolution (int): Controls how fine/coarse the mesh is.
         """
-        self._mesh = mshr.generate_mesh(self._domain,resolution)
+        self._mesh = mshr.generate_mesh(self._domain, resolution)
         self.input['mesh'] = self._mesh
         self._V = FEN.FunctionSpace(self._mesh, typ, order)
         self.input['V'] = self._V
@@ -149,52 +154,59 @@ class fenics(PythonTemplateJob):
 
     def FunctionSpace(self, typ, order):
         """
-        this function defines the volume function.
-        typ (string), defines the type of the element; e.g. 'p' refers to langrangian element; 
-                    for further information look at https://fenicsproject.org/pub/graphics/fenics-femtable-cards.pdf  
-        order (int), defines the order of the element.
-                    for further information look at https://fenicsproject.org/pub/graphics/fenics-femtable-cards.pdf  
+        Returns the volume function using the current mesh.
+
+        Args:
+            typ (string): The type of the element; e.g. 'p' refers to langrangian element. For further information see
+                https://fenicsproject.org/pub/graphics/fenics-femtable-cards.pdf
+            order (int): The order of the element. For further information see
+                https://fenicsproject.org/pub/graphics/fenics-femtable-cards.pdf
         """
         return FEN.FunctionSpace(self._mesh, typ, order)
 
     def Constant(self, value):
         """
-        returns the constant value as a function.
-        Arges:
-        value (float), is the value for the constant function.
+        Wraps a value as a fenics constant.
+
+        Args:
+            value (float): The value to wrap.
+
+        Returns:
+            fenics.Constant: The wrapped value.
         """
         return FEN.Constant(value)
 
     def DirichletBC(self, expression, boundary):
         """
-        This function defines Drichlet boundary condition based on the given expression on the boundary
+        This function defines Drichlet boundary condition based on the given expression on the boundary.
+
         Args:
-        expression (string) is the expression used to evaluate the value of the unknown on the boundary
-        boundary (boundary object from FEniCS module) is the spatial boundary, which the condition will be applied to
+            expression (string): The expression used to evaluate the value of the unknown on the boundary.
+            boundary (fenics.DirichletBC): The spatial boundary, which the condition will be applied to.
         """
         return FEN.DirichletBC(self._V, expression, boundary)
 
     def TrialFunction(self):
         """
-        It returns a FEniCS trial function
+        Returns a FEniCS trial function
         """
         return FEN.TrialFunction(self._V)
     
     def TestFunction(self):
         """
-        It returns a FEniCS test function
+        Returns a FEniCS test function
         """
         return FEN.TestFunction(self._V)
     
     def dot(self, arg1, arg2):
         """
-        It returns the dot product between the FEniCS objects. 
+        Returns the dot product between the FEniCS objects.
         """
         return FEN.dot(arg1, arg2)
     
     def dx(self):
         """
-        It returns the FEniCS dx object.
+        Returns the FEniCS dx object.
         """
         return FEN.dx
 
@@ -203,11 +215,18 @@ class fenics(PythonTemplateJob):
 
     def mesh_gen_default(self, intervals, typ='P', order=1):
         """
-        creates a square with sides of 1, divided by the given intervals
-        By default the type of the volume associated with the mesh
-        is considered to be Lagrangian, with order 1.
+        Sets the mesh to a unit square (i.e. side length=1), updating the volume (`V`), and trial (`u`) and test (`v`)
+        functions accordingly.
+
+        Args:
+            intervals (int): The number of squares on the mesh in each direction.
+            typ (string): The type of the element; e.g. 'p' refers to langrangian element. (Default is 'P', i.e.
+                Lagrangian.)For further information see
+                https://fenicsproject.org/pub/graphics/fenics-femtable-cards.pdf.
+            order (int): The order of the element. (Default is 1.) For further information see
+                https://fenicsproject.org/pub/graphics/fenics-femtable-cards.pdf.
         """
-        self._mesh = FEN.UnitSquareMesh(intervals,intervals) 
+        self._mesh = FEN.UnitSquareMesh(intervals, intervals)
         self.input['mesh'] = self._mesh
         self._V = FEN.FunctionSpace(self._mesh, typ, order)
         self.input['V'] = self._V
@@ -216,21 +235,21 @@ class fenics(PythonTemplateJob):
 
     def BC_default(self, x, on_boundary):
         """
-        return the geometrical boundary 
+        Returns the geometrical boundary.
         """
         return on_boundary
 
     def write_vtk(self):
         """
-        write the output to a .vtk file
+        Write the output to a .vtk file.
         """
         vtkfile = FEN.File(self._vtk_filename)
         vtkfile << self._u
 
     def run_static(self):
         """
-        solve a PDE based on 'LHS=RHS' using u and v as trial and test function respectively
-        u is the desired unknown and RHS is the known part.
+        Solve a PDE based on 'LHS=RHS' using u and v as trial and test function respectively. Here, u is the desired
+        unknown and RHS is the known part.
         """
         if self._mesh is None:
             print("Fatal error: no mesh is defined")
@@ -251,12 +270,12 @@ class fenics(PythonTemplateJob):
     
     def plot_u(self):
         """
-        plots the unknown u.
+        Plots the unknown u.
         """
         FEN.plot(self._u)
 
     def plot_mesh(self):
         """
-        plots the mesh.
+        Plots the mesh.
         """
         FEN.plot(self._mesh)

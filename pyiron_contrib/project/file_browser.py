@@ -15,15 +15,14 @@ from pyiron_contrib.generic.data import Data
 
 
 class DisplayFile:
-    """
-        Class to display a file located at path in the given outwidget
-    """
+    """  Class to display a file located at path in the given outwidget    """
     def __init__(self, file, outwidget):
         """
             Class to display different files in a notebook
+
             Args:
                 file (str/None): path to the file to be displayed.
-                outwidget (`ipywidgets.Output` widget): Will be used to display the file.
+                outwidget (:class:`ipywidgets.Output` widget): Will be used to display the file.
         """
         self.output = outwidget
         self.fig = None
@@ -34,6 +33,10 @@ class DisplayFile:
     def display_file(self, file, outwidget=None):
         """
             Display the file in the outwidget
+
+            Args:
+                file (str): path to the file to be displayed.
+                outwidget (:class:`ipywidgets.Output` widget / None): New output widget to be used to display the file.
         """
         if outwidget is not None:
             self.output = outwidget
@@ -86,12 +89,33 @@ class DisplayFile:
 
 
 class DisplayMetadata:
-    def __init__(self, metadata, outwidget):
-        self.metadata = metadata
-        self.output = outwidget
-        self.display()
+    def __init__(self, metadata=None, outwidget):
+        """
+            Display the metadata in the outwidget
 
-    def display(self):
+            Args:
+                metadata (dict/None): Metadata to be displayed.
+                outwidget (:class:`ipywidgets.Output` widget): New output widget to be used to display the metadata.
+        """
+        self.output = outwidget
+        self.metadata = metadata
+        if metadata is not None:
+            self._display_metadata()
+
+    def display(self, metadata, outwidget=None):
+        """
+            Display the metadata in the outwidget
+
+            Args:
+                metadata (dict): Metadata to be displayed.
+                outwidget (:class:`ipywidgets.Output` widget / None): New output widget to be used to display the metadata.
+        """
+        self.metadata = metadata
+        if outwidget is not None:
+            self.output = outwidget
+        self._display_metadata()
+
+    def _display_metadata(self):
         with self.output:
             print("Metadata:")
             print("------------------------")
@@ -150,6 +174,7 @@ class _FileBrowser:
             self.path = self.s3path
         self.output = widgets.Output(layout=widgets.Layout(width='50%', height='100%'))
         self._display_file = DisplayFile(file=None, outwidget=self.output).display_file
+        self._display_metadata = DisplayMetadata(metadata=None, outwidget=self.output).display
         self._clickedFiles = []
         self._data = []
         self.fix_storage_sys = fix_storage_sys
@@ -549,7 +574,7 @@ class _FileBrowser:
                     print(self._h5_access[b.description])
             else:
                 metadata = self._s3_access.get_metadata(f, abspath=True)
-                DisplayMetadata(metadata, self.output)
+                self._display_metadata(metadata)
             if f in self._clickedFiles:
                 b.style.button_color = file_color
                 self._clickedFiles.remove(f)

@@ -1,7 +1,25 @@
-from __future__ import print_function
+# coding: utf-8
+# Copyright (c) Max-Planck-Institut für Eisenforschung GmbH - Computational Materials Design (CM) Department
+# Distributed under the terms of "New BSD License", see the LICENSE file.
+
+"""
+A job class for performing finite element simulations using the [FEniCS](https://fenicsproject.org) code.
+"""
+
 import fenics as FEN
 import mshr
 from pyiron_base import PythonTemplateJob
+
+__author__ = "Muhammad Hassani, Liam Huber"
+__copyright__ = (
+    "Copyright 2020, Max-Planck-Institut für Eisenforschung GmbH - "
+    "Computational Materials Design (CM) Department"
+)
+__version__ = "0.1"
+__maintainer__ = "Muhammad Hassani"
+__email__ = "hassani@mpie.de"
+__status__ = "development"
+__date__ = "Dec 6, 2020"
 
 
 class Fenics(PythonTemplateJob):

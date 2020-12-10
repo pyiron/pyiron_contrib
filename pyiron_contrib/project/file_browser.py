@@ -15,7 +15,7 @@ from pyiron_contrib.generic.data import Data
 
 
 class DisplayFile:
-    """  Class to display a file located at path in the given outwidget    """
+    """  Class to display a file located at path in the given outwidget   """
     def __init__(self, file, outwidget):
         """
             Class to display different files in a notebook
@@ -27,8 +27,9 @@ class DisplayFile:
         self.output = outwidget
         self.fig = None
         self.ax = None
+        self.file = file
         if file is not None:
-            self.display_file(file)
+            self._display_file()
 
     def display_file(self, file, outwidget=None):
         """
@@ -41,7 +42,10 @@ class DisplayFile:
         if outwidget is not None:
             self.output = outwidget
         self.file = file
-        _, filetype = os.path.splitext(file)
+        self._display_file()
+
+    def _display_file(self):
+        _, filetype = os.path.splitext(self.file)
         if filetype.lower() in ['.tif', '.tiff']:
             self._display_tiff()
         elif filetype.lower() in ['.jpg', '.jpeg', '.png', '.gif']:
@@ -89,7 +93,7 @@ class DisplayFile:
 
 
 class DisplayMetadata:
-    def __init__(self, metadata=None, outwidget):
+    def __init__(self, metadata, outwidget):
         """
             Display the metadata in the outwidget
 
@@ -121,7 +125,6 @@ class DisplayMetadata:
             print("------------------------")
             for key, value in self.metadata.items():
                 print(key + ': ' + value)
-
 
 
 class _FileBrowser:

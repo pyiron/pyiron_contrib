@@ -8,7 +8,7 @@ A job class for performing finite element simulations using the [FEniCS](https:/
 
 import fenics as FEN
 import mshr
-from pyiron_base import GenericJob, InputList
+from pyiron_base import GenericJob, InputList, PyironFactory
 from os.path import join
 
 __author__ = "Muhammad Hassani, Liam Huber"
@@ -43,6 +43,7 @@ class Fenics(GenericJob):
         self.u = None  # u is the unkown function
         self.v = None  # the test function
         self.domain = None  # the domain
+        self.create = Creator(self)
 
     def point(self, x, y):
         """
@@ -228,3 +229,27 @@ class Fenics(GenericJob):
         super().from_hdf(hdf=hdf, group_name=group_name)
         self.input.from_hdf(hdf=self.project_hdf5)
         self.output.from_hdf(hdf=self.project_hdf5)
+
+
+class Creator:
+    def __init__(self, job):
+        self._job = job
+        self._domain = DomainFactory()
+
+    @property
+    def domain(self):
+        return self._domain
+
+
+class DomainFactory(PyironFactory):
+
+    def circle(self, center, radius):
+        return mshr.Circle(FEN.Point(*center), radius)
+    circle.__doc__ = mshr.Circle.__doc__
+
+    def square(self, length):
+        return mshr.Rectangle(length, length)
+    square.__doc__ = mshr.Rectangle.__doc__
+
+    def __call__(self):
+        return self.square(1.)

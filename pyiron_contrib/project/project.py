@@ -3,7 +3,8 @@ from pyiron import Project as ProjectCore
 from pyiron_contrib.project.file_browser import FileBrowser
 
 class Project(ProjectCore):
-    """     Basically a wrapper of Project from pyiron_base to extend for metadata     """
+
+    """ Basically a wrapper of Project from pyiron_base to extend for metadata. """
     def __init__(self, path="", user=None, sql_query=None, default_working_directory=False):
         super().__init__(path=path,
                          user=user,

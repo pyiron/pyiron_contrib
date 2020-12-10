@@ -49,7 +49,7 @@ class FileS3IO(object):
         return self._group
 
     def print_bucket_info(self):
-        """ Print name of the associated bucket.        """
+        """ Print name of the associated bucket. """
         print('Bucket name: {}'.format(self._bucket.name))
 
     def list_groups(self):
@@ -343,11 +343,11 @@ class FileS3IO(object):
                     print('\t Deleted: {}'.format(deleted['Key']))
 
     def __enter__(self):
-        """         Compatibility function for the with statement.         """
+        """ Compatibility function for the with statement."""
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """         Compatibility function for the with statement.         """
+        """ Compatibility function for the with statement."""
         self.close()
 
     def __repr__(self):

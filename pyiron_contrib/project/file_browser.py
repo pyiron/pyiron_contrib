@@ -15,10 +15,11 @@ from pyiron_contrib.generic.data import Data
 
 
 class DisplayFile:
-    """  Class to display a file located at path in the given outwidget   """
+
+    """ Class to display a file in the given outwidget. """
     def __init__(self, file, outwidget):
         """
-            Class to display different files in a notebook
+            Class to display different files in a notebook.
 
             Args:
                 file (str/None): path to the file to be displayed.
@@ -33,7 +34,7 @@ class DisplayFile:
 
     def display_file(self, file, outwidget=None):
         """
-            Display the file in the outwidget
+            Display the file in the outwidget,
 
             Args:
                 file (str): path to the file to be displayed.
@@ -93,9 +94,11 @@ class DisplayFile:
 
 
 class DisplayMetadata:
+
+    """ Class to display metadata of a file in the given outwidget. """
     def __init__(self, metadata, outwidget):
         """
-            Display the metadata in the outwidget
+            Display the metadata in the outwidget.
 
             Args:
                 metadata (dict/None): Metadata to be displayed.

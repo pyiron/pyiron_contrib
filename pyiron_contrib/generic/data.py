@@ -6,10 +6,12 @@ from PIL import Image
 
 
 class Data:
-    """ Data stores an instance of a data file, e.g. a single Image from a measurement  """
+
+    """ Data stores an instance of a data file, e.g. a single Image from a measurement """
     def __init__(self, source=None, data=None, filename=None, metadata=None, filetype=None, storedata=False):
         """
             Data class to store data and associated metadata.
+
             Args:
                 source (str/None): path to the data file
                 data (object/None): object containing data
@@ -61,7 +63,7 @@ class Data:
 
     def data_as_np_array(self):
         """
-        returns the data converted to a numpy array if conversion is known for the given filetype.
+        Returns the data converted to a numpy array if conversion is known for the given filetype.
         Otherwise returns None.
         """
         if self.filetype.upper() in ["TIF", "TIFF"]:

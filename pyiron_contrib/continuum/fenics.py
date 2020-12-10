@@ -8,7 +8,7 @@ A job class for performing finite element simulations using the [FEniCS](https:/
 
 import fenics as FEN
 import mshr
-from pyiron_base import GenericJob, GenericParameters
+from pyiron_base import GenericJob, InputList
 from os.path import join
 
 __author__ = "Muhammad Hassani, Liam Huber"
@@ -30,104 +30,19 @@ class Fenics(GenericJob):
 
     def __init__(self, project, job_name):
         super(Fenics, self).__init__(project, job_name)
-        self.input = GenericParameters(table_name="input")
         self._python_only_job = True
-        self.input['LHS'] = ''  # the left hand side of the equation; FEniCS function
-        self.input['RHS'] = ''  # the right hand side of the equation; FEniCS function
-        self._LHS = None
-        self._RHS = None
+        self.input = InputList(table_name='input')
+        self.output = InputList(table_name='output')
+        self.LHS = None  # the left hand side of the equation; FEniCS function
+        self.RHS = None  # the right hand side of the equation; FEniCS function
         self._vtk_filename = join(self.project_hdf5.path, 'output.pvd')
-        self.input['mesh'] = None
-        self._mesh = None
-        self._BC = None
-        self.input['BC'] = None
-        self.input['V'] = None  # finite element volume space
-        self._V = None
-        self._u = None  # u is the unkown function
-        self._v = None  # the test function
-        self.input['u']
-        self.input['v'] 
-        self._domain = None  # the domain
-
-    @property
-    def domain(self):
-        return self._domain
-
-    @domain.setter
-    def domain(self, dmn):
-        self._domain = dmn
-
-    @property
-    def RHS(self):
-        return self._RHS
-
-    @RHS.setter
-    def RHS(self, expression):
-        self.input['RHS'] = expression
-        self._RHS = expression
-
-    @property
-    def mesh(self):
-        return self._mesh
-    
-    @mesh.setter
-    def mesh(self, mesh):
-        self.input['mesh'] = mesh
-        self._mesh = mesh
-        
-    @property
-    def V(self):
-        return self._V
-    
-    @V.setter
-    def V(self, vol):
-        self.input['V'] = vol
-        self._V = vol
-
-    @property
-    def u(self):
-        return self._u
-    
-    @u.setter
-    def u(self, exp):
-        self.input['u'] = exp
-        self._u = exp
-    
-    @property
-    def v(self):
-        return self._v
-    
-    @v.setter
-    def v(self, exp):
-        self.input['v'] = exp
-        self._v = exp
-    
-    @property
-    def BC(self):
-        return self._BC
-    
-    @BC.setter
-    def BC(self, boundary):
-        self.input['BC'] = boundary
-        self._BC = boundary
-
-    @property
-    def LHS(self):
-        return self._LHS
-    
-    @LHS.setter
-    def LHS(self, expression):
-        self.input['LHS'] = expression
-        self._LHS = expression
-
-    @property
-    def vtk_filename(self):
-        return self.input['vtk_filename']
-    
-    @vtk_filename.setter
-    def vtk_filename(self, filename):
-        self.input['vtk_filename'] = filename
-        self._vtk_filename = filename
+        self.mesh = None
+        self.mesh = None
+        self.BC = None
+        self.V = None  # finite element volume space
+        self.u = None  # u is the unkown function
+        self.v = None  # the test function
+        self.domain = None  # the domain
 
     def point(self, x, y):
         """
@@ -164,12 +79,10 @@ class Fenics(GenericJob):
             order (int): Order of the elements.
             resolution (int): Controls how fine/coarse the mesh is.
         """
-        self._mesh = mshr.generate_mesh(self._domain, resolution)
-        self.input['mesh'] = self._mesh
-        self._V = FEN.FunctionSpace(self._mesh, typ, order)
-        self.input['V'] = self._V
-        self._u = FEN.TrialFunction(self._V)
-        self._v = FEN.TestFunction(self._V)
+        self.mesh = mshr.generate_mesh(self.domain, resolution)
+        self.V = FEN.FunctionSpace(self.mesh, typ, order)
+        self.u = FEN.TrialFunction(self.V)
+        self.v = FEN.TestFunction(self.V)
 
     def FunctionSpace(self, typ, order):
         """
@@ -181,7 +94,7 @@ class Fenics(GenericJob):
             order (int): The order of the element. For further information see
                 https://fenicsproject.org/pub/graphics/fenics-femtable-cards.pdf
         """
-        return FEN.FunctionSpace(self._mesh, typ, order)
+        return FEN.FunctionSpace(self.mesh, typ, order)
 
     def Constant(self, value):
         """
@@ -203,19 +116,19 @@ class Fenics(GenericJob):
             expression (string): The expression used to evaluate the value of the unknown on the boundary.
             boundary (fenics.DirichletBC): The spatial boundary, which the condition will be applied to.
         """
-        return FEN.DirichletBC(self._V, expression, boundary)
+        return FEN.DirichletBC(self.V, expression, boundary)
 
     def TrialFunction(self):
         """
         Returns a FEniCS trial function
         """
-        return FEN.TrialFunction(self._V)
+        return FEN.TrialFunction(self.V)
     
     def TestFunction(self):
         """
         Returns a FEniCS test function
         """
-        return FEN.TestFunction(self._V)
+        return FEN.TestFunction(self.V)
     
     def dot(self, arg1, arg2):
         """
@@ -245,12 +158,12 @@ class Fenics(GenericJob):
             order (int): The order of the element. (Default is 1.) For further information see
                 https://fenicsproject.org/pub/graphics/fenics-femtable-cards.pdf.
         """
-        self._mesh = FEN.UnitSquareMesh(intervals, intervals)
-        self.input['mesh'] = self._mesh
-        self._V = FEN.FunctionSpace(self._mesh, typ, order)
-        self.input['V'] = self._V
-        self._u = FEN.TrialFunction(self._V)
-        self._v = FEN.TestFunction(self._V)
+        self.mesh = FEN.UnitSquareMesh(intervals, intervals)
+        self.input['mesh'] = self.mesh
+        self.V = FEN.FunctionSpace(self.mesh, typ, order)
+        self.input['V'] = self.V
+        self.u = FEN.TrialFunction(self.V)
+        self.v = FEN.TestFunction(self.V)
 
     def BC_default(self, x, on_boundary):
         """
@@ -263,54 +176,48 @@ class Fenics(GenericJob):
         Write the output to a .vtk file.
         """
         vtkfile = FEN.File(self._vtk_filename)
-        vtkfile << self._u
+        vtkfile << self.u
 
     def run_static(self):
         """
         Solve a PDE based on 'LHS=RHS' using u and v as trial and test function respectively. Here, u is the desired
         unknown and RHS is the known part.
         """
-        if self._mesh is None:
+        if self.mesh is None:
             print("Fatal error: no mesh is defined")
-        if self._RHS is None:
+        if self.RHS is None:
             print("Fatal error: the bilinear form (RHS) is not defined")
-        if self._LHS is None:
+        if self.LHS is None:
             print("Fatal error: the linear form (LHS) is not defined")
-        if self._V is None:
+        if self.V is None:
             print("Fatal error: the volume is not defined; no V defined")
-        if self._BC is None:
+        if self.BC is None:
             print("Fatal error: the BC is not defined")
-        self._u = FEN.Function(self._V)
-        FEN.solve(self._LHS == self._RHS, self._u, self._BC)
-        with self.project_hdf5.open("output/generic") as h5out:
-            h5out["u"] = self._u.compute_vertex_values(self._mesh)
+        self.u = FEN.Function(self.V)
+        FEN.solve(self.LHS == self.RHS, self.u, self.BC)
+        self.output.u = self.u.compute_vertex_values(self.mesh)
         self.write_vtk()
+        self.to_hdf()
         self.status.finished = True
     
     def plot_u(self):
         """
         Plots the unknown u.
         """
-        FEN.plot(self._u)
+        FEN.plot(self.u)
 
     def plot_mesh(self):
         """
         Plots the mesh.
         """
-        FEN.plot(self._mesh)
+        FEN.plot(self.mesh)
 
     def to_hdf(self, hdf=None, group_name=None):
-        super().to_hdf(
-            hdf=hdf,
-            group_name=group_name
-        )
-        with self.project_hdf5.open("input") as h5in:
-            self.input.to_hdf(h5in)
+        super().to_hdf(hdf=hdf, group_name=group_name)
+        self.input.to_hdf(hdf=self.project_hdf5)
+        self.output.to_hdf(hdf=self.project_hdf5)
 
     def from_hdf(self, hdf=None, group_name=None):
-        super().from_hdf(
-            hdf=hdf,
-            group_name=group_name
-        )
-        with self.project_hdf5.open("input") as h5in:
-            self.input.from_hdf(h5in)
+        super().from_hdf(hdf=hdf, group_name=group_name)
+        self.input.from_hdf(hdf=self.project_hdf5)
+        self.output.from_hdf(hdf=self.project_hdf5)

@@ -9,6 +9,7 @@ A job class for performing finite element simulations using the [FEniCS](https:/
 import fenics as FEN
 import mshr
 from pyiron_base import GenericJob, GenericParameters
+from os.path import join
 
 __author__ = "Muhammad Hassani, Liam Huber"
 __copyright__ = (
@@ -35,8 +36,7 @@ class Fenics(GenericJob):
         self.input['RHS'] = ''  # the right hand side of the equation; FEniCS function
         self._LHS = None
         self._RHS = None
-        self.input['vtk_filename'] = project.name+'/output.pvd'
-        self._vtk_filename = str(job_name)+'/output.pvd'
+        self._vtk_filename = join(self.project_hdf5.path, 'output.pvd')
         self.input['mesh'] = None
         self._mesh = None
         self._BC = None

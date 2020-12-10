@@ -178,21 +178,23 @@ class Fenics(GenericJob):
         vtkfile = FEN.File(self._vtk_filename)
         vtkfile << self.u
 
+    def validate_ready_to_run(self):
+        if self.mesh is None:
+            raise ValueError("No mesh is defined")
+        if self.RHS is None:
+            raise ValueError("The bilinear form (RHS) is not defined")
+        if self.LHS is None:
+            raise ValueError("The linear form (LHS) is not defined")
+        if self.V is None:
+            raise ValueError("The volume is not defined; no V defined")
+        if self.BC is None:
+            raise ValueError("The boundary condition(s) (BC) is not defined")
+
     def run_static(self):
         """
         Solve a PDE based on 'LHS=RHS' using u and v as trial and test function respectively. Here, u is the desired
         unknown and RHS is the known part.
         """
-        if self.mesh is None:
-            print("Fatal error: no mesh is defined")
-        if self.RHS is None:
-            print("Fatal error: the bilinear form (RHS) is not defined")
-        if self.LHS is None:
-            print("Fatal error: the linear form (LHS) is not defined")
-        if self.V is None:
-            print("Fatal error: the volume is not defined; no V defined")
-        if self.BC is None:
-            print("Fatal error: the BC is not defined")
         self.u = FEN.Function(self.V)
         FEN.solve(self.LHS == self.RHS, self.u, self.BC)
         self.output.u = self.u.compute_vertex_values(self.mesh)

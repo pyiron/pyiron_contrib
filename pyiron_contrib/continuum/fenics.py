@@ -8,7 +8,7 @@ A job class for performing finite element simulations using the [FEniCS](https:/
 
 import fenics as FEN
 import mshr
-from pyiron_base import PythonTemplateJob
+from pyiron_base import GenericJob, GenericParameters
 
 __author__ = "Muhammad Hassani, Liam Huber"
 __copyright__ = (
@@ -22,13 +22,15 @@ __status__ = "development"
 __date__ = "Dec 6, 2020"
 
 
-class Fenics(PythonTemplateJob):
+class Fenics(GenericJob):
     """
     A job class for using the FEniCS library to solve a finite element method (FEM) problem.
     """
 
     def __init__(self, project, job_name):
         super(Fenics, self).__init__(project, job_name)
+        self.input = GenericParameters(table_name="input")
+        self._python_only_job = True
         self.input['LHS'] = ''  # the left hand side of the equation; FEniCS function
         self.input['RHS'] = ''  # the right hand side of the equation; FEniCS function
         self._LHS = None
@@ -296,3 +298,19 @@ class Fenics(PythonTemplateJob):
         Plots the mesh.
         """
         FEN.plot(self._mesh)
+
+    def to_hdf(self, hdf=None, group_name=None):
+        super().to_hdf(
+            hdf=hdf,
+            group_name=group_name
+        )
+        with self.project_hdf5.open("input") as h5in:
+            self.input.to_hdf(h5in)
+
+    def from_hdf(self, hdf=None, group_name=None):
+        super().from_hdf(
+            hdf=hdf,
+            group_name=group_name
+        )
+        with self.project_hdf5.open("input") as h5in:
+            self.input.from_hdf(h5in)

@@ -45,23 +45,11 @@ class Fenics(GenericJob):
         self.domain = None  # the domain
         self.create = Creator(self)
 
-    def point(self, x, y):
-        """
-        Returns a spatial point as fenics object, based on the given coordinate.
-        """
-        return FEN.Point(x, y)
-
     def grad(self, arg):
         """
         Returns the gradient of the given argument.
         """
         return FEN.grad(arg)
-
-    def Circle(self, center, rad):
-        """
-        Create a mesh on a circular domain with a radius equal to rad.
-        """
-        return mshr.Circle(center, rad)
     
     def dxProd(self, A):
         """

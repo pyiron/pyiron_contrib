@@ -5,13 +5,13 @@ import fenics as FEN
 from pyiron_base import PythonTemplateJob
 
 
-class fenics(PythonTemplateJob):
+class Fenics(PythonTemplateJob):
     """
     A job class for using the FEniCS library to solve a finite element method (FEM) problem.
     """
 
     def __init__(self, project, job_name):
-        super(fenics, self).__init__(project, job_name)
+        super(Fenics, self).__init__(project, job_name)
         self.input['LHS'] = ''  # the left hand side of the equation; FEniCS function
         self.input['RHS'] = ''  # the right hand side of the equation; FEniCS function
         self._LHS = None

@@ -195,8 +195,13 @@ class Fenics(GenericJob):
         Solve a PDE based on 'LHS=RHS' using u and v as trial and test function respectively. Here, u is the desired
         unknown and RHS is the known part.
         """
+        self.status.running = True
         self.u = FEN.Function(self.V)
         FEN.solve(self.LHS == self.RHS, self.u, self.BC)
+        self.collect_output()
+
+    def collect_output(self):
+        self.status.collect = True
         self.output.u = self.u.compute_vertex_values(self.mesh)
         self.write_vtk()
         self.to_hdf()

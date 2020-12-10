@@ -31,59 +31,69 @@ class Fenics(GenericJob):
     def __init__(self, project, job_name):
         super(Fenics, self).__init__(project, job_name)
         self._python_only_job = True
+        self.create = Creator(self)
+
         self.input = InputList(table_name='input')
+        self.input.mesh_resolution = 2
+        self.input.element_type = 'P'
+        self.input.element_order = 1
+        # TODO?: Make input sub-classes to catch invalid input?
+
         self.output = InputList(table_name='output')
+        self.output.u = None
+
+        self.domain = self.create.domain()  # the domain
+        self.BC = None  # the boundary condition
         self.LHS = None  # the left hand side of the equation; FEniCS function
         self.RHS = None  # the right hand side of the equation; FEniCS function
+
+        self._mesh = None  # the discretization mesh
+        self._V = None  # finite element volume space
+        self._u = None  # u is the unkown function
+        self._v = None  # the test function
         self._vtk_filename = join(self.project_hdf5.path, 'output.pvd')
-        self.mesh = None
-        self.mesh = None
-        self.BC = None
-        self.V = None  # finite element volume space
-        self.u = None  # u is the unkown function
-        self.v = None  # the test function
-        self.domain = None  # the domain
-        self.create = Creator(self)
+
+    def generate_mesh(self):
+        self._mesh = mshr.generate_mesh(self.domain, self.input.mesh_resolution)
+        self._V = FEN.FunctionSpace(self.mesh, self.input.element_type, self.input.element_order)
+        # TODO: Allow changing what type of function space is used (VectorFunctionSpace, MultiMeshFunctionSpace...)
+        # TODO: Allow having multiple sets of spaces and test/trial functions
+        self._u = FEN.TrialFunction(self.V)
+        self._v = FEN.TestFunction(self.V)
+
+    def refresh(self):
+        self.generate_mesh()
+
+    @property
+    def mesh(self):
+        if self._mesh is None:
+            self.refresh()
+        return self._mesh
+
+    @property
+    def V(self):
+        if self._V is None:
+            self.refresh()
+        return self._V
+
+    @property
+    def u(self):
+        if self._u is None:
+            self.refresh()
+        return self._u
+
+    @property
+    def v(self):
+        if self._v is None:
+            self.refresh()
+        return self._v
+    # TODO: Do all this refreshing with a simple decorator instead of duplicate code
 
     def grad(self, arg):
         """
         Returns the gradient of the given argument.
         """
         return FEN.grad(arg)
-    
-    def dxProd(self, A):
-        """
-        Returns the product of A and the FEniCS library's dx object.
-        """
-        return A*FEN.dx
-
-    def generate_mesh(self, typ, order, resolution):
-        """
-        Generate a mesh based on the resolution and the job's `domain` attribute and assigns it to the `mesh` attribute.
-        Additionally, it creates and assigns as an attribute the finite element volume `V` with the given type and
-        order, as well as the unknown trial function `u` and test function `v`.
-
-        Args:
-            type (str): Type of the elements making up the mesh.
-            order (int): Order of the elements.
-            resolution (int): Controls how fine/coarse the mesh is.
-        """
-        self.mesh = mshr.generate_mesh(self.domain, resolution)
-        self.V = FEN.FunctionSpace(self.mesh, typ, order)
-        self.u = FEN.TrialFunction(self.V)
-        self.v = FEN.TestFunction(self.V)
-
-    def FunctionSpace(self, typ, order):
-        """
-        Returns the volume function using the current mesh.
-
-        Args:
-            typ (string): The type of the element; e.g. 'p' refers to langrangian element. For further information see
-                https://fenicsproject.org/pub/graphics/fenics-femtable-cards.pdf
-            order (int): The order of the element. For further information see
-                https://fenicsproject.org/pub/graphics/fenics-femtable-cards.pdf
-        """
-        return FEN.FunctionSpace(self.mesh, typ, order)
 
     def Constant(self, value):
         """
@@ -106,25 +116,14 @@ class Fenics(GenericJob):
             boundary (fenics.DirichletBC): The spatial boundary, which the condition will be applied to.
         """
         return FEN.DirichletBC(self.V, expression, boundary)
-
-    def TrialFunction(self):
-        """
-        Returns a FEniCS trial function
-        """
-        return FEN.TrialFunction(self.V)
-    
-    def TestFunction(self):
-        """
-        Returns a FEniCS test function
-        """
-        return FEN.TestFunction(self.V)
     
     def dot(self, arg1, arg2):
         """
         Returns the dot product between the FEniCS objects.
         """
         return FEN.dot(arg1, arg2)
-    
+
+    @property
     def dx(self):
         """
         Returns the FEniCS dx object.
@@ -133,26 +132,6 @@ class Fenics(GenericJob):
 
     def Expression(self, *args, **kwargs):
         return FEN.Expression(*args, **kwargs)
-
-    def mesh_gen_default(self, intervals, typ='P', order=1):
-        """
-        Sets the mesh to a unit square (i.e. side length=1), updating the volume (`V`), and trial (`u`) and test (`v`)
-        functions accordingly.
-
-        Args:
-            intervals (int): The number of squares on the mesh in each direction.
-            typ (string): The type of the element; e.g. 'p' refers to langrangian element. (Default is 'P', i.e.
-                Lagrangian.)For further information see
-                https://fenicsproject.org/pub/graphics/fenics-femtable-cards.pdf.
-            order (int): The order of the element. (Default is 1.) For further information see
-                https://fenicsproject.org/pub/graphics/fenics-femtable-cards.pdf.
-        """
-        self.mesh = FEN.UnitSquareMesh(intervals, intervals)
-        self.input['mesh'] = self.mesh
-        self.V = FEN.FunctionSpace(self.mesh, typ, order)
-        self.input['V'] = self.V
-        self.u = FEN.TrialFunction(self.V)
-        self.v = FEN.TestFunction(self.V)
 
     def BC_default(self, x, on_boundary):
         """
@@ -185,7 +164,7 @@ class Fenics(GenericJob):
         unknown and RHS is the known part.
         """
         self.status.running = True
-        self.u = FEN.Function(self.V)
+        self._u = FEN.Function(self.V)
         FEN.solve(self.LHS == self.RHS, self.u, self.BC)
         self.collect_output()
 
@@ -235,8 +214,12 @@ class DomainFactory(PyironFactory):
         return mshr.Circle(FEN.Point(*center), radius)
     circle.__doc__ = mshr.Circle.__doc__
 
-    def square(self, length):
-        return mshr.Rectangle(length, length)
+    def square(self, length, origin=None):
+        if origin is None:
+            x, y = 0, 0
+        else:
+            x, y = origin[0], origin[1]
+        return mshr.Rectangle(FEN.Point(0 + x, 0 + y), FEN.Point(length + x, length + y))
     square.__doc__ = mshr.Rectangle.__doc__
 
     def __call__(self):

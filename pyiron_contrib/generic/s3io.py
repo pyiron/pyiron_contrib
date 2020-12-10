@@ -40,7 +40,7 @@ class FileS3IO(object):
         )
         bucket_name = config['bucket']
         # Now, the bucket object
-        self.bucket = s3resource.Bucket(bucket_name)
+        self._bucket = s3resource.Bucket(bucket_name)
         self._group = ""
         self.open(group)
 
@@ -50,7 +50,7 @@ class FileS3IO(object):
 
     def print_bucket_info(self):
         """ Print name of the associated bucket.        """
-        print('Bucket name: {}'.format(self.bucket.name))
+        print('Bucket name: {}'.format(self._bucket.name))
 
     def list_groups(self):
         """
@@ -177,7 +177,7 @@ class FileS3IO(object):
             #    print('{} {}/{} bytes'.format(filename, x, s))
             #s = os.path.getsize(file)
             # Upload file accepts extra_args: Dictionary with predefined keys. One key is Metadata
-            self.bucket.upload_file(
+            self._bucket.upload_file(
                 file,
                 self._group + filename,
                 {"Metadata": metadata}
@@ -196,7 +196,7 @@ class FileS3IO(object):
         for f in files:
             filepath = os.path.join(targetpath, f.split("/")[-1])
             print(filepath)
-            self.bucket.download_file(self._group + f, filepath)
+            self._bucket.download_file(self._group + f, filepath)
 
     def get_metadata(self, file, abspath=False):
         """
@@ -208,9 +208,9 @@ class FileS3IO(object):
              dict: metadata field associated with file.
         """
         if abspath:
-            return self.bucket.Object(file).metadata
+            return self._bucket.Object(file).metadata
         else:
-            return self.bucket.Object(self._group + file).metadata
+            return self._bucket.Object(self._group + file).metadata
 
     def get(self, file, abspath=False):
         """
@@ -223,9 +223,9 @@ class FileS3IO(object):
              Object containing a file.
         """
         if abspath:
-            return self.bucket.Object(file).get()
+            return self._bucket.Object(file).get()
         else:
-            return self.bucket.Object(self._group + file).get()
+            return self._bucket.Object(self._group + file).get()
 
     def put(self, data_obj, metadata=None):
         """
@@ -246,13 +246,13 @@ class FileS3IO(object):
             raise ValueError
         if data is None:
             raise ValueError
-        self.bucket.put_object(Key=path, Body=data, Metadata=metadata)
+        self._bucket.put_object(Key=path, Body=data, Metadata=metadata)
 
 
 
     def _list_objects(self):
         l = []
-        for obj in self.bucket.objects.filter(Prefix=self._group):
+        for obj in self._bucket.objects.filter(Prefix=self._group):
             l.append(obj)
         return l
 
@@ -261,12 +261,12 @@ class FileS3IO(object):
             Prints the filename, last modified date and size for all files in the current group,
             recursively including sub groups.
         """
-        for obj in self.bucket.objects.filter(Prefix=self._group):
+        for obj in self._bucket.objects.filter(Prefix=self._group):
             print('{} {} {} bytes'.format(obj.key, obj.last_modified, obj.size))
 
     def _list_all_files_of_bucket(self):
         l = []
-        for obj in self.bucket.objects.all():
+        for obj in self._bucket.objects.all():
             l.append(obj)
         return l
 
@@ -283,9 +283,9 @@ class FileS3IO(object):
                 list: List of files matching the provided path.
         """
         if relpath and len(self._group) > 0:
-            path = self._group + '/' + path
+            path = self._group + path
         l = []
-        for obj in self.bucket.objects.filter(Prefix=self._group):
+        for obj in self._bucket.objects.filter(Prefix=self._group):
             if fnmatch.fnmatchcase(obj.key, path):
                 l.append(obj.key)
         return l
@@ -296,6 +296,21 @@ class FileS3IO(object):
         """
         for obj in filelist:
             print('{} {} {} bytes'.format(obj.key, obj.last_modified, obj.size))
+
+    def remove_file(self, file, abspath=False):
+        """
+            Deletes the object associated with a file.
+
+            Args:
+                file (str/None): path like string to the file to be removed.
+                abspath(bool): If True, treat the path as absolute.
+        """
+        if not abspath:
+            file = self._group + file
+        if not self.is_file(file):
+            raise ValueError("{} is not a file.".format(file))
+        self._bucket.Object(file).delete()
+        #self._remove_object(prefix=file, debug=debug)
 
     def remove_group(self, group=None, debug=False):
         """
@@ -320,8 +335,8 @@ class FileS3IO(object):
                 debug(bool): If True, additional information is printed.
         """
         if debug:
-            print('\nDeleting all objects with sample prefix {}/{}.'.format(self.bucket.name, prefix))
-        delete_responses = self.bucket.objects.filter(Prefix=prefix).delete()
+            print('\nDeleting all objects with sample prefix {}/{}.'.format(self._bucket.name, prefix))
+        delete_responses = self._bucket.objects.filter(Prefix=prefix).delete()
         if debug:
             for delete_response in delete_responses:
                 for deleted in delete_response['Deleted']:

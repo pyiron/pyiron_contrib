@@ -3,9 +3,7 @@ from pyiron import Project as ProjectCore
 from pyiron_contrib.project.file_browser import FileBrowser
 
 class Project(ProjectCore):
-    """
-    Basically a wrapper of Project from pyiron_base to extend for metadata
-    """
+    """     Basically a wrapper of Project from pyiron_base to extend for metadata     """
     def __init__(self, path="", user=None, sql_query=None, default_working_directory=False):
         super().__init__(path=path,
                          user=user,
@@ -17,12 +15,14 @@ class Project(ProjectCore):
         self.hdf5 = self.create_hdf(self.path, self.base_name + "_projectdata")
         self.load_metadata()
         self._load_projectinfo()
+    __init__.__doc__ = ProjectCore.__init__.__doc__
 
     def open_file_browser(self, Vbox=None):
         """
         Provides a file browser to inspect the local data system.
+
         Args:
-             Vbox (ipywidgets.Vbox / None): Vbox in which the file browser is displayed.
+             Vbox (:class:`ipywidgets.Vbox` / None): Vbox in which the file browser is displayed.
                                             If None, a new Vbox is provided.
         """
         return FileBrowser(project=self, Vbox=Vbox, fix_storage_sys=True, hdf_as_dirs=True).gui()

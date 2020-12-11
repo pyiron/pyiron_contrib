@@ -79,7 +79,7 @@ class Fenics(GenericJob):
         >>> job.domain = job.create.domain.circle((0, 0), 1)
         >>> job.BC = job.create.bc.dirichlet_bc(job.Constant(0))
         >>> p = job.Expression('4*exp(-pow(beta, 2)*(pow(x[0], 2) + pow(x[1] - R0, 2)))', degree=1, beta=8, R0=0.6)
-        >>> job.LHS = job.dot(job.grad(job.u), job.grad(job.v)) * job.dx
+        >>> job.LHS = job.dot(job.grad_u, job.grad_v) * job.dx
         >>> job.RHS = p * job.v * job.dx
         >>> job.run()
         >>> job.plot_u()
@@ -151,6 +151,14 @@ class Fenics(GenericJob):
             self.refresh()
         return self._v
     # TODO: Do all this refreshing with a simple decorator instead of duplicate code
+
+    @property
+    def grad_u(self):
+        return FEN.grad(self.u)
+
+    @property
+    def grad_v(self):
+        return FEN.grad(self.v)
 
     @property
     def F(self):

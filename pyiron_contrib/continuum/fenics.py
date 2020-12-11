@@ -160,6 +160,18 @@ class Fenics(GenericJob):
         return self._v
     # TODO: Do all this refreshing with a simple decorator instead of duplicate code
 
+    @property
+    def F(self):
+        try:
+            return self.LHS - self.RHS
+        except TypeError:
+            return self.LHS
+
+    @F.setter
+    def F(self, new_equation):
+        self.LHS = fenics.lhs(new_equation)
+        self.RHS = fenics.rhs(new_equation)
+
     def grad(self, arg):
         """
         Returns the gradient of the given argument.

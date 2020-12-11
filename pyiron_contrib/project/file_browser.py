@@ -144,7 +144,7 @@ class _FileBrowser:
                  fix_s3_path=False,
                  storage_system="local",
                  fix_storage_sys=False,
-                 S3_config_file=None,
+                 s3_config=None,
                  hdf_as_dirs=False,
                  hide_hdf=False
                  ):
@@ -156,7 +156,8 @@ class _FileBrowser:
               fix_s3_path (bool): If True the path in the remote file system cannot be changed.
               storage_system (str): The filesystem to access (fist) either "local" or "S3".
               fix_storage_sys (bool): If True the file system cannot be changed.
-              S3_config_file (str): path to a json configuration file with login credentials for the remote file system.
+              s3_config (str/dict/None): path to a json configuration file or dictionary with login
+                                        credentials for the remote file system.
               hdf_as_dirs (bool): If True hdf files in the local file system are shown and treated as directories
               hide_hdf (bool/None): If True hdf files are hidden (also not displayed as directories)
         """
@@ -190,7 +191,7 @@ class _FileBrowser:
         self.filebox = widgets.VBox(layout=widgets.Layout(width='50%', height='100%', justify_content='flex-start'))
         self.path_string_box = widgets.Text(description="(rel) Path", width='min-content')
         try:
-            self._s3_access = FileS3IO(config_file=S3_config_file,
+            self._s3_access = FileS3IO(config=s3_config,
                                        group=self.s3path)
             self._update_files()
             self.update()

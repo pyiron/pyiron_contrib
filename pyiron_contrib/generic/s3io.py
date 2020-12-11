@@ -6,13 +6,12 @@ import json
 
 
 class FileS3IO(object):
-    def __init__(self, config_file=None, config_json=None, group=''):
+    def __init__(self, config, group=''):
         """
             Establishes connection to a specific 'bucket' of a S3 type object store.
 
             Args:
-                config_file (str/None):  path to a json configuration file with login credentials for the bucket.
-                config_json (dict/None): directly providing credentials as dict; overwrites config_file.
+                config_file (str/dict/None):  path to a json configuration file with login credentials for the bucket.
                 group (str): Initial group in the bucket which is opened.
 
             The configuration needs to provide the following information:
@@ -24,12 +23,8 @@ class FileS3IO(object):
                 }
         """
         self.history = []
-        if config_json is not None:
-            config = config_json
-        else:
-            if config_file is None:
-                raise TypeError("config_json or config_file have to be provided (both None)")
-            with open(config_file) as json_file:
+        if isinstance(config, str):
+            with open(config) as json_file:
                 config = json.load(json_file)
 
         s3resource = boto3.resource('s3',

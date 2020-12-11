@@ -66,7 +66,7 @@ class Fenics(GenericJob):
         mesh_resolution (int): How dense the mesh should be (larger values = denser mesh). (Default is 2.)
         element_type (str): What type of element should be used. (Default is 'P'.) TODO: Restrict choices.
         element_order (int): What order the elements have. (Default is 1.)  TODO: Better description.
-        refresh_mesh_before_run (bool): When true the mesh and underlying variables are recreated immediately before
+        refresh_before_run (bool): When true the mesh and underlying variables are recreated immediately before
             solving the PDE, thus guaranteeing that the latest input parameters have been used. For extreme meshes this
             could be needlessly costly. (Default is True -- be safe and update the mesh!)
 
@@ -96,7 +96,7 @@ class Fenics(GenericJob):
         self.input.mesh_resolution = 2
         self.input.element_type = 'P'
         self.input.element_order = 1
-        self.input.refresh_mesh_before_run = True
+        self.input.refresh_before_run = True
         # TODO?: Make input sub-classes to catch invalid input?
 
         self.output = InputList(table_name='output')

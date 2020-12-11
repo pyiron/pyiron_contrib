@@ -203,7 +203,8 @@ class Fenics(GenericJob):
     def Expression(self, *args, **kwargs):
         return fenics.Expression(*args, **kwargs)
 
-    def BC_default(self, x, on_boundary):
+    @staticmethod
+    def BC_default(x, on_boundary):
         """
         Returns the geometrical boundary.
         """

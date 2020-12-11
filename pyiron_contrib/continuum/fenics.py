@@ -214,7 +214,7 @@ class Fenics(GenericJob):
     def plot_mesh(self):
         FEN.plot(self.mesh)
 
-    def project(self, v, **kwargs):
+    def project_function(self, v, **kwargs):
         """
         Project v onto the job's element, V.
 
@@ -227,7 +227,7 @@ class Fenics(GenericJob):
         """
         return FEN.project(v, V=self.V, **kwargs)
 
-    def interpolate(self, v):
+    def interpolate_function(self, v):
         """
         Interpolate v on the job's element, V.
 

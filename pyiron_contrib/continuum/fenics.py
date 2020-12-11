@@ -272,11 +272,6 @@ class Fenics(GenericJob):
 
     dx.__doc__ = FEN.dx.__doc__
 
-    @property
-    def dt(self):
-        return FEN.dt
-    dt.__doc__ = FEN.dt.__doc__
-
     def grad(self, arg):
         return FEN.grad(arg)
     grad.__doc__ = FEN.grad.__doc__  # TODO: Is there a nice way to do this with a decorator?

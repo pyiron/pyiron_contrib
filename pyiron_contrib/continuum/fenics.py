@@ -10,6 +10,7 @@ import fenics
 import mshr
 from pyiron_base import GenericJob, InputList, PyironFactory
 from os.path import join
+import warnings
 
 __author__ = "Muhammad Hassani, Liam Huber"
 __copyright__ = (
@@ -120,6 +121,9 @@ class Fenics(GenericJob):
         return mshr
 
     def generate_mesh(self):
+        if any([v is not None for v in [self.BC, self.LHS, self.RHS]]):
+            warnings.warn("The mesh is being generated, but at least one of the boundary conditions or equation sides"
+                          "is already defined -- please re-define these values since the mesh is updated")
         self._mesh = mshr.generate_mesh(self.domain, self.input.mesh_resolution)
         self._V = fenics.FunctionSpace(self.mesh, self.input.element_type, self.input.element_order)
         # TODO: Allow changing what type of function space is used (VectorFunctionSpace, MultiMeshFunctionSpace...)

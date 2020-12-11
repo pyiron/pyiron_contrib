@@ -77,7 +77,7 @@ class Fenics(GenericJob):
         >>> job.input.element_type = 'P'
         >>> job.input.element_order = 2
         >>> job.domain = job.create.domain.circle((0, 0), 1)
-        >>> job.BC = job.create.bc.dirichlet_bc(job.Constant(0))
+        >>> job.BC = job.create.bc.dirichlet(job.Constant(0))
         >>> p = job.Expression('4*exp(-pow(beta, 2)*(pow(x[0], 2) + pow(x[1] - R0, 2)))', degree=1, beta=8, R0=0.6)
         >>> job.LHS = job.dot(job.grad_u, job.grad_v) * job.dx
         >>> job.RHS = p * job.v * job.dx
@@ -296,7 +296,7 @@ class BoundaryConditionFactory(PyironFactory):
     def _default_bc_fnc(x, on_boundary):
         return on_boundary
 
-    def dirichlet_bc(self, expression, bc_fnc=None):
+    def dirichlet(self, expression, bc_fnc=None):
         """
         This function defines Dirichlet boundary condition based on the given expression on the boundary.
 

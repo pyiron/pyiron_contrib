@@ -6,7 +6,7 @@
 A job class for performing finite element simulations using the [FEniCS](https://fenicsproject.org) code.
 """
 
-import fenics
+import fenics as FEN
 import mshr
 from pyiron_base import GenericJob, InputList, PyironFactory
 from os.path import join
@@ -112,25 +112,17 @@ class Fenics(GenericJob):
         self._v = None  # the test function
         self._vtk_filename = join(self.project_hdf5.path, 'output.pvd')
 
-    @property
-    def fenics(self):
-        return fenics
-
-    @property
-    def mshr(self):
-        return mshr
-
     def generate_mesh(self):
         if any([v is not None for v in [self.BC, self.LHS, self.RHS]]):
             warnings.warn("The mesh is being generated, but at least one of the boundary conditions or equation sides"
                           "is already defined -- please re-define these values since the mesh is updated")
         self._mesh = mshr.generate_mesh(self.domain, self.input.mesh_resolution)
         # TODO?: Accommodate uniform meshes like fenics.SquareMesh?
-        self._V = fenics.FunctionSpace(self.mesh, self.input.element_type, self.input.element_order)
+        self._V = FEN.FunctionSpace(self.mesh, self.input.element_type, self.input.element_order)
         # TODO: Allow changing what type of function space is used (VectorFunctionSpace, MultiMeshFunctionSpace...)
         # TODO: Allow having multiple sets of spaces and test/trial functions
-        self._u = fenics.TrialFunction(self.V)
-        self._v = fenics.TestFunction(self.V)
+        self._u = FEN.TrialFunction(self.V)
+        self._v = FEN.TestFunction(self.V)
 
     def refresh(self):
         self.generate_mesh()
@@ -169,48 +161,14 @@ class Fenics(GenericJob):
 
     @F.setter
     def F(self, new_equation):
-        self.LHS = fenics.lhs(new_equation)
-        self.RHS = fenics.rhs(new_equation)
+        self.LHS = FEN.lhs(new_equation)
+        self.RHS = FEN.rhs(new_equation)
 
-    def grad(self, arg):
-        """
-        Returns the gradient of the given argument.
-        """
-        return fenics.grad(arg)
-
-    def Constant(self, value):
-        """
-        Wraps a value as a fenics constant.
-
-        Args:
-            value (float): The value to wrap.
-
-        Returns:
-            fenics.Constant: The wrapped value.
-        """
-        return fenics.Constant(value)
-    
-    def dot(self, arg1, arg2):
-        """
-        Returns the dot product between the FEniCS objects.
-        """
-        return fenics.dot(arg1, arg2)
-
-    @property
-    def dx(self):
-        """
-        Returns the FEniCS dx object.
-        """
-        return fenics.dx
-
-    def Expression(self, *args, **kwargs):
-        return fenics.Expression(*args, **kwargs)
-
-    def write_vtk(self):
+    def _write_vtk(self):
         """
         Write the output to a .vtk file.
         """
-        vtkfile = fenics.File(self._vtk_filename)
+        vtkfile = FEN.File(self._vtk_filename)
         vtkfile << self.u
 
     def validate_ready_to_run(self):
@@ -231,28 +189,22 @@ class Fenics(GenericJob):
         unknown and RHS is the known part.
         """
         self.status.running = True
-        self._u = fenics.Function(self.V)
-        fenics.solve(self.LHS == self.RHS, self.u, self.BC)
+        self._u = FEN.Function(self.V)
+        FEN.solve(self.LHS == self.RHS, self.u, self.BC)
         self.status.collect = True
         self.run()
 
     def collect_output(self):
         self.output.u = self.u.compute_vertex_values(self.mesh)
-        self.write_vtk()  # TODO: Get the output files so they're all tarballed after successful runs, like other codes
+        self._write_vtk()  # TODO: Get the output files so they're all tarballed after successful runs, like other codes
         self.to_hdf()
         self.status.finished = True
     
     def plot_u(self):
-        """
-        Plots the unknown u.
-        """
-        fenics.plot(self.u)
+        FEN.plot(self.u)
 
     def plot_mesh(self):
-        """
-        Plots the mesh.
-        """
-        fenics.plot(self.mesh)
+        FEN.plot(self.mesh)
 
     def to_hdf(self, hdf=None, group_name=None):
         super().to_hdf(hdf=hdf, group_name=group_name)
@@ -263,6 +215,36 @@ class Fenics(GenericJob):
         super().from_hdf(hdf=hdf, group_name=group_name)
         self.input.from_hdf(hdf=self.project_hdf5)
         self.output.from_hdf(hdf=self.project_hdf5)
+
+    # Convenience bindings:
+    @property
+    def fenics(self):
+        return FEN
+
+    @property
+    def mshr(self):
+        return mshr
+
+    def grad(self, arg):
+        return FEN.grad(arg)
+    grad.__doc__ = FEN.grad.__doc__  # TODO: Is there a nice way to do this with a decorator?
+
+    def Constant(self, value):
+        return FEN.Constant(value)
+    Constant.__doc__ = FEN.Constant.__doc__
+
+    def dot(self, arg1, arg2):
+        return FEN.dot(arg1, arg2)
+    dot.__doc__ = FEN.dot.__doc__
+
+    @property
+    def dx(self):
+        return FEN.dx
+    dx.__doc__ = FEN.dx.__doc__
+
+    def Expression(self, *args, **kwargs):
+        return FEN.Expression(*args, **kwargs)
+    Expression.__doc__ = FEN.Expression.__doc__
 
 
 class Creator:
@@ -283,7 +265,7 @@ class Creator:
 class DomainFactory(PyironFactory):
 
     def circle(self, center, radius):
-        return mshr.Circle(fenics.Point(*center), radius)
+        return mshr.Circle(FEN.Point(*center), radius)
     circle.__doc__ = mshr.Circle.__doc__
 
     def square(self, length, origin=None):
@@ -291,7 +273,7 @@ class DomainFactory(PyironFactory):
             x, y = 0, 0
         else:
             x, y = origin[0], origin[1]
-        return mshr.Rectangle(fenics.Point(0 + x, 0 + y), fenics.Point(length + x, length + y))
+        return mshr.Rectangle(FEN.Point(0 + x, 0 + y), FEN.Point(length + x, length + y))
     square.__doc__ = mshr.Rectangle.__doc__
 
     def __call__(self):
@@ -316,4 +298,4 @@ class BoundaryConditionFactory(PyironFactory):
                 expression is applied as displacement.
         """
         bc_fnc = bc_fnc or self._default_bc_fnc
-        return fenics.DirichletBC(self._job.V, expression, bc_fnc)
+        return FEN.DirichletBC(self._job.V, expression, bc_fnc)

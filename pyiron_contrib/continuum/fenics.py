@@ -77,7 +77,7 @@ class Fenics(GenericJob):
         >>> job.input.element_type = 'P'
         >>> job.input.element_order = 2
         >>> job.domain = job.create.domain.circle((0, 0), 1)
-        >>> job.BC = job.DirichletBC(job.Constant(0), job.BC_default)
+        >>> job.BC = job.create.bc.dirichlet_bc(job.Constant(0))
         >>> p = job.Expression('4*exp(-pow(beta, 2)*(pow(x[0], 2) + pow(x[1] - R0, 2)))', degree=1, beta=8, R0=0.6)
         >>> job.LHS = job.dot(job.grad(job.u), job.grad(job.v)) * job.dx
         >>> job.RHS = p * job.v * job.dx
@@ -189,16 +189,6 @@ class Fenics(GenericJob):
             fenics.Constant: The wrapped value.
         """
         return fenics.Constant(value)
-
-    def DirichletBC(self, expression, boundary):
-        """
-        This function defines Drichlet boundary condition based on the given expression on the boundary.
-
-        Args:
-            expression (string): The expression used to evaluate the value of the unknown on the boundary.
-            boundary (fenics.DirichletBC): The spatial boundary, which the condition will be applied to.
-        """
-        return fenics.DirichletBC(self.V, expression, boundary)
     
     def dot(self, arg1, arg2):
         """
@@ -215,13 +205,6 @@ class Fenics(GenericJob):
 
     def Expression(self, *args, **kwargs):
         return fenics.Expression(*args, **kwargs)
-
-    @staticmethod
-    def BC_default(x, on_boundary):
-        """
-        Returns the geometrical boundary.
-        """
-        return on_boundary
 
     def write_vtk(self):
         """
@@ -286,10 +269,15 @@ class Creator:
     def __init__(self, job):
         self._job = job
         self._domain = DomainFactory()
+        self._bc = BoundaryConditionFactory(job)
 
     @property
     def domain(self):
         return self._domain
+
+    @property
+    def bc(self):
+        return self._bc
 
 
 class DomainFactory(PyironFactory):
@@ -308,3 +296,24 @@ class DomainFactory(PyironFactory):
 
     def __call__(self):
         return self.square(1.)
+
+
+class BoundaryConditionFactory(PyironFactory):
+    def __init__(self, job):
+        self._job = job
+
+    @staticmethod
+    def _default_bc_fnc(x, on_boundary):
+        return on_boundary
+
+    def dirichlet_bc(self, expression, bc_fnc=None):
+        """
+        This function defines Dirichlet boundary condition based on the given expression on the boundary.
+
+        Args:
+            expression (string): The expression used to evaluate the value of the unknown on the boundary.
+            bc_fnc (fnc): The function which evaluates which nodes belong to the boundary to which the provided
+                expression is applied as displacement.
+        """
+        bc_fnc = bc_fnc or self._default_bc_fnc
+        return fenics.DirichletBC(self._job.V, expression, bc_fnc)

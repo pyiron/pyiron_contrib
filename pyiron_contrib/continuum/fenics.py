@@ -214,6 +214,31 @@ class Fenics(GenericJob):
     def plot_mesh(self):
         FEN.plot(self.mesh)
 
+    def project(self, v, **kwargs):
+        """
+        Project v onto the job's element, V.
+
+        Args:
+            v (?): The function to project.
+            **kwargs: Valid `fenics.project` kwargs (except `V`, which is provided automatically).
+
+        Returns:
+            (?): Projected function.
+        """
+        return FEN.project(v, V=self.V, **kwargs)
+
+    def interpolate(self, v):
+        """
+        Interpolate v on the job's element, V.
+
+        Args:
+            v (?): The function to interpolate.
+
+        Returns:
+            (?): Interpolated function.
+        """
+        return FEN.interpolate(v, V=self.V)
+
     def to_hdf(self, hdf=None, group_name=None):
         super().to_hdf(hdf=hdf, group_name=group_name)
         self.input.to_hdf(hdf=self.project_hdf5)
@@ -233,26 +258,36 @@ class Fenics(GenericJob):
     def mshr(self):
         return mshr
 
-    def grad(self, arg):
-        return FEN.grad(arg)
-    grad.__doc__ = FEN.grad.__doc__  # TODO: Is there a nice way to do this with a decorator?
-
     def Constant(self, value):
         return FEN.Constant(value)
     Constant.__doc__ = FEN.Constant.__doc__
 
-    def dot(self, arg1, arg2):
-        return FEN.dot(arg1, arg2)
-    dot.__doc__ = FEN.dot.__doc__
+    def Expression(self, *args, **kwargs):
+        return FEN.Expression(*args, **kwargs)
+    Expression.__doc__ = FEN.Expression.__doc__
 
     @property
     def dx(self):
         return FEN.dx
+
     dx.__doc__ = FEN.dx.__doc__
 
-    def Expression(self, *args, **kwargs):
-        return FEN.Expression(*args, **kwargs)
-    Expression.__doc__ = FEN.Expression.__doc__
+    @property
+    def dt(self):
+        return FEN.dt
+    dt.__doc__ = FEN.dt.__doc__
+
+    def grad(self, arg):
+        return FEN.grad(arg)
+    grad.__doc__ = FEN.grad.__doc__  # TODO: Is there a nice way to do this with a decorator?
+
+    def nabla(self, arg):
+        return FEN.nabla_grad(arg)
+    nabla.__doc__ = FEN.nabla_grad.__doc__
+
+    def dot(self, arg1, arg2):
+        return FEN.dot(arg1, arg2)
+    dot.__doc__ = FEN.dot.__doc__
 
 
 class Creator:

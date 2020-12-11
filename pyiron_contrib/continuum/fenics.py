@@ -25,7 +25,63 @@ __date__ = "Dec 6, 2020"
 
 class Fenics(GenericJob):
     """
-    A job class for using the FEniCS library to solve a finite element method (FEM) problem.
+    The job provides an interface to the [FEniCS project](https://fenicsproject.org) PDE solver using the finite element
+    method (FEM).
+
+    The objective is to streamline and simplify regular usage and connect FEniCS calculations to the full job management
+    and execution distribution capabilities of pyiron, without losing the power or flexibility of the underlying fenics
+    library.
+
+    Flexibility and power are currently maintained by directly exposing the underlying `fenics` and `mshr` libraries as
+    attributes of the job for power users.
+
+    Ease of use is underway, e.g. elements, trial and test functions, and the mesh are automatically populated based on
+    the provided domain. Quality of life will be continuously improved as pyiron and fenics get to know each other.
+
+    TODO: Integration with pyiron's job and data management is incomplete, as some input data types (domains and
+          boundary conditions) are not yet compatible with HDF5 storage. This is a simple problem to describe, but might
+          be a pain to solve with sufficient flexibility. We also need to consider storing more sophisticated output.
+
+    TODO: Full power and flexibility still needs to be realized by allowing (a) variable function space types, (b)
+          variable number of elements and trial/test functions, and (c) multiple solve types.
+          (a) Is a simple input option, we just need to be smart about how to limit the choices to existing fenics
+              classes.
+          (b) Can probably be nicely realized by subclassing off the main job type to allow for two sets of functions --
+              `V:(u,v), Q:(p,q)` -- and a variable number of functions -- `V[0]:(u[0], v[0]),...,V[n]:(u[n], v[n])` --
+              which are automatically populated during mesh generation and which are accessible for building the
+              equation.
+          (c) Solution types just means linear system `solve(A, x, b, ...)`, linear variational problems
+              `solve(a == L, u, ...)`, and nonlinear variational problems `solve(F == 0, u, ...)`. This is probably also
+              going to be pretty easy to control through an input parameter with a few fixed options an a bit of
+              modification to how the LHS and RHS of equations are provided, and what actually is called during `run`.
+              Currently the linear variational problem is hardcoded.
+
+    Attributes:
+        input (InputList): The input parameters controlling the run.
+        output (InputList): The output from the run, i.e. data that comes from `solve`ing the PDE.
+        domain (?): The spatial domain on which to build the mesh. To be provided prior to running the job.
+        BC (?): The boundary conditions for the mesh. To be provided prior to running the job.
+
+    Input:
+        mesh_resolution (int): How dense the mesh should be (larger values = denser mesh). (Default is 2.)
+        element_type (str): What type of element should be used. (Default is 'P'.) TODO: Restrict choices.
+        element_order (int): What order the elements have. (Default is 1.)  TODO: Better description.
+
+    Output:
+        u (numpy.ndarray): The solved function values evaluated at the mesh points.
+
+    Example:
+        >>> job = pr.create.job.Fenics('fenics_job')
+        >>> job.input.mesh_resolution = 64
+        >>> job.input.element_type = 'P'
+        >>> job.input.element_order = 2
+        >>> job.domain = job.create.domain.circle((0, 0), 1)
+        >>> job.BC = job.DirichletBC(job.Constant(0), job.BC_default)
+        >>> p = job.Expression('4*exp(-pow(beta, 2)*(pow(x[0], 2) + pow(x[1] - R0, 2)))', degree=1, beta=8, R0=0.6)
+        >>> job.LHS = job.dot(job.grad(job.u), job.grad(job.v)) * job.dx
+        >>> job.RHS = p * job.v * job.dx
+        >>> job.run()
+        >>> job.plot_u()
     """
 
     def __init__(self, project, job_name):
@@ -42,10 +98,12 @@ class Fenics(GenericJob):
         self.output = InputList(table_name='output')
         self.output.u = None
 
-        self.domain = self.create.domain()  # the domain
-        self.BC = None  # the boundary condition
+        self.domain = self.create.domain()  # the domain  TODO: Get this into the input and saving/loading properly
+        self.BC = None  # the boundary condition  TODO: Get this into the input and saving/loading properly
         self.LHS = None  # the left hand side of the equation; FEniCS function
         self.RHS = None  # the right hand side of the equation; FEniCS function
+        # TODO: Get LHS and RHS into the input and saving/loading properly
+        #       (maybe with a softlink directly at the job level given the importance of this feature?
 
         self._mesh = None  # the discretization mesh
         self._V = None  # finite element volume space
@@ -179,7 +237,7 @@ class Fenics(GenericJob):
 
     def collect_output(self):
         self.output.u = self.u.compute_vertex_values(self.mesh)
-        self.write_vtk()
+        self.write_vtk()  # TODO: Get the output files so they're all tarballed after successful runs, like other codes
         self.to_hdf()
         self.status.finished = True
     

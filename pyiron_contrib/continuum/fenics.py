@@ -125,6 +125,7 @@ class Fenics(GenericJob):
             warnings.warn("The mesh is being generated, but at least one of the boundary conditions or equation sides"
                           "is already defined -- please re-define these values since the mesh is updated")
         self._mesh = mshr.generate_mesh(self.domain, self.input.mesh_resolution)
+        # TODO?: Accommodate uniform meshes like fenics.SquareMesh?
         self._V = fenics.FunctionSpace(self.mesh, self.input.element_type, self.input.element_order)
         # TODO: Allow changing what type of function space is used (VectorFunctionSpace, MultiMeshFunctionSpace...)
         # TODO: Allow having multiple sets of spaces and test/trial functions

@@ -4,6 +4,8 @@
 
 from __future__ import print_function
 
+from abc import ABC
+
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -415,7 +417,7 @@ class HarmonicTILD(_TILDParent):
         return f
 
 
-class ProtocolHarmonicTILD(Protocol, HarmonicTILD):
+class ProtocolHarmonicTILD(Protocol, HarmonicTILD, ABC):
     pass
 
 
@@ -852,7 +854,7 @@ class HarmonicTILDParallel(HarmonicTILD):
         return np.array(~o.mean_diff[-1]), ~o.std_diff[-1] / np.sqrt(~o.n_samples[-1])
 
 
-class ProtocolHarmonicTILDParallel(Protocol, HarmonicTILDParallel):
+class ProtocolHarmonicTILDParallel(Protocol, HarmonicTILDParallel, ABC):
     pass
 
 
@@ -1205,7 +1207,7 @@ class VacancyTILD(_TILDParent):
         }
 
 
-class ProtocolVacancyTILD(Protocol, VacancyTILD):
+class ProtocolVacancyTILD(Protocol, VacancyTILD, ABC):
     pass
 
 
@@ -1708,7 +1710,7 @@ class VacancyTILDParallel(VacancyTILD):
         return np.array(~o.mean_diff[-1]), ~o.std_diff[-1] / np.sqrt(~o.n_samples[-1])
 
 
-class ProtocolVacancyTILDParallel(Protocol, VacancyTILDParallel):
+class ProtocolVacancyTILDParallel(Protocol, VacancyTILDParallel, ABC):
     pass
 
 
@@ -2158,5 +2160,5 @@ class VacancyFormation(VacancyTILDParallel):
         return np.array(vertex.mean_diff[-1]), vertex.std_diff[-1] / np.sqrt(vertex.n_samples[-1])
 
 
-class ProtocolVacancyFormation(Protocol, VacancyFormation):
+class ProtocolVacancyFormation(Protocol, VacancyFormation, ABC):
     pass

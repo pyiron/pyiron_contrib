@@ -661,7 +661,7 @@ class FileBrowser(_FileBrowser):
                  storage_system="local",
                  fix_storage_sys=False,
                  hdf_as_dirs=False,
-                 S3_config_file = None
+                 s3_config=None
                  ):
 
         path = project.path[:-1] if project is not None else None
@@ -672,6 +672,6 @@ class FileBrowser(_FileBrowser):
                          hdf_as_dirs=hdf_as_dirs,
                          storage_system=storage_system,
                          fix_storage_sys=fix_storage_sys,
-                         S3_config_file=S3_config_file)
+                         s3_config=s3_config)
     __init__.__doc__ = _FileBrowser.__init__.__doc__
 

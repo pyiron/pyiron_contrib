@@ -13,6 +13,7 @@ class Project(ProjectCore):
                          )
         self._project_info = InputList(table_name="projectinfo")
         self._metadata = InputList(table_name="metadata")
+        self._filebrowser = None
         self.hdf5 = self.create_hdf(self.path, self.base_name + "_projectdata")
         self.load_metadata()
         self._load_projectinfo()
@@ -26,7 +27,9 @@ class Project(ProjectCore):
              Vbox (:class:`ipywidgets.Vbox` / None): Vbox in which the file browser is displayed.
                                             If None, a new Vbox is provided.
         """
-        return FileBrowser(project=self, Vbox=Vbox, fix_storage_sys=True, hdf_as_dirs=True).gui()
+        if self._filebrowser is None:
+            self._filebrowser = FileBrowser(project=self, Vbox=Vbox, fix_storage_sys=True, hdf_as_dirs=True)
+        return self._filebrowser.gui()
 
     @property
     def metadata(self):

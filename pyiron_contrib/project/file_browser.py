@@ -661,8 +661,22 @@ class FileBrowser(_FileBrowser):
                  storage_system="local",
                  fix_storage_sys=False,
                  hdf_as_dirs=False,
+                 hide_hdf=False,
                  s3_config=None
                  ):
+        """
+            Filebrowser to browse the local or a remote (S3-based) file system.
+            Args:
+              s3path (str): Starting path within the remote file system.
+              project (:class:`pyiron.Project`): Pyiron Project object from which the local path is taken.
+              fix_s3_path (bool): If True the path in the remote file system cannot be changed.
+              storage_system (str): The filesystem to access (fist) either "local" or "S3".
+              fix_storage_sys (bool): If True the file system cannot be changed.
+              s3_config (str/dict/None): path to a json configuration file or dictionary with login
+                                        credentials for the remote file system.
+              hdf_as_dirs (bool): If True hdf files in the local file system are shown and treated as directories
+              hide_hdf (bool/None): If True hdf files are hidden (also not displayed as directories)
+        """
 
         path = project.path[:-1] if project is not None else None
         super().__init__(Vbox=Vbox,
@@ -672,6 +686,7 @@ class FileBrowser(_FileBrowser):
                          hdf_as_dirs=hdf_as_dirs,
                          storage_system=storage_system,
                          fix_storage_sys=fix_storage_sys,
+                         hide_hdf=hide_hdf,
                          s3_config=s3_config)
     __init__.__doc__ = _FileBrowser.__init__.__doc__
 

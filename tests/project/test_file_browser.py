@@ -7,12 +7,14 @@ from pyiron_contrib.project.project import Project
 
 
 class TestFileBrowser(unittest.TestCase):
+    @classmethod
     def setUpClass(cls):
         """Set up project and file browser classes."""
         cls.filebrowser = FileBrowser()
         cls.current_dir = os.path.dirname(os.path.abspath(__file__)).replace("\\", "/")
         cls.project = Project(os.path.join(cls.current_dir, "sub_folder"))
 
+    @classmethod
     def tearDown(self):
         """Tear down test classes."""
         self.project.remove(enable=True)

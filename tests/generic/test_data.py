@@ -3,6 +3,7 @@ import unittest
 from pyiron_contrib.generic.data import Data
 
 class TestData(unittest.TestCase):
+    @classmethod
     def setUpClass(cls):
         cls.data = Data(source="../static/test_data.txt")
 

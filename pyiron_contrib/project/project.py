@@ -65,6 +65,16 @@ class Project(ProjectCore):
         except ValueError:
             pass
 
+    def copy(self):
+        """
+        Copy the project object - copying just the Python object but maintaining the same pyiron path
+
+        Returns:
+            Project: copy of the project object
+        """
+        new = Project(path=self.path, user=self.user, sql_query=self.sql_query)
+        return new
+
     def open(self, rel_path, history=True):
         new = super().open(rel_path, history=history)
         new.hdf5 = new.create_hdf(new.path, new.base_name + "_projectdata")

@@ -47,7 +47,7 @@ class Data:
             self.metadata = {}
         else:
             self.metadata = metadata
-        self.hasdata = True if self._data is None else False
+        self.hasdata = True if self._data is not None else False
 
     def _read_source(self):
         with open(self.source, "rb") as f:

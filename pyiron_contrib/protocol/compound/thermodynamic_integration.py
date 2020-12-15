@@ -1329,6 +1329,7 @@ class _Decoupling(CompoundVertex):
         g.harmonic.input.positions = gp.reflect.output.positions[-1]
         g.harmonic.input.structure = ip.structure
         g.harmonic.input.mask = ip.vacancy_id
+        g.harmonic.input.eq_energy = ip.eq_energy
 
         # write_vac_forces
         g.write_vac_forces.input.target = gp.calc_full.output.forces[-1]
@@ -1609,6 +1610,7 @@ class VacancyTILDParallel(VacancyTILD):
         g.run_lambda_points.direct.spring_constant = ip.spring_constant
         g.run_lambda_points.direct.force_constants = ip.force_constants
         g.run_lambda_points.direct.vacancy_id = ip.vacancy_id
+        g.run_lambda_points.direct.eq_energy = ip.zero_k_energy
 
         # run_lambda_points - write_vac_forces -  takes inputs already specified
 

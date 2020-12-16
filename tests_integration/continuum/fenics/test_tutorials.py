@@ -33,8 +33,6 @@ class TestFenicsTutorials(unittest.TestCase):
 
     def test_page_5(self):
         job = self.pr.create.job.Fenics('poisson', delete_existing_job=True)
-        job.input.element_type = 'P'
-        job.input.element_order = 1
         job.domain = job.create.domain.unit_mesh.square(8, 8)
 
         u_D = job.Expression('1 + x[0]*x[0] + 2*x[1]*x[1]', degree=2)  # String expressions must have valid C++ syntax
@@ -50,7 +48,6 @@ class TestFenicsTutorials(unittest.TestCase):
     def test_page_6(self):
         job = self.pr.create.job.Fenics('membrane', delete_existing_job=True)
         job.input.mesh_resolution = 64
-        job.input.element_type = 'P'
         job.input.element_order = 2
 
         job.domain = job.create.domain.circle((0, 0), 1)
@@ -70,8 +67,6 @@ class TestFenicsTutorials(unittest.TestCase):
         num_steps = 10  # number of time steps
         dt = total_time / num_steps  # time step size
 
-        job.input.element_types = 'P'
-        job.input.element_order = 1
         job.input.n_steps = 10
         job.input.dt = 0.2
 
@@ -99,8 +94,6 @@ class TestFenicsTutorials(unittest.TestCase):
         num_steps = 50  # number of time steps
         dt = total_time / num_steps  # time step size
 
-        job.input.element_types = 'P'
-        job.input.element_order = 1
         job.input.n_steps = num_steps
         job.input.dt = dt
 

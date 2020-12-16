@@ -234,6 +234,9 @@ class Fenics(GenericJob):
         """
         Makes a plot of the output solution.
 
+        Based off of
+        [matplotlib docs](https://matplotlib.org/3.1.0/gallery/images_contours_and_fields/irregulardatagrid.html)
+
         Args:
             frame (int): Which output frame to use. (Default is -1, most recent.)
             n_grid (int): Number of points to use when interpolating the mesh values. (Default is 1000.)

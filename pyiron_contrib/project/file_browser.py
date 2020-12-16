@@ -192,7 +192,7 @@ class _FileBrowser:
         self.path_string_box = widgets.Text(description="(rel) Path", width='min-content')
         try:
             self._s3_access = FileS3IO(config=s3_config,
-                                       group=self.s3path)
+                                       path=self.s3path)
             self._update_files()
             self.update()
         except TypeError:

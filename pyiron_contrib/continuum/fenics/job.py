@@ -416,6 +416,10 @@ class Fenics(GenericJob):
     def tr(self, A):
         return FEN.tr(A)
 
+    @copy_docstring(FEN.sqrt)
+    def sqrt(self, f):
+        return FEN.sqrt(f)
+
 
 class Creator:
     def __init__(self, job):

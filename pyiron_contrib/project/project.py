@@ -2,6 +2,7 @@ from pyiron_base import InputList
 from pyiron import Project as ProjectCore
 from pyiron_contrib.project.file_browser import FileBrowser
 
+
 class Project(ProjectCore):
 
     """ Basically a wrapper of Project from pyiron_base to extend for metadata. """
@@ -15,8 +16,7 @@ class Project(ProjectCore):
         self._metadata = InputList(table_name="metadata")
         self._filebrowser = None
         self.hdf5 = self.create_hdf(self.path, self.base_name + "_projectdata")
-        self.load_metadata()
-        self._load_projectinfo()
+        self.from_hdf()
     __init__.__doc__ = ProjectCore.__init__.__doc__
 
     def open_file_browser(self, Vbox=None):
@@ -28,7 +28,10 @@ class Project(ProjectCore):
                                             If None, a new Vbox is provided.
         """
         if self._filebrowser is None:
-            self._filebrowser = FileBrowser(project=self, Vbox=Vbox, fix_storage_sys=True, hdf_as_dirs=True)
+            self._filebrowser = FileBrowser(project=self.copy(),
+                                            Vbox=Vbox,
+                                            fix_storage_sys=True,
+                                            hdf_as_dirs=True)
         return self._filebrowser.gui()
 
     @property
@@ -39,15 +42,6 @@ class Project(ProjectCore):
     def metadata(self, metadata):
         self._metadata = InputList(metadata, table_name="metadata")
 
-    def save_metadata(self):
-        self._metadata.to_hdf(self.hdf5, group_name=None)
-
-    def load_metadata(self):
-        try:
-            self._metadata.from_hdf(self.hdf5, group_name=None)
-        except ValueError:
-            pass
-
     @property
     def project_info(self):
         return self._project_info
@@ -56,12 +50,23 @@ class Project(ProjectCore):
     def project_info(self, project_info):
         self._project_info = InputList(project_info, table_name="projectinfo")
 
-    def _save_projectinfo(self):
-        self._project_info.to_hdf(self.hdf5, group_name=None)
+    def to_hdf(self, hdf=None, group_name=None):
+        """Store meta data and info of the project in the project hdf5 file."""
+        if hdf is None:
+            hdf = self.hdf5
+        self._metadata.to_hdf(hdf, group_name=None)
+        self._project_info.to_hdf(hdf, group_name=None)
 
-    def _load_projectinfo(self):
+    def from_hdf(self, hdf=None, group_name=None):
+        """Load meta data and info of the project from the project hdf5 file."""
+        if hdf is None:
+            hdf = self.hdf5
         try:
-            self._project_info.from_hdf(self.hdf5, group_name=None)
+            self._metadata.from_hdf(hdf, group_name=None)
+        except ValueError:
+            pass
+        try:
+            self._metadata.from_hdf(hdf, group_name=None)
         except ValueError:
             pass
 
@@ -76,10 +81,9 @@ class Project(ProjectCore):
         return new
 
     def open(self, rel_path, history=True):
-        new = super().open(rel_path, history=history)
+        new = self.open(rel_path, history=history)
         new.hdf5 = new.create_hdf(new.path, new.base_name + "_projectdata")
         new._metadata = InputList(table_name="metadata")
         new._project_info = InputList(table_name="projectinfo")
-        new.load_metadata()
-        new._load_projectinfo()
+        new.from_hdf()
         return new

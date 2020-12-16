@@ -88,7 +88,6 @@ class TestFenicsTutorials(unittest.TestCase):
 
         job.time_dependent_expressions.append(u_D)
         job.assigned_u = u_n
-        # Notebook tutorial code ends. Copy and paste this chunk into the appropriate tutorial cell.
 
         job.run()
 

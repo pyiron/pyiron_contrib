@@ -93,6 +93,7 @@ class Fenics(GenericJob):
     """
 
     def __init__(self, project, job_name):
+        """Create a new Fenics type job"""
         super(Fenics, self).__init__(project, job_name)
         self._python_only_job = True
         self.create = Creator(self)

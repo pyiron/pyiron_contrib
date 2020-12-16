@@ -68,6 +68,8 @@ class Fenics(GenericJob):
         LHS/RHS (?): The left-hand and right-hand sides of the equation to solve.
         time_dependent_expressions (list[Expression]): All expressions used in the domain, BC, LHS and RHS which have a
             `t` attribute that needs updating at each step. (Default is None, which initializes an empty list.)
+        assigned_u (?): The term which will be assigned the solution at each timestep. (Default is None, don't assign
+            anything.)
 
     Input:
         mesh_resolution (int): How dense the mesh should be (larger values = denser mesh). (Default is 2.)
@@ -118,6 +120,7 @@ class Fenics(GenericJob):
         self.RHS = None  # the right hand side of the equation; FEniCS function
         self.time_dependent_expressions = []  # Any expressions used with a `t` attribute to evolve
         # TODO: Make a class to force these to be Expressions and to update them?
+        self.assigned_u = None
 
         self._mesh = None  # the discretization mesh
         self._V = None  # finite element volume space
@@ -216,6 +219,10 @@ class Fenics(GenericJob):
                 expr.t += self.input.dt
             FEN.solve(self.LHS == self.RHS, self.u, self.BC)
             self.output.u.append(self.u.compute_vertex_values(self.mesh))
+            try:
+                self.assigned_u.assign(self.u)
+            except AttributeError:
+                pass
         self.status.collect = True
         self.run()
 

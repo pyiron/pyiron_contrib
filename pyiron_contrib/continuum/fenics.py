@@ -63,6 +63,7 @@ class Fenics(GenericJob):
         output (InputList): The output from the run, i.e. data that comes from `solve`ing the PDE.
         domain (?): The spatial domain on which to build the mesh. To be provided prior to running the job.
         BC (?): The boundary conditions for the mesh. To be provided prior to running the job.
+        LHS/RHS (?): The left-hand and right-hand sides of the equation to solve.
         time_dependent_expressions (list[Expression]): All expressions used in the domain, BC, LHS and RHS which have a
             `t` attribute that needs updating at each step. (Default is None, which initializes an empty list.)
 

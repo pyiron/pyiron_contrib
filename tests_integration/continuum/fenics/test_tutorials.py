@@ -45,7 +45,7 @@ class TestFenicsTutorials(unittest.TestCase):
 
         job.run()
 
-        self.assertTrue(np.all(np.isclose(job.output.u[-1], page_5.poisson())))
+        self.assertTrue(np.all(np.isclose(job.output.solution[-1], page_5.poisson())))
 
     def test_page_6(self):
         job = self.pr.create.job.Fenics('membrane', delete_existing_job=True)
@@ -62,7 +62,7 @@ class TestFenicsTutorials(unittest.TestCase):
 
         job.run()
 
-        self.assertTrue(np.all(np.isclose(job.output.u[-1], page_6.membrane())))
+        self.assertTrue(np.all(np.isclose(job.output.solution[-1], page_6.membrane())))
 
     def test_page_7_heat(self):
         job = self.pr.create.job.Fenics('heat', delete_existing_job=True)
@@ -91,7 +91,7 @@ class TestFenicsTutorials(unittest.TestCase):
 
         job.run()
 
-        self.assertTrue(np.all(np.isclose(job.output.u[-1], page_7.heat_equation())))
+        self.assertTrue(np.all(np.isclose(job.output.solution[-1], page_7.heat_equation())))
 
     def test_page_7_gaussian(self):
         job = self.pr.create.job.Fenics('gauss', delete_existing_job=True)
@@ -118,4 +118,7 @@ class TestFenicsTutorials(unittest.TestCase):
 
         job.run()
 
-        self.assertTrue(np.all(np.isclose(job.output.u[-1], page_7.gaussian_evolution())))
+        self.assertTrue(np.all(np.isclose(job.output.solution[-1], page_7.gaussian_evolution())))
+
+    def test_page_8(self):
+        pass

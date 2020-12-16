@@ -73,6 +73,10 @@ class Fenics(GenericJob):
         assigned_u (?): The term which will be assigned the solution at each timestep. (Default is None, don't assign
             anything.)
         mesh (?): The mesh. Generated automatically.
+        u:
+        v:
+        solution:
+        F:
 
     Input:
         mesh_resolution (int): How dense the mesh should be (larger values = denser mesh). (Default is 2, but not used
@@ -115,7 +119,7 @@ class Fenics(GenericJob):
         # TODO?: Make input sub-classes to catch invalid input?
 
         self.output = InputList(table_name='output')
-        self.output.u = []
+        self.output.solution = []
 
         # TODO: Figure out how to get these attributes into input/otherwise serializable
         self.domain = None  # the domain
@@ -130,6 +134,7 @@ class Fenics(GenericJob):
         self._V = None  # finite element volume space
         self._u = None  # u is the unkown function
         self._v = None  # the test function
+        self._solution = None
         self._vtk_filename = join(self.project_hdf5.path, 'output.pvd')
 
     def generate_mesh(self):
@@ -147,6 +152,7 @@ class Fenics(GenericJob):
         # TODO: Allow having multiple sets of spaces and test/trial functions
         self._u = FEN.TrialFunction(self.V)
         self._v = FEN.TestFunction(self.V)
+        self._solution = FEN.Function(self.V)
 
     def refresh(self):
         self.generate_mesh()
@@ -177,12 +183,22 @@ class Fenics(GenericJob):
     # TODO: Do all this refreshing with a simple decorator instead of duplicate code
 
     @property
+    def solution(self):
+        if self._solution is None:
+            self.refresh()
+        return self._solution
+
+    @property
     def grad_u(self):
         return FEN.grad(self.u)
 
     @property
     def grad_v(self):
         return FEN.grad(self.v)
+
+    @property
+    def grad_solution(self):
+        return FEN.grad(self.solution)
 
     @property
     def F(self):
@@ -201,7 +217,7 @@ class Fenics(GenericJob):
         Write the output to a .vtk file.
         """
         vtkfile = FEN.File(self._vtk_filename)
-        vtkfile << self.u
+        vtkfile << self.solution
 
     def validate_ready_to_run(self):
         if self.mesh is None:
@@ -221,14 +237,14 @@ class Fenics(GenericJob):
         unknown and RHS is the known part.
         """
         self.status.running = True
-        self._u = FEN.Function(self.V)
+        self._u = self.solution
         for _ in np.arange(self.input.n_steps):
             for expr in self.time_dependent_expressions:
                 expr.t += self.input.dt
             FEN.solve(self.LHS == self.RHS, self.u, self.BC)
-            self.output.u.append(self.u.compute_vertex_values(self.mesh))
+            self.output.solution.append(self.solution.compute_vertex_values(self.mesh))
             try:
-                self.assigned_u.assign(self.u)
+                self.assigned_u.assign(self.solution)
             except AttributeError:
                 pass
         self.status.collect = True
@@ -239,8 +255,8 @@ class Fenics(GenericJob):
         self.to_hdf()
         self.status.finished = True
     
-    def plot_u(self):
-        FEN.plot(self.u)
+    def plot_solution(self):
+        FEN.plot(self.solution)
 
     def plot_mesh(self):
         FEN.plot(self.mesh)
@@ -270,7 +286,7 @@ class Fenics(GenericJob):
         n_grid_y = n_grid_y or n_grid
 
         mesh_X, mesh_Y = self.mesh.coordinates().T
-        u_Z = self.output.u[frame]
+        u_Z = self.output.solution[frame]
 
         # Create grid values first.
         xi = np.linspace(np.amin(mesh_X), np.amax(mesh_X), n_grid_x)

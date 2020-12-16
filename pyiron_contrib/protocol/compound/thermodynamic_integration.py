@@ -294,7 +294,7 @@ class HarmonicTILD(_TILDParent):
         g.harmonic.direct.reference_positions = ip.structure.positions
         g.harmonic.broadcast.positions = gp.reflect.output.positions[-1]
         g.harmonic.direct.structure = ip.structure
-        g.harmonic.direct.eq_energy = ip.zero_k_energy
+        g.harmonic.direct.zero_k_energy = ip.zero_k_energy
 
         # transpose_forces
         g.transpose_forces.input.matrix = [
@@ -520,7 +520,7 @@ class _HarmonicallyCoupled(CompoundVertex):
         g.harmonic.input.reference_positions = ip.structure.positions
         g.harmonic.input.positions = gp.reflect.output.positions[-1]
         g.harmonic.input.structure = ip.structure
-        g.harmonic.input.eq_energy = ip.eq_energy
+        g.harmonic.input.zero_k_energy = ip.zero_k_energy
 
         # mix
         g.mix.input.vectors = [
@@ -758,7 +758,7 @@ class HarmonicTILDParallel(HarmonicTILD):
         # run_lambda_points - harmonic
         g.run_lambda_points.direct.spring_constant = ip.spring_constant
         g.run_lambda_points.direct.force_constants = ip.force_constants
-        g.run_lambda_points.direct.eq_energy = ip.zero_k_energy
+        g.run_lambda_points.direct.zero_k_energy = ip.zero_k_energy
 
         # run_lambda_points - mix
         g.run_lambda_points.broadcast.coupling_weights = gp.build_lambdas.output.lambda_pairs[-1]
@@ -896,6 +896,7 @@ class VacancyTILD(_TILDParent):
             it by the cutoff factor. A default value of 0.45 is chosen, because taking a cutoff factor of ~0.5
             sometimes let certain reflections off the hook, and we do not want that to happen. (Default is 0.45.)
         use_reflection (boolean): Turn on or off `SphereReflection` (Default is True.)
+        zero_k_energy (float): The zero Kelvin potential energy of the structure. (Default is None.)
 
     Output attributes:
         total_steps (list): The total number of steps for each integration point, up to convergence, or max steps.
@@ -932,6 +933,7 @@ class VacancyTILD(_TILDParent):
         id_.cutoff_factor = 0.5
         id_.use_reflection = True
         id_._total_steps = 0
+        id_.zero_k_energy = None
 
     def define_vertices(self):
         # Graph components
@@ -1104,7 +1106,7 @@ class VacancyTILD(_TILDParent):
         g.harmonic.broadcast.positions = gp.reflect.output.positions[-1]
         g.harmonic.direct.structure = ip.structure
         g.harmonic.direct.mask = ip.vacancy_id
-        g.harmonic.direct.eq_energy = ip.eq_energy
+        g.harmonic.direct.zero_k_energy = ip.zero_k_energy
 
         # write_vac_forces
         g.write_vac_forces.input.n_children = ip.n_lambdas
@@ -1329,7 +1331,7 @@ class _Decoupling(CompoundVertex):
         g.harmonic.input.positions = gp.reflect.output.positions[-1]
         g.harmonic.input.structure = ip.structure
         g.harmonic.input.mask = ip.vacancy_id
-        g.harmonic.input.eq_energy = ip.eq_energy
+        g.harmonic.input.zero_k_energy = ip.zero_k_energy
 
         # write_vac_forces
         g.write_vac_forces.input.target = gp.calc_full.output.forces[-1]
@@ -1610,7 +1612,7 @@ class VacancyTILDParallel(VacancyTILD):
         g.run_lambda_points.direct.spring_constant = ip.spring_constant
         g.run_lambda_points.direct.force_constants = ip.force_constants
         g.run_lambda_points.direct.vacancy_id = ip.vacancy_id
-        g.run_lambda_points.direct.eq_energy = ip.zero_k_energy
+        g.run_lambda_points.direct.zero_k_energy = ip.zero_k_energy
 
         # run_lambda_points - write_vac_forces -  takes inputs already specified
 

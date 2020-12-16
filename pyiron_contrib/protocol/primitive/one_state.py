@@ -577,7 +577,7 @@ class HarmonicHamiltonian(PrimitiveVertex):
         structure (Atoms): The reference structure.
         mask (numpy.array): Which of the atoms to consider. The other atoms are ignored. (Default is None, consider
             all atoms.)
-        eq_energy (float): The equilibrium energy of the structure.
+        zero_k_energy (float): The equilibrium energy of the structure.
 
     Output attributes:
         energy_pot (float): The harmonic potential energy.
@@ -591,7 +591,7 @@ class HarmonicHamiltonian(PrimitiveVertex):
         id_.force_constants = None
 
     def command(self, positions, reference_positions, structure, spring_constant=None, force_constants=None,
-                mask=None, eq_energy=None):
+                mask=None, zero_k_energy=None):
 
         dr = structure.find_mic(positions - reference_positions)
         if spring_constant is not None and force_constants is None:
@@ -617,8 +617,8 @@ class HarmonicHamiltonian(PrimitiveVertex):
         else:
             raise TypeError('Please specify either a spring constant or the force constant matrix')
 
-        if eq_energy is not None:
-            energy += eq_energy
+        if zero_k_energy is not None:
+            energy += zero_k_energy
 
         return {
             'forces': forces,

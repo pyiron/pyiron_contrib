@@ -14,6 +14,7 @@ import warnings
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.tri as tri
+from dolfin.cpp.mesh import Mesh
 
 __author__ = "Muhammad Hassani, Liam Huber"
 __copyright__ = (
@@ -132,8 +133,12 @@ class Fenics(GenericJob):
         if any([v is not None for v in [self.BC, self.LHS, self.RHS]]):
             warnings.warn("The mesh is being generated, but at least one of the boundary conditions or equation sides"
                           "is already defined -- please re-define these values since the mesh is updated")
-        self._mesh = mshr.generate_mesh(self.domain, self.input.mesh_resolution)
-        # TODO?: Accommodate uniform meshes like fenics.SquareMesh?
+
+        if isinstance(self.domain, Mesh):
+            self._mesh = self.domain  # Intent: Allow the domain to return a unit mesh
+        else:
+            self._mesh = mshr.generate_mesh(self.domain, self.input.mesh_resolution)
+
         self._V = FEN.FunctionSpace(self.mesh, self.input.element_type, self.input.element_order)
         # TODO: Allow changing what type of function space is used (VectorFunctionSpace, MultiMeshFunctionSpace...)
         # TODO: Allow having multiple sets of spaces and test/trial functions
@@ -385,6 +390,10 @@ class DomainFactory(PyironFactory):
             x, y = origin[0], origin[1]
         return mshr.Rectangle(FEN.Point(0 + x, 0 + y), FEN.Point(length + x, length + y))
     square.__doc__ = mshr.Rectangle.__doc__
+
+    def unit_square(self, nx, ny):
+        return FEN.UnitSquareMesh(nx, ny)
+    unit_square.__doc__ = FEN.UnitSquareMesh.__doc__
 
     def __call__(self):
         return self.square(1.)

@@ -19,6 +19,7 @@ from dolfin.cpp.mesh import Mesh
 from pyiron_contrib.continuum.fenics.factory import DomainFactory, BoundaryConditionFactory
 from pyiron_contrib.continuum.fenics.plotting import plot as modified_fenics_plot
 from matplotlib.docstring import copy as copy_docstring
+from ufl import nabla_div as ufl_nabla_div
 
 __author__ = "Muhammad Hassani, Liam Huber"
 __copyright__ = (
@@ -392,8 +393,12 @@ class Fenics(GenericJob):
         return FEN.grad(arg)
 
     @copy_docstring(FEN.nabla_grad)
-    def nabla(self, arg):
+    def nabla_grad(self, arg):
         return FEN.nabla_grad(arg)
+
+    @copy_docstring(ufl_nabla_div)
+    def nabla_div(self, f):
+        return ufl_nabla_div(f)
 
     @copy_docstring(FEN.inner)
     def inner(self, a, b):

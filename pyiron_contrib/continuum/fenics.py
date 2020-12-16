@@ -11,6 +11,7 @@ import mshr
 from pyiron_base import GenericJob, InputList, PyironFactory
 from os.path import join
 import warnings
+import numpy as np
 
 __author__ = "Muhammad Hassani, Liam Huber"
 __copyright__ = (
@@ -62,14 +63,19 @@ class Fenics(GenericJob):
         output (InputList): The output from the run, i.e. data that comes from `solve`ing the PDE.
         domain (?): The spatial domain on which to build the mesh. To be provided prior to running the job.
         BC (?): The boundary conditions for the mesh. To be provided prior to running the job.
+        time_dependent_expressions (list[Expression]): All expressions used in the domain, BC, LHS and RHS which have a
+            `t` attribute that needs updating at each step. (Default is None, which initializes an empty list.)
 
     Input:
         mesh_resolution (int): How dense the mesh should be (larger values = denser mesh). (Default is 2.)
         element_type (str): What type of element should be used. (Default is 'P'.) TODO: Restrict choices.
         element_order (int): What order the elements have. (Default is 1.)  TODO: Better description.
+        n_steps (int): How many steps to run for, where the `t` attribute of all time dependent expressions gets updated
+            at each step. (Default is 1.)
+        dt (float): How much to increase the `t` attribute of  all time dependent expressions each step. (Default is 1.)
 
     Output:
-        u (numpy.ndarray): The solved function values evaluated at the mesh points.
+        u (list): The solved function values evaluated at the mesh points at each time step.
 
     Example:
         >>> job = pr.create.job.Fenics('fenics_job')
@@ -94,17 +100,20 @@ class Fenics(GenericJob):
         self.input.mesh_resolution = 2
         self.input.element_type = 'P'
         self.input.element_order = 1
+        self.input.n_steps = 1
+        self.input.dt = 1
         # TODO?: Make input sub-classes to catch invalid input?
 
         self.output = InputList(table_name='output')
-        self.output.u = None
+        self.output.u = []
 
-        self.domain = self.create.domain()  # the domain  TODO: Get this into the input and saving/loading properly
-        self.BC = None  # the boundary condition  TODO: Get this into the input and saving/loading properly
+        # TODO: Figure out how to get these attributes into input/otherwise serializable
+        self.domain = self.create.domain()  # the domain
+        self.BC = None  # the boundary condition
         self.LHS = None  # the left hand side of the equation; FEniCS function
         self.RHS = None  # the right hand side of the equation; FEniCS function
-        # TODO: Get LHS and RHS into the input and saving/loading properly
-        #       (maybe with a softlink directly at the job level given the importance of this feature?
+        self.time_dependent_expressions = []  # Any expressions used with a `t` attribute to evolve
+        # TODO: Make a class to force these to be Expressions and to update them?
 
         self._mesh = None  # the discretization mesh
         self._V = None  # finite element volume space
@@ -198,12 +207,15 @@ class Fenics(GenericJob):
         """
         self.status.running = True
         self._u = FEN.Function(self.V)
-        FEN.solve(self.LHS == self.RHS, self.u, self.BC)
+        for _ in np.arange(self.input.n_steps):
+            for expr in self.time_dependent_expressions:
+                expr.t += self.input.dt
+            FEN.solve(self.LHS == self.RHS, self.u, self.BC)
+            self.output.u.append(self.u.compute_vertex_values(self.mesh))
         self.status.collect = True
         self.run()
 
     def collect_output(self):
-        self.output.u = self.u.compute_vertex_values(self.mesh)
         self._write_vtk()  # TODO: Get the output files so they're all tarballed after successful runs, like other codes
         self.to_hdf()
         self.status.finished = True

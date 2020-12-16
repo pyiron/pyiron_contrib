@@ -18,6 +18,7 @@ import matplotlib.tri as tri
 from dolfin.cpp.mesh import Mesh
 from pyiron_contrib.continuum.fenics.factory import DomainFactory, BoundaryConditionFactory
 from pyiron_contrib.continuum.fenics.plotting import plot as modified_fenics_plot
+from matplotlib.docstring import copy as copy_docstring
 
 __author__ = "Muhammad Hassani, Liam Huber"
 __copyright__ = (
@@ -265,9 +266,9 @@ class Fenics(GenericJob):
     def plot_mesh(self):
         FEN.plot(self.mesh)
 
+    @copy_docstring(modified_fenics_plot)
     def plot(self, object, *args, **kwargs):
         return modified_fenics_plot(object, *args, **kwargs)
-    plot.__doc__ = modified_fenics_plot.__doc__
 
     def plot_output(self, frame=-1, n_grid=1000, n_grid_x=None, n_grid_y=None, add_colorbar=True):
         """
@@ -318,6 +319,7 @@ class Fenics(GenericJob):
             fig.colorbar(heat, shrink=0.5, aspect=10)
         return heat, fig, ax
 
+    @copy_docstring(FEN.project)
     def project_function(self, v, **kwargs):
         """
         Project v onto the job's element, V.
@@ -331,6 +333,7 @@ class Fenics(GenericJob):
         """
         return FEN.project(v, V=self.V, **kwargs)
 
+    @copy_docstring(FEN.interpolate)
     def interpolate_function(self, v):
         """
         Interpolate v on the job's element, V.
@@ -366,39 +369,39 @@ class Fenics(GenericJob):
     def sympy(self):
         return sympy
 
+    @copy_docstring(FEN.Constant)
     def Constant(self, value):
         return FEN.Constant(value)
-    Constant.__doc__ = FEN.Constant.__doc__
 
+    @copy_docstring(FEN.Expression)
     def Expression(self, *args, **kwargs):
         return FEN.Expression(*args, **kwargs)
-    Expression.__doc__ = FEN.Expression.__doc__
 
     @property
+    @copy_docstring(FEN.dx)
     def dx(self):
         return FEN.dx
-    dx.__doc__ = FEN.dx.__doc__
 
     @property
+    @copy_docstring(FEN.ds)
     def ds(self):
         return FEN.ds
-    ds.__doc__ = FEN.ds.__doc__
 
+    @copy_docstring(FEN.grad)
     def grad(self, arg):
         return FEN.grad(arg)
-    grad.__doc__ = FEN.grad.__doc__  # TODO: Is there a nice way to do this with a decorator?
 
+    @copy_docstring(FEN.nabla_grad)
     def nabla(self, arg):
         return FEN.nabla_grad(arg)
-    nabla.__doc__ = FEN.nabla_grad.__doc__
 
+    @copy_docstring(FEN.inner)
     def inner(self, a, b):
         return FEN.inner(a, b)
-    inner.__doc__ = FEN.inner.__doc__
 
+    @copy_docstring(FEN.dot)
     def dot(self, arg1, arg2):
         return FEN.dot(arg1, arg2)
-    dot.__doc__ = FEN.dot.__doc__
 
 
 class Creator:

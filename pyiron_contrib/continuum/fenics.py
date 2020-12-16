@@ -8,6 +8,7 @@ A job class for performing finite element simulations using the [FEniCS](https:/
 
 import fenics as FEN
 import mshr
+import sympy
 from pyiron_base import GenericJob, InputList, PyironFactory
 from os.path import join
 import warnings
@@ -353,6 +354,10 @@ class Fenics(GenericJob):
     @property
     def mshr(self):
         return mshr
+
+    @property
+    def sympy(self):
+        return sympy
 
     def Constant(self, value):
         return FEN.Constant(value)

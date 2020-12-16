@@ -440,6 +440,10 @@ class RegularMeshFactory(PyironFactory):
         return FEN.RectangleMesh(FEN.Point(p1), FEN.Point(p2), nx, ny)
     rectangle.__doc__ = FEN.RectangleMesh.__doc__
 
+    def box(self, p1, p2, nx, ny, nz):
+        return FEN.BoxMesh(FEN.Point(p1), FEN.Point(p2), nx, ny, nz)
+    box.__doc__ = FEN.BoxMesh.__doc__
+
 
 class BoundaryConditionFactory(PyironFactory):
     def __init__(self, job):

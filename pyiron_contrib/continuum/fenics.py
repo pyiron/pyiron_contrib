@@ -378,6 +378,13 @@ class Creator:
 
 
 class DomainFactory(PyironFactory):
+    def __init__(self):
+        super().__init__()
+        self._regular = RegularMeshFactory()
+
+    @property
+    def regular_mesh(self):
+        return self._regular
 
     def circle(self, center, radius):
         return mshr.Circle(FEN.Point(*center), radius)
@@ -397,6 +404,12 @@ class DomainFactory(PyironFactory):
 
     def __call__(self):
         return self.square(1.)
+
+
+class RegularMeshFactory(PyironFactory):
+    def rectangle(self, p1, p2, nx, ny):
+        return FEN.RectangleMesh(FEN.Point(p1), FEN.Point(p2), nx, ny)
+    rectangle.__doc__ = FEN.RectangleMesh.__doc__
 
 
 class BoundaryConditionFactory(PyironFactory):

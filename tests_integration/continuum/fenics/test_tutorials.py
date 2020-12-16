@@ -93,3 +93,30 @@ class TestFenicsTutorials(unittest.TestCase):
         job.run()
 
         self.assertTrue(np.all(np.isclose(job.output.u[-1], page_7.heat_equation())))
+
+    def test_page_7_gaussian(self):
+        job = self.pr.create.job.Fenics('gauss', delete_existing_job=True)
+        total_time = 2.0  # final time
+        num_steps = 50  # number of time steps
+        dt = total_time / num_steps  # time step size
+
+        job.input.element_types = 'P'
+        job.input.element_order = 1
+        job.input.n_steps = num_steps
+        job.input.dt = dt
+
+        job.domain = job.create.domain.regular_mesh.rectangle((-2, -2), (2, 2), 30, 30)
+        job.BC = job.create.bc.dirichlet(job.Constant(0))
+
+        u_0 = job.Expression('exp(-a*pow(x[0], 2) - a*pow(x[1], 2))', degree=2, a=5)
+        u_n = job.interpolate_function(u_0)
+
+        f = job.Constant(0)
+        job.F = job.u * job.v * job.dx + job.input.dt * job.dot(job.grad_u, job.grad_v) * job.dx \
+                - (u_n + job.input.dt * f) * job.v * job.dx
+
+        job.assigned_u = u_n
+
+        job.run()
+
+        self.assertTrue(np.all(np.isclose(job.output.u[-1], page_7.gaussian_evolution())))

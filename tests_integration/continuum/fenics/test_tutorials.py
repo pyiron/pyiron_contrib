@@ -35,7 +35,7 @@ class TestFenicsTutorials(unittest.TestCase):
         job = self.pr.create.job.Fenics('poisson', delete_existing_job=True)
         job.input.element_type = 'P'
         job.input.element_order = 1
-        job.domain = job.create.domain.unit_square(8, 8)
+        job.domain = job.create.domain.unit_mesh.square(8, 8)
 
         u_D = job.Expression('1 + x[0]*x[0] + 2*x[1]*x[1]', degree=2)  # String expressions must have valid C++ syntax
         job.BC = job.create.bc.dirichlet(u_D)
@@ -75,7 +75,7 @@ class TestFenicsTutorials(unittest.TestCase):
         job.input.n_steps = 10
         job.input.dt = 0.2
 
-        job.domain = job.create.domain.unit_square(8, 8)
+        job.domain = job.create.domain.unit_mesh.square(8, 8)
 
         u_D = job.Expression('1 + x[0]*x[0] + alpha*x[1]*x[1] + beta*t', degree=2, alpha=3, beta=1.2, t=0)
         job.BC = job.create.bc.dirichlet(u_D)

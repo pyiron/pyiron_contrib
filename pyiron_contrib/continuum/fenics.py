@@ -64,16 +64,19 @@ class Fenics(GenericJob):
     Attributes:
         input (InputList): The input parameters controlling the run.
         output (InputList): The output from the run, i.e. data that comes from `solve`ing the PDE.
-        domain (?): The spatial domain on which to build the mesh. To be provided prior to running the job.
+        domain (?): The spatial domain on which to build the mesh or, in the case of special meshes, the mesh itself.
+            To be provided prior to running the job.
         BC (?): The boundary conditions for the mesh. To be provided prior to running the job.
         LHS/RHS (?): The left-hand and right-hand sides of the equation to solve.
         time_dependent_expressions (list[Expression]): All expressions used in the domain, BC, LHS and RHS which have a
             `t` attribute that needs updating at each step. (Default is None, which initializes an empty list.)
         assigned_u (?): The term which will be assigned the solution at each timestep. (Default is None, don't assign
             anything.)
+        mesh (?): The mesh. Generated automatically.
 
     Input:
-        mesh_resolution (int): How dense the mesh should be (larger values = denser mesh). (Default is 2.)
+        mesh_resolution (int): How dense the mesh should be (larger values = denser mesh). (Default is 2, but not used
+            if the domain is a special mesh, e.g. unit or regular.)
         element_type (str): What type of element should be used. (Default is 'P'.) TODO: Restrict choices.
         element_order (int): What order the elements have. (Default is 1.)  TODO: Better description.
         n_steps (int): How many steps to run for, where the `t` attribute of all time dependent expressions gets updated
@@ -115,7 +118,7 @@ class Fenics(GenericJob):
         self.output.u = []
 
         # TODO: Figure out how to get these attributes into input/otherwise serializable
-        self.domain = self.create.domain()  # the domain
+        self.domain = None  # the domain
         self.BC = None  # the boundary condition
         self.LHS = None  # the left hand side of the equation; FEniCS function
         self.RHS = None  # the right hand side of the equation; FEniCS function
@@ -381,10 +384,15 @@ class DomainFactory(PyironFactory):
     def __init__(self):
         super().__init__()
         self._regular = RegularMeshFactory()
+        self._unit = UnitMeshFactory()
 
     @property
     def regular_mesh(self):
         return self._regular
+
+    @property
+    def unit_mesh(self):
+        return self._unit
 
     def circle(self, center, radius):
         return mshr.Circle(FEN.Point(*center), radius)
@@ -398,12 +406,11 @@ class DomainFactory(PyironFactory):
         return mshr.Rectangle(FEN.Point(0 + x, 0 + y), FEN.Point(length + x, length + y))
     square.__doc__ = mshr.Rectangle.__doc__
 
-    def unit_square(self, nx, ny):
-        return FEN.UnitSquareMesh(nx, ny)
-    unit_square.__doc__ = FEN.UnitSquareMesh.__doc__
 
-    def __call__(self):
-        return self.square(1.)
+class UnitMeshFactory(PyironFactory):
+    def square(self, nx, ny):
+        return FEN.UnitSquareMesh(nx, ny)
+    square.__doc__ = FEN.UnitSquareMesh.__doc__
 
 
 class RegularMeshFactory(PyironFactory):

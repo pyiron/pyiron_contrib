@@ -382,6 +382,10 @@ class Fenics(GenericJob):
         return FEN.nabla_grad(arg)
     nabla.__doc__ = FEN.nabla_grad.__doc__
 
+    def inner(self, a, b):
+        return FEN.inner(a, b)
+    inner.__doc__ = FEN.inner.__doc__
+
     def dot(self, arg1, arg2):
         return FEN.dot(arg1, arg2)
     dot.__doc__ = FEN.dot.__doc__

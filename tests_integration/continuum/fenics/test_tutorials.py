@@ -63,12 +63,9 @@ class TestFenicsTutorials(unittest.TestCase):
 
     def test_page_7_heat(self):
         job = self.pr.create.job.Fenics('heat', delete_existing_job=True)
-        total_time = 2.0  # final time
-        num_steps = 10  # number of time steps
-        dt = total_time / num_steps  # time step size
 
         job.input.n_steps = 10
-        job.input.dt = 0.2
+        job.input.dt = 2.0 / job.input.n_steps
 
         job.domain = job.create.domain.unit_mesh.square(8, 8)
 
@@ -78,7 +75,7 @@ class TestFenicsTutorials(unittest.TestCase):
         u_n = job.interpolate_function(u_D)
 
         f = job.Constant(u_D.beta - 2 - 2 * u_D.alpha)
-        job.F = job.u * job.v * job.dx + dt * job.dot(job.grad_u, job.grad_v) * job.dx \
+        job.F = job.u * job.v * job.dx + job.input.dt * job.dot(job.grad_u, job.grad_v) * job.dx \
                 - (u_n + job.input.dt * f) * job.v * job.dx
 
         job.time_dependent_expressions.append(u_D)
@@ -90,12 +87,8 @@ class TestFenicsTutorials(unittest.TestCase):
 
     def test_page_7_gaussian(self):
         job = self.pr.create.job.Fenics('gauss', delete_existing_job=True)
-        total_time = 2.0  # final time
-        num_steps = 50  # number of time steps
-        dt = total_time / num_steps  # time step size
-
-        job.input.n_steps = num_steps
-        job.input.dt = dt
+        job.input.n_steps = 50
+        job.input.dt = 2.0 / job.input.n_steps
 
         job.domain = job.create.domain.regular_mesh.rectangle((-2, -2), (2, 2), 30, 30)
         job.BC = job.create.bc.dirichlet(job.Constant(0))

@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 import matplotlib.tri as tri
 from dolfin.cpp.mesh import Mesh
 from pyiron_contrib.continuum.fenics.factory import DomainFactory, BoundaryConditionFactory
+from pyiron_contrib.continuum.fenics.plotting import plot as modified_fenics_plot
 
 __author__ = "Muhammad Hassani, Liam Huber"
 __copyright__ = (
@@ -263,6 +264,10 @@ class Fenics(GenericJob):
 
     def plot_mesh(self):
         FEN.plot(self.mesh)
+
+    def plot(self, object, *args, **kwargs):
+        return modified_fenics_plot(object, *args, **kwargs)
+    plot.__doc__ = modified_fenics_plot.__doc__
 
     def plot_output(self, frame=-1, n_grid=1000, n_grid_x=None, n_grid_y=None, add_colorbar=True):
         """

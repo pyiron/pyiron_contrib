@@ -371,8 +371,12 @@ class Fenics(GenericJob):
     @property
     def dx(self):
         return FEN.dx
-
     dx.__doc__ = FEN.dx.__doc__
+
+    @property
+    def ds(self):
+        return FEN.ds
+    ds.__doc__ = FEN.ds.__doc__
 
     def grad(self, arg):
         return FEN.grad(arg)

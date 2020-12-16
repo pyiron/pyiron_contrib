@@ -378,6 +378,10 @@ class Fenics(GenericJob):
     def Expression(self, *args, **kwargs):
         return FEN.Expression(*args, **kwargs)
 
+    @copy_docstring(FEN.Identity)
+    def Identity(self, dim):
+        return FEN.Identity(dim)
+
     @property
     @copy_docstring(FEN.dx)
     def dx(self):
@@ -407,6 +411,10 @@ class Fenics(GenericJob):
     @copy_docstring(FEN.dot)
     def dot(self, arg1, arg2):
         return FEN.dot(arg1, arg2)
+
+    @copy_docstring(FEN.tr)
+    def tr(self, A):
+        return FEN.tr(A)
 
 
 class Creator:

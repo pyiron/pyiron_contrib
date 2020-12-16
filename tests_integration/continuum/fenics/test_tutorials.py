@@ -56,7 +56,7 @@ class TestFenicsTutorials(unittest.TestCase):
         job.domain = job.create.domain.circle((0, 0), 1)
         job.BC = job.create.bc.dirichlet(job.Constant(0))
 
-        p = job.Expression('4*exp(-pow(beta, 2)*(pow(x[0], 2) + pow(x[1] - R0, 2)))', degree=1, beta=12, R0=0.3)
+        p = job.Expression('4*exp(-pow(beta, 2)*(pow(x[0], 2) + pow(x[1] - R0, 2)))', degree=1, beta=8, R0=0.6)
         job.LHS = job.dot(job.grad_u, job.grad_v) * job.dx
         job.RHS = p * job.v * job.dx
 

@@ -13,10 +13,11 @@ def membrane():
     R0 = 0.6
     p = Expression('4*exp(-pow(beta, 2)*(pow(x[0], 2) + pow(x[1] - R0, 2)))',
                    degree=1, beta=beta, R0=R0)
-    p.beta = 12
-    p.R0 = 0.3
+    # p.beta = 12
+    # p.R0 = 0.3
 
     def does_not_appear_on_webpage(mesh):
+        """But rather in downloaded .py file from the page."""
         V = FunctionSpace(mesh, 'P', 2)
 
         def boundary(x, on_boundary):

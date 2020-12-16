@@ -18,7 +18,7 @@ import unittest
 from pyiron_base import Project
 import pyiron_contrib
 import numpy as np
-from .tutorials import page_5, page_6, page_7, page_8
+from .tutorials import page_5, page_6, page_7, page_8, page_9
 
 
 class TestFenicsTutorials(unittest.TestCase):
@@ -132,3 +132,41 @@ class TestFenicsTutorials(unittest.TestCase):
         job.run()
 
         self.assertTrue(np.all(np.isclose(job.output.solution[-1], page_8.poisson_nonlinear())))
+
+    def test_page_9(self):
+        # Scaled variables
+        L = 1;
+        W = 0.2
+        mu = 1
+        rho = 1
+        delta = W / L
+        gamma = 0.4 * delta ** 2
+        beta = 1.25
+        lambda_ = beta
+        g = gamma
+
+        job = self.pr.create.job.Fenics('linear_elasticity', delete_existing_job=True)
+        job.V_class = job.fenics.VectorFunctionSpace
+        job.domain = job.create.domain.regular_mesh.box((0, 0, 0), (L, W, W), 10, 3, 3)
+
+        def clamped_boundary(x, on_boundary):
+            return on_boundary and x[0] < 1e-14
+
+        job.BC = job.create.bc.dirichlet(job.Constant((0, 0, 0)), bc_fnc=clamped_boundary)
+
+        # Define strain and stress
+        def epsilon(u):
+            return 0.5 * (job.nabla_grad(u) + job.nabla_grad(u).T)
+            # return sym(nabla_grad(u))
+
+        def sigma(u):
+            return lambda_ * job.nabla_div(u) * job.Identity(u.geometric_dimension()) + 2 * mu * epsilon(u)
+
+        f = job.Constant((0, 0, -rho * g))
+        T = job.Constant((0, 0, 0))
+        job.LHS = job.inner(sigma(job.u), epsilon(job.v)) * job.dx
+        job.RHS = job.dot(f, job.v) * job.dx + job.dot(T, job.v) * job.ds
+
+        job.run()
+
+        self.assertTrue(np.all(np.isclose(job.output.solution[-1], page_9.linear_elasticity())))

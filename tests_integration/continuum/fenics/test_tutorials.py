@@ -18,7 +18,7 @@ import unittest
 from pyiron_base import Project
 import pyiron_contrib
 import numpy as np
-from .tutorials import page_5, page_6, page_7
+from .tutorials import page_5, page_6, page_7, page_8
 
 
 class TestFenicsTutorials(unittest.TestCase):
@@ -121,4 +121,28 @@ class TestFenicsTutorials(unittest.TestCase):
         self.assertTrue(np.all(np.isclose(job.output.solution[-1], page_7.gaussian_evolution())))
 
     def test_page_8(self):
-        pass
+        job = self.pr.create.job.Fenics('poisson_nonlinear', delete_existing_job=True)
+
+        def q(u):
+            """Return nonlinear coefficient"""
+            return 1 + u ** 2
+
+        x, y = job.sympy.symbols('x[0], x[1]')
+        u = 1 + x + 2 * y
+        f = - job.sympy.diff(q(u) * job.sympy.diff(u, x), x) - job.sympy.diff(q(u) * job.sympy.diff(u, y), y)
+        f = job.sympy.simplify(f)
+        u_code = job.sympy.printing.ccode(u)
+        f_code = job.sympy.printing.ccode(f)
+
+        job.domain = job.create.domain.unit_mesh.square(8, 8)
+
+        u_D = job.Expression(u_code, degree=1)
+        job.BC = job.create.bc.dirichlet(u_D)
+
+        f = job.Expression(f_code, degree=1)
+        job.LHS = q(job.solution) * job.dot(job.grad_solution, job.grad_v) * job.dx - f * job.v * job.dx
+        job.RHS = 0
+
+        job.run()
+
+        self.assertTrue(np.all(np.isclose(job.output.solution[-1], page_8.poisson_nonlinear())))

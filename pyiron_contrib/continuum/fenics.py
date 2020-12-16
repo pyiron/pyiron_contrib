@@ -130,6 +130,7 @@ class Fenics(GenericJob):
         self.time_dependent_expressions = []  # Any expressions used with a `t` attribute to evolve
         # TODO: Make a class to force these to be Expressions and to update them?
         self.assigned_u = None
+        self.V_class = FEN.FunctionSpace
 
         self._mesh = None  # the discretization mesh
         self._V = None  # finite element volume space
@@ -148,7 +149,7 @@ class Fenics(GenericJob):
         else:
             self._mesh = mshr.generate_mesh(self.domain, self.input.mesh_resolution)
 
-        self._V = FEN.FunctionSpace(self.mesh, self.input.element_type, self.input.element_order)
+        self._V = self.V_class(self.mesh, self.input.element_type, self.input.element_order)
         # TODO: Allow changing what type of function space is used (VectorFunctionSpace, MultiMeshFunctionSpace...)
         # TODO: Allow having multiple sets of spaces and test/trial functions
         self._u = FEN.TrialFunction(self.V)

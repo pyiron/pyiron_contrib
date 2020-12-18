@@ -6,7 +6,7 @@ dependencies:
   - coverage
   - codacy-coverage
   - matplotlib =3.2.1
-  - fenics =2019.1.0
+  - fenics =2019.1.0=*_9
   - mshr =2019.1.0=*_2
   - numpy =1.19.1
   - pyiron =0.3.6

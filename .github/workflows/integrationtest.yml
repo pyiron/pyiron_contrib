@@ -35,4 +35,4 @@ jobs:
         pip install --no-deps .
     - name: Test
       shell: bash -l {0}
-      run: unittest discover tests_integration
+      run: python -m unittest discover tests_integration

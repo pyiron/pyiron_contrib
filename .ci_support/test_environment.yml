@@ -6,7 +6,8 @@ dependencies:
   - coverage
   - codacy-coverage
   - matplotlib
-  - fenics =2019.1.0=*_9
+  - fenics =2019.1.0=*_13
+  - fenics-libdolfin =2019.1.0=*_8
   - mshr =2019.1.0=*_2
   - numpy
   - pyiron =0.3.6

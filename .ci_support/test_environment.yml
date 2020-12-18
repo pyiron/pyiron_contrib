@@ -10,7 +10,7 @@ dependencies:
   - fenics-libdolfin =2019.1.0=*_8
   - mshr =2019.1.0=*_2
   - numpy
-  - pyiron =0.3.6
+  - pyiron
   - scipy
   - seaborn
   - scikit-image

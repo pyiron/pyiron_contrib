@@ -1,15 +1,15 @@
 channels:
   - conda-forge
 dependencies:
-  - ase =3.19
+  - ase
   - coveralls
   - coverage
   - codacy-coverage
-  - matplotlib =3.2.1
+  - matplotlib
   - fenics =2019.1.0=*_9
   - mshr =2019.1.0=*_2
-  - numpy =1.19.1
+  - numpy
   - pyiron =0.3.6
-  - scipy =1.5.2
-  - seaborn =0.11.0
-  - scikit-image =0.17.2
+  - scipy
+  - seaborn
+  - scikit-image

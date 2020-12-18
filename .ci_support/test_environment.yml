@@ -1,0 +1,16 @@
+channels:
+  - conda-forge
+dependencies:
+  - ase
+  - coveralls
+  - coverage
+  - codacy-coverage
+  - matplotlib
+  - fenics =2019.1.0
+  - fenics-libdolfin =2019.1.0=*_8
+  - mshr =2019.1.0=*_2
+  - numpy
+  - pyiron
+  - scipy
+  - seaborn
+  - scikit-image

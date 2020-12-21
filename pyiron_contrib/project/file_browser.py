@@ -130,7 +130,7 @@ class DisplayMetadata:
                 print(key + ': ' + value)
 
 
-class _FileBrowser:
+class FileBrowser:
     """
         File Browser Widget with S3 support
 
@@ -138,139 +138,95 @@ class _FileBrowser:
         Selected files may be received from this FileBrowser widget by data attribute.
     """
     def __init__(self,
+                 project=None,
                  Vbox=None,
-                 s3path="",
-                 localpath=None,
-                 fix_s3_path=False,
-                 storage_system="local",
-                 fix_storage_sys=False,
-                 s3_config=None,
-                 hdf_as_dirs=False,
-                 hide_hdf=False
+                 fix_path=False,
                  ):
         """
-            Filebrowser to browse the local or a remote (S3-based) file system.
+            Filebrowser to browse the project file system.
             Args:
-              s3path (str): Starting path within the remote file system.
-              localpath (str/None): Starting path in the local filesystem; if None use current directory.
-              fix_s3_path (bool): If True the path in the remote file system cannot be changed.
-              storage_system (str): The filesystem to access (fist) either "local" or "S3".
-              fix_storage_sys (bool): If True the file system cannot be changed.
-              s3_config (str/dict/None): path to a json configuration file or dictionary with login
-                                        credentials for the remote file system.
-              hdf_as_dirs (bool): If True hdf files in the local file system are shown and treated as directories
-              hide_hdf (bool/None): If True hdf files are hidden (also not displayed as directories)
+                project (:class:`pyiron.Project`):
+                fix_path (bool): If True the path in the file system cannot be changed.
         """
+        self.project = project.copy()
+        self._initial_path = self.path
+        self._project_root_path = self.project.root_path
+
         if Vbox is None:
             self.box = widgets.VBox()
         else:
             self.box = Vbox
-        self.fix_s3_path = fix_s3_path
-        self.s3path = s3path
-        if localpath is None:
-            localpath = os.getcwd()
-        self.hdf_as_dirs = hdf_as_dirs
-        self.hide_hdf = hide_hdf
-        self._in_hdf = False
-        self._h5_access = None
-        self._h5_path = ""
-        self.data_sys = storage_system
-        if self.data_sys == "local":
-            self.path = localpath
-        else:
-            self.path = self.s3path
+        self.fix_path = fix_path
         self.output = widgets.Output(layout=widgets.Layout(width='50%', height='100%'))
-        self._display_file = DisplayFile(file=None, outwidget=self.output).display_file
-        self._display_metadata = DisplayMetadata(metadata=None, outwidget=self.output).display
+        #TODO: move to project self._display_file = DisplayFile(file=None, outwidget=self.output).display_file
+        #TODO: move to project self._display_metadata = DisplayMetadata(metadata=None, outwidget=self.output).display
         self._clickedFiles = []
         self._data = []
-        self.fix_storage_sys = fix_storage_sys
-        self._path_storage = [localpath, self.s3path]
         self.pathbox = widgets.HBox(layout=widgets.Layout(width='100%', justify_content='flex-start'))
         self.optionbox = widgets.HBox()
         self.filebox = widgets.VBox(layout=widgets.Layout(width='50%', height='100%', justify_content='flex-start'))
         self.path_string_box = widgets.Text(description="(rel) Path", width='min-content')
-        try:
-            self._s3_access = FileS3IO(config=s3_config,
-                                       path=self.s3path)
-            self._update_files()
-            self.update()
-        except TypeError:
-            self._s3_access = None
-            self.configure(storage_system="local", fix_storage_sys=True)
-
-    def configure(self,
-                 s3path=None,
-                 fix_s3_path=None,
-                 storage_system=None,
-                 fix_storage_sys=None,
-                 hdf_as_dirs=None,
-                 hide_hdf=None,
-                 ):
-        """
-            Reconfigure and refresh Filebrowser.
-            Args:
-              s3path (str/None): Path within the remote file system.
-              fix_s3_path (bool/None): If True the path in the remote file system cannot be changed.
-              storage_system (str/None): The filesystem to access (first): either "local" or "S3".
-              fix_storage_sys (bool/None): If True the file system cannot be changed.
-              hdf_as_dirs (bool/None): If True hdf files in the local file system are shown and treated as directories
-              hide_hdf (bool/None): If True hdf files are hidden (also not displayed as directories)
-        """
-        if s3path is not None:
-            self.s3path = s3path
-        if hdf_as_dirs is not None:
-            self.hdf_as_dirs = hdf_as_dirs
-        if hide_hdf is not None:
-            self.hide_hdf = hide_hdf
-        if fix_s3_path is not None:
-            self.fix_s3_path = fix_s3_path
-        if storage_system is not None:
-            if storage_system == "S3" and self.data_sys == "local":
-                self._path_storage[0] = self.path
-                self.path = self._path_storage[1]
-            elif storage_system == "local" and self.data_sys == "S3":
-                self._path_storage[1] = self.path
-                self.path = self._path_storage[0]
-            self.data_sys = storage_system
-        if fix_storage_sys is not None:
-            self.fix_storage_sys = fix_storage_sys
-
-        if s3path is not None:
-            if self.data_sys == "S3":
-                self.path = self.s3path
-            else:
-                self._path_storage[1] = self.s3path
         self._update_files()
         self.update()
 
+    #def configure(self,
+    #             s3path=None,
+    #             fix_s3_path=None,
+    #             storage_system=None,
+    #             fix_storage_sys=None,
+    #             hdf_as_dirs=None,
+    #             hide_hdf=None,
+    #             ):
+    #    """
+    #        Reconfigure and refresh Filebrowser.
+    #        Args:
+    #          s3path (str/None): Path within the remote file system.
+    #          fix_s3_path (bool/None): If True the path in the remote file system cannot be changed.
+    #          storage_system (str/None): The filesystem to access (first): either "local" or "S3".
+    #          fix_storage_sys (bool/None): If True the file system cannot be changed.
+    #          hdf_as_dirs (bool/None): If True hdf files in the local file system are shown and treated as directories
+    #          hide_hdf (bool/None): If True hdf files are hidden (also not displayed as directories)
+    #    """
+    #    if s3path is not None:
+    #        self.s3path = s3path
+    #    if hdf_as_dirs is not None:
+    #        self.hdf_as_dirs = hdf_as_dirs
+    #    if hide_hdf is not None:
+    #        self.hide_hdf = hide_hdf
+    #    if fix_s3_path is not None:
+    #        self.fix_s3_path = fix_s3_path
+    #    if storage_system is not None:
+    #        if storage_system == "S3" and self.data_sys == "local":
+    #            self._path_storage[0] = self.path
+    #            self.path = self._path_storage[1]
+    #        elif storage_system == "local" and self.data_sys == "S3":
+    #            self._path_storage[1] = self.path
+    #            self.path = self._path_storage[0]
+    #        self.data_sys = storage_system
+    #    if fix_storage_sys is not None:
+    #        self.fix_storage_sys = fix_storage_sys
+
+    #    if s3path is not None:
+    #        if self.data_sys == "S3":
+    #            self.path = self.s3path
+    #        else:
+    #            self._path_storage[1] = self.s3path
+    #    self._update_files()
+    #    self.update()
+
+    @property
+    def path(self):
+        return self.project.path
+
+
     def _update_files(self):
-        self.files = list()
-        self.dirs = list()
-        self.h5dirs = list()
-        if self.data_sys == "local" and not self._in_hdf:
-            if os.path.isdir(self.path):
-                for f in iglob(self.path + '/*'):
-                    if os.path.isdir(f):
-                        self.dirs.append(os.path.split(f)[1])
-                    else:
-                        filename = os.path.split(f)[1]
-                        if os.path.splitext(filename)[1] in ".h5":
-                            self.h5dirs.append(filename)
-                        else:
-                            self.files.append(filename)
-        elif self._in_hdf:
-            self._h5_access.h5_path = self._h5_path
-            list_all_dir = self._h5_access.list_all()
-            self.files = list_all_dir["nodes"]
-            self.h5dirs = list_all_dir["groups"]
-        else:
-            if self._s3_access is None:
-                raise AttributeError("S3 Access is not set up!")
-            self._s3_access.open(self.path)
-            self.files = self._s3_access.list_nodes()
-            if not self.fix_s3_path:
-                self.dirs = self._s3_access.list_groups()
+        # HDF and S3 project do not have list_files
+        try:
+            self.files = self.project.list_files()
+        except AttributeError:
+            self.files = list()
+        self.nodes = self.project.list_nodes()
+        self.dirs = self.project.list_groups()
 
     def gui(self):
         self.update()
@@ -291,66 +247,19 @@ class _FileBrowser:
         Vbox.children = tuple([self.optionbox, self.pathbox, body])
 
     def _update_optionbox(self, optionbox):
-        def on_sys_change(b):
-            if b.description == 'RDM':
-                if self.data_sys == 'S3':
-                    return
-                self._clickedFiles = []
-                self._path_storage[0] = self.path
-                self.path = self._path_storage[1]
-                b.style = checkbox_active_style
-                file_sys_button_local.style = checkbox_inactive_style
-                if self.fix_s3_path:
-                    set_path_button.disabled = True
-                self.data_sys = 'S3'
-                self._update_files()
-                self._update_filebox(self.filebox)
-                return
-            if b.description == 'local':
-                if self.data_sys == 'local':
-                    return
-                self._clickedFiles = []
-                self._path_storage[1] = self.path
-                self.path = self._path_storage[0]
-                b.style = checkbox_active_style
-                set_path_button.disabled = False
-                file_sys_button_S3.style = checkbox_inactive_style
-                self.data_sys = 'local'
-                self._update_files()
-                self._update_filebox(self.filebox)
-                return
         # some color definitions:
         checkbox_active_style = {"button_color": "#FF8888", 'font_weight': 'bold'}
         checkbox_inactive_style = {"button_color": "#CCAAAA"}
 
-        file_sys_button_local = widgets.Button(description='local', tooltip="Change to local filesystem",
-                                         icon="fa-database", layout=widgets.Layout(width='80px'))
-        file_sys_button_S3 = widgets.Button(description='RDM', tooltip="Change to Research Data Management System",
-                                          icon="fa-database", layout=widgets.Layout(width='80px'))
-        if self.data_sys == "local":
-            file_sys_button_local.style = checkbox_active_style
-            file_sys_button_S3.style = checkbox_inactive_style
-        else:
-            file_sys_button_local.style = checkbox_inactive_style
-            file_sys_button_S3.style = checkbox_active_style
-
-        file_sys_button_local.on_click(on_sys_change)
-        file_sys_button_S3.on_click(on_sys_change)
-
-        if self.fix_storage_sys:
-            if self.data_sys == "local":
-                childs = [file_sys_button_local,  self.path_string_box]
-            else:
-                childs = [file_sys_button_S3,  self.path_string_box]
-        else:
-            childs = [file_sys_button_local, file_sys_button_S3, self.path_string_box]
+        file_sys_button = widgets.Button(description=self.project.base_name,
+                                         icon="database", layout=widgets.Layout(width='80px'))
 
         set_path_button = widgets.Button(description='Set Path', tooltip="Sets current path to provided string.")
         set_path_button.on_click(self._click_option_button)
-        if self.fix_s3_path and self.data_sys == "S3":
+        if self.fix_path:
             set_path_button.disabled = True
-        if not (self.fix_s3_path and self.fix_storage_sys and self.data_sys == "S3"):
-            childs.append(set_path_button)
+        childs = [set_path_button, self.path_string_box]
+
         button = widgets.Button(description="Select File(s)", width='min-content',
                                  tooltip='Selects all files ' +
                                          'matching the provided string patten; wildcards allowed.')
@@ -367,10 +276,8 @@ class _FileBrowser:
         with self.output:
             print('')
         if b.description == 'Set Path':
-            if self.data_sys == 'S3':
-                if self.fix_s3_path:
-                    return
-                path = '/' + self.path
+            if self.fix_path:
+                return
             else:
                 path = self.path
             if len(self.path_string_box.value) == 0:
@@ -382,111 +289,105 @@ class _FileBrowser:
             else:
                 path = self.path_string_box.value
             # check path consistency:
-            if (self.data_sys == 'local' and os.path.exists(path)):
-                self.path = os.path.abspath(path)
-            elif (self._s3_access.is_dir(path[1:]) and self.data_sys == 'S3'):
-                self.path = path[1:]
-            else:
+            try:
+                rel_path = os.path.relpath(path, self.path)
+                new_project = self.project[rel_path]
+                self.project = new_project
+            except ValueError:
                 self.path_string_box.__init__(description="(rel) Path", value='')
                 with self.output:
-                    if not self.hdf_as_dirs:
-                        print('No valid path')
-                    else:
-                        print('No valid path or path within h5 (not supported)')
+                    print('No valid path')
                 return
             self._update_files()
             self._update_filebox(self.filebox)
             self.path_string_box.__init__(description="(rel) Path", value='')
-        if b.description == 'Select File(s)':
-            self._select_files()
+        #if b.description == 'Select File(s)':
+        #    self._select_files()
         if b.description == 'Reset selection':
             self._clickedFiles = []
             self._update_filebox(self.filebox)
 
-    @property
-    def data(self):
-        if self.data_sys == "S3":
-            self._download_data_from_s3()
-        else:
-            for file in self._clickedFiles:
-                data = Data(source=file)
-                self._data.append(data)
-        with self.output:
-            if len(self._data) > 0:
-                print('Loaded %i File(s):' % (len(self._data)))
-                for i in self._data:
-                    print(i.filename)
-            else:
-                print('No files chosen')
-        self._clickedFiles = []
-        self._update_filebox(self.filebox)
-        return self._data
+    #@property
+    #def data(self):
+    #    for file in self._clickedFiles:
+    #        data = Data(source=file)
+    #        self._data.append(data)
+    #    with self.output:
+    #        if len(self._data) > 0:
+    #            print('Loaded %i File(s):' % (len(self._data)))
+    #            for i in self._data:
+    #                print(i.filename)
+    #        else:
+    #            print('No files chosen')
+    #    self._clickedFiles = []
+    #    self._update_filebox(self.filebox)
+    #    return self._data
 
-    def put_data(self, data, metadata=None):
-        """
-        Uploads a single data object to the current directory of the RDM System
-        Args:
-            data: MeasuredData Object like the ones stored in self.data
-            metadata: metadata to be used (has to be a dictionary of type {"string": "string, })
-                      provided metadata overwrites the one possibly present in the data object
-        """
-        if self._s3_access is None:
-            raise AttributeError ("S3 Access is not set up!")
-        self._s3_access.put(data, metadata)
+    #def put_data(self, data, metadata=None):
+    #    """
+    #    Uploads a single data object to the current directory of the RDM System
+    #    Args:
+    #        data: MeasuredData Object like the ones stored in self.data
+    #        metadata: metadata to be used (has to be a dictionary of type {"string": "string, })
+    #                  provided metadata overwrites the one possibly present in the data object
+    #    """
+    #    if self._s3_access is None:
+    #        raise AttributeError ("S3 Access is not set up!")
+    #    self._s3_access.put(data, metadata)
 
-    def _download_data_from_s3(self):
-        for file in self._clickedFiles:
-            filename = os.path.split(file)[1]
-            filetype = os.path.splitext(filename)[1]
-            if len(filetype[1:]) == 0:
-                filetype = None
-            else:
-                filetype = filetype[1:]
-            obj = self._s3_access.get(file, abspath=True)
-            data = Data(data=obj['Body'].read(), filename=filename, filetype=filetype,
-                        metadata=obj["Metadata"])
-            self._data.append(data)
+    #def _download_data_from_s3(self):
+    #    for file in self._clickedFiles:
+    #        filename = os.path.split(file)[1]
+    #        filetype = os.path.splitext(filename)[1]
+    #        if len(filetype[1:]) == 0:
+    #            filetype = None
+    #        else:
+    #            filetype = filetype[1:]
+    #        obj = self._s3_access.get(file, abspath=True)
+    #        data = Data(data=obj['Body'].read(), filename=filename, filetype=filetype,
+    #                    metadata=obj["Metadata"])
+    #        self._data.append(data)
 
-    def upload_data_to_s3(self, files, metadata=None):
-        """
-        Uploads files into the currently opened directory of the Research Data System
-        Arguments:
-            files `list` : List of filenames to upload
-            metadata `dictionary`: metadata of the files (Not nested, only "str" type)
-        """
-        if self._s3_access is None:
-            raise AttributeError ("S3 Access is not set up!")
-        self._s3_access.upload(files=files, metadata=metadata)
+    #def upload_data_to_s3(self, files, metadata=None):
+    #    """
+    #    Uploads files into the currently opened directory of the Research Data System
+    #    Arguments:
+    #        files `list` : List of filenames to upload
+    #        metadata `dictionary`: metadata of the files (Not nested, only "str" type)
+    #    """
+    #    if self._s3_access is None:
+    #        raise AttributeError ("S3 Access is not set up!")
+    #    self._s3_access.upload(files=files, metadata=metadata)
 
-    def _select_files(self):
-        if len(self.path_string_box.value) == 0:
-            path = self.path
-        elif self.path_string_box.value[0] != '/':
-            path = os.path.join(self.path, self.path_string_box.value)
-        elif self.data_sys == "S3":
-            with self.output:
-                print("Only relative paths supported")
-            return
-        else:
-            path = self.path_string_box.value
-        appendlist = []
-        if self.data_sys == "local" and not self._in_hdf:
-            for f in iglob(path):
-                if os.path.isfile(f):
-                    appendlist.append(os.path.normpath(f))
-        elif self._in_hdf:
-            pass
-        else:
-            appendlist = self._s3_access.glob(path)
-        self._clickedFiles.extend(appendlist)
-        self._update_filebox(self.filebox)
-        with self.output:
-            if len(appendlist) > 0:
-                print('Selected %i File(s):' % (len(appendlist)))
-                for i in appendlist:
-                    print(i)
-            else:
-                print('No additional files selected')
+    #def _select_files(self):
+    #    if len(self.path_string_box.value) == 0:
+    #        path = self.path
+    #    elif self.path_string_box.value[0] != '/':
+    #        path = os.path.join(self.path, self.path_string_box.value)
+    #    elif hasattr(self.project, 'data_backend') and self.project.data_backend == "S3":
+    #        with self.output:
+    #            print("Only relative paths supported")
+    #        return
+    #    else:
+    #        path = self.path_string_box.value
+    #    appendlist = []
+    #    if self.data_sys == "local" and not self._in_hdf:
+    #        for f in iglob(path):
+    #            if os.path.isfile(f):
+    #                appendlist.append(os.path.normpath(f))
+    #    elif self._in_hdf:
+    #        pass
+    #    else:
+    #        appendlist = self.project.glob(path)
+    #    self._clickedFiles.extend(appendlist)
+    #    self._update_filebox(self.filebox)
+    #    with self.output:
+    #        if len(appendlist) > 0:
+    #            print('Selected %i File(s):' % (len(appendlist)))
+    #            for i in appendlist:
+    #                print(i)
+    #        else:
+    #            print('No additional files selected')
 
     def _update_pathbox(self, box):
         path_color = '#DDDDAA'
@@ -494,32 +395,22 @@ class _FileBrowser:
         home_color = '#999999'
 
         def on_click(b):
-            if not b.h5:
-                self.path = b.path
-                self._h5_access = None
-                self._in_hdf = False
-            else:
-                self._h5_path = b.path
+            rel_path = os.path.relpath(b.path, self.path)
+            with self.output:
+                print(rel_path)
+            if rel_path == '.':
+                return
+            new_project = self.project[rel_path]
+            self.project = new_project
             self._update_files()
             self._update_filebox(self.filebox)
             self.path_string_box.__init__(description="(rel) Path", value='')
 
+        with self.output:
+            display(self.project)
         buttons = []
-        if self._in_hdf:
-            tmppath = self._h5_path
-            tmppath_old = self._h5_path + '/'
-            while tmppath != tmppath_old:
-                tmppath_old = tmppath
-                [tmppath, dir] = os.path.split(tmppath)
-                if dir == "":
-                    dir = self._h5_access.base_name
-                button = widgets.Button(description=dir + '/', layout=widgets.Layout(width='auto'))
-                button.style.button_color = h5_path_color
-                button.path = tmppath_old
-                button.h5 = True
-                button.on_click(on_click)
-                buttons.append(button)
-        tmppath = self.path
+        tmppath = self.path[:-1]
+        len_root_path = self._project_root_path[:-1]
         tmppath_old = self.path + '/'
         while tmppath != tmppath_old:
             tmppath_old = tmppath
@@ -527,20 +418,15 @@ class _FileBrowser:
             button = widgets.Button(description=dir + '/', layout=widgets.Layout(width='auto'))
             button.style.button_color = path_color
             button.path = tmppath_old
-            button.h5 = False
             button.on_click(on_click)
-            if self.fix_s3_path and self.data_sys == "S3":
+            if self.fix_path or len(tmppath) < len(len_root_path):
                 button.disabled = True
             buttons.append(button)
         button = widgets.Button(icon="fa-home", layout=widgets.Layout(width='auto'))
         button.style.button_color = home_color
-        if self.data_sys == 'local':
-            button.path = os.getcwd()
-        else:
-            button.path = self.s3path
-            if self.fix_s3_path:
-                button.disabled = True
-        button.h5 = False
+        button.path = self._initial_path
+        if self.fix_path:
+            button.disabled = True
         button.on_click(on_click)
         buttons.append(button)
         buttons.reverse()
@@ -555,38 +441,19 @@ class _FileBrowser:
         self.output.clear_output(True)
 
         def on_click(b):
-            if b.h5:
-                self._h5_path = "/"
-                self._in_hdf = True
-                self._h5_access = FileHDFio(file_name=os.path.join(self.path, b.h5file),
-                                            h5_path=self._h5_path,
-                                            mode="r")
-            else:
-                self.path = os.path.join(self.path, b.description)
-            self._update_files()
-            self._update_filebox(filebox)
-
-        def on_click_h5(b):
-            self._h5_path = os.path.join(self._h5_path, b.description)
+            new_project = self.project[b.description]
+            self.project = new_project
             self._update_files()
             self._update_filebox(filebox)
 
         def on_click_file(b):
             f = os.path.join(self.path, b.description)
             self.output.clear_output(True)
-            if self.data_sys == 'local' and not self._in_hdf:
-                self._display_file(f)
-            elif self._in_hdf:
-                with self.output:
-                    print(self._h5_access[b.description])
-            else:
-                metadata = self._s3_access.get_metadata(f, abspath=True)
-                self._display_metadata(metadata)
+            with self.output:
+                print([b.description])
             if f in self._clickedFiles:
                 b.style.button_color = file_color
                 self._clickedFiles.remove(f)
-            elif self._in_hdf:
-                pass
             else:
                 b.style.button_color = file_chosen_color
                 self._clickedFiles.append(f)
@@ -598,39 +465,13 @@ class _FileBrowser:
                                      display='flex',
                                      align_items="center",
                                      justify_content='flex-start')
-        for f in self.dirs:
+        for f in self.dirs + self.nodes:
             button = widgets.Button(description=f,
                                     icon="fa-folder",
                                     layout=item_layout)
             button.style.button_color = dir_color
-            button.h5 = False
             button.on_click(on_click)
             buttons.append(button)
-
-        if not self.hide_hdf and self.hdf_as_dirs:
-            for f in self.h5dirs:
-                button = widgets.Button(description=os.path.splitext(f)[0],
-                                        icon="fa-folder",
-                                        layout=item_layout)
-                button.style.button_color = h5_dir_color
-                if not self._in_hdf:
-                    button.h5 = True
-                    button.h5file = f
-                    button.on_click(on_click)
-                else:
-                    button.on_click(on_click_h5)
-                buttons.append(button)
-        elif not self.hide_hdf:
-            for f in self.h5dirs:
-                button = widgets.Button(description=f,
-                                        icon="fa-file-o",
-                                        layout=item_layout)
-                if os.path.join(self.path, f) in self._clickedFiles:
-                    button.style.button_color = file_chosen_color
-                else:
-                    button.style.button_color = file_color
-                button.on_click(on_click_file)
-                buttons.append(button)
 
         for f in self.files:
             button = widgets.Button(description=f,
@@ -644,49 +485,4 @@ class _FileBrowser:
             buttons.append(button)
         filebox.children = tuple(buttons)
         self._update_pathbox(self.pathbox)
-
-
-class FileBrowser(_FileBrowser):
-    """
-        File Browser Widget with S3 support
-
-        Allows to browse files in the local or a remote S3 based file system.
-        Selected files may be received from this FileBrowser widget by its data attribute.
-    """
-    def __init__(self,
-                 project=None,
-                 Vbox = None,
-                 s3path="",
-                 fix_s3_path=False,
-                 storage_system="local",
-                 fix_storage_sys=False,
-                 hdf_as_dirs=False,
-                 hide_hdf=False,
-                 s3_config=None
-                 ):
-        """
-            Filebrowser to browse the local or a remote (S3-based) file system.
-            Args:
-              s3path (str): Starting path within the remote file system.
-              project (:class:`pyiron.Project`): Pyiron Project object from which the local path is taken.
-              fix_s3_path (bool): If True the path in the remote file system cannot be changed.
-              storage_system (str): The filesystem to access (fist) either "local" or "S3".
-              fix_storage_sys (bool): If True the file system cannot be changed.
-              s3_config (str/dict/None): path to a json configuration file or dictionary with login
-                                        credentials for the remote file system.
-              hdf_as_dirs (bool): If True hdf files in the local file system are shown and treated as directories
-              hide_hdf (bool/None): If True hdf files are hidden (also not displayed as directories)
-        """
-
-        path = project.path[:-1] if project is not None else None
-        super().__init__(Vbox=Vbox,
-                         s3path=s3path,
-                         localpath=path,
-                         fix_s3_path=fix_s3_path,
-                         hdf_as_dirs=hdf_as_dirs,
-                         storage_system=storage_system,
-                         fix_storage_sys=fix_storage_sys,
-                         hide_hdf=hide_hdf,
-                         s3_config=s3_config)
-    __init__.__doc__ = _FileBrowser.__init__.__doc__
 

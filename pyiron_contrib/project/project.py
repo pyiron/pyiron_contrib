@@ -28,10 +28,8 @@ class Project(ProjectCore):
                                             If None, a new Vbox is provided.
         """
         if self._filebrowser is None:
-            self._filebrowser = FileBrowser(project=self.copy(),
-                                            Vbox=Vbox,
-                                            fix_storage_sys=True,
-                                            hdf_as_dirs=True)
+            self._filebrowser = FileBrowser(project=self,
+                                            Vbox=Vbox)
         return self._filebrowser.gui()
 
     @property

@@ -537,6 +537,7 @@ class ProjectS3IO(FileS3IO):
     def __init__(self, project, config, path='/'):
         self._project = project.copy()
         super().__init__(config=config, path=path)
+        self._project.data_backend = "S3"
 
     @property
     def base_name(self):

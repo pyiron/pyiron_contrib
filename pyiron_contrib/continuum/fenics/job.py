@@ -91,6 +91,9 @@ class Fenics(GenericJob):
         n_steps (int): How many steps to run for, where the `t` attribute of all time dependent expressions gets updated
             at each step. (Default is 1.)
         dt (float): How much to increase the `t` attribute of  all time dependent expressions each step. (Default is 1.)
+        solver_parameters (dict): kwargs for FEniCS solver.
+            Cf. [FEniCS docs](https://fenicsproject.org/pub/tutorial/html/._ftut1017.html) for more details. (Default is
+            an empty dictionary.)
 
     Output:
         u (list): The solved function values evaluated at the mesh points at each time step.
@@ -121,6 +124,7 @@ class Fenics(GenericJob):
         self.input.element_order = 1
         self.input.n_steps = 1
         self.input.dt = 1
+        self.input.solver_parameters = {}
         # TODO?: Make input sub-classes to catch invalid input?
 
         self.output = InputList(table_name='output')
@@ -247,7 +251,7 @@ class Fenics(GenericJob):
         for _ in np.arange(self.input.n_steps):
             for expr in self.time_dependent_expressions:
                 expr.t += self.input.dt
-            FEN.solve(self.LHS == self.RHS, self.u, self.BC)
+            FEN.solve(self.LHS == self.RHS, self.u, self.BC, solver_parameters=self.input.solver_parameters)
             self.output.solution.append(self.solution.compute_vertex_values(self.mesh))
             try:
                 self.assigned_u.assign(self.solution)

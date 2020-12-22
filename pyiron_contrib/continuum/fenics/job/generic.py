@@ -90,6 +90,8 @@ class Fenics(GenericJob):
         element_order (int): What order the elements have. (Default is 1.)  TODO: Better description.
         n_steps (int): How many steps to run for, where the `t` attribute of all time dependent expressions gets updated
             at each step. (Default is 1.)
+        n_print (int): The period of steps for saving to output. (Default is 1.) Note: The final step will always be
+            saved regardless of the mod value.
         dt (float): How much to increase the `t` attribute of  all time dependent expressions each step. (Default is 1.)
         solver_parameters (dict): kwargs for FEniCS solver.
             Cf. [FEniCS docs](https://fenicsproject.org/pub/tutorial/html/._ftut1017.html) for more details. (Default is
@@ -123,6 +125,7 @@ class Fenics(GenericJob):
         self.input.element_type = 'P'
         self.input.element_order = 1
         self.input.n_steps = 1
+        self.input.n_print = 1
         self.input.dt = 1
         self.input.solver_parameters = {}
         # TODO?: Make input sub-classes to catch invalid input?
@@ -248,17 +251,21 @@ class Fenics(GenericJob):
         """
         self.status.running = True
         self._u = self.solution
-        for _ in np.arange(self.input.n_steps):
+        for step in np.arange(self.input.n_steps):
             for expr in self.time_dependent_expressions:
                 expr.t += self.input.dt
             FEN.solve(self.LHS == self.RHS, self.u, self.BC, solver_parameters=self.input.solver_parameters)
-            self.output.solution.append(self.solution.compute_vertex_values(self.mesh))
+            if step % self.input.n_print == 0 or step == self.input.n_print - 1:
+                self._append_to_output()
             try:
                 self.assigned_u.assign(self.solution)
             except AttributeError:
                 pass
         self.status.collect = True
         self.run()
+
+    def _append_to_output(self):
+        self.output.solution.append(self.solution.compute_vertex_values(self.mesh))
 
     def collect_output(self):
         self._write_vtk()  # TODO: Get the output files so they're all tarballed after successful runs, like other codes

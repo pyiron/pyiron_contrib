@@ -148,10 +148,6 @@ class Fenics(GenericJob):
         self._vtk_filename = join(self.project_hdf5.path, 'output.pvd')
 
     def generate_mesh(self):
-        if any([v is not None for v in [self.BC, self.LHS, self.RHS]]):
-            warnings.warn("The mesh is being generated, but at least one of the boundary conditions or equation sides"
-                          "is already defined -- please re-define these values since the mesh is updated")
-
         if isinstance(self.domain, Mesh):
             self._mesh = self.domain  # Intent: Allow the domain to return a unit mesh
         else:
@@ -163,6 +159,10 @@ class Fenics(GenericJob):
         self._u = FEN.TrialFunction(self.V)
         self._v = FEN.TestFunction(self.V)
         self._solution = FEN.Function(self.V)
+
+        if any([v is not None for v in [self.BC, self.LHS, self.RHS]]):
+            warnings.warn("The mesh is being generated, but at least one of the boundary conditions or equation sides"
+                          "is already defined -- please re-define these values since the mesh is updated")
 
     def refresh(self):
         self.generate_mesh()

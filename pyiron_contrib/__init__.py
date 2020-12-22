@@ -21,6 +21,7 @@ JOB_CLASS_DICT['ProtocolFTSEvolutionParallel'] = 'pyiron_contrib.protocol.compou
 JOB_CLASS_DICT['ImageJob'] = 'pyiron_contrib.image.job'
 JOB_CLASS_DICT['RandSpg'] = 'pyiron_contrib.atomistic.atomistics.structures.randspg'
 JOB_CLASS_DICT['Fenics'] = 'pyiron_contrib.continuum.fenics.job.generic'
+JOB_CLASS_DICT['FenicsLinearElastic'] = 'pyiron_contrib.continuum.fenics.job.elastic'
 
 from ._version import get_versions
 

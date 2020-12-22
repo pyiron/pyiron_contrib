@@ -37,6 +37,18 @@ class DomainFactory(PyironFactory):
         return mshr.Rectangle(FEN.Point(0 + x, 0 + y), FEN.Point(length + x, length + y))
     square.__doc__ = mshr.Rectangle.__doc__
 
+    @staticmethod
+    def box(corner1=None, corner2=None):
+        """A 3d rectangular prism from `corner1` to `corner2` ((0, 0, 0) to (1, 1, 1) by default)"""
+        corner1 = corner1 or (0, 0, 0)
+        corner2 = corner2 or (1, 1, 1)
+        return mshr.Box(FEN.Point(corner1), FEN.Point(corner2))
+
+    @staticmethod
+    def tetrahedron(p1, p2, p3, p4):
+        """A tetrahedron defined by four points. (Details to be discovered and documented.)"""
+        return mshr.Tetrahedron(FEN.Point(p1), FEN.Point(p2), FEN.Point(p3), FEN.Point(p4))
+
 
 class UnitMeshFactory(PyironFactory):
     def square(self, nx, ny):

@@ -158,4 +158,7 @@ class TestFenicsTutorials(unittest.TestCase):
 
         job.run()
 
-        self.assertTrue(np.all(np.isclose(job.output.solution[-1].T.flatten(), page_9.linear_elasticity())))
+        self.assertTrue(np.all(np.isclose(
+            job.solution_to_original_shape(job.output.solution[-1]),
+            page_9.linear_elasticity()
+        )))

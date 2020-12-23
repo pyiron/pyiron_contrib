@@ -292,6 +292,14 @@ class Fenics(GenericJob):
             nodal_solution = nodal_solution.reshape(nodes.T.shape).T
         self.output.solution.append(nodal_solution)
 
+    @staticmethod
+    def solution_to_original_shape(nodal_solution_frame):
+        """Get a frame of the solution back to its original shape, even if it was reformed to match the mesh length."""
+        if len(nodal_solution_frame.shape) == 1:
+            return nodal_solution_frame
+        else:
+            return nodal_solution_frame.T.flatten()
+
     def collect_output(self):
         self._write_vtk()  # TODO: Get the output files so they're all tarballed after successful runs, like other codes
         self.to_hdf()

@@ -13,11 +13,9 @@ from pyiron_base import GenericJob, InputList
 from os.path import join
 import warnings
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.tri as tri
 from dolfin.cpp.mesh import Mesh
 from pyiron_contrib.continuum.fenics.factory import DomainFactory, BoundaryConditionFactory
-from pyiron_contrib.continuum.fenics.plotting import plot as modified_fenics_plot
+from pyiron_contrib.continuum.fenics.plot import Plot
 from matplotlib.docstring import copy as copy_docstring
 from ufl import nabla_div as ufl_nabla_div
 
@@ -119,6 +117,7 @@ class Fenics(GenericJob):
         super(Fenics, self).__init__(project, job_name)
         self._python_only_job = True
         self.create = Creator(self)
+        self._plot = Plot(self)
 
         self.input = InputList(table_name='input')
         self.input.mesh_resolution = 2
@@ -149,6 +148,10 @@ class Fenics(GenericJob):
         self._v = None  # the test function
         self._solution = None
         self._vtk_filename = join(self.project_hdf5.path, 'output.pvd')
+
+    @property
+    def plot(self):
+        return self._plot
 
     def generate_mesh(self):
         if isinstance(self.domain, Mesh):
@@ -266,71 +269,14 @@ class Fenics(GenericJob):
 
     def _append_to_output(self):
         """Evaluate the result at nodes and store in the output as a numpy array."""
-        self.output.solution.append(self.solution.compute_vertex_values(self.mesh))
+        self.output.solution.append(
+            self.solution.compute_vertex_values(self.mesh).reshape(self.mesh.coordinates().shape)
+        )
 
     def collect_output(self):
         self._write_vtk()  # TODO: Get the output files so they're all tarballed after successful runs, like other codes
         self.to_hdf()
         self.status.finished = True
-    
-    def plot_solution(self):
-        FEN.plot(self.solution)
-
-    def plot_mesh(self):
-        FEN.plot(self.mesh)
-
-    @copy_docstring(modified_fenics_plot)
-    def plot(self, object, *args, **kwargs):
-        return modified_fenics_plot(object, *args, **kwargs)
-
-    def plot_output(self, frame=-1, n_grid=1000, n_grid_x=None, n_grid_y=None, add_colorbar=True):
-        """
-        Makes a plot of the output solution.
-
-        Based off of
-        [matplotlib docs](https://matplotlib.org/3.1.0/gallery/images_contours_and_fields/irregulardatagrid.html)
-
-        Args:
-            frame (int): Which output frame to use. (Default is -1, most recent.)
-            n_grid (int): Number of points to use when interpolating the mesh values. (Default is 1000.)
-            n_grid_x (int): Number of grid points to use when interpolating the mesh values in the x-direction.
-                (Default is None, use n_grid value.)
-            n_grid_y (int): Number of grid points to use when interpolating the mesh values in the y-direction.
-                (Default is None, use n_grid value.)
-            add_colorbar (bool): Whether or not to add the colorbar to the figure. (Default is True.)
-
-        Returns:
-            (matplotlib.image.AxesImage): The imshow object.
-            (matplotlib.figure.Figure): The parent figure.
-            (matplotlib.axes._subplots.AxesSubplot): The subplots axis on which the plotting occurs.
-        """
-        n_grid_x = n_grid_x or n_grid
-        n_grid_y = n_grid_y or n_grid
-
-        mesh_X, mesh_Y = self.mesh.coordinates().T
-        u_Z = self.output.solution[frame]
-
-        # Create grid values first.
-        xi = np.linspace(np.amin(mesh_X), np.amax(mesh_X), n_grid_x)
-        yi = np.linspace(np.amin(mesh_Y), np.amax(mesh_Y), n_grid_y)
-
-        # Perform linear interpolation of the data (x,y)
-        # on a grid defined by (xi,yi)
-        triang = tri.Triangulation(mesh_X, mesh_Y)
-        interpolator = tri.LinearTriInterpolator(triang, u_Z)
-        Xi, Yi = np.meshgrid(xi, yi)
-        Zi = interpolator(Xi, Yi)
-
-        fig, ax = plt.subplots()
-        heat = ax.imshow(
-            Zi[::-1],
-            aspect='equal',
-            cmap=plt.cm.viridis,
-            extent=[Xi.min(), Xi.max(), Yi.min(), Yi.max()]
-        )
-        if add_colorbar:
-            fig.colorbar(heat, shrink=0.5, aspect=10)
-        return heat, fig, ax
 
     @copy_docstring(FEN.project)
     def project_function(self, v, **kwargs):

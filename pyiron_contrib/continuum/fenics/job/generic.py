@@ -269,9 +269,11 @@ class Fenics(GenericJob):
 
     def _append_to_output(self):
         """Evaluate the result at nodes and store in the output as a numpy array."""
-        self.output.solution.append(
-            self.solution.compute_vertex_values(self.mesh).reshape(self.mesh.coordinates().T.shape).T
-        )
+        nodal_solution = self.solution.compute_vertex_values(self.mesh)
+        nodes = self.mesh.coordinates()
+        if len(nodal_solution) != len(nodes):
+            nodal_solution.reshape(nodes.T.shape).T
+        self.output.solution.append(nodal_solution)
 
     def collect_output(self):
         self._write_vtk()  # TODO: Get the output files so they're all tarballed after successful runs, like other codes

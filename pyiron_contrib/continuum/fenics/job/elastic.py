@@ -9,6 +9,7 @@ A job class for FEM linear elasticity with [fenics](https://fenicsproject.org/pu
 """
 
 from pyiron_contrib.continuum.fenics.job.generic import Fenics
+from pyiron_contrib.continuum.fenics.plot import Plot
 
 
 class FenicsLinearElastic(Fenics):
@@ -34,6 +35,8 @@ class FenicsLinearElastic(Fenics):
     def __init__(self, project, job_name):
         """Create a new Fenics type job for linear elastic problems"""
         super().__init__(project=project, job_name=job_name)
+        self._plot = ElasticPlot(self)
+
         self.input.bulk_modulus = 76
         self.input.shear_modulus = 26
 
@@ -80,3 +83,65 @@ class FenicsLinearElastic(Fenics):
     def _append_to_output(self):
         super()._append_to_output()
         self.output.von_Mises.append(self.von_Mises(self.solution).compute_vertex_values(self.mesh))
+
+
+class ElasticPlot(Plot):
+    def stress2d(
+            self,
+            frame=-1,
+            n_grid=1000,
+            n_grid_x=None,
+            n_grid_y=None,
+            add_colorbar=True,
+            lognorm=False,
+            projection_axis=None
+    ):
+        """
+        Plot a heatmap of the von Mises stress interpolated onto a uniform grid.
+
+        Args:
+            frame (int): Which output frame to use. (Default is -1, most recent.)
+            n_grid (int): Number of points to use when interpolating the mesh values. (Default is 1000.)
+            n_grid_x (int): Number of grid points to use when interpolating the mesh values in the x-direction.
+                (Default is None, use n_grid value.)
+            n_grid_y (int): Number of grid points to use when interpolating the mesh values in the y-direction.
+                (Default is None, use n_grid value.)
+            add_colorbar (bool): Whether or not to add the colorbar to the figure. (Default is True.)
+            lognorm (bool): Normalize the colorscheme to a log scale. (Default is False.)
+            projection_axis (int): The axis onto which to project mesh nodes and nodal values if the data is 3d.
+                (Default is None, project z onto xy-plane if needed.)
+
+        Returns:
+            (matplotlib.image.AxesImage): The imshow object.
+            (matplotlib.figure.Figure): The parent figure.
+            (matplotlib.axes._subplots.AxesSubplot): The subplots axis on which the plotting occurs.
+        """
+        return self.nodal2d(
+            nodal_values=self._job.output.von_Mises[frame],
+            nodes=self._job.mesh.coordinates() + self._job.output.solution[frame],
+            n_grid=n_grid,
+            n_grid_x=n_grid_x,
+            n_grid_y=n_grid_y,
+            add_colorbar=add_colorbar,
+            lognorm=lognorm,
+            projection_axis=projection_axis
+        )
+
+    def stress3d(self, frame=-1, add_colorbar=True):
+        """
+        3d scatter plot of the von Mises stress.
+
+        Args:
+            frame (int): Which output frame to use. (Default is -1, most recent.)
+            add_colorbar (bool): Whether or not to add the colorbar to the figure. (Default is True.)
+
+        Returns:
+            (matplotlib.image.AxesImage): The scatter object.
+            (matplotlib.figure.Figure): The parent figure.
+            (matplotlib.axes._subplots.AxesSubplot): The subplots axis on which the plotting occurs.
+        """
+        return self.nodal3d(
+            nodal_values=self._job.output.von_Mises[frame],
+            nodes=self._job.mesh.coordinates() + self._job.output.solution[frame],
+            add_colorbar=add_colorbar
+        )

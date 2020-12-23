@@ -39,7 +39,6 @@ class Plot:
     def _nodes_to_2d(nodes, projection_axis):
         if len(nodes) == 3:
             axes = [0, 1, 2]
-            print(projection_axis)
             axes.pop(projection_axis)
             return nodes[axes]
         elif len(nodes) != 2:

@@ -14,6 +14,7 @@ from pyiron_contrib.continuum.fenics.job.generic import Fenics
 class FenicsLinearElastic(Fenics):
     """
     Solves a linear elastic problem in three dimensions using bulk and shear moduli to describe the elasticity.
+    Determines the displacement given the body load, traction, and boundary conditions.
 
     The variational equation solved is the integral of:
     `inner(sigma(u), epsilon(v)) * dx == dot(f, v) * dx + dot(T, v) * ds`
@@ -27,7 +28,6 @@ class FenicsLinearElastic(Fenics):
         shear_modulus (float): Material elastic parameter. (Default is 26, the experimental value for Al in GPa.)
 
     Output
-        displacement (list): The array of 3D displacements from the mesh-evaluated solution at each step.
         von_Mises (list): The von Mises stress from the mesh-evaluated solution at each step.
     """
 
@@ -37,7 +37,6 @@ class FenicsLinearElastic(Fenics):
         self.input.bulk_modulus = 76
         self.input.shear_modulus = 26
 
-        self.output.displacement = []
         self.output.von_Mises = []
 
         self.V_class = self.fenics.VectorFunctionSpace
@@ -64,5 +63,4 @@ class FenicsLinearElastic(Fenics):
 
     def _append_to_output(self):
         super()._append_to_output()
-        self.output.displacement.append(self.solution.compute_vertex_values(self.mesh).reshape(3, -1).T)
         self.output.von_Mises.append(self.von_Mises(self.solution).compute_vertex_values(self.mesh))

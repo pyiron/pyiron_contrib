@@ -95,7 +95,7 @@ class Plot:
         n_grid_x = n_grid_x or n_grid
         n_grid_y = n_grid_y or n_grid
 
-        nodes = nodes or self._job.mesh.coordinates()
+        nodes = self._job.mesh.coordinates() if nodes is None else nodes
         nodes = nodes.T
 
         projection_axis = -1 if projection_axis is None else projection_axis
@@ -151,7 +151,7 @@ class Plot:
         ax = fig.add_subplot(111, projection='3d')
 
         nodal_values = self._nodal_values_to_1d(nodal_values)
-        nodes = nodes or self._job.mesh.coordinates()
+        nodes = self._job.mesh.coordinates() if nodes is None else nodes
         if nodes.shape[1] != 3:
             raise ValueError("Expected nodes to have shape (n, 3)  but got {}".format(nodes.shape))
 

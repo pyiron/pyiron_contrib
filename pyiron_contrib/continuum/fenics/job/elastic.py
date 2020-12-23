@@ -25,6 +25,10 @@ class FenicsLinearElastic(Fenics):
     Input:
         lambda_ (float): The Lame lambda parameter. (Default is 1.25.)
         mu (float): The Lame mu parameters. (Default is 10.)
+
+    Output
+        displacement (list): The array of 3D displacements from the mesh-evaluated solution at each step.
+        von_Mises (list): The von Mises stress from the mesh-evaluated solution at each step.
     """
 
     def __init__(self, project, job_name):
@@ -32,6 +36,9 @@ class FenicsLinearElastic(Fenics):
         super().__init__(project=project, job_name=job_name)
         self.input.lambda_ = 1.25
         self.input.mu = 10.
+
+        self.output.displacement = []
+        self.output.von_Mises = []
 
         self.V_class = self.fenics.VectorFunctionSpace
 
@@ -53,3 +60,8 @@ class FenicsLinearElastic(Fenics):
     def von_Mises(self, u):
         s = self.sigma(u) - (1. / 3) * self.tr(self.sigma(u)) * self.Identity(u.geometric_dimension())
         return self.fenics.project(self.sqrt(3. / 2 * self.inner(s, s)), self.fenics.FunctionSpace(self.mesh, 'P', 1))
+
+    def _append_to_output(self):
+        super()._append_to_output()
+        self.output.displacement.append(self.solution.compute_vertex_values(self.mesh).reshape(3, -1).T)
+        self.output.von_Mises.append(self.von_Mises(self.solution).compute_vertex_values(self.mesh))

@@ -52,9 +52,25 @@ class FenicsLinearElastic(Fenics):
         return lambda_ * self.nabla_div(u) * self.Identity(u.geometric_dimension()) \
                + 2 * self.input.shear_modulus * self.epsilon(u)
 
+    @property
+    def LHS(self):
+        return self._lhs
+
+    @LHS.setter
+    def LHS(self, _):
+        raise NotImplementedError
+
+    @property
+    def RHS(self):
+        return self._rhs
+
+    @RHS.setter
+    def RHS(self, _):
+        raise NotImplementedError
+
     def validate_ready_to_run(self):
-        self.LHS = self.inner(self.sigma(self.u), self.epsilon(self.v)) * self.dx
-        self.RHS = self.dot(self.f, self.v) * self.dx + self.dot(self.T, self.v) * self.ds
+        self._lhs = self.inner(self.sigma(self.u), self.epsilon(self.v)) * self.dx
+        self._rhs = self.dot(self.f, self.v) * self.dx + self.dot(self.T, self.v) * self.ds
         super().validate_ready_to_run()
 
     def von_Mises(self, u):

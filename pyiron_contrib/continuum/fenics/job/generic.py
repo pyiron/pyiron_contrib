@@ -135,8 +135,8 @@ class Fenics(GenericJob):
         # TODO: Figure out how to get these attributes into input/otherwise serializable
         self.domain = None  # the domain
         self.BC = None  # the boundary condition
-        self.LHS = None  # the left hand side of the equation; FEniCS function
-        self.RHS = None  # the right hand side of the equation; FEniCS function
+        self._lhs = None  # the left hand side of the equation; FEniCS function
+        self._rhs = None  # the right hand side of the equation; FEniCS function
         self.time_dependent_expressions = []  # Any expressions used with a `t` attribute to evolve
         # TODO: Make a class to force these to be Expressions and to update them?
         self.assigned_u = None
@@ -148,6 +148,23 @@ class Fenics(GenericJob):
         self._v = None  # the test function
         self._solution = None
         self._vtk_filename = join(self.project_hdf5.path, 'output.pvd')
+
+    # Wrap equations in setters so they can be easily protected in subclasses
+    @property
+    def LHS(self):
+        return self._lhs
+
+    @LHS.setter
+    def LHS(self, new_lhs):
+        self._lhs = new_lhs
+
+    @property
+    def RHS(self):
+        return self._rhs
+
+    @RHS.setter
+    def RHS(self, new_rhs):
+        self._rhs = new_rhs
 
     @property
     def plot(self):

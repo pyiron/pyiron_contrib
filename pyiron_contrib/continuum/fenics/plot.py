@@ -43,6 +43,8 @@ class Plot:
             return nodes[axes]
         elif len(nodes) != 2:
             raise ValueError("Expected nodes to be in 2- or 3-dimensions, but got node shape {}".format(nodes.T.shape))
+        else:
+            return nodes
 
     @staticmethod
     def _nodal_values_to_1d(nodal_values):

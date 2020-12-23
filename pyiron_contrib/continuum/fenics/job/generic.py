@@ -270,7 +270,7 @@ class Fenics(GenericJob):
     def _append_to_output(self):
         """Evaluate the result at nodes and store in the output as a numpy array."""
         self.output.solution.append(
-            self.solution.compute_vertex_values(self.mesh).reshape(self.mesh.coordinates().shape)
+            self.solution.compute_vertex_values(self.mesh).reshape(self.mesh.coordinates().T.shape).T
         )
 
     def collect_output(self):

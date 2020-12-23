@@ -289,7 +289,7 @@ class Fenics(GenericJob):
         nodal_solution = self.solution.compute_vertex_values(self.mesh)
         nodes = self.mesh.coordinates()
         if len(nodal_solution) != len(nodes):
-            nodal_solution.reshape(nodes.T.shape).T
+            nodal_solution = nodal_solution.reshape(nodes.T.shape).T
         self.output.solution.append(nodal_solution)
 
     def collect_output(self):

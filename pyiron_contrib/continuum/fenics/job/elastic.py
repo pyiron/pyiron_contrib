@@ -13,18 +13,18 @@ from pyiron_contrib.continuum.fenics.job.generic import Fenics
 
 class FenicsLinearElastic(Fenics):
     """
-    Solves a linear elastic problem in three dimensions using Lame's parameters to describe the elasticity.
+    Solves a linear elastic problem in three dimensions using bulk and shear moduli to describe the elasticity.
 
-    The exact variational equation solved is the integral of:
-        `inner(sigma(u), epsilon(v)) * dx == dot(f, v) * dx + dot(T, v) * ds`
+    The variational equation solved is the integral of:
+    `inner(sigma(u), epsilon(v)) * dx == dot(f, v) * dx + dot(T, v) * ds`
 
     Parameters:
         f (Constant/Expression): The body force term. (Default is Constant((0, 0, 0)).)
         T (Constant/Expression): The traction conditions. (Default is Constant((0, 0, 0)).)
 
     Input:
-        lambda_ (float): The Lame lambda parameter. (Default is 1.25.)
-        mu (float): The Lame mu parameters. (Default is 10.)
+        bulk_modulus (float): Material elastic parameter. (Default is 76, the experimental value for Al in GPa.)
+        shear_modulus (float): Material elastic parameter. (Default is 26, the experimental value for Al in GPa.)
 
     Output
         displacement (list): The array of 3D displacements from the mesh-evaluated solution at each step.
@@ -34,8 +34,8 @@ class FenicsLinearElastic(Fenics):
     def __init__(self, project, job_name):
         """Create a new Fenics type job for linear elastic problems"""
         super().__init__(project=project, job_name=job_name)
-        self.input.lambda_ = 1.25
-        self.input.mu = 10.
+        self.input.bulk_modulus = 76
+        self.input.shear_modulus = 26
 
         self.output.displacement = []
         self.output.von_Mises = []
@@ -49,8 +49,9 @@ class FenicsLinearElastic(Fenics):
         return self.fenics.sym(self.nabla_grad(u))
 
     def sigma(self, u):
-        return self.input.lambda_ * self.nabla_div(u) * self.Identity(u.geometric_dimension()) \
-               + 2 * self.input.mu * self.epsilon(u)
+        lambda_ = self.input.bulk_modulus - (2 * self.input.shear_modulus / 3)
+        return lambda_ * self.nabla_div(u) * self.Identity(u.geometric_dimension()) \
+               + 2 * self.input.shear_modulus * self.epsilon(u)
 
     def validate_ready_to_run(self):
         self.LHS = self.inner(self.sigma(self.u), self.epsilon(self.v)) * self.dx

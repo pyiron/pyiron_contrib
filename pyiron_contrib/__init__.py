@@ -1,7 +1,11 @@
 __version__ = "0.1"
 __all__ = []
 
-from pyiron import Project
+try:
+        from pyiron import Project
+except:
+        print("Warning: pyiron module not found;\nBe carefule not to use \"from pyiron_contrib import Projects\"")
+
 from pyiron_base import JOB_CLASS_DICT
 
 # Make classes available for new pyiron version

@@ -18,12 +18,16 @@ __date__ = "Sep 1, 2018"
 
 class Mixer(InteractiveWrapper):
     """
+    Mixing forces of two quantum engines
+
     Args:
-        project (pyiron.project.Project instance):  Specifies the project path among other attributes
-        job_name (str): Name of the job
+        project (ProjectHDFio): ProjectHDFio instance which points to the HDF5 file the job is stored in
+        job_name (str): name of the job, which has to be unique within the project
 
     Attributes:
-        input (pyiron.objects.hamilton.md.lammps.Input instance): Instance which handles the input
+        input (pyiron_base.GenericParameters): Instance which handles the input
+        ref_job_0 (pyiron.atomistics.job.atomistic.AtomisticGenericJob): First quantum engine
+        ref_job_1 (pyiron.atomistics.job.atomistic.AtomisticGenericJob): Second quantum engine
     """
 
     def __init__(self, project, job_name):
@@ -38,19 +42,31 @@ class Mixer(InteractiveWrapper):
 
     @property
     def ref_job(self):
+        """
+        Compatibility function - it is recommended to use ref_job_0 instead
+
+        Returns:
+            pyiron.atomistics.job.atomistic.AtomisticGenericJob: Reference Job
+        """
         return self.ref_job_0
 
     @ref_job.setter
     def ref_job(self, ref_job):
+        """
+        Compatibility function - it is recommended to use ref_job_0 instead
+
+        Args:
+            ref_job (pyiron.atomistics.job.atomistic.AtomisticGenericJob): Reference Job
+        """
         self.ref_job_0 = ref_job
 
     @property
     def ref_job_0(self):
         """
-        Get the reference job template from which all jobs within the ParallelMaster are generated.
+        First Quantum engine to mix forces
 
         Returns:
-            GenericJob: reference job
+            pyiron.atomistics.job.atomistic.AtomisticGenericJob: Reference Job
         """
         if self._ref_job_0 is not None:
             return self._ref_job_0
@@ -68,20 +84,20 @@ class Mixer(InteractiveWrapper):
     @ref_job_0.setter
     def ref_job_0(self, ref_job):
         """
-        Set the reference job template from which all jobs within the ParallelMaster are generated.
+        First Quantum engine to mix forces
 
         Args:
-            ref_job (GenericJob): reference job
+            ref_job (pyiron.atomistics.job.atomistic.AtomisticGenericJob): Reference Job
         """
         self.append(ref_job)
 
     @property
     def ref_job_1(self):
         """
-        Get the reference job template from which all jobs within the ParallelMaster are generated.
+        Second Quantum engine to mix forces
 
         Returns:
-            GenericJob: reference job
+            pyiron.atomistics.job.atomistic.AtomisticGenericJob: Reference Job
         """
         if self._ref_job_1 is not None:
             return self._ref_job_1
@@ -99,10 +115,10 @@ class Mixer(InteractiveWrapper):
     @ref_job_1.setter
     def ref_job_1(self, ref_job):
         """
-        Set the reference job template from which all jobs within the ParallelMaster are generated.
+        Second Quantum engine to mix forces
 
         Args:
-            ref_job (GenericJob): reference job
+            ref_job (pyiron.atomistics.job.atomistic.AtomisticGenericJob): Reference Job
         """
         if self.ref_job_0 is None:
             raise ValueError('Please assign ref_job_0 before ref_job_1.')
@@ -111,6 +127,12 @@ class Mixer(InteractiveWrapper):
 
     @property
     def structure(self):
+        """
+        Atomistic Structure - returns structure of first reference job
+
+        Returns:
+            pyiron.atomistics.structure.atoms.Atoms: Atomistic crystal structure
+        """
         if self.ref_job is not None:
             return self._ref_job_0.structure
         else:
@@ -118,6 +140,12 @@ class Mixer(InteractiveWrapper):
 
     @structure.setter
     def structure(self, basis):
+        """
+        Atomistic Structure - set structure of first reference job
+
+        Args:
+            basis (pyiron.atomistics.structure.atoms.Atoms): Atomistic crystal structure
+        """
         if self.ref_job_0 is not None and self.ref_job_1 is not None:
             self._ref_job_0.structure = basis
             self._ref_job_1.structure = basis
@@ -133,18 +161,34 @@ class Mixer(InteractiveWrapper):
         self.input.read_only = True
 
     def write_input(self):
+        """
+        No input is written for the Mixer class
+        """
         pass
 
     def _write_run_wrapper(self, debug=False):
+        """
+        No wrapper is writen for the Mixer class
+
+        Args:
+            debug (bool): the debug flag is ignored
+        """
         pass
 
     def interactive_initialize_interface(self):
+        """
+        Internal helper function to initialize the interactive interface
+        """
         for key in list(set(list(self.ref_job_0.interactive_cache.keys()) +
                             list(self.ref_job_1.interactive_cache.keys()))):
             self.interactive_cache[key] = []
         self.output = MixingOutput(job=self)
 
     def run_if_interactive(self):
+        """
+        The interactive run function calls run on both quantum engines - both interactive and non-interactive jobs
+        are supported.
+        """
         self.status.running = True
         if self.ref_job_0.server.run_mode.interactive:
             self.ref_job_0.run()
@@ -156,10 +200,20 @@ class Mixer(InteractiveWrapper):
             self.ref_job_1.run(run_again=True)
 
     def interactive_store_in_cache(self, key, value):
+        """
+        Helper function to store the output in the cache - storing the same information in both reference jobs
+
+        Args:
+            key (str): Key in cache
+            value (list/float/int): value to store
+        """
         self.ref_job_0.interactive_cache[key] = value
         self.ref_job_1.interactive_cache[key] = value
 
     def interactive_close(self):
+        """
+        Internal helper function to close the interactive interface.
+        """
         self.status.collect = True
         if self.ref_job_0.server.run_mode.interactive:
             self.ref_job_0.interactive_close()
@@ -170,7 +224,7 @@ class Mixer(InteractiveWrapper):
 
     def from_hdf(self, hdf=None, group_name=None):
         """
-        Restore the ParallelMaster from an HDF5 file
+        Restore the Mixer from an HDF5 file
 
         Args:
             hdf (ProjectHDFio): HDF5 group object - optional
@@ -182,7 +236,7 @@ class Mixer(InteractiveWrapper):
 
 class Input(GenericParameters):
     """
-    class to control the generic input for a Sphinx calculation.
+    class to control the generic input for a Mixer calculation.
 
     Args:
         input_file_name (str): name of the input file
@@ -203,31 +257,67 @@ class Input(GenericParameters):
 
 class MixingOutput(ReferenceJobOutput):
     def __init__(self, job):
+        """
+        Output class to aggregate the combined output of both calculation, only in the output the energies and forces
+        are mixed.
+
+        Args:
+            job (Mixer): Corresponding Mixer job
+        """
         super(MixingOutput, self).__init__(job=job)
         self._lambda = float(job.input['lambda'])
 
     @property
     def energy_pot(self):
+        """
+        Combined potential energy
+
+        Returns:
+            list: potential energy
+        """
         return self._lambda * np.array(self._job.ref_job_0.output.energy_pot) + \
                (1-self._lambda) * np.array(self._job.ref_job_1.output.energy_pot)
 
     @property
     def energy_tot(self):
+        """
+        Combined total energy
+
+        Returns:
+            list: total energy
+        """
         return self._lambda * np.array(self._job.ref_job_0.output.energy_tot) + \
                (1 - self._lambda) * np.array(self._job.ref_job_1.output.energy_tot)
 
     @property
     def forces(self):
+        """
+        Combined forces
+
+        Returns:
+            list: forces
+        """
         return self._lambda * np.array(self._job.ref_job_0.output.forces) + \
                (1 - self._lambda) * np.array(self._job.ref_job_1.output.forces)
 
     @property
     def pressures(self):
+        """
+        Combined pressure
+
+        Returns:
+            list: pressure
+        """
         return self._lambda * np.array(self._job.ref_job_0.output.pressures) + \
                (1 - self._lambda) * np.array(self._job.ref_job_1.output.pressures)
 
     @property
-    def temperatures(self):
-        return self._lambda * np.array(self._job.ref_job_0.output.temperatures) + \
-               (1 - self._lambda) * np.array(self._job.ref_job_1.output.temperatures)
+    def temperature(self):
+        """
+        Combined temperature
 
+        Returns:
+            list: temperature
+        """
+        return self._lambda * np.array(self._job.ref_job_0.output.temperature) + \
+               (1 - self._lambda) * np.array(self._job.ref_job_1.output.temperature)

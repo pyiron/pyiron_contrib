@@ -20,9 +20,13 @@ __date__ = "Sep 1, 2018"
 
 class LangevinAse(InteractiveWrapper):
     """
+    Reference implementation of a thermostat implemented in ASE. While we have multiple implementations of the
+    Langevin thermostat already, this one is using the ASE interface and the Langevin thermostat implemented in ASE.
+    It is therefore a perfect example how other thermostats implemented in ASE can be used inside pyiron.
+
     Args:
-        project (pyiron.project.Project instance):  Specifies the project path among other attributes
-        job_name (str): Name of the job
+        project (ProjectHDFio): ProjectHDFio instance which points to the HDF5 file the job is stored in
+        job_name (str): name of the job, which has to be unique within the project
 
     Attributes:
         input (pyiron.objects.hamilton.md.lammps.Input instance): Instance which handles the input
@@ -43,12 +47,25 @@ class LangevinAse(InteractiveWrapper):
         self.input.read_only = True
 
     def write_input(self):
+        """
+        No input is written when using the ASE interface
+        """
         pass
 
     def _write_run_wrapper(self, debug=False):
+        """
+        No wrapper is written for the ASE interface
+
+        Args:
+            debug (bool): the debug flag is ignored
+        """
         pass
 
     def run_static(self):
+        """
+        Static run function, which uses the ASEAdapter to connect the pyiron interactive reference job with the
+        Langevin thermostat implemented in ASE, by setting the ASEAdapter as a replacement of the ASE atoms object.
+        """
         self.status.running = True
         self.ref_job_initialize()
         aseadapter = AseAdapter(

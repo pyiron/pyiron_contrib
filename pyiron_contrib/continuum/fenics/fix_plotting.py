@@ -24,6 +24,17 @@ from dolfin.common.plotting import (
 import dolfin.cpp as cpp
 import ufl
 
+__author__ = "Liam Huber"
+__copyright__ = (
+    "Copyright 2020, Max-Planck-Institut für Eisenforschung GmbH - "
+    "Computational Materials Design (CM) Department"
+)
+__version__ = "0.1"
+__maintainer__ = "Liam Huber"
+__email__ = "huber@mpie.de"
+__status__ = "development"
+__date__ = "Dec 26, 2020"
+
 
 def plot(object, *args, **kwargs):
     """

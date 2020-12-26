@@ -9,6 +9,17 @@ A job class for FEM linear elasticity with [fenics](https://fenicsproject.org/pu
 from pyiron_contrib.continuum.fenics.job.generic import Fenics
 from pyiron_contrib.continuum.fenics.plot import Plot
 
+__author__ = "Liam Huber"
+__copyright__ = (
+    "Copyright 2020, Max-Planck-Institut für Eisenforschung GmbH - "
+    "Computational Materials Design (CM) Department"
+)
+__version__ = "0.1"
+__maintainer__ = "Liam Huber"
+__email__ = "huber@mpie.de"
+__status__ = "development"
+__date__ = "Dec 26, 2020"
+
 
 class FenicsLinearElastic(Fenics):
     """

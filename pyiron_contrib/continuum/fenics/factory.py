@@ -5,9 +5,9 @@
 """
 Factories for Fenics-related object creation.
 """
+
 import fenics as FEN
 import mshr
-
 from pyiron_base import PyironFactory
 
 

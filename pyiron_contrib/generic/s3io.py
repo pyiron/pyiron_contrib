@@ -292,7 +292,8 @@ class FileS3IO:
         Returns:
         """
         file = self._to_abs_bucketpath(file)
-        return self._bucket.Object(file)
+        s3object = self._bucket.Object(file)
+        return s3object
 
     def get(self, file):
         """
@@ -461,6 +462,8 @@ class FileS3IO:
         else:
             item_lst = item.split("/")
             if len(item_lst) == 1 and item_lst[0] != "..":
+                if item == "":
+                    return self
                 if item in self.list_nodes():
                     return self._s3io_object(item)
                 if item in self.list_groups():

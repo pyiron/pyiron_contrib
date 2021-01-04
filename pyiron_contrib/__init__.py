@@ -1,7 +1,7 @@
 __version__ = "0.1"
 __all__ = []
 
-from pyiron import Project
+from pyiron_contrib.project.project import Project
 from pyiron_base import JOB_CLASS_DICT
 
 # Make classes available for new pyiron version

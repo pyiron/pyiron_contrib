@@ -1,6 +1,6 @@
 from pyiron_base import InputList
 from pyiron import Project as ProjectCore
-from pyiron_contrib.project.file_browser import FileBrowser
+from pyiron_contrib.project.file_browser import ProjectBrowser
 
 
 class Project(ProjectCore):
@@ -14,12 +14,12 @@ class Project(ProjectCore):
                          )
         self._project_info = InputList(table_name="projectinfo")
         self._metadata = InputList(table_name="metadata")
-        self._filebrowser = None
+        self._project_browser = None
         self.hdf5 = self.create_hdf(self.path, self.base_name + "_projectdata")
         self.from_hdf()
     __init__.__doc__ = ProjectCore.__init__.__doc__
 
-    def open_file_browser(self, Vbox=None):
+    def open_project_browser(self, Vbox=None):
         """
         Provides a file browser to inspect the local data system.
 
@@ -27,10 +27,11 @@ class Project(ProjectCore):
              Vbox (:class:`ipywidgets.Vbox` / None): Vbox in which the file browser is displayed.
                                             If None, a new Vbox is provided.
         """
-        if self._filebrowser is None:
-            self._filebrowser = FileBrowser(project=self,
-                                            Vbox=Vbox)
-        return self._filebrowser.gui()
+        if self._project_browser is None:
+            self._project_browser = ProjectBrowser(project=self,
+                                                   show_files=False,
+                                                   Vbox=Vbox)
+        return self._project_browser.gui()
 
     @property
     def metadata(self):

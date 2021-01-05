@@ -275,10 +275,12 @@ class ProjectBrowser:
     def _update_project_worker(self, rel_path):
         try:
             new_project = self.project[rel_path]
-            self.project = new_project
         except ValueError:
             self.path_string_box.__init__(description="(rel) Path", value='')
             return "No valid path"
+        else:
+            if new_project is not None:
+                self.project = new_project
 
     def _update_project(self, path):
         self.output.clear_output(True)

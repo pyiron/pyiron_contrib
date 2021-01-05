@@ -80,7 +80,7 @@ class Project(ProjectCore):
         return new
 
     def open(self, rel_path, history=True):
-        new = self.open(rel_path, history=history)
+        new = super().open(rel_path, history=history)
         new.hdf5 = new.create_hdf(new.path, new.base_name + "_projectdata")
         new._metadata = InputList(table_name="metadata")
         new._project_info = InputList(table_name="projectinfo")

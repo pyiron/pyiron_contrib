@@ -577,7 +577,7 @@ class ProjectS3IO(FileS3IO):
     @property
     def project(self):
         """
-        Get the project instance the ProjectHDFio object is located in
+        Get the project instance the ProjectS3io object is located in
 
         Returns:
             Project: pyiron project
@@ -604,6 +604,18 @@ class ProjectS3IO(FileS3IO):
             str: pyiron user directory of the current project
         """
         return self._project.root_path
+
+    @property
+    def working_directory(self):
+        """
+        Get the working directory of the current ProjectS3io object. The working directory equals the path but it is
+        represented by the filesystem:
+            /absolute/path/to/the/project/path/inside/the/s3/store
+
+        Returns:
+            str: absolute path to the working directory
+        """
+        return self.path
 
     @property
     def sql_query(self):
@@ -781,4 +793,19 @@ class ProjectS3IO(FileS3IO):
                                - default=False
         """
         self._project.remove_job(job_specifier=job_specifier, _unprotect=_unprotect)
+
+    def __getitem__(self, item):
+        """Check if the result is within the S3 store or at the project level and return corresponding object."""
+        if isinstance(item, slice):
+            raise NotImplementedError("Implement if needed, e.g. for [:]")
+        else:
+            item_abs_path = (
+                os.path.relpath(os.path.join(self.path, item), self.project.path)
+                    .replace("\\", "/")
+            )
+            print(item_abs_path, item_abs_path.split('/'))
+            if item_abs_path.split('/')[0] != "..":
+                return super().__getitem__(item)
+            else:
+                return self._project[item_abs_path]
 

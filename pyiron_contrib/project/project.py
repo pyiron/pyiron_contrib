@@ -1,6 +1,6 @@
 from pyiron_base import InputList
 from pyiron import Project as ProjectCore
-from pyiron_contrib.project.file_browser import ProjectBrowser
+from pyiron_contrib.project.project_browser import ProjectBrowser
 
 
 class Project(ProjectCore):

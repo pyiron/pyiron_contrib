@@ -166,7 +166,7 @@ class ProjectBrowser:
         #TODO: move to project self._display_file = DisplayFile(file=None, outwidget=self.output).display_file
         #TODO: move to project self._display_metadata = DisplayMetadata(metadata=None, outwidget=self.output).display
         self._clickedFiles = []
-        self._data = []
+        self._data = None
         self.pathbox = widgets.HBox(layout=widgets.Layout(width='100%', justify_content='flex-start'))
         self.optionbox = widgets.HBox()
         self.filebox = widgets.VBox(layout=widgets.Layout(width='50%', height='100%', justify_content='flex-start'))
@@ -253,6 +253,7 @@ class ProjectBrowser:
             self._update_project(path)
         if b.description == 'Reset selection':
             self._clickedFiles = []
+            self._data = None
             self._update_filebox(self.filebox)
         self._busy_check(False)
 
@@ -362,9 +363,12 @@ class ProjectBrowser:
             self.output.clear_output(True)
             with self.output:
                 try:
-                    display(self.project[b.description])
+                    data = self.project[b.description]
                 except:
                     print([b.description])
+                else:
+                    display(data)
+                    self._data = Data(data=data, filename=b.description, metadata={"path": "f"})
             if f in self._clickedFiles:
                 b.style.button_color = file_color
                 self._clickedFiles.remove(f)

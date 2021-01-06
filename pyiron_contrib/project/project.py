@@ -33,6 +33,8 @@ class Project(ProjectCore):
             self._project_browser = ProjectBrowser(project=self,
                                                    show_files=show_files,
                                                    Vbox=Vbox)
+        else:
+            self._project_browser.update(Vbox=Vbox, show_files=show_files)
         return self._project_browser.gui()
 
     @property

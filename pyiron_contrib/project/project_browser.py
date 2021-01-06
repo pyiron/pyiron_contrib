@@ -76,9 +76,13 @@ class ProjectBrowser:
         self.update()
         return self.box
 
-    def update(self, Vbox=None):
+    def update(self, Vbox=None, fix_path = None, show_files=None):
         if Vbox is None:
             Vbox = self.box
+        if fix_path is not None:
+            self.fix_path = fix_path
+        if show_files is not None:
+            self._show_files = show_files
         self.output.clear_output(True)
         self._update_files()
         self._update_optionbox(self.optionbox)

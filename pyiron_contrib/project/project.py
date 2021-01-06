@@ -1,6 +1,8 @@
 from pyiron_base import InputList
 from pyiron import Project as ProjectCore
+import posixpath
 from pyiron_contrib.project.project_browser import ProjectBrowser
+from pyiron_contrib.generic.display_item import DisplayItem
 
 
 class Project(ProjectCore):
@@ -19,7 +21,7 @@ class Project(ProjectCore):
         self.from_hdf()
     __init__.__doc__ = ProjectCore.__init__.__doc__
 
-    def open_project_browser(self, Vbox=None):
+    def open_project_browser(self, Vbox=None, show_files=False):
         """
         Provides a file browser to inspect the local data system.
 
@@ -29,7 +31,7 @@ class Project(ProjectCore):
         """
         if self._project_browser is None:
             self._project_browser = ProjectBrowser(project=self,
-                                                   show_files=False,
+                                                   show_files=show_files,
                                                    Vbox=Vbox)
         return self._project_browser.gui()
 
@@ -86,3 +88,10 @@ class Project(ProjectCore):
         new._project_info = InputList(table_name="projectinfo")
         new.from_hdf()
         return new
+
+    def display_item(self, item, outwidget=None):
+        if item in self.list_files() and item not in self.list_files(extension="h5"):
+            DisplayItem(self.path+item, outwidget)
+        else:
+            DisplayItem(self.__getitem__(item), outwidget)
+

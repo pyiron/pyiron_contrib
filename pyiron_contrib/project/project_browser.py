@@ -1,134 +1,11 @@
-import functools
 import os
-from glob import iglob
 
 import ipywidgets as widgets
-from IPython import display as IPyDisplay
 from IPython.core.display import display
-from matplotlib import pylab as plt
-from skimage import io
-import pandas
 
 from pyiron_base import Project as BaseProject
-from pyiron_base.generic.hdfio import FileHDFio
-from pyiron_contrib.generic.s3io import FileS3IO
 from pyiron_contrib.generic.data import Data
-
-
-class DisplayFile:
-
-    """ Class to display a file in the given outwidget. """
-    def __init__(self, file, outwidget):
-        """
-            Class to display different files in a notebook.
-
-            Args:
-                file (str/None): path to the file to be displayed.
-                outwidget (:class:`ipywidgets.Output` widget): Will be used to display the file.
-        """
-        self.output = outwidget
-        self.fig = None
-        self.ax = None
-        self.file = file
-        if file is not None:
-            self._display_file()
-
-    def display_file(self, file, outwidget=None):
-        """
-            Display the file in the outwidget,
-
-            Args:
-                file (str): path to the file to be displayed.
-                outwidget (:class:`ipywidgets.Output` widget / None): New output widget to be used to display the file.
-        """
-        if outwidget is not None:
-            self.output = outwidget
-        self.file = file
-        self._display_file()
-
-    def _display_file(self):
-        _, filetype = os.path.splitext(self.file)
-        if filetype.lower() in ['.tif', '.tiff']:
-            self._display_tiff()
-        elif filetype.lower() in ['.jpg', '.jpeg', '.png', '.gif']:
-            self._display_img()
-        elif filetype.lower() in ['.txt']:
-            self._display_txt()
-        elif filetype.lower() in ['.csv']:
-            self._display_csv()
-        else:
-            self._display_default()
-
-    def _display_tiff(self):
-        plt.ioff()
-        data = io.imread(self.file)
-        if self.fig is None:
-            self.fig, self.ax = plt.subplots()
-        else:
-            self.ax.clear()
-        self.ax.imshow(data)
-        self.ax.get_xaxis().set_visible(False)
-        self.ax.get_yaxis().set_visible(False)
-        with self.output:
-            display(self.fig)
-
-    def _display_txt(self):
-        with self.output:
-            with open(self.file) as f:
-                print(f.read(), end='')
-
-    def _display_csv(self):
-        with self.output:
-            display(pandas.read_csv(self.file))
-
-    def _display_img(self):
-        with self.output:
-            display(IPyDisplay.Image(self.file))
-
-    def _display_default(self):
-        try:
-            with self.output:
-                display(self.file)
-        except:
-            with self.output:
-                print(self.file)
-
-
-class DisplayMetadata:
-
-    """ Class to display metadata of a file in the given outwidget. """
-    def __init__(self, metadata, outwidget):
-        """
-            Display the metadata in the outwidget.
-
-            Args:
-                metadata (dict/None): Metadata to be displayed.
-                outwidget (:class:`ipywidgets.Output` widget): New output widget to be used to display the metadata.
-        """
-        self.output = outwidget
-        self.metadata = metadata
-        if metadata is not None:
-            self._display_metadata()
-
-    def display(self, metadata, outwidget=None):
-        """
-            Display the metadata in the outwidget
-
-            Args:
-                metadata (dict): Metadata to be displayed.
-                outwidget (:class:`ipywidgets.Output` widget / None): New output widget to be used to display the metadata.
-        """
-        self.metadata = metadata
-        if outwidget is not None:
-            self.output = outwidget
-        self._display_metadata()
-
-    def _display_metadata(self):
-        with self.output:
-            print("Metadata:")
-            print("------------------------")
-            for key, value in self.metadata.items():
-                print(key + ': ' + value)
+from pyiron_contrib.generic.display_item import DisplayItem
 
 
 class ProjectBrowser:
@@ -171,6 +48,7 @@ class ProjectBrowser:
         self.optionbox = widgets.HBox()
         self.filebox = widgets.VBox(layout=widgets.Layout(width='50%', height='100%', justify_content='flex-start'))
         self.path_string_box = widgets.Text(description="(rel) Path", width='min-content')
+        self._display_item = DisplayItem(item=None, outwidget=self.output).display
         self.update()
 
     @property
@@ -361,18 +239,27 @@ class ProjectBrowser:
             self._busy_check()
             f = os.path.join(self.path, b.description)
             self.output.clear_output(True)
-            with self.output:
+            try:
+                with self.output:
+                    print(" ")
+                self.project.display_item(b.description, self.output)
+            except:
                 try:
-                    data = self.project[b.description]
+                    self._display_item(self.project[b.description])
                 except:
-                    print([b.description])
-                else:
-                    display(data)
-                    self._data = Data(data=data, filename=b.description, metadata={"path": "f"})
+                    with self.output:
+                        print([b.description])
             if f in self._clickedFiles:
+                self._data = None
                 b.style.button_color = file_color
                 self._clickedFiles.remove(f)
             else:
+                try:
+                    data = self.project[b.description]
+                except:
+                    pass
+                else:
+                    self._data = Data(data=data, filename=b.description, metadata={"path": f})
                 b.style.button_color = file_chosen_color
                 #self._clickedFiles.append(f)
                 self._clickedFiles = [f]

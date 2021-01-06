@@ -803,7 +803,6 @@ class ProjectS3IO(FileS3IO):
                 os.path.relpath(os.path.join(self.path, item), self.project.path)
                     .replace("\\", "/")
             )
-            print(item_abs_path, item_abs_path.split('/'))
             if item_abs_path.split('/')[0] != "..":
                 return super().__getitem__(item)
             else:

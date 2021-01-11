@@ -66,10 +66,7 @@ class Project(ProjectCore):
             hdf = self.hdf5
         try:
             self._metadata.from_hdf(hdf, group_name=None)
-        except ValueError:
-            pass
-        try:
-            self._metadata.from_hdf(hdf, group_name=None)
+            self._project_info.from_hdf(hdf, group_name=None)
         except ValueError:
             pass
 

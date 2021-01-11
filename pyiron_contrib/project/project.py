@@ -1,8 +1,6 @@
 from pyiron_base import InputList
 from pyiron import Project as ProjectCore
 import posixpath
-from pyiron_contrib.project.project_browser import ProjectBrowser
-from pyiron_contrib.generic.display_item import DisplayItem
 
 
 class Project(ProjectCore):
@@ -29,6 +27,7 @@ class Project(ProjectCore):
              Vbox (:class:`ipywidgets.Vbox` / None): Vbox in which the file browser is displayed.
                                             If None, a new Vbox is provided.
         """
+        from pyiron_contrib.project.project_browser import ProjectBrowser
         if self._project_browser is None:
             self._project_browser = ProjectBrowser(project=self,
                                                    show_files=show_files,
@@ -89,6 +88,7 @@ class Project(ProjectCore):
         return new
 
     def display_item(self, item, outwidget=None):
+        from pyiron_contrib.generic.display_item import DisplayItem
         if item in self.list_files() and item not in self.list_files(extension="h5"):
             DisplayItem(self.path+item, outwidget)
         else:

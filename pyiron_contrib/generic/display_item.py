@@ -78,8 +78,11 @@ class DisplayFile:
 
     def _display_default(self):
         with self.output:
-            with open(self.file) as f:
-                print(f.readlines())
+            try:
+                with open(self.file) as f:
+                    print(f.readlines())
+            except:
+                print(self.file)
 
 
 class DisplayMetadata:
@@ -176,12 +179,11 @@ class DisplayItem:
             display(self.item)
 
     def _fallback_display(self):
-        print('fallback')
         if isinstance(self.item, str):
             try:
                 with open(self.item) as f:
                     print(f.readlines())
-            except FileNotFoundError:
+            except:
                 print(self.item)
         else:
             print(self.item)

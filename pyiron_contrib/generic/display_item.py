@@ -1,10 +1,9 @@
 import os
 
 import pandas
-from IPython import display as IPyDisplay
+from PIL import Image
 from IPython.core.display import display
-from matplotlib import pylab as plt
-from skimage import io
+from pyiron_base import FileHDFio
 
 class DisplayFile:
 
@@ -34,28 +33,16 @@ class DisplayFile:
 
     def _display_file(self):
         _, filetype = os.path.splitext(self.file)
-        if filetype.lower() in ['.tif', '.tiff']:
-            return self._display_tiff()
-        elif filetype.lower() in ['.jpg', '.jpeg', '.png', '.gif']:
-            return self._display_img()
+        if filetype.lower() in ['.h5', '.hdf']:
+            return FileHDFio(file_name=self.file)
         elif filetype.lower() in ['.txt']:
             return self._display_txt()
         elif filetype.lower() in ['.csv']:
             return self._display_csv()
+        elif filetype.lower() in Image.registered_extensions():
+            return self._display_img()
         else:
             return self._display_default()
-
-    def _display_tiff(self):
-        #plt.ioff()
-        data = io.imread(self.file)
-        if self.fig is None:
-            self.fig, self.ax = plt.subplots()
-        else:
-            self.ax.clear()
-        self.ax.imshow(data)
-        self.ax.get_xaxis().set_visible(False)
-        self.ax.get_yaxis().set_visible(False)
-        return self.fig
 
     def _display_txt(self):
         with open(self.file) as f:
@@ -65,7 +52,7 @@ class DisplayFile:
         return pandas.read_csv(self.file)
 
     def _display_img(self):
-        return IPyDisplay.Image(self.file)
+        return Image.open(self.file)
 
     def _display_default(self):
         try:

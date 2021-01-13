@@ -240,15 +240,11 @@ class ProjectBrowser:
             self._busy_check()
             f = os.path.join(self.path, b.description)
             self.output.clear_output(True)
-            try:
-                with self.output:
-                    display(self.project.display_item(b.description))
-            except:
+            with self.output:
                 try:
-                    self._display_item(self.project[b.description])
+                    display(self.project[b.description])
                 except:
-                    with self.output:
-                        print([b.description])
+                    print([b.description])
             if f in self._clickedFiles:
                 self._data = None
                 b.style.button_color = file_color

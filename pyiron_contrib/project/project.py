@@ -1,11 +1,19 @@
-from pyiron_base import InputList
+from pyiron_base import InputList, ImportAlarm
 from pyiron import Project as ProjectCore
 import posixpath
+try:
+    from pyiron_contrib.project.project_browser import ProjectBrowser
+    import_alarm = ImportAlarm()
+except ImportError:
+    import_alarm = ImportAlarm(
+        "The dependencies of the project's browser are not met (ipywidgets, IPython)."
+    )
 
 
 class Project(ProjectCore):
 
-    """ Basically a wrapper of Project from pyiron_base to extend for metadata. """
+    """ Basically a wrapper of Project from pyiron_atomistic to extend functionality. """
+    @import_alarm
     def __init__(self, path="", user=None, sql_query=None, default_working_directory=False):
         super().__init__(path=path,
                          user=user,
@@ -27,7 +35,6 @@ class Project(ProjectCore):
              Vbox (:class:`ipywidgets.Vbox` / None): Vbox in which the file browser is displayed.
                                             If None, a new Vbox is provided.
         """
-        from pyiron_contrib.project.project_browser import ProjectBrowser
         if self._project_browser is None:
             self._project_browser = ProjectBrowser(project=self,
                                                    show_files=show_files,

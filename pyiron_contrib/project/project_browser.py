@@ -172,9 +172,6 @@ class ProjectBrowser:
         if rel_path == '.':
             return
         self._update_project_worker(rel_path)
-        if self.path != path:
-            rel_path = os.path.relpath(path, self.path)
-            self._update_project_worker(rel_path)
         self._node_as_dirs = isinstance(self.project, BaseProject)
         self._update_files()
         self._update_filebox(self.filebox)

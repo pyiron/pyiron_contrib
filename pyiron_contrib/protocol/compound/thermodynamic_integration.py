@@ -42,11 +42,9 @@ class _TILDParent(CompoundVertex):
     """
     A parent class for thermodynamic integration by langevin dynamics. Mostly just to avoid duplicate code in
     `HarmonicTILD` and `VacancyTILD`.
-
     Assumes the presence of `build_lambdas`, `average` (for the thermodynamic average of the integrand), `reflect`
     (to keep each atom closest to its own lattice site), and `mix` (to combine the forces from different
     representations).
-
     WARNING: The methods in this parent class require loading of the finished interactive jobs that run within the
     child protocol. Since reloading jobs is (at times) time consuming, I add a TILDPostProcessing vertex at the end
     of the child protocol. That makes the methods defined in this parent class redundant. -Raynol
@@ -87,12 +85,10 @@ class HarmonicTILD(_TILDParent):
     A serial TILD protocol to compute the free energy change when the system changes from a set of harmonically
         oscillating atoms, to a fully interacting system of atoms. The interactions are described by an
         interatomic potential, for example, an EAM potential.
-
     NOTE: 1. This protocol is as of now untested with DFT pseudopotentials, and only works for sure, with LAMMPS-
         based potentials.
           2. Convergence criterion is NOT implemented for this protocol, because it runs serially (and would take
         a VERY long time to achieve a good convergence.
-
     Input attributes:
         ref_job_full_path (str): Path to the pyiron job to use for evaluating forces and energies.
         structure (Atoms): The structure evolve.
@@ -119,8 +115,7 @@ class HarmonicTILD(_TILDParent):
             it by the cutoff factor. A default value of 0.45 is chosen, because taking a cutoff factor of ~0.5
             sometimes let certain reflections off the hook, and we do not want that to happen. (Default is 0.45.)
         use_reflection (boolean): Turn on or off `SphereReflection` (Default is True.)
-        zero_k_energy (float): The zero Kelvin potential energy of the structure. (Default is None.)
-
+        eq_energy (float): The minimized potential energy of the static (expanded) structure. (Default is None.)
     Output attributes:
         total_steps (list): The total number of steps for each integration point, up to convergence, or max steps.
         temperature_mean (list): Mean output temperature for each integration point.
@@ -294,7 +289,7 @@ class HarmonicTILD(_TILDParent):
         g.harmonic.direct.reference_positions = ip.structure.positions
         g.harmonic.broadcast.positions = gp.reflect.output.positions[-1]
         g.harmonic.direct.structure = ip.structure
-        g.harmonic.direct.zero_k_energy = ip.zero_k_energy
+        g.harmonic.direct.eq_energy = ip.eq_energy
 
         # transpose_forces
         g.transpose_forces.input.matrix = [
@@ -385,7 +380,6 @@ class HarmonicTILD(_TILDParent):
         """
         Get the total free energy of a harmonic oscillator with this frequency and these atoms. Temperatures are
             clipped at 1 micro-Kelvin.
-
         Returns:
             float/np.ndarray: The sum of the free energy of each atom.
         """
@@ -400,7 +394,6 @@ class HarmonicTILD(_TILDParent):
         """
         Get the total free energy of a harmonic oscillator with this frequency and these atoms. Temperatures are
             clipped at 1 micro-Kelvin.
-
         Returns:
             float/np.ndarray: The sum of the free energy of each atom.
         """
@@ -520,7 +513,7 @@ class _HarmonicallyCoupled(CompoundVertex):
         g.harmonic.input.reference_positions = ip.structure.positions
         g.harmonic.input.positions = gp.reflect.output.positions[-1]
         g.harmonic.input.structure = ip.structure
-        g.harmonic.input.zero_k_energy = ip.zero_k_energy
+        g.harmonic.input.eq_energy = ip.eq_energy
 
         # mix
         g.mix.input.vectors = [
@@ -609,11 +602,9 @@ class HarmonicTILDParallel(HarmonicTILD):
     A version of HarmonicTILD where the evolution of each integration point is executed in parallel, thus giving a
         substantial speed-up. A free energy perturbation standard error convergence exit criterion can be applied,
         that is unavailable in the serial version of the HarmonicTILD protocol.
-
         Maximum efficiency for parallelization can be achieved by setting the number of cores the job can use to
         the number of lambdas, ie., cores / lambdas = 1. Setting the number of cores greater than the number of
         lambdas gives zero gain, and is wasteful if cores % lambdas != 0.
-
     Input attributes:
         sleep_time (float): A delay in seconds for database access of results. For sqlite, a non-zero delay maybe
             required. (Default is 0 seconds, no delay.)
@@ -623,9 +614,7 @@ class HarmonicTILDParallel(HarmonicTILD):
             protocol. (Default is None.)
         fe_tol (float): The free energy standard error tolerance. This is the convergence criterion in eV. (Default
             is 0.01 eV)
-
     Output attributes:
-
     For inherited input and output attributes, refer the `HarmonicTILD` protocol.
     """
 
@@ -758,7 +747,7 @@ class HarmonicTILDParallel(HarmonicTILD):
         # run_lambda_points - harmonic
         g.run_lambda_points.direct.spring_constant = ip.spring_constant
         g.run_lambda_points.direct.force_constants = ip.force_constants
-        g.run_lambda_points.direct.zero_k_energy = ip.zero_k_energy
+        g.run_lambda_points.direct.eq_energy = ip.eq_energy
 
         # run_lambda_points - mix
         g.run_lambda_points.broadcast.coupling_weights = gp.build_lambdas.output.lambda_pairs[-1]
@@ -864,12 +853,10 @@ class VacancyTILD(_TILDParent):
         pseudo-vacancy. The chemical potential of this harmonically oscillating atom is then subtracted from the
         total free energy change, to give the free energy change between the fully interacting system, and the same
         system with a vacancy.
-
         NOTE: 1. This protocol is as of now untested with DFT pseudopotentials, and only works for sure, with LAMMPS-
         based potentials.
         2. Convergence criterion is NOT implemented for this protocol, because it runs serially (and would take
         a VERY long time to achieve a good convergence.
-
     Input attributes:
         ref_job_full_path (str): Path to the pyiron job to use for evaluating forces and energies.
         structure (Atoms): The structure evolve.
@@ -896,8 +883,6 @@ class VacancyTILD(_TILDParent):
             it by the cutoff factor. A default value of 0.45 is chosen, because taking a cutoff factor of ~0.5
             sometimes let certain reflections off the hook, and we do not want that to happen. (Default is 0.45.)
         use_reflection (boolean): Turn on or off `SphereReflection` (Default is True.)
-        zero_k_energy (float): The zero Kelvin potential energy of the structure. (Default is None.)
-
     Output attributes:
         total_steps (list): The total number of steps for each integration point, up to convergence, or max steps.
         temperature_mean (list): Mean output temperature for each integration point.
@@ -911,7 +896,6 @@ class VacancyTILD(_TILDParent):
         fep_free_energy_mean (float): Mean calculated via free energy perturbation.
         fep_free_energy_std (float): Standard deviation calculated via free energy perturbation.
         fep_free_energy_se (float): Standard error calculated via free energy perturbation.
-
     """
 
     def __init__(self, **kwargs):
@@ -933,7 +917,6 @@ class VacancyTILD(_TILDParent):
         id_.cutoff_factor = 0.5
         id_.use_reflection = True
         id_._total_steps = 0
-        id_.zero_k_energy = None
 
     def define_vertices(self):
         # Graph components
@@ -1106,7 +1089,6 @@ class VacancyTILD(_TILDParent):
         g.harmonic.broadcast.positions = gp.reflect.output.positions[-1]
         g.harmonic.direct.structure = ip.structure
         g.harmonic.direct.mask = ip.vacancy_id
-        g.harmonic.direct.zero_k_energy = ip.zero_k_energy
 
         # write_vac_forces
         g.write_vac_forces.input.n_children = ip.n_lambdas
@@ -1331,7 +1313,6 @@ class _Decoupling(CompoundVertex):
         g.harmonic.input.positions = gp.reflect.output.positions[-1]
         g.harmonic.input.structure = ip.structure
         g.harmonic.input.mask = ip.vacancy_id
-        g.harmonic.input.zero_k_energy = ip.zero_k_energy
 
         # write_vac_forces
         g.write_vac_forces.input.target = gp.calc_full.output.forces[-1]
@@ -1431,11 +1412,9 @@ class VacancyTILDParallel(VacancyTILD):
     A version of VacancyTILD where the evolution of each integration point is executed in parallel, thus giving a
         substantial speed-up. A free energy perturbation standard error convergence exit criterion can be applied,
         that is unavailable in the serial version of the VacancyTILD protocol.
-
         Maximum efficiency for parallelization can be achieved by setting the number of cores the job can use to
         the number of lambdas, ie., cores / lambdas = 1. Setting the number of cores greater than the number of
         lambdas gives zero gain, and is wasteful if cores % lambdas != 0.
-
     Input attributes:
         sleep_time (float): A delay in seconds for database access of results. For sqlite, a non-zero delay maybe
             required. (Default is 0 seconds, no delay.)
@@ -1445,9 +1424,7 @@ class VacancyTILDParallel(VacancyTILD):
             protocol. (Default is None.)
         fe_tol (float): The free energy standard error tolerance. This is the convergence criterion in eV. (Default
             is 0.01 eV)
-
     Output attributes:
-
     For inherited input and output attributes, refer the `HarmonicTILD` protocol.
     """
 
@@ -1612,7 +1589,6 @@ class VacancyTILDParallel(VacancyTILD):
         g.run_lambda_points.direct.spring_constant = ip.spring_constant
         g.run_lambda_points.direct.force_constants = ip.force_constants
         g.run_lambda_points.direct.vacancy_id = ip.vacancy_id
-        g.run_lambda_points.direct.zero_k_energy = ip.zero_k_energy
 
         # run_lambda_points - write_vac_forces -  takes inputs already specified
 
@@ -1721,7 +1697,6 @@ class VacancyFormation(VacancyTILDParallel):
     A protocol which combines HarmonicTILD and VacancyTILD to give the Helmholtz free energy of vacancy formation
         directly. The formation energy is computed via thermodynamic integration, as well as free energy
         perturbation. A formation energy standard error convergence criterion can be applied.
-
     Input attributes:
         fe_tol (float): The formation energy standard error tolerance. This is the convergence criterion in eV.
             The default is set low, in case maximum number of steps need to be run. (Default is 1e-8 eV.)
@@ -1735,7 +1710,6 @@ class VacancyFormation(VacancyTILDParallel):
             vacancy TILD. (Default is None.)
         default_formation_energy_se (float): Initialize default free energy standard error to pass into the child
             protocol. (Default is None.)
-
     Output attributes:
         formation_energy_tild (float): The Helmholtz free energy of vacancy formation computed from thermodynamic
             integration.
@@ -1745,7 +1719,6 @@ class VacancyFormation(VacancyTILDParallel):
             perturbation.
         formation_energy_fep_std (float): The fep standard deviation.
         formation_energy_fep_se (float): The fep standard error of the mean.
-
     For inherited input and output attributes, refer the `VacancyTILDParallel` protocol.
     """
 
@@ -1926,7 +1899,7 @@ class VacancyFormation(VacancyTILDParallel):
         # run_harm_to_inter - harmonic
         g.run_harm_to_inter.direct.spring_constant = ip.spring_constant
         g.run_harm_to_inter.direct.force_constants = ip.force_constants_harm_to_inter
-        g.run_harm_to_inter.direct.eq_energy = ip.zero_k_energy
+        g.run_harm_to_inter.direct.eq_energy = ip.eq_energy
 
         # run_harm_to_inter - mix
         g.run_harm_to_inter.broadcast.coupling_weights = gp.build_lambdas_harm_to_inter.output.lambda_pairs[-1]

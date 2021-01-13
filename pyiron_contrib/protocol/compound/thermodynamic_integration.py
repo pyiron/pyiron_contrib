@@ -113,7 +113,7 @@ class HarmonicTILD(_TILDParent):
         spring_constant (float): A single spring / force constant that is used to compute the restoring forces
             on each atom, thus treating every atom as an independent harmonic oscillator (Einstein atom).
             (Default is None.)
-        force_constants (NxN matrix): The Hessian matrix, obtained from, for ex. Phonopy. (Default is None, treat
+        force_constants (NxNx3x3 matrix): The Hessian matrix, obtained from, for ex. Phonopy. (Default is None, treat
             the atoms as independent harmonic oscillators (Einstein atoms.).)
         cutoff_factor (float): The cutoff is obtained by taking the first nearest neighbor distance and multiplying
             it by the cutoff factor. A default value of 0.45 is chosen, because taking a cutoff factor of ~0.5

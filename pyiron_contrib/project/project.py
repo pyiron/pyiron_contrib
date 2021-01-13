@@ -8,6 +8,7 @@ except ImportError:
     import_alarm = ImportAlarm(
         "The dependencies of the project's browser are not met (ipywidgets, IPython)."
     )
+from pyiron_contrib.generic.display_item import DisplayItem
 
 
 class Project(ProjectCore):
@@ -65,9 +66,46 @@ class Project(ProjectCore):
         return new
 
     def display_item(self, item, outwidget=None):
-        from pyiron_contrib.generic.display_item import DisplayItem
         if item in self.list_files() and item not in self.list_files(extension="h5"):
             return DisplayItem(self.path+item, outwidget).display()
         else:
             return DisplayItem(self.__getitem__(item), outwidget).display()
 
+    def _get_item_helper(self, item, convert_to_object=True):
+        """
+        Internal helper function to get item from project
+
+        Args:
+            item (str, int): key
+            convert_to_object (bool): convert the object to an pyiron object or only access the HDF5 file - default=True
+                                      accessing only the HDF5 file is about an order of magnitude faster, but only
+                                      provides limited functionality. Compare the GenericJob object to JobCore object.
+
+        Returns:
+            Project, GenericJob, JobCore, dict, list, float: basically any kind of item inside the project.
+        """
+        if item == "..":
+            return self.parent_group
+        if item in self.list_nodes():
+            if self._inspect_mode or not convert_to_object:
+                return self.inspect(item)
+            return self.load(item)
+        if item in self.list_files(extension="h5"):
+            file_name = posixpath.join(self.path, "{}.h5".format(item))
+            return ProjectHDFio(project=self, file_name=file_name)
+        if item in self.list_files():
+            file_name = posixpath.join(self.path, "{}".format(item))
+            return DisplayItem(file_name).display()
+        if item in self.list_dirs():
+            with self.open(item) as new_item:
+                return new_item.copy()
+        raise ValueError("Unknown item: {}".format(item))
+
+    def __repr__(self):
+        """
+        Human readable string representation of the project object
+
+        Returns:
+            str: string representation
+        """
+        return str(self.list_all())

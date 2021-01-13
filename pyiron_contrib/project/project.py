@@ -27,7 +27,8 @@ class Project(ProjectCore):
         self.from_hdf()
     __init__.__doc__ = ProjectCore.__init__.__doc__
 
-    def open_project_browser(self, Vbox=None, show_files=False):
+    @property
+    def browser(self, Vbox=None, show_files=False):
         """
         Provides a file browser to inspect the local data system.
 

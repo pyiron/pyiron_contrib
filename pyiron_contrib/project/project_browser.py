@@ -242,8 +242,7 @@ class ProjectBrowser:
             self.output.clear_output(True)
             try:
                 with self.output:
-                    print(" ")
-                self.project.display_item(b.description, self.output)
+                    display(self.project.display_item(b.description))
             except:
                 try:
                     self._display_item(self.project[b.description])

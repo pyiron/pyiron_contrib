@@ -16,8 +16,6 @@ class DisplayFile:
                 file (str/None): path to the file to be displayed.
                 outwidget (:class:`ipywidgets.Output` widget): Will be used to display the file.
         """
-        self.fig = None
-        self.ax = None
         self.file = file
 
     def display_file(self, file):

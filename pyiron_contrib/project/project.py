@@ -67,7 +67,7 @@ class Project(ProjectCore):
     def display_item(self, item, outwidget=None):
         from pyiron_contrib.generic.display_item import DisplayItem
         if item in self.list_files() and item not in self.list_files(extension="h5"):
-            DisplayItem(self.path+item, outwidget)
+            return DisplayItem(self.path+item, outwidget).display()
         else:
-            DisplayItem(self.__getitem__(item), outwidget)
+            return DisplayItem(self.__getitem__(item), outwidget).display()
 

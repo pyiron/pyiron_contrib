@@ -23,8 +23,7 @@ class Project(ProjectCore):
         self._project_browser = None
     __init__.__doc__ = ProjectCore.__init__.__doc__
 
-    @property
-    def browser(self, Vbox=None, show_files=False):
+    def open_browser(self, Vbox=None, show_files=False):
         """
         Provides a file browser to inspect the local data system.
 

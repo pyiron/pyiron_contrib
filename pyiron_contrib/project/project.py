@@ -40,6 +40,20 @@ class Project(ProjectCore):
             self._project_browser.update(Vbox=Vbox, show_files=show_files)
         return self._project_browser.gui()
 
+    def list_nodes(self, recursive=False):
+        """
+        List nodes/ jobs/ pyiron objects inside the project
+
+        Args:
+            recursive (bool): search subprojects [True/False] - default=False
+
+        Returns:
+            list: list of nodes/ jobs/ pyiron objects inside the project
+        """
+        if "nodes" not in self._filter:
+            return []
+        nodes = self.get_jobs(recursive=recursive, columns=["job"])["job"]
+        return nodes
 
     def copy(self):
         """

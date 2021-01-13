@@ -13,8 +13,8 @@ from scipy.integrate import simps
 from ase.geometry import get_distances
 
 from pyiron import Project
-from pyiron.atomistics.job.interactive import GenericInteractive
-from pyiron.lammps.lammps import LammpsInteractive
+from pyiron_atomistics.atomistics.job.interactive import GenericInteractive
+from pyiron_atomistics.lammps.lammps import LammpsInteractive
 from pyiron_contrib.protocol.generic import PrimitiveVertex
 from pyiron_contrib.protocol.utils import Pointer
 from pyiron_contrib.protocol.utils import ensure_iterable

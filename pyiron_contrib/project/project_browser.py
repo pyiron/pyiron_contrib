@@ -159,7 +159,7 @@ class ProjectBrowser:
         try:
             new_project = self.project[rel_path]
         except ValueError:
-            self.path_string_box.__init__(description="(rel) Path", value='')
+            self.path_string_box = self.path_string_box.__class__(description="(rel) Path", value='')
             return "No valid path"
         else:
             if new_project is not None:
@@ -176,7 +176,7 @@ class ProjectBrowser:
         self._update_files()
         self._update_filebox(self.filebox)
         self._update_pathbox(self.pathbox)
-        self.path_string_box.__init__(description="(rel) Path", value='')
+        self.path_string_box = self.path_string_box.__class__(description="(rel) Path", value='')
 
     def _update_pathbox(self, box):
         path_color = '#DDDDAA'

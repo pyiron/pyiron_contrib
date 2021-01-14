@@ -668,7 +668,6 @@ class Protocol(CompoundVertex, GenericJob):
         """
         if hdf is None:
             hdf = self.project_hdf5
-        self.graph.to_hdf(hdf=hdf, group_name="graph")
         super(CompoundVertex, self).to_hdf(hdf=hdf, group_name=group_name)
 
     def from_hdf(self, hdf=None, group_name=None):

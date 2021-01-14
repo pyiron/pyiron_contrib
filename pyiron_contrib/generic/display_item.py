@@ -1,6 +1,7 @@
 import os
 
 import pandas
+import json
 from PIL import Image
 from IPython.core.display import display
 from pyiron_base import FileHDFio
@@ -33,6 +34,8 @@ class DisplayFile:
         _, filetype = os.path.splitext(self.file)
         if filetype.lower() in ['.h5', '.hdf']:
             return FileHDFio(file_name=self.file)
+        if filetype.lower() in ['.json']:
+            return self._display_json()
         elif filetype.lower() in ['.txt']:
             return self._display_txt()
         elif filetype.lower() in ['.csv']:
@@ -44,7 +47,10 @@ class DisplayFile:
 
     def _display_txt(self):
         with open(self.file) as f:
-            return f.read()
+            return f.readlines()
+
+    def _display_json(self):
+        return json.load(self.file)
 
     def _display_csv(self):
         return pandas.read_csv(self.file)
@@ -54,8 +60,7 @@ class DisplayFile:
 
     def _display_default(self):
         try:
-            with open(self.file) as f:
-                return f.readlines()
+            return self._display_txt()
         except:
             return self.file
 

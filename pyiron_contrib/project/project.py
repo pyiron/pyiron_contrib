@@ -55,15 +55,6 @@ class Project(ProjectCore):
         nodes = self.get_jobs(recursive=recursive, columns=["job"])["job"]
         return nodes
 
-    def copy(self):
-        """
-        Copy the project object - copying just the Python object but maintaining the same pyiron path
-
-        Returns:
-            Project: copy of the project object
-        """
-        new = Project(path=self.path, user=self.user, sql_query=self.sql_query)
-        return new
 
     def display_item(self, item, outwidget=None):
         if item in self.list_files() and item not in self.list_files(extension="h5"):
@@ -109,3 +100,34 @@ class Project(ProjectCore):
             str: string representation
         """
         return str(self.list_all())
+
+    # These methods need to be copied as is as they return a new Project(...) object which differs for the super class.
+    def copy(self):
+        """
+        Copy the project object - copying just the Python object but maintaining the same pyiron path
+
+        Returns:
+            Project: copy of the project object
+        """
+        new = Project(path=self.path, user=self.user, sql_query=self.sql_query)
+        return new
+
+    def load_from_jobpath(self, job_id=None, db_entry=None, convert_to_object=True):
+        """
+        Internal function to load an existing job either based on the job ID or based on the database entry dictionary.
+
+        Args:
+            job_id (int): Job ID - optional, but either the job_id or the db_entry is required.
+            db_entry (dict): database entry dictionary - optional, but either the job_id or the db_entry is required.
+            convert_to_object (bool): convert the object to an pyiron object or only access the HDF5 file - default=True
+                                      accessing only the HDF5 file is about an order of magnitude faster, but only
+                                      provides limited functionality. Compare the GenericJob object to JobCore object.
+
+        Returns:
+            GenericJob, JobCore: Either the full GenericJob object or just a reduced JobCore object
+        """
+        job = super(Project, self).load_from_jobpath(
+            job_id=job_id, db_entry=db_entry, convert_to_object=convert_to_object
+        )
+        job.project_hdf5._project = Project(path=job.project_hdf5.file_path)
+        return job

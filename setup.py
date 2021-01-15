@@ -39,6 +39,5 @@ setup(
         'scipy>=1.5.2',
         'seaborn>=0.11.0',
         'scikit-image>=0.17.2',
-        'pyiron_atomistics>=0.2.0'
     ]
 )

@@ -2,9 +2,31 @@ import os
 
 import pandas
 import json
-from PIL import Image
-from IPython.core.display import display
-from pyiron_base import FileHDFio
+from pyiron_base import FileHDFio, ImportAlarm
+_has_imported = {}
+try:
+    from PIL import Image
+    _has_imported['PIL'] = True
+except ImportError:
+    _has_imported['PIL'] = False
+try:
+    from IPython.core.display import display
+    _has_imported['IPython'] = True
+except ImportError:
+    _has_imported['IPython'] = False
+if all(_has_imported.values()):
+    import_alarm = ImportAlarm()
+else:
+    _not_imported = ''
+    for k, j in _has_imported.items():
+        if j and len(_not_imported) > 0:
+            _not_imported += ', '
+        if j:
+            _not_imported += k
+    import_alarm = ImportAlarm(
+        "Reduced functionality, since " + _not_imported + " could not be imported."
+                               )
+
 
 class DisplayFile:
 
@@ -40,7 +62,7 @@ class DisplayFile:
             return self._display_txt()
         elif filetype.lower() in ['.csv']:
             return self._display_csv()
-        elif filetype.lower() in Image.registered_extensions():
+        elif _has_imported['PIL'] and filetype.lower() in Image.registered_extensions():
             return self._display_img()
         else:
             return self._display_default()
@@ -97,7 +119,7 @@ class DisplayItem:
             obj = self._display_s3_metadata()
         else:
             obj = self._display_obj()
-        if self.output is None:
+        if self.output is None or not _has_imported['IPython']:
             return obj
         else:
             with self.output:
@@ -115,4 +137,3 @@ class DisplayItem:
 
     def _display_obj(self):
         return self.item
-

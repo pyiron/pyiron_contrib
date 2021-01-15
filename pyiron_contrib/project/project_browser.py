@@ -240,21 +240,29 @@ class ProjectBrowser:
             self._busy_check()
             f = os.path.join(self.path, b.description)
             self.output.clear_output(True)
+            try:
+                data = self.project[b.description]
+            except:
+                data = None
             with self.output:
-                try:
-                    display(self.project[b.description])
-                except:
+                if data is not None and str(type(data)) == "<class 'boto3.resources.factory.s3.Object'>":
+                    def _display_s3_metadata(s3_obj):
+                        metadata_str = "Metadata:\n"
+                        metadata_str += "------------------------\n"
+                        for key, value in s3_obj.metadata.items():
+                            metadata_str += key + ': ' + value + '\n'
+                        return metadata_str
+                    print(_display_s3_metadata(data))
+                elif data is not None:
+                    display(data)
+                else:
                     print([b.description])
             if f in self._clickedFiles:
                 self._data = None
                 b.style.button_color = file_color
                 self._clickedFiles.remove(f)
             else:
-                try:
-                    data = self.project[b.description]
-                except:
-                    pass
-                else:
+                if data is not None:
                     self._data = Data(data=data, filename=b.description, metadata={"path": f})
                 b.style.button_color = file_chosen_color
                 #self._clickedFiles.append(f)

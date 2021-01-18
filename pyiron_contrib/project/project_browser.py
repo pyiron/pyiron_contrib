@@ -137,21 +137,9 @@ class ProjectBrowser:
             self._update_filebox(self.filebox)
         self._busy_check(False)
 
-    #@property
-    #def data(self):
-    #    for file in self._clickedFiles:
-    #        data = Data(source=file)
-    #        self._data.append(data)
-    #    with self.output:
-    #        if len(self._data) > 0:
-    #            print('Loaded %i File(s):' % (len(self._data)))
-    #            for i in self._data:
-    #                print(i.filename)
-    #        else:
-    #            print('No files chosen')
-    #    self._clickedFiles = []
-    #    self._update_filebox(self.filebox)
-    #    return self._data
+    @property
+    def data(self):
+        return self._data
 
     def _update_project_worker(self, rel_path):
         try:

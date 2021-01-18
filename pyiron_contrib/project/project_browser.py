@@ -40,8 +40,6 @@ class ProjectBrowser:
         self._busy = False
         self._show_files = show_files
         self.output = widgets.Output(layout=widgets.Layout(width='50%', height='100%'))
-        #TODO: move to project self._display_file = DisplayFile(file=None, outwidget=self.output).display_file
-        #TODO: move to project self._display_metadata = DisplayMetadata(metadata=None, outwidget=self.output).display
         self._clickedFiles = []
         self._data = None
         self.pathbox = widgets.HBox(layout=widgets.Layout(width='100%', justify_content='flex-start'))
@@ -188,8 +186,6 @@ class ProjectBrowser:
             self._update_project(b.path)
             self._busy_check(False)
 
-        #with self.output:
-        #    display(self.project)
         buttons = []
         tmppath = os.path.abspath(self.path)
         if tmppath[-1] == '/':
@@ -299,3 +295,5 @@ class ProjectBrowser:
 
         filebox.children = tuple(buttons)
 
+    def _ipython_display_(self):
+        display(self.gui())

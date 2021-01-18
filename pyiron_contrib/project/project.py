@@ -24,7 +24,8 @@ class Project(ProjectCore):
         self._project_browser = None
     __init__.__doc__ = ProjectCore.__init__.__doc__
 
-    def open_browser(self, Vbox=None, show_files=False):
+    @property
+    def browser(self):
         """
         Provides a file browser to inspect the local data system.
 
@@ -34,11 +35,9 @@ class Project(ProjectCore):
         """
         if self._project_browser is None:
             self._project_browser = ProjectBrowser(project=self,
-                                                   show_files=show_files,
-                                                   Vbox=Vbox)
-        else:
-            self._project_browser.update(Vbox=Vbox, show_files=show_files)
-        return self._project_browser.gui()
+                                                   show_files=False,
+                                                   Vbox=None)
+        return self._project_browser
 
     def list_nodes(self, recursive=False):
         """

@@ -104,61 +104,57 @@ class Data:
 
 
 
-class DisplayFile:
+class LoadFile:
 
-    """ Class to display a file in the given outwidget. """
-    def __init__(self, file, outwidget):
-        """
-            Class to display different files in a notebook.
+    """ Class to load a file into an appropriate object. """
 
-            Args:
-                file (str/None): path to the file to be displayed.
-        """
-        self.file = file
+    def __call__(self, file):
+        return self.load_file(file)
 
-    def display_file(self, file):
+    def load_file(self, file):
         """
-            Display the file in the outwidget,
+            Load the file and return an appropriate object containing the data.
 
             Args:
                 file (str): path to the file to be displayed.
         """
-        self.file = file
-        return self._display_file()
-
-    def _display_file(self):
-        _, filetype = os.path.splitext(self.file)
+        _, filetype = os.path.splitext(file)
         if filetype.lower() in ['.h5', '.hdf']:
-            return FileHDFio(file_name=self.file)
+            return FileHDFio(file_name=file)
         if filetype.lower() in ['.json']:
-            return self._display_json()
+            return self._load_json(file)
         elif filetype.lower() in ['.txt']:
-            return self._display_txt()
+            return self._load_txt(file)
         elif filetype.lower() in ['.csv']:
-            return self._display_csv()
+            return self._load_csv(file)
         elif _has_imported['PIL'] and filetype.lower() in Image.registered_extensions():
-            return self._display_img()
+            return self._load_img(file)
         else:
-            return self._display_default()
+            return self._load_default(file)
 
-    def _display_txt(self):
-        with open(self.file) as f:
+    @staticmethod
+    def _load_txt(file):
+        with open(file) as f:
             return f.readlines()
 
-    def _display_json(self):
-        return json.load(self.file)
+    @staticmethod
+    def _load_json(file):
+        with open(file) as f:
+            return json.load(f)
 
-    def _display_csv(self):
-        return pandas.read_csv(self.file)
+    @staticmethod
+    def _load_csv(file):
+        return pandas.read_csv(file)
 
-    def _display_img(self):
-        return Image.open(self.file)
+    @staticmethod
+    def _load_img(file):
+        return Image.open(file)
 
-    def _display_default(self):
+    def _load_default(self, file):
         try:
-            return self._display_txt()
+            return self._load_txt(file)
         except:
-            return self.file
+            return file
 
 
 class DisplayItem:
@@ -173,7 +169,7 @@ class DisplayItem:
         """
         self.output = outwidget
         self.item = item
-        self._FileDisplay = DisplayFile(file=None, outwidget=self.output).display_file
+        self._FileDisplay = LoadFile()
         if item is not None and outwidget is not None:
             self._display()
 

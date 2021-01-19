@@ -236,6 +236,13 @@ class ProjectBrowser:
                             metadata_str += key + ': ' + value + '\n'
                         return metadata_str
                     print(_display_s3_metadata(data))
+                elif data is not None and str(type(data)).split('.')[0] == "<class 'PIL":
+                    try:
+                        data_cp = data.copy()
+                        data_cp.thumbnail((800, 800))
+                    except:
+                        data_cp = data
+                    display(data_cp)
                 elif data is not None:
                     display(data)
                 else:

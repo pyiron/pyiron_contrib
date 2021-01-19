@@ -4,8 +4,7 @@ import ipywidgets as widgets
 from IPython.core.display import display
 
 from pyiron_base import Project as BaseProject
-from pyiron_contrib.generic.data import Data
-from pyiron_contrib.generic.display_item import DisplayItem
+from pyiron_contrib.generic.data import Data, DisplayItem
 
 
 class ProjectBrowser:

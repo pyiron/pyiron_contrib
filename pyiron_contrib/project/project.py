@@ -1,4 +1,4 @@
-from pyiron_base import InputList, ImportAlarm
+from pyiron_base import ProjectHDFio, ImportAlarm
 from pyiron import Project as ProjectCore
 import posixpath
 try:
@@ -8,7 +8,7 @@ except ImportError:
     import_alarm = ImportAlarm(
         "The dependencies of the project's browser are not met (ipywidgets, IPython)."
     )
-from pyiron_contrib.generic.display_item import DisplayItem
+from pyiron_contrib.generic.data import DisplayItem
 
 
 class Project(ProjectCore):

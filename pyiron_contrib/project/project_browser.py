@@ -4,7 +4,7 @@ import ipywidgets as widgets
 from IPython.core.display import display
 
 from pyiron_base import Project as BaseProject
-from pyiron_contrib.generic.data import Data, DisplayItem
+from pyiron_contrib.generic.filedata import FileData, DisplayItem
 
 
 class ProjectBrowser:
@@ -253,7 +253,7 @@ class ProjectBrowser:
                 self._clickedFiles.remove(f)
             else:
                 if data is not None:
-                    self._data = Data(data=data, filename=b.description, metadata={"path": f})
+                    self._data = FileData(data=data, filename=b.description, metadata={"path": f})
                 b.style.button_color = file_chosen_color
                 #self._clickedFiles.append(f)
                 self._clickedFiles = [f]

@@ -8,7 +8,7 @@ except ImportError:
     import_alarm = ImportAlarm(
         "The dependencies of the project's browser are not met (ipywidgets, IPython)."
     )
-from pyiron_contrib.generic.data import DisplayItem
+from pyiron_contrib.generic.filedata import DisplayItem
 
 
 class Project(ProjectCore):
@@ -53,13 +53,6 @@ class Project(ProjectCore):
             return []
         nodes = self.get_jobs(recursive=recursive, columns=["job"])["job"]
         return nodes
-
-
-    def display_item(self, item, outwidget=None):
-        if item in self.list_files() and item not in self.list_files(extension="h5"):
-            return DisplayItem(self.path+item, outwidget).display()
-        else:
-            return DisplayItem(self.__getitem__(item), outwidget).display()
 
     def _get_item_helper(self, item, convert_to_object=True):
         """

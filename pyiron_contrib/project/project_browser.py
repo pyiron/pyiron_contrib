@@ -28,7 +28,7 @@ class ProjectBrowser:
         """
         self.project = project.copy()
         self._node_as_dirs = isinstance(self.project, BaseProject)
-        self._initial_path = self.path
+        self._initial_project = project.copy()
         self._project_root_path = self.project.root_path
 
         if Vbox is None:
@@ -73,14 +73,9 @@ class ProjectBrowser:
         self.update()
         return self.box
 
-    def update(self, Vbox=None, fix_path = None, show_files=None):
-        if Vbox is None:
-            Vbox = self.box
-        if fix_path is not None:
-            self.fix_path = fix_path
-        if show_files is not None:
-            self._show_files = show_files
+    def refresh(self):
         self.output.clear_output(True)
+        self._node_as_dirs = isinstance(self.project, BaseProject)
         self._update_files()
         self._update_optionbox(self.optionbox)
         self._update_filebox(self.filebox)
@@ -90,7 +85,18 @@ class ProjectBrowser:
                                 min_height='100px',
                                 max_height='800px'
                             ))
-        Vbox.children = tuple([self.optionbox, self.pathbox, body])
+        self.path_string_box = self.path_string_box.__class__(description="(rel) Path", value='')
+        self.box.children = tuple([self.optionbox, self.pathbox, body])
+
+
+    def update(self, Vbox=None, fix_path = None, show_files=None):
+        if Vbox is not None:
+            self.box = Vbox
+        if fix_path is not None:
+            self.fix_path = fix_path
+        if show_files is not None:
+            self._show_files = show_files
+        self.refresh()
 
     def _update_optionbox(self, optionbox):
 
@@ -151,17 +157,15 @@ class ProjectBrowser:
                 self.project = new_project
 
     def _update_project(self, path):
-        self.output.clear_output(True)
-        # check path consistency:
-        rel_path = os.path.relpath(path, self.path)
-        if rel_path == '.':
-            return
-        self._update_project_worker(rel_path)
-        self._node_as_dirs = isinstance(self.project, BaseProject)
-        self._update_files()
-        self._update_filebox(self.filebox)
-        self._update_pathbox(self.pathbox)
-        self.path_string_box = self.path_string_box.__class__(description="(rel) Path", value='')
+        if isinstance(path, str):
+            # check path consistency:
+            rel_path = os.path.relpath(path, self.path)
+            if rel_path == '.':
+                return
+            self._update_project_worker(rel_path)
+        else:
+            self.project = path
+        self.refresh()
 
     def _update_pathbox(self, box):
         path_color = '#DDDDAA'
@@ -191,7 +195,7 @@ class ProjectBrowser:
             buttons.append(button)
         button = widgets.Button(icon="fa-home", layout=widgets.Layout(width='auto'))
         button.style.button_color = home_color
-        button.path = self._initial_path
+        button.path = self._initial_project
         if self.fix_path:
             button.disabled = True
         button.on_click(on_click)

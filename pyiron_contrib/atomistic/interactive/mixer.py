@@ -18,16 +18,16 @@ __date__ = "Sep 1, 2018"
 
 class Mixer(InteractiveWrapper):
     """
-    Mixing forces of two quantum engines
+    Mixing forces of two atomistic interpreters, e.g. a LAMMPS or VASP job
 
     Args:
         project (ProjectHDFio): ProjectHDFio instance which points to the HDF5 file the job is stored in
         job_name (str): name of the job, which has to be unique within the project
 
     Attributes:
-        input (pyiron_base.GenericParameters): Instance which handles the input
-        ref_job_0 (pyiron.atomistics.job.atomistic.AtomisticGenericJob): First quantum engine
-        ref_job_1 (pyiron.atomistics.job.atomistic.AtomisticGenericJob): Second quantum engine
+        input (pyiron_base.GenericParameters): handles the input
+        ref_job_0 (pyiron.atomistics.job.atomistic.AtomisticGenericJob): First atomistic interpreter
+        ref_job_1 (pyiron.atomistics.job.atomistic.AtomisticGenericJob): Second atomistic interpreter
     """
 
     def __init__(self, project, job_name):

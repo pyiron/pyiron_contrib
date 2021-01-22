@@ -25,11 +25,11 @@ class LangevinAse(InteractiveWrapper):
     It is therefore a perfect example how other thermostats implemented in ASE can be used inside pyiron.
 
     Args:
-        project (ProjectHDFio): ProjectHDFio instance which points to the HDF5 file the job is stored in
+        project (ProjectHDFio): points to the HDF5 file the job is stored in
         job_name (str): name of the job, which has to be unique within the project
 
     Attributes:
-        input (pyiron.objects.hamilton.md.lammps.Input instance): Instance which handles the input
+        input (pyiron.objects.hamilton.md.lammps.Input): handle the input
     """
 
     def __init__(self, project, job_name):

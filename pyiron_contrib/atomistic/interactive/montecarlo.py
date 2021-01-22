@@ -32,10 +32,10 @@ class MonteCarloMaster(InteractiveWrapper):
         job_name (str): name of the job, which has to be unique within the project
 
     Attributes:
-        input (pyiron_base.GenericParameters instance): Instance which handles the input
+        input (pyiron_base.GenericParameters): handles the input
         structure_lattice (pyiron.atomistics.structure.atoms.Atoms): Crystal Lattice
         structure_sublattice (pyiron.atomistics.structure.atoms.Atoms): Crystal Lattice of interstitial positions
-        ref_job (pyiron.atomistics.job.atomistic.AtomisticGenericJob): Quantum Engine used to evaluate structures
+        ref_job (pyiron.atomistics.job.atomistic.AtomisticGenericJob): atomistic interpreter used to evaluate structures
     """
     def __init__(self, project, job_name):
         super(MonteCarloMaster, self).__init__(project, job_name)
@@ -189,7 +189,8 @@ class MonteCarloMaster(InteractiveWrapper):
             temperature (float): temperature which defines the acceptance ratio
 
         Returns:
-            list of accepted energies, list of all energies
+            (list): accepted energies
+            (list): all energies
         """
         step_nr, try_nr = 0, 0
         e_prev = None

@@ -205,6 +205,43 @@ class ProjectBrowser:
         buttons.reverse()
         box.children = tuple(buttons)
 
+    def _on_click_file(self, filename):
+        filepath = os.path.join(self.path, filename)
+        self.output.clear_output(True)
+        try:
+            data = self.project[filename]
+        except(KeyError):
+            data = None
+        with self.output:
+            if data is not None and str(type(data)) == "<class 'boto3.resources.factory.s3.Object'>":
+                def _display_s3_metadata(s3_obj):
+                    metadata_str = "Metadata:\n"
+                    metadata_str += "------------------------\n"
+                    for key, value in s3_obj.metadata.items():
+                        metadata_str += key + ': ' + value + '\n'
+                    return metadata_str
+
+                print(_display_s3_metadata(data))
+            elif data is not None and str(type(data)).split('.')[0] == "<class 'PIL":
+                try:
+                    data_cp = data.copy()
+                    data_cp.thumbnail((800, 800))
+                except:
+                    data_cp = data
+                display(data_cp)
+            elif data is not None:
+                display(data)
+            else:
+                print([filename])
+        if filepath in self._clickedFiles:
+            self._data = None
+            self._clickedFiles.remove(filepath)
+        else:
+            if data is not None:
+                self._data = FileData(data=data, filename=filename, metadata={"path": filepath})
+            # self._clickedFiles.append(filepath)
+            self._clickedFiles = [filepath]
+
     def _update_filebox(self, filebox):
         # color definitions
         dir_color = '#9999FF'
@@ -227,43 +264,8 @@ class ProjectBrowser:
 
         def on_click_file(b):
             self._busy_check()
-            f = os.path.join(self.path, b.description)
-            self.output.clear_output(True)
-            try:
-                data = self.project[b.description]
-            except:
-                data = None
-            with self.output:
-                if data is not None and str(type(data)) == "<class 'boto3.resources.factory.s3.Object'>":
-                    def _display_s3_metadata(s3_obj):
-                        metadata_str = "Metadata:\n"
-                        metadata_str += "------------------------\n"
-                        for key, value in s3_obj.metadata.items():
-                            metadata_str += key + ': ' + value + '\n'
-                        return metadata_str
-                    print(_display_s3_metadata(data))
-                elif data is not None and str(type(data)).split('.')[0] == "<class 'PIL":
-                    try:
-                        data_cp = data.copy()
-                        data_cp.thumbnail((800, 800))
-                    except:
-                        data_cp = data
-                    display(data_cp)
-                elif data is not None:
-                    display(data)
-                else:
-                    print([b.description])
-            if f in self._clickedFiles:
-                self._data = None
-                b.style.button_color = file_color
-                self._clickedFiles.remove(f)
-            else:
-                if data is not None:
-                    self._data = FileData(data=data, filename=b.description, metadata={"path": f})
-                b.style.button_color = file_chosen_color
-                #self._clickedFiles.append(f)
-                self._clickedFiles = [f]
-                self._update_filebox(filebox)
+            self._on_click_file(b.description)
+            self._update_filebox(filebox)
             self._busy_check(False)
 
         buttons = []

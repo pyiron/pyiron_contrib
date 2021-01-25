@@ -38,6 +38,7 @@ class ProjectBrowser:
         self.fix_path = fix_path
         self._busy = False
         self._show_files = show_files
+        self._hide_path = True
         self.output = widgets.Output(layout=widgets.Layout(width='50%', height='100%'))
         self._clickedFiles = []
         self._data = None
@@ -97,14 +98,15 @@ class ProjectBrowser:
         # self.path_string_box.__init__(description="(rel) Path", value='')
         self.box.children = tuple([self.optionbox, self.pathbox, body])
 
-
-    def update(self, Vbox=None, fix_path = None, show_files=None):
+    def configure(self, Vbox=None, fix_path=None, show_files=None, hide_path=None):
         if Vbox is not None:
             self.box = Vbox
         if fix_path is not None:
             self.fix_path = fix_path
         if show_files is not None:
             self._show_files = show_files
+        if hide_path is not None:
+            self._hide_path = hide_path
         self.refresh()
 
     def _update_optionbox(self, optionbox):
@@ -208,6 +210,8 @@ class ProjectBrowser:
             button.on_click(on_click)
             if self.fix_path or len(tmppath) < len_root_path - 1:
                 button.disabled = True
+                if self._hide_path:
+                    button.layout.display = 'none'
             buttons.append(button)
         button = widgets.Button(icon="fa-home",
                                 tooltip=self._initial_project_path,

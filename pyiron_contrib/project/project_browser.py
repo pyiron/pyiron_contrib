@@ -200,14 +200,18 @@ class ProjectBrowser:
         while tmppath != tmppath_old:
             tmppath_old = tmppath
             [tmppath, curentdir] = os.path.split(tmppath)
-            button = widgets.Button(description=curentdir + '/', layout=widgets.Layout(width='auto'))
+            button = widgets.Button(description=curentdir + '/',
+                                    tooltip=curentdir,
+                                    layout=widgets.Layout(width='auto'))
             button.style.button_color = path_color
             button.path = tmppath_old
             button.on_click(on_click)
             if self.fix_path or len(tmppath) < len_root_path - 1:
                 button.disabled = True
             buttons.append(button)
-        button = widgets.Button(icon="fa-home", layout=widgets.Layout(width='auto'))
+        button = widgets.Button(icon="fa-home",
+                                tooltip=self._initial_project_path,
+                                layout=widgets.Layout(width='auto'))
         button.style.button_color = home_color
         button.path = self._initial_project
         if self.fix_path:

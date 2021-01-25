@@ -101,8 +101,13 @@ class ProjectBrowser:
 
     def _update_optionbox(self, optionbox):
 
+        def click_option_button(b):
+            self._busy_check()
+            self._click_option_button(b)
+            self._busy_check(False)
+
         set_path_button = widgets.Button(description='Set Path', tooltip="Sets current path to provided string.")
-        set_path_button.on_click(self._click_option_button)
+        set_path_button.on_click(click_option_button)
         if self.fix_path:
             set_path_button.disabled = True
         childs = [set_path_button, self.path_string_box]
@@ -113,13 +118,12 @@ class ProjectBrowser:
         #button.on_click(self._click_option_button)
         #childs.append(button)
         button = widgets.Button(description="Reset selection", width='min-content')
-        button.on_click(self._click_option_button)
+        button.on_click(click_option_button)
         childs.append(button)
 
         optionbox.children = tuple(childs)
 
     def _click_option_button(self, b):
-        self._busy_check()
         self.output.clear_output(True)
         with self.output:
             print('')
@@ -141,7 +145,6 @@ class ProjectBrowser:
             self._clickedFiles = []
             self._data = None
             self._update_filebox(self.filebox)
-        self._busy_check(False)
 
     @property
     def data(self):

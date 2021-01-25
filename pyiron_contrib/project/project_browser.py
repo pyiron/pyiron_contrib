@@ -29,7 +29,7 @@ class ProjectBrowser:
         self.project = project.copy()
         self._node_as_dirs = isinstance(self.project, BaseProject)
         self._initial_project = project.copy()
-        self._project_root_path = self.project.root_path
+        self._initial_project_path = self.path
 
         if Vbox is None:
             self.box = widgets.VBox()
@@ -46,7 +46,7 @@ class ProjectBrowser:
         self.filebox = widgets.VBox(layout=widgets.Layout(width='50%', height='100%', justify_content='flex-start'))
         self.path_string_box = widgets.Text(description="(rel) Path", width='min-content')
         self._display_item = DisplayItem(item=None, outwidget=self.output).display
-        self.update()
+        self.refresh()
 
     @property
     def path(self):
@@ -70,22 +70,23 @@ class ProjectBrowser:
         self.dirs = self.project.list_groups()
 
     def gui(self):
-        self.update()
+        self.refresh()
         return self.box
 
     def refresh(self):
         self.output.clear_output(True)
         self._node_as_dirs = isinstance(self.project, BaseProject)
         self._update_files()
-        self._update_optionbox(self.optionbox)
-        self._update_filebox(self.filebox)
-        self._update_pathbox(self.pathbox)
         body = widgets.HBox([self.filebox, self.output],
                             layout=widgets.Layout(
                                 min_height='100px',
                                 max_height='800px'
                             ))
         self.path_string_box = self.path_string_box.__class__(description="(rel) Path", value='')
+        self._update_optionbox(self.optionbox)
+        self._update_filebox(self.filebox)
+        self._update_pathbox(self.pathbox)
+        # self.path_string_box.__init__(description="(rel) Path", value='')
         self.box.children = tuple([self.optionbox, self.pathbox, body])
 
 
@@ -158,7 +159,6 @@ class ProjectBrowser:
 
     def _update_project(self, path):
         if isinstance(path, str):
-            # check path consistency:
             rel_path = os.path.relpath(path, self.path)
             if rel_path == '.':
                 return
@@ -169,7 +169,6 @@ class ProjectBrowser:
 
     def _update_pathbox(self, box):
         path_color = '#DDDDAA'
-        h5_path_color = '#CCCCAA'
         home_color = '#999999'
 
         def on_click(b):

@@ -52,6 +52,14 @@ class ProjectBrowser:
     def path(self):
         return self.project.path
 
+    @property
+    def _project_root_path(self):
+        try:
+            root_path = self.project.root_path
+        except AttributeError:
+            root_path = self.project.project.root_path
+        return root_path
+
     def _busy_check(self, busy=True):
         if self._busy and busy:
             return
@@ -153,9 +161,13 @@ class ProjectBrowser:
     def _update_project_worker(self, rel_path):
         try:
             new_project = self.project[rel_path]
-        except ValueError:
+            # Check if the new_project implements list_nodes()
+            new_project.list_nodes()
+        except (ValueError, AttributeError):
             self.path_string_box = self.path_string_box.__class__(description="(rel) Path", value='')
-            return "No valid path"
+            with self.output:
+                print("No valid path")
+            return
         else:
             if new_project is not None:
                 self.project = new_project

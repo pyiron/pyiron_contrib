@@ -24,6 +24,7 @@ JOB_CLASS_DICT['Mixer'] = 'pyiron_contrib.atomistic.interactive.mixer'
 JOB_CLASS_DICT['ParameterMaster'] = 'pyiron_contrib.atomistic.dft.parametermaster'
 JOB_CLASS_DICT['MonteCarloMaster'] = 'pyiron_contrib.atomistic.interactive.montecarlo'
 JOB_CLASS_DICT['RandSpg'] = 'pyiron_contrib.atomistic.atomistics.structures.randspg'
+JOB_CLASS_DICT['TrainingContainer'] = 'pyiron_contrib.atomistic.atomistics.job.trainingcontainer'
 
 from ._version import get_versions
 

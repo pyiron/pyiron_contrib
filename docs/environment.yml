@@ -1,0 +1,8 @@
+channels:
+- conda-forge
+dependencies:
+- ipywidgets
+- cython
+- pyiron_atomistics
+- pyiron_contrib
+- nbsphinx

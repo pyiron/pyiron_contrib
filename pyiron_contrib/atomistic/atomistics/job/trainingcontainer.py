@@ -48,6 +48,18 @@ class TrainingContainer(GenericJob):
                  "number_of_atoms": len(structure)},
                 ignore_index=True)
 
+    def include_dataset(self, dataset):
+        """
+        Add a pandas DataFrame to the saved structures.
+
+        The dataframe should have the following columns:
+            - name: human readable name of the structure
+            - atoms(:class:`ase.Atoms`): the atomic structure
+            - energy(float): energy of the whole structure
+            - forces (Nx3 array of float): per atom forces, where N is the number of atoms in the structure
+        """
+        self._table = self._table.append(dataset, ignore_index=True)
+
     def to_pandas(self):
         """
         Export list of structure to pandas table for external fitting codes.

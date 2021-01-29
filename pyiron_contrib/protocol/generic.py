@@ -1,8 +1,8 @@
-from __future__ import print_function
 # coding: utf-8
 # Copyright (c) Max-Planck-Institut für Eisenforschung GmbH - Computational Materials Design (CM) Department
 # Distributed under the terms of "New BSD License", see the LICENSE file.
 
+from __future__ import print_function
 import sys
 from pyiron_base import GenericJob
 from pyiron_contrib.protocol.utils import IODictionary, InputDictionary, LoggerMixin, Event, EventHandler, \
@@ -617,7 +617,6 @@ class Protocol(CompoundVertex, GenericJob):
     """
     A parent class for compound vertices which are being instantiated as regular pyiron jobs, i.e. the highest level
     graph in their context.
-
     Example: if `X` inherits from `CompoundVertex` and performs the desired logic, then
     ```
     class ProtocolX(Protocol, X):
@@ -661,7 +660,6 @@ class Protocol(CompoundVertex, GenericJob):
     def to_hdf(self, hdf=None, group_name=None):
         """
         Store the Protocol in an HDF5 file.
-
         Args:
             hdf (ProjectHDFio): HDF5 group object - optional
             group_name (str): HDF5 subgroup name - optional
@@ -673,7 +671,6 @@ class Protocol(CompoundVertex, GenericJob):
     def from_hdf(self, hdf=None, group_name=None):
         """
         Load the Protocol from an HDF5 file.
-
         Args:
             hdf (ProjectHDFio): HDF5 group object - optional
             group_name (str): HDF5 subgroup name - optional

@@ -32,11 +32,11 @@ from pyiron_base import GenericJob
 
 class TrainingContainer(GenericJob):
     """
-    Stores ASE structres with energies and forces.
+    Stores ASE structures with energies and forces.
     """
 
-    def __init__(self, job_name, project):
-        super().__init__(job_name, project)
+    def __init__(self, project, job_name):
+        super().__init__(project=project, job_name=job_name)
         self._table = pd.DataFrame({
             "name": [],
             "atoms": [],

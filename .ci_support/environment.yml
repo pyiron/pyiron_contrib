@@ -5,7 +5,7 @@ dependencies:
   - coveralls
   - coverage
   - codacy-coverage
-  - matplotlib >=3.2.1
+  - matplotlib >=3.3.4
   - numpy >=1.19.4
   - pyiron_base >=0.1.44
   - pyiron_atomistics >=0.2.2

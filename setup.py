@@ -37,7 +37,7 @@ setup(
         'numpy==1.19.1',
         'pyiron==0.3.6',
         'scipy==1.6.0',
-        'seaborn==0.11.0',
+        'seaborn==0.11.1',
         'scikit-image==0.18.1',
     ]
 )

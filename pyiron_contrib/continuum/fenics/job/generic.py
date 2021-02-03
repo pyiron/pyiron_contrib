@@ -115,6 +115,10 @@ class Fenics(GenericJob):
     def __init__(self, project, job_name):
         """Create a new Fenics type job"""
         super(Fenics, self).__init__(project, job_name)
+        warnings.warn("Currently, the c++ dolfin functions used by fenics are not stored in the HDF5 file."
+                      " This includes the domains, boundary condition, spatial functions."
+                      " Therefore, it is not possible to reload the job properly, from HDF5 file."
+                      " It would be safe to remove the Fenics jobs, after defining the project.")
         self._python_only_job = True
         self.create = Creator(self)
         self._plot = Plot(self)

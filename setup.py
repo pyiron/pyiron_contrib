@@ -32,12 +32,12 @@ setup(
     keywords='pyiron',
     packages=find_packages(exclude=["*tests*"]),
     install_requires=[
-        'ase>=3.19.1',
-        'matplotlib>=3.2.1',
-        'numpy>=1.19.1',
-        'pyiron>=0.3.6',
-        'scipy>=1.5.2',
-        'seaborn>=0.11.0',
-        'scikit-image>=0.17.2',
+        'ase==3.21.1',
+        'matplotlib==3.3.4',
+        'numpy==1.20.0',
+        'pyiron_atomistics==0.2.3',
+        'scipy==1.6.0',
+        'seaborn==0.11.1',
+        'scikit-image==0.18.1',
     ]
 )

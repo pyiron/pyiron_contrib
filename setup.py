@@ -39,5 +39,7 @@ setup(
         'scipy==1.6.0',
         'seaborn==0.11.1',
         'scikit-image==0.18.1',
+        'fenics==2019.1.0',
+        'mshr=2019.1.0',
     ]
 )

@@ -27,7 +27,7 @@ jobs:
       with:
         auto-update-conda: true
         python-version: ${{ matrix.python-version }}
-        environment-file: .ci_support/test_environment.yml
+        environment-file: .ci_support/environment-notebooks.yml
     - name: Setup
       shell: bash -l {0}
       run: |

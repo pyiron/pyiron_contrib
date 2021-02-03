@@ -13,3 +13,4 @@ dependencies:
   - scipy
   - seaborn
   - scikit-image
+  - papermill

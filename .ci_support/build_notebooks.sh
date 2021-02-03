@@ -1,4 +1,7 @@
 #!/bin/bash
+for f in $(cat .ci_support/exclude); do 
+    rm "notebooks/$f";     
+done;
 # execute notebooks
 i=0;
 for notebook in $(ls notebooks/*.ipynb); do 

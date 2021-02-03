@@ -34,7 +34,7 @@ setup(
     install_requires=[
         'ase==3.21.1',
         'matplotlib==3.3.4',
-        'numpy==1.20',
+        'numpy==1.20.0',
         'pyiron_atomistics==0.2.3',
         'scipy==1.6.0',
         'seaborn==0.11.1',

@@ -28,7 +28,7 @@ class StructureList(object):
         
     def to_hdf(self, hdf, group="structure_list"):
         with hdf.open(group) as hdf_s_lst:
-            for k, struct in self:
+            for k, struct in enumerate(self._structure_lst):
                 struct.to_hdf(hdf=hdf_s_lst, group=f"structure_{k}")
             
     def from_hdf(self, hdf, group="structure_list"):

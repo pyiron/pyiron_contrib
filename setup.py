@@ -2,11 +2,12 @@
 Setuptools based setup module
 """
 from setuptools import setup, find_packages
+import versioneer
 
 
 setup(
     name='pyiron_contrib',
-    version='0.0.1',
+    version=versioneer.get_version(),
     description='Repository for user-generated plugins to the pyiron IDE.',
     long_description='http://pyiron.org',
 
@@ -39,5 +40,7 @@ setup(
         'scipy==1.6.0',
         'seaborn==0.11.1',
         'scikit-image==0.18.1',
-    ]
+    ],
+    cmdclass=versioneer.get_cmdclass(),
+    
 )

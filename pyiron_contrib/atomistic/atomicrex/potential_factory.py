@@ -50,12 +50,11 @@ class LJPotential():
         write_pretty_xml(lj, filename)
         
 
-class EAMPotential:
+class EAMPotential(InputList):
     def __init__(self, identifier, export_file, rho_range_factor, resolution, species):
         self.pair_interactions = InputList(table_name="pair_interactions")
         self.electron_densities = InputList(table_name="electron_densities")
         self.embedding_energies = InputList(table_name="embedding_energies")
-        self.function_factory = FunctionFactory()
         self.identifier = identifier
         self.export_file = export_file
         self.rho_range_factor = rho_range_factor
@@ -100,6 +99,10 @@ class EAMPotential:
             
         filename = posixpath.join(directory, "potential.xml")
         write_pretty_xml(eam, filename)
+    
+    def to_hdf(self, hdf=None, group_name=None):
+        super().to_hdf(hdf=hdf, group_name=group_name)
+
 
     def _parse_final_parameters(self, lines):
         for l in lines:

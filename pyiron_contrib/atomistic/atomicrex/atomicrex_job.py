@@ -9,10 +9,11 @@ import subprocess
 
 from pyiron_base import GenericJob, Settings, PyironFactory
 
-from pyiron_contrib.atomistic.atomicrex.general_input import GeneralARInput
+from pyiron_contrib.atomistic.atomicrex.general_input import GeneralARInput, AlgorithmFactory
 from pyiron_contrib.atomistic.atomicrex.structure_list import ARStructureList
 from pyiron_contrib.atomistic.atomicrex.potential_factory import ARPotFactory
 from pyiron_contrib.atomistic.atomicrex.output import Output
+from pyiron_contrib.atomistic.atomicrex.function_factory import FunctionFactory
 
 
 s = Settings()
@@ -38,22 +39,21 @@ class Atomicrex(PotentialFittingBase):
         self.input = GeneralARInput()
         self.potential = None
         self.structures = ARStructureList()
-        self.potential_factory = ARPotFactory()
         ## temprorary set working directory manually before full pyiron integration
         self._working_directory = None
         self.output = Output()
+        self.factories = Factories()
+        
 
-    """
     def to_hdf(self, hdf=None, group_name=None):
         if hdf == None:
             hdf = self.project_hdf5
-        self.input.to_hdf()
-        self.potential.to_hdf()
-        self.structures.to_hdf()
+        super().to_hdf(hdf=hdf, group_name=group_name)
+        self.input.to_hdf(hdf=hdf)
+        self.potential.to_hdf(hdf=hdf)
+        self.structures.to_hdf(hdf=hdf)
         return
-    """
 
-    """
     def from_hdf(self, hdf=None, group_name=None):
         if hdf == None:
             hdf = self.project_hdf5
@@ -61,7 +61,7 @@ class Atomicrex(PotentialFittingBase):
         self.potential.from_hdf()
         self.structures.from_hdf()
         return
-    """
+
 
     @property
     def publication(self):
@@ -125,3 +125,9 @@ class Atomicrex(PotentialFittingBase):
         with open(f"{cwd}/atomicrex.out", "w") as f:
             subprocess.run(["atomicrex", "main.xml"], stdout=f, stderr=f, text=True, cwd=cwd)
     """
+
+class Factories:
+    def __init__(self):
+        self.potentials = ARPotFactory()
+        self.functions = FunctionFactory()
+        self.algorithms = AlgorithmFactory()

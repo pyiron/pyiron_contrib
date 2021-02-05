@@ -22,7 +22,6 @@ class GeneralARInput(InputList):
         self.fit_algorithm = AR_LBFGS(conv_threshold=1e-10, max_iter=50, gradient_epsilon=1e-8)
         self.output_interval = 100
         self.enable_fitting = True
-        self.factories = Factories()
         
     def _write_xml_file(self, directory):
         job = ET.Element("job")
@@ -70,12 +69,10 @@ class GeneralARInput(InputList):
         file_name = posixpath.join(directory, "main.xml")
         write_pretty_xml(job, file_name)
 
+    def to_hdf(self, hdf=None, group_name=None):
+        super().to_hdf(hdf=hdf, group_name=group_name)
 
-class Factories:
-    def __init__(self):
-        self.potentials = ARPotFactory()
-        self.functions = FunctionFactory()
-        self.algorithms = AlgorithmFactory()
+
 
 
 class AlgorithmFactory(PyironFactory):

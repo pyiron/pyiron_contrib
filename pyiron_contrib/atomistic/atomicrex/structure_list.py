@@ -157,10 +157,10 @@ class ARStructureList(InputList):
         filename = posixpath.join(directory, name)
         write_pretty_xml(root, filename)
     
-    def to_hdf(self, hdf = None):
-        raise NotImplementedError("TODO")
+    def to_hdf(self, hdf=None, group_name=None):
+        super().to_hdf(hdf=hdf, group_name=group_name)
     
-    def from_hdf(self, hdf = None):
+    def from_hdf(self, hdf=None):
         raise NotImplementedError("TODO")
     
     def _parse_final_properties(self, struct_lines):

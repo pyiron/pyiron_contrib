@@ -87,7 +87,11 @@ def structure_to_xml_element(structure):
     return pbc, cell
 
 
-class ARStructure:
+class ARStructure(InputList):
+    #def __new__(cls, *args, **kwargs):
+    #    instance = super().__new__(cls)
+    #    object.__setattr__(instance, "structure", Atoms())
+
     def __init__(self, structure, fit_properties, identifier, relative_weight=1, clamp=True,):
         self.structure = structure
         self.fit_properties = fit_properties
@@ -128,6 +132,10 @@ class ARStructure:
             self.clamp,
             self.fit_properties
         )
+    
+    def to_hdf(self, hdf=None, group_name=None):
+        self.structure.to_hdf(hdf=hdf, group_name=group_name)
+        super().to_hdf(hdf=hdf, group_name=group_name)
 
 
 class ARStructureList(InputList):
@@ -153,7 +161,6 @@ class ARStructureList(InputList):
         root = ET.Element("group")
         for s in self.values():
             root.append(s._write_poscar_return_xml(directory))
-
         filename = posixpath.join(directory, name)
         write_pretty_xml(root, filename)
     

@@ -7,13 +7,14 @@ import posixpath
 import os
 import subprocess
 
-from pyiron_base import GenericJob, Settings, PyironFactory
+from pyiron_base import GenericJob, Settings, PyironFactory, Executable
 
 from pyiron_contrib.atomistic.atomicrex.general_input import GeneralARInput, AlgorithmFactory
 from pyiron_contrib.atomistic.atomicrex.structure_list import ARStructureList
 from pyiron_contrib.atomistic.atomicrex.potential_factory import ARPotFactory
 from pyiron_contrib.atomistic.atomicrex.output import Output
 from pyiron_contrib.atomistic.atomicrex.function_factory import FunctionFactory
+
 
 
 s = Settings()
@@ -117,6 +118,20 @@ class Atomicrex(PotentialFittingBase):
         self.potential.write_xml_file(directory = directory)
         self.structures.write_xml_file(directory = directory)
     
+    def _executable_activate(self, enforce=False):
+        if self._executable is None or enforce:
+            if len(self.__module__.split(".")) > 1:
+                self._executable = Executable(
+                    codename=self.__name__,
+                    module=self.__module__.split(".")[-2],
+                    path_binary_codes=s.resource_paths,
+                )
+            else:
+                self._executable = Executable(
+                    codename=self.__name__, path_binary_codes=s.resource_paths
+                )
+
+
     """
     def run(self):
         cwd = self.working_directory

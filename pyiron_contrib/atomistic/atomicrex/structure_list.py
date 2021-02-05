@@ -173,7 +173,7 @@ class ARStructureList(object):
 
     def write_xml_file(self, directory, name="structures.xml"):
         root = ET.Element("group")
-        for s in self.values():
+        for s in self._structure_dict.values():
             root.append(s._write_poscar_return_xml(directory))
         filename = posixpath.join(directory, name)
         write_pretty_xml(root, filename)
@@ -195,7 +195,7 @@ class ARStructureList(object):
             l = l.strip()
             if l.startswith("Structure"):
                 s_id = l.split("'")[1]
-                s = self[s_id]
+                s = self._structure_dict[s_id]
             else:
                 prop, f_val = ARFitProperty._parse_final_value(line=l)
                 if prop in s.fit_properties:

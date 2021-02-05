@@ -87,7 +87,7 @@ class Atomicrex(PotentialFittingBase):
         if cwd is None:
             cwd = self.working_directory
 
-        filepath = f"{cwd}/atomicrex.out"
+        filepath = f"{cwd}/error.out"
         with open(filepath) as f:
             lines = f.readlines()
         l_index_params = None

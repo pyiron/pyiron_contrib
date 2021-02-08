@@ -9,9 +9,9 @@ from pyiron_contrib.atomistic.atomicrex.fit_properties import ARFitPropertyList,
 from pyiron_contrib.atomistic.atomicrex.utility_functions import write_pretty_xml
 
 
-class StructureList(InputList):
-    def __init__(self, table_name="Structures"):
-        super().__init__(table_name=table_name)
+class StructureList(object):
+    def __init__(self):
+        self._structure_lst = []
         
     def add_structure(self, structure, **kw_properties):
         if isinstance(structure, ASEAtoms):
@@ -24,11 +24,11 @@ class StructureList(InputList):
             raise ValueError("Structures have to be supplied as pyiron or ase atoms")
             
         structure.info.update(kw_properties)
-        self.append(structure)
+        self._structure_lst.append(structure)
         
     def to_hdf(self, hdf, group="structure_list"):
         with hdf.open(group) as hdf_s_lst:
-            for k, struct in self:
+            for k, struct in enumerate(self._structure_lst):
                 struct.to_hdf(hdf=hdf_s_lst, group=f"structure_{k}")
             
     def from_hdf(self, hdf, group="structure_list"):
@@ -87,12 +87,12 @@ def structure_to_xml_element(structure):
     return pbc, cell
 
 
-class ARStructure(InputList):
+class ARStructure(object):
     #def __new__(cls, *args, **kwargs):
     #    instance = super().__new__(cls)
     #    object.__setattr__(instance, "structure", Atoms())
 
-    def __init__(self, structure, fit_properties, identifier, relative_weight=1, clamp=True,):
+    def __init__(self, structure=None, fit_properties=None, identifier=None, relative_weight=1, clamp=True,):
         self.structure = structure
         self.fit_properties = fit_properties
         self.identifier = identifier
@@ -133,14 +133,28 @@ class ARStructure(InputList):
             self.fit_properties
         )
     
-    def to_hdf(self, hdf=None, group_name=None):
-        self.structure.to_hdf(hdf=hdf, group_name=group_name)
-        super().to_hdf(hdf=hdf, group_name=group_name)
+    def to_hdf(self, hdf=None, group_name="arstructure"):
+        with hdf.open(group_name) as hdf_s_lst:
+            self.structure.to_hdf(hdf=hdf_s_lst, group_name="structure")
+            hdf_s_lst["fit_properties"] = self.fit_properties
+            hdf_s_lst["relative_weight"] = self.relative_weight
+            hdf_s_lst["identifier"] = self.identifier
+            hdf_s_lst["clamp"] = self.clamp
+
+    def from_hdf(self, hdf=None, group_name="arstructure"):
+        with hdf.open(group_name) as hdf_s_lst:
+            structure = Atoms()
+            structure.from_hdf(hdf_s_lst, group_name="structure")
+            self.structure = structure
+            self.fit_properties = hdf_s_lst["fit_properties"]
+            self.relative_weight = hdf_s_lst["relative_weight"]
+            self.identifier = hdf_s_lst["identifier"]
+            self.clamp = hdf_s_lst["clamp"]
 
 
-class ARStructureList(InputList):
+class ARStructureList(object):
     def __init__(self):
-        super().__init__(table_name="Structures")
+        self._structure_dict = {}
         
     def add_structure(self, structure, identifier, fit_properties=None, relative_weight=1, clamp=True):
         if isinstance(structure, Atoms):
@@ -154,28 +168,34 @@ class ARStructureList(InputList):
     ## Split into another function to be able to implement some checks later
     def _add_ARstructure(self, structure):
         identifier = f"{structure.identifier}"
-        self[identifier] = structure
-        return self[identifier]
+        self._structure_dict[identifier] = structure
+        return self._structure_dict[identifier]
 
     def write_xml_file(self, directory, name="structures.xml"):
         root = ET.Element("group")
-        for s in self.values():
+        for s in self._structure_dict.values():
             root.append(s._write_poscar_return_xml(directory))
         filename = posixpath.join(directory, name)
         write_pretty_xml(root, filename)
     
-    def to_hdf(self, hdf=None, group_name=None):
-        super().to_hdf(hdf=hdf, group_name=group_name)
+    def to_hdf(self, hdf=None, group_name="arstructurelist"):
+        with hdf.open(group_name) as hdf_s_lst:
+            for k, v in self._structure_dict.items():
+                v.to_hdf(hdf=hdf_s_lst, group_name=k)
     
     def from_hdf(self, hdf=None):
-        raise NotImplementedError("TODO")
+        with hdf.open(group_name) as hdf_s_lst:
+            for g in sorted(hdf_s_lst.list_groups()):
+                s = ARStructure()
+                s.from_hdf(hdf=hdf_s_lst, group_name=g)
+                self._structure_dict[g] = s
     
     def _parse_final_properties(self, struct_lines):
         for l in struct_lines:
             l = l.strip()
             if l.startswith("Structure"):
                 s_id = l.split("'")[1]
-                s = self[s_id]
+                s = self._structure_dict[s_id]
             else:
                 prop, f_val = ARFitProperty._parse_final_value(line=l)
                 if prop in s.fit_properties:

@@ -88,7 +88,7 @@ class ARFitProperty(InputList):
             return "atomic-forces", None
         else:
             line = line.split()
-            return line[0], float(line[1])
+            return line[0].rstrip(":"), float(line[1])
 
 
 

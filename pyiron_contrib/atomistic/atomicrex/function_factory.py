@@ -20,32 +20,32 @@ class FunctionFactory(PyironFactory):
     @staticmethod
     def exp_A_screening(identifier, cutoff, species=["*", "*"], is_screening_function=True):
         return ExpA(identifier, cutoff, species=species, is_screening_function=is_screening_function)
-    
+
     @staticmethod
     def exp_B_screening(identifier, cutoff, rc, alpha, exponent, species=["*", "*"], is_screening_function=True):
         return ExpB(identifier, cutoff, rc, alpha, exponent, species=species, is_screening_function=is_screening_function)
-        
+
     @staticmethod
     def exp_gaussian_screening(identifier, cutoff, stddev, alpha, exponent, species=["*", "*"], is_screening_function=True):
         return ExpGaussian(identifier, cutoff, stddev, alpha, exponent, species=species, is_screening_function=is_screening_function)
-    
+
     @staticmethod
     def morse_A(identifier, D0, r0, beta, species=["*","*"]):
         return MorseA(identifier, D0, r0, beta, species=species)
-        
+
     @staticmethod
     def morse_B(identifier, D0, r0, beta, S, delta, species=["*","*"]):
         return MorseB(identifier, D0, r0, beta, S, delta, species=species)
-        
+
     @staticmethod
     def morse_C(identifier, A, B, mu, lambda_val, delta, species=["*", "*"]):
         return MorseC(identifier, A, B, mu, lambda_val, delta, species=species)
-    
+
     @staticmethod
     def gaussian(identifier, prefactor, eta, mu, species=["*", "*"]):
         return Gaussian(identifier, prefactor, eta, mu, species)
 
-   
+
 class SpecialFunction(InputList):
     def __init__(self, identifier, species=["*", "*"], is_screening_function=False):
         super().__init__(table_name=f"special_function_{identifier}")
@@ -62,7 +62,7 @@ class SpecialFunction(InputList):
             root = ET.SubElement(screening, f"{name}")
         else:
             root = ET.Element(f"{name}")
-        
+
         root.set("id", f"{self.identifier}")
         for param in self.parameters.values():
             p = ET.SubElement(root, f"{param.param}")
@@ -71,7 +71,7 @@ class SpecialFunction(InputList):
         if not self.is_screening_function:
             if self.screening is not None:
                 root.append(self.screening._to_xml_element())
-            return root    
+            return root
         else:
             return screening
 
@@ -101,7 +101,7 @@ class Spline(InputList):
         self.derivative_right = derivative_right
         self.species = species
         self.parameters = NodeList()
-    
+
     def _to_xml_element(self):
         spline = ET.Element("spline")
         spline.set("id", self.identifier)
@@ -124,10 +124,10 @@ class ExpA(SpecialFunction):
             enabled=False,
             fitable=False,
         )
-        
+
     def _to_xml_element(self):
         return super()._to_xml_element(name="exp-A")
-        
+
 
 class ExpB(SpecialFunction):
     def __init__(self, identifier, cutoff,  rc, alpha, exponent, species, is_screening_function):
@@ -153,11 +153,11 @@ class ExpB(SpecialFunction):
             start_val=exponent,
             enabled=False,
         )
-        
+
     def _to_xml_element(self):
         return super()._to_xml_element(name="exp-B")
 
-        
+
 class ExpGaussian(SpecialFunction):
     def __init__(self, identifier, cutoff, stddev, alpha, exponent, species, is_screening_function):
         super().__init__(identifier, species=species, is_screening_function=is_screening_function)
@@ -182,10 +182,10 @@ class ExpGaussian(SpecialFunction):
             start_val=exponent,
             enabled=False,
         )
-        
+
     def _to_xml_element(self):
         return super()._to_xml_element(name="exp-gaussian")
-        
+
 
 class MorseA(SpecialFunction):
     def __init__(self, identifier, D0, r0, beta, species):
@@ -268,7 +268,7 @@ class MorseC(SpecialFunction):
             start_val=lambda_val,
             enabled=True,
         )
-        
+
         self.parameters.add_parameter(
             "delta",
             start_val=delta,
@@ -277,7 +277,7 @@ class MorseC(SpecialFunction):
 
     def _to_xml_element(self):
         return super()._to_xml_element(name="morse-C")
-    
+
 
 class Gaussian(SpecialFunction):
     def __init__(self, identifier, prefactor, eta, mu, species):
@@ -287,7 +287,7 @@ class Gaussian(SpecialFunction):
             start_val=prefactor,
             enabled=True,
         )
-        
+
         self.parameters.add_parameter(
             "eta",
             start_val=eta,
@@ -301,9 +301,9 @@ class Gaussian(SpecialFunction):
         )
 
     def _to_xml_element(self):
-        return super()._to_xml_element(name="morse-A")    
-    
-                               
+        return super()._to_xml_element(name="morse-A")
+
+
 class UserFunction(InputList):
     def __init__(self, identifier, input_variable, species, is_screening_function):
         super().__init__(table_name=f"user_func_{identifier}")
@@ -316,7 +316,7 @@ class UserFunction(InputList):
         self.is_screening_function = is_screening_function
         if not is_screening_function:
             self.screening = None
-    
+
     def _to_xml_element(self):
         if self.is_screening_function:
             screening = ET.Element("screening")
@@ -330,18 +330,18 @@ class UserFunction(InputList):
         expression.text = f"{self.expression}"
         derivative = ET.SubElement(root, "derivative")
         derivative.text = f"{self.derivative}"
-        
+
         for param in self.parameters.values():
             p = ET.SubElement(root, "param")
             p.set("name", f"{param.param}")
             p.text = f"{param.start_val}"
-        
+
         root.append(self.parameters.fit_dofs_to_xml_element())
-        
+
         if not self.is_screening_function:
             if self.screening is not None:
                 root.append(self.screening._to_xml_element())
-            return root    
+            return root
         else:
             return screening
 
@@ -369,12 +369,12 @@ class FunctionParameter(InputList):
         if self.tag is not None:
             root.set("tag", f"{self.tag}")
         return root
-    
-        
+
+
 class FunctionParameterList(InputList):
     def __init__(self):
         super().__init__(table_name="FunctionParameterList")
-    
+
     def add_parameter(self, param, start_val, enabled=True, reset=False, min_val=None, max_val=None, tag=None, fitable=True):
         self[param] = FunctionParameter(
             param,
@@ -385,8 +385,8 @@ class FunctionParameterList(InputList):
             max_val=max_val,
             tag=tag,
             fitable=fitable,
-            )
-    
+        )
+
     def fit_dofs_to_xml_element(self):
         fit_dof = ET.Element("fit-dof")
         for param in self.values():
@@ -407,16 +407,16 @@ class PolyCoeff(FunctionParameter):
             fitable=True,
             tag=None)
         self.n = n
-    
+
     def _to_xml_element(self):
         root = super()._to_xml_element()
         root.set("n", self.n)
-    
+
 
 class PolyCoeffList(InputList):
     def __init__(self):
         super().__init__(table_name="PolyCoeffList")
-    
+
     def add_coeff(self, n, start_val, enabled=True, reset=False, min_val=None, max_val=None):
         self[f"coeff_{n}"] = PolyCoeff(
             n,
@@ -426,7 +426,7 @@ class PolyCoeffList(InputList):
             min_val,
             max_val,
         )
-    
+
     def _to_xml_element(self):
         coefficients = ET.Element("coefficients")
         for coeff in self.values():
@@ -446,7 +446,7 @@ class Node(FunctionParameter):
             fitable=True,
             tag=None)
         self.x = x
-    
+
     def _to_xml_element(self):
         node = super()._to_xml_element()
         node.set("x", f"{self.x}")
@@ -457,7 +457,7 @@ class Node(FunctionParameter):
 class NodeList(InputList):
     def __init__(self):
         super().__init__(table_name="NodeList")
-    
+
     def add_node(self, x, start_val, enabled=True, reset=False, min_val=None, max_val=None):
         x = float(x)
         self[f"node_{x}"] = Node(
@@ -468,7 +468,7 @@ class NodeList(InputList):
             min_val=min_val,
             max_val=max_val,
         )
-    
+
     def _to_xml_element(self):
         nodes = ET.Element("nodes")
         for node in self.values():

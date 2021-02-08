@@ -7,4 +7,4 @@ def write_pretty_xml(elem, filename):
     reparsed = reparsed.toprettyxml(indent="    ")
     with open(filename, "w") as f:
         f.write(reparsed)
-    return 
+    return

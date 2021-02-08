@@ -6,22 +6,25 @@
 Store structures together with energies and forces for potential fitting applications.
 
 Basic usage:
+
 >>> pr = Project("training")
 >>> container = pr.create.job.TrainingContainer("small_structures")
 
 Let's make a structure and invent some forces
+
 >>> structure = pr.create.structure.ase_bulk("Fe")
 >>> forces = numpy.array([-1, 1, -1])
 >>> container.include_structure(structure, energy=-1.234, forces=forces, name="Fe_bcc")
 
 If you have a lot of precomputed structures you may also add them in bulk from a pandas DataFrame
+
 >>> df = pandas.DataFrame({ "name": "Fe_bcc", "atoms": structure, "energy": -1.234, "forces": forces })
 >>> container.include_dataset(df)
 
 You can retrieve the full database with :method:`~.TrainingContainer.to_pandas()` like this
 >>> container.to_pandas()
-    name    atoms   energy  forces  number_of_atoms
-    Fe_bcc  ...
+name    atoms   energy  forces  number_of_atoms
+Fe_bcc  ...
 """
 
 import pandas as pd

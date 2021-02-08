@@ -6,25 +6,31 @@ from pyiron_base import InputList
 class ARFitProperty(InputList):
     def __init__(
             self,
-            prop,
-            target_value,
-            fit,
-            relax,
-            relative_weight,
-            residual_style,
-            output,
-            tolerance,
-            min_val,
-            max_val,
+            prop=None,
+            target_value=None,
+            fit=None,
+            relax=None,
+            relative_weight=None,
+            residual_style=None,
+            output=None,
+            tolerance=None,
+            min_val=None,
+            max_val=None,
+            *args,
+            **kwargs
     ):
-        super().__init__(table_name="Fit-Parameter")
-        self.prop = prop
+        super().__init__(table_name="fit_property", *args, **kwargs)
+        self._prop = None
+        self._residual_style = None
+        if prop is not None:
+            self.prop = prop
+        if residual_style is not None:
+            self.residual_style = residual_style
         self.target_value = target_value
         self.fit = fit
         self.relax = relax
         self.relative_weight = relative_weight
         self.tolerance = tolerance
-        self.residual_style = residual_style
         self.min_val = min_val
         self.max_val = max_val
         self.final_value = None
@@ -93,8 +99,8 @@ class ARFitProperty(InputList):
 
 
 class ARFitPropertyList(InputList):
-    def __init__(self):
-        super().__init__(table_name="Fit-Parameters")
+    def __init__(self, *args, **kwargs):
+        super().__init__(table_name="fit_property", *args, **kwargs)
 
     def add_FitProperty(
             self,

@@ -140,7 +140,7 @@ class ARStructure(object):
     def to_hdf(self, hdf=None, group_name="arstructure"):
         with hdf.open(group_name) as hdf_s_lst:
             self.structure.to_hdf(hdf=hdf_s_lst, group_name="structure")
-            hdf_s_lst["fit_properties"] = self.fit_properties
+            self.fit_properties.to_hdf(hdf=hdf_s_lst, group_name="fit_properties")
             hdf_s_lst["relative_weight"] = self.relative_weight
             hdf_s_lst["identifier"] = self.identifier
             hdf_s_lst["clamp"] = self.clamp
@@ -150,7 +150,8 @@ class ARStructure(object):
             structure = Atoms()
             structure.from_hdf(hdf_s_lst, group_name="structure")
             self.structure = structure
-            self.fit_properties = hdf_s_lst["fit_properties"]
+            self.fit_properties = ARFitPropertyList()
+            self.fit_properties.from_hdf(hdf=hdf_s_lst, group_name="fit_properties")
             self.relative_weight = hdf_s_lst["relative_weight"]
             self.identifier = hdf_s_lst["identifier"]
             self.clamp = hdf_s_lst["clamp"]
@@ -278,4 +279,3 @@ def structure_meta_xml(
         properties.append(prop.to_xml_element())
 
     return struct_xml
-

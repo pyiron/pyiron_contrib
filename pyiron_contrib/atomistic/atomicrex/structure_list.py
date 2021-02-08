@@ -12,7 +12,7 @@ from pyiron_contrib.atomistic.atomicrex.utility_functions import write_pretty_xm
 class StructureList(object):
     def __init__(self):
         self._structure_lst = []
-        
+
     def add_structure(self, structure, **kw_properties):
         if isinstance(structure, ASEAtoms):
             i = structure.info
@@ -22,28 +22,28 @@ class StructureList(object):
             pass
         else:
             raise ValueError("Structures have to be supplied as pyiron or ase atoms")
-            
+
         structure.info.update(kw_properties)
         self._structure_lst.append(structure)
-        
-    def to_hdf(self, hdf, group="structure_list"):
-        with hdf.open(group) as hdf_s_lst:
+
+    def to_hdf(self, hdf, group_name="structure_list"):
+        with hdf.open(group_name) as hdf_s_lst:
             for k, struct in enumerate(self._structure_lst):
                 struct.to_hdf(hdf=hdf_s_lst, group=f"structure_{k}")
-            
-    def from_hdf(self, hdf, group="structure_list"):
-        with hdf.open(group) as hdf_s_lst:
+
+    def from_hdf(self, hdf, group_name="structure_list"):
+        with hdf.open(group_name) as hdf_s_lst:
             for g in sorted(hdf_s_lst.list_groups()):
                 structure = Atoms()
                 structure.from_hdf(hdf, group_name = g)
                 self.append(structure)
-        
+
     def to_ase_db(self, db):
         print("NOT TESTED FUNCTION")
         for struct in self.structures:
             struct = pyiron_to_ase(struct)
             db.write(atoms=struct, forces=self.forces, key_value_pairs=struct.info)
-            
+
     def from_ase_db(self, db):
         for row in db.select():
             kvp = row.key_value_pairs
@@ -51,7 +51,7 @@ class StructureList(object):
                 p_id = kvp["pyiron_id"]
             else:
                 raise KeyError("pyiron_id has to be supplied as key in row to transform to structure list")
-            i = row.data            
+            i = row.data
             i.update(kvp)
             a = row.toatoms()
             structure = ase_to_pyiron(a)
@@ -66,7 +66,7 @@ def structure_to_xml_element(structure):
     pbc.set("x", f"{structure.pbc[0]}".lower())
     pbc.set("y", f"{structure.pbc[1]}".lower())
     pbc.set("z", f"{structure.pbc[2]}".lower())
-    
+
     c = structure.cell
     cell = ET.Element("cell")
     for i in range(3):
@@ -74,7 +74,7 @@ def structure_to_xml_element(structure):
         a.set("x", f"{c[i][0]}")
         a.set("y", f"{c[i][1]}")
         a.set("z", f"{c[i][2]}")
-    
+
     atoms = ET.SubElement(cell, "atoms")
     for at in structure:
         a = ET.SubElement(atoms, "atom")
@@ -83,7 +83,7 @@ def structure_to_xml_element(structure):
         a.set("y", f"{at.b}")
         a.set("z", f"{at.c}")
         a.set("reduced", "false")
-    
+
     return pbc, cell
 
 
@@ -93,26 +93,30 @@ class ARStructure(object):
     #    object.__setattr__(instance, "structure", Atoms())
 
     def __init__(self, structure=None, fit_properties=None, identifier=None, relative_weight=1, clamp=True,):
-        self.structure = structure
-        self.fit_properties = fit_properties
+        self._structure = None
+        self._fit_properties = None
+        if structure is not None:
+            self.structure = structure
+        if fit_properties is not None:
+            self.fit_properties = fit_properties
         self.identifier = identifier
         self.relative_weight = relative_weight
         self.clamp = clamp
-    
+
     @property
     def structure(self):
         return self._structure
-    
+
     @structure.setter
     def structure(self, structure):
         if not isinstance(structure, Atoms):
             raise ValueError("structure has to be a pyiron atoms instance")
         self._structure = structure
-    
+
     @property
     def fit_properties(self):
         return self._fit_properties
-    
+
     @fit_properties.setter
     def fit_properties(self, fit_properties=ARFitPropertyList()):
         if not isinstance(fit_properties, ARFitPropertyList):
@@ -122,7 +126,7 @@ class ARStructure(object):
     #@fit_properties.getter
     #def fit_properties(self):
     #    return self._fit_properties
-    
+
     def _write_poscar_return_xml(self, directory):
         forces = self.fit_properties["atomic-forces"].target_value
         write_modified_poscar(self.identifier, self.structure, forces, directory)
@@ -132,7 +136,7 @@ class ARStructure(object):
             self.clamp,
             self.fit_properties
         )
-    
+
     def to_hdf(self, hdf=None, group_name="arstructure"):
         with hdf.open(group_name) as hdf_s_lst:
             self.structure.to_hdf(hdf=hdf_s_lst, group_name="structure")
@@ -155,7 +159,7 @@ class ARStructure(object):
 class ARStructureList(object):
     def __init__(self):
         self._structure_dict = {}
-        
+
     def add_structure(self, structure, identifier, fit_properties=None, relative_weight=1, clamp=True):
         if isinstance(structure, Atoms):
             if fit_properties is None:
@@ -164,7 +168,7 @@ class ARStructureList(object):
             return self._add_ARstructure(ar_struct)
         else:
             raise ValueError("Structure has to be an ARStructure instance")
-        
+
     ## Split into another function to be able to implement some checks later
     def _add_ARstructure(self, structure):
         identifier = f"{structure.identifier}"
@@ -177,19 +181,19 @@ class ARStructureList(object):
             root.append(s._write_poscar_return_xml(directory))
         filename = posixpath.join(directory, name)
         write_pretty_xml(root, filename)
-    
+
     def to_hdf(self, hdf=None, group_name="arstructurelist"):
         with hdf.open(group_name) as hdf_s_lst:
             for k, v in self._structure_dict.items():
                 v.to_hdf(hdf=hdf_s_lst, group_name=k)
-    
-    def from_hdf(self, hdf=None):
+
+    def from_hdf(self, hdf=None, group_name="arstructurelist"):
         with hdf.open(group_name) as hdf_s_lst:
             for g in sorted(hdf_s_lst.list_groups()):
                 s = ARStructure()
                 s.from_hdf(hdf=hdf_s_lst, group_name=g)
                 self._structure_dict[g] = s
-    
+
     def _parse_final_properties(self, struct_lines):
         for l in struct_lines:
             l = l.strip()
@@ -201,7 +205,7 @@ class ARStructureList(object):
                 if prop in s.fit_properties:
                     s.fit_properties[prop].final_value = f_val
 
-    
+
 def write_modified_poscar(identifier, structure, forces, directory):
     filename = posixpath.join(directory, f"POSCAR_{identifier}")
     with open(filename, 'w') as f:
@@ -210,7 +214,7 @@ def write_modified_poscar(identifier, structure, forces, directory):
         for elem in structure.get_chemical_symbols():
             if not elem in elements: elements.append(elem)
         f.write(f"{elements}\n")
-        
+
         # Cell metric
         f.write('1.0\n')
         for vec in structure.cell:
@@ -224,7 +228,7 @@ def write_modified_poscar(identifier, structure, forces, directory):
         f.write('\n')
 
         # Number of elements per type
-        
+
         for elem in elements:
             symbols = structure.get_chemical_symbols()
             n = len(symbols[symbols==elem])
@@ -242,24 +246,24 @@ def write_modified_poscar(identifier, structure, forces, directory):
             for r in force: f.write((f'{r} '))
             f.write('\n')
 
-                 
+
 def structure_meta_xml(
-    identifier,
-    relative_weight,
-    clamp, ## Not sure if and how this combines with relax in the ARFitParameter sets
-    fit_properties,
-    mod_poscar = True,
-    ):
-    
+        identifier,
+        relative_weight,
+        clamp, ## Not sure if and how this combines with relax in the ARFitParameter sets
+        fit_properties,
+        mod_poscar = True,
+):
+
     struct_xml = ET.Element("user-structure")
     struct_xml.set("id", f"{identifier}")
     struct_xml.set("relative-weight", f"{relative_weight}")
-    
+
     if mod_poscar:
         poscar_file = ET.SubElement(struct_xml, "poscar-file")
         poscar_file.text = f"POSCAR_{identifier}"
     else:
-    #    struct_xml.extend(structure_to_xml_element(structure))
+        #    struct_xml.extend(structure_to_xml_element(structure))
         raise NotImplementedError(
             "Only writing structure meta information, \n"
             "not structure data for now because this is not implemented in atomicrex"
@@ -268,11 +272,10 @@ def structure_meta_xml(
     if not clamp:
         relax_dof = ET.SubElement(struct_xml, "relax-dof")
         atom_coordinates = ET.SubElement(relax_dof, "atom-coordinates")
-    
+
     properties = ET.SubElement(struct_xml, "properties")
     for prop in fit_properties.values():
         properties.append(prop.to_xml_element())
-    
-    return struct_xml
 
+    return struct_xml
 

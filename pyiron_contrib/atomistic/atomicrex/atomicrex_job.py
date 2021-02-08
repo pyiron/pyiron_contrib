@@ -11,7 +11,7 @@ from pyiron_base import GenericJob, Settings, PyironFactory, Executable
 
 from pyiron_contrib.atomistic.atomicrex.general_input import GeneralARInput, AlgorithmFactory
 from pyiron_contrib.atomistic.atomicrex.structure_list import ARStructureList
-from pyiron_contrib.atomistic.atomicrex.potential_factory import ARPotFactory
+from pyiron_contrib.atomistic.atomicrex.potential_factory import ARPotFactory, AbstractPotential
 from pyiron_contrib.atomistic.atomicrex.output import Output
 from pyiron_contrib.atomistic.atomicrex.function_factory import FunctionFactory
 
@@ -44,23 +44,21 @@ class Atomicrex(PotentialFittingBase):
         self._working_directory = None
         self.output = Output()
         self.factories = Factories()
-        
+
 
     def to_hdf(self, hdf=None, group_name=None):
-        if hdf == None:
-            hdf = self.project_hdf5
         super().to_hdf(hdf=hdf, group_name=group_name)
-        self.input.to_hdf(hdf=hdf)
-        self.potential.to_hdf(hdf=hdf)
-        self.structures.to_hdf(hdf=hdf)
+        self.input.to_hdf(hdf=self._hdf5)
+        self.potential.to_hdf(hdf=self._hdf5)
+        self.structures.to_hdf(hdf=self._hdf5)
         return
 
     def from_hdf(self, hdf=None, group_name=None):
-        if hdf == None:
-            hdf = self.project_hdf5
-        self.input.from_hdf()
-        self.potential.from_hdf()
-        self.structures.from_hdf()
+        super().from_hdf(hdf=hdf, group_name=group_name)
+        self.input.from_hdf(hdf=self._hdf5)
+        self.potential = AbstractPotential()
+        self.potential.from_hdf(hdf=self._hdf5)
+        self.structures.from_hdf(hdf=self._hdf5)
         return
 
 
@@ -81,7 +79,7 @@ class Atomicrex(PotentialFittingBase):
                 }
             }
         }
-    
+
     def collect_output(self, cwd=None):
         #self.input.from_hdf(self._hdf5)
         if cwd is None:
@@ -110,14 +108,14 @@ class Atomicrex(PotentialFittingBase):
 
     def convergence_check(self):
         return
-    
+
     def write_input(self, directory=None):
         if directory is None:
             directory = self.working_directory
         self.input._write_xml_file(directory = directory)
         self.potential.write_xml_file(directory = directory)
         self.structures.write_xml_file(directory = directory)
-    
+
     def _executable_activate(self, enforce=False):
         if self._executable is None or enforce:
             if len(self.__module__.split(".")) > 1:
@@ -131,15 +129,6 @@ class Atomicrex(PotentialFittingBase):
                     codename=self.__name__, path_binary_codes=s.resource_paths
                 )
 
-
-    """
-    def run(self):
-        cwd = self.working_directory
-        self._create_working_directory()
-        self.write_input(directory=cwd)
-        with open(f"{cwd}/atomicrex.out", "w") as f:
-            subprocess.run(["atomicrex", "main.xml"], stdout=f, stderr=f, text=True, cwd=cwd)
-    """
 
 class Factories:
     def __init__(self):

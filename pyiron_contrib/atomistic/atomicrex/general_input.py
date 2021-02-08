@@ -22,22 +22,22 @@ class GeneralARInput(InputList):
         self.fit_algorithm = AR_LBFGS(conv_threshold=1e-10, max_iter=50, gradient_epsilon=1e-8)
         self.output_interval = 100
         self.enable_fitting = True
-        
+
     def _write_xml_file(self, directory):
         job = ET.Element("job")
-        
+
         name = ET.SubElement(job, "name")
         name.text = self.name
-            
+
         verbosity = ET.SubElement(job, "verbosity")
         verbosity.text = self.verbosity
-        
+
         if self.validate_potentials:
             validate_potentials = ET.SubElement(job, "validate_potentials")
-        
+
         real_precision = ET.SubElement(job, "real-precision")
         real_precision.text = f"{self.real_precision}"
-        
+
         atom_types = ET.SubElement(job, "atom-types")
         for k, v in self.atom_types.items():
             species = ET.SubElement(atom_types, "species")
@@ -47,7 +47,7 @@ class GeneralARInput(InputList):
             else:
                 index = atomic_numbers[k]
                 mass = atomic_masses[index]
-                
+
             species.set("mass", f"{mass}")
             species.set("atomic-number", f"{index}")
 
@@ -55,17 +55,17 @@ class GeneralARInput(InputList):
         fitting.set("enabled", f"{self.enable_fitting}".lower())
         fitting.set("output-interval", f"{self.output_interval}")
         fitting.append(self.fit_algorithm._to_xml_element())
-         
+
         potentials = ET.SubElement(job, "potentials")
         include = ET.SubElement(potentials, "xi:include")
         include.set("href", "potential.xml")
         include.set("xmlns:xi", "http://www.w3.org/2003/XInclude")
-        
+
         structures = ET.SubElement(job, "structures")
         include = ET.SubElement(structures, "xi:include")
         include.set("href", "structures.xml")
         include.set("xmlns:xi", "http://www.w3.org/2003/XInclude")
-        
+
         file_name = posixpath.join(directory, "main.xml")
         write_pretty_xml(job, file_name)
 
@@ -76,7 +76,7 @@ class GeneralARInput(InputList):
 
 
 class AlgorithmFactory(PyironFactory):
-    
+
     @staticmethod
     def ar_lbfgs(conv_threshold=1e-10, max_iter=50, gradient_epsilon=None):
         return AR_LBFGS(conv_threshold=conv_threshold, max_iter=max_iter, gradient_epsilon=gradient_epsilon)
@@ -88,19 +88,19 @@ class AlgorithmFactory(PyironFactory):
     @staticmethod
     def ld_lbfgs(stopval=1e-10, maxeval=50, maxtime=None, ftol_rel=None, ftol_abs=None, xtol_rel=None, seed=None):
         return LD_LBFGS(stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed)
-    
+
     @staticmethod
     def ld_mma(stopval=1e-10, maxeval=50, maxtime=None, ftol_rel=None, ftol_abs=None, xtol_rel=None, seed=None):
         return LD_MMA(stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed)
-    
+
     @staticmethod
     def ln_neldermead(stopval=1e-10, maxeval=50, maxtime=None, ftol_rel=None, ftol_abs=None, xtol_rel=None, seed=None):
         return LN_NELDERMEAD(stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed)
-    
+
     @staticmethod
     def ln_sbplx(stopval=1e-10, maxeval=50, maxtime=None, ftol_rel=None, ftol_abs=None, xtol_rel=None, seed=None):
         return LN_SBPLX(stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed)
-    
+
     @staticmethod
     def gn_crs2_lm(stopval=1e-10, maxeval=50, maxtime=None, ftol_rel=None, ftol_abs=None, xtol_rel=None, seed=None):
         return GN_CRS2_LM(stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed)
@@ -108,15 +108,15 @@ class AlgorithmFactory(PyironFactory):
     @staticmethod
     def gn_esch(stopval=1e-10, maxeval=50, maxtime=None, ftol_rel=None, ftol_abs=None, xtol_rel=None, seed=None):
         return GN_ESCH(stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed)
-    
+
     @staticmethod
     def gn_direct(stopval=1e-10, maxeval=50, maxtime=None, ftol_rel=None, ftol_abs=None, xtol_rel=None, seed=None):
         return GN_DIRECT(stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed)
-    
+
     @staticmethod
     def gn_direct_l(stopval=1e-10, maxeval=50, maxtime=None, ftol_rel=None, ftol_abs=None, xtol_rel=None, seed=None):
         return GN_DIRECT_L(stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed)
-    
+
     @staticmethod
     def gn_isres(stopval=1e-10, maxeval=50, maxtime=None, ftol_rel=None, ftol_abs=None, xtol_rel=None, seed=None):
         return GN_ISRES(stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed)
@@ -129,7 +129,7 @@ class AtomicrexAlgorithm(InputList):
         self.max_iter = max_iter
         self.gradient_epsilon = gradient_epsilon
         self.name = name
-    
+
     def _to_xml_element(self):
         algo = ET.Element(self.name)
         algo.set("conv-threshold", f"{self.conv_threshold}")
@@ -142,7 +142,7 @@ class AtomicrexAlgorithm(InputList):
 class AR_LBFGS(AtomicrexAlgorithm):
     def __init__(self, conv_threshold, max_iter, gradient_epsilon):
         super().__init__(conv_threshold, max_iter, gradient_epsilon, name="BFGS")
-    
+
 
 class SpaMinimizer:
     def __init__(self, spa_iterations, seed):
@@ -184,7 +184,7 @@ class NloptAlgorithm(InputList):
         if self.ftol_abs is not None:
             nlopt.set("ftol_abs", f"{self.ftol_abs}")
         if self.xtol_rel is not None:
-            nlopt.set("xtol_rel", f"{self.xtol_rel}") 
+            nlopt.set("xtol_rel", f"{self.xtol_rel}")
         return nlopt
 
 class LD_LBFGS(NloptAlgorithm):
@@ -222,4 +222,3 @@ class GN_DIRECT_L(NloptAlgorithm):
 class GN_ISRES(NloptAlgorithm):
     def __init__(self, stopval, maxeval, maxtime, ftol_rel, ftol_abs, xtol_rel, seed):
         super().__init__(stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed, name="GN_ISRES")
-

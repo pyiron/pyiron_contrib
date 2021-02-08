@@ -5,17 +5,17 @@ from pyiron_base import InputList
 
 class ARFitProperty(InputList):
     def __init__(
-        self,
-        prop,
-        target_value,
-        fit,
-        relax,
-        relative_weight,
-        residual_style,
-        output,
-        tolerance,
-        min_val,
-        max_val,
+            self,
+            prop,
+            target_value,
+            fit,
+            relax,
+            relative_weight,
+            residual_style,
+            output,
+            tolerance,
+            min_val,
+            max_val,
     ):
         super().__init__(table_name="Fit-Parameter")
         self.prop = prop
@@ -29,11 +29,11 @@ class ARFitProperty(InputList):
         self.max_val = max_val
         self.final_value = None
 
-    
+
     @property
     def prop(self):
         return self._prop
-    
+
     @prop.setter
     def prop(self, prop):
         fittable_properties = [
@@ -48,11 +48,11 @@ class ARFitProperty(InputList):
             self._prop = prop
         else:
             raise ValueError(f"prop should be one of {fittable_properties}")
-        
+
     @property
     def residual_style(self):
         return self._residual_style
-    
+
     @residual_style.setter
     def residual_style(self, residual_style):
         res_styles = ["squared", "squared-relative", "absolute-diff"]
@@ -60,13 +60,13 @@ class ARFitProperty(InputList):
             self._residual_style = residual_style
         else:
             raise ValueError(f"residual style has to be one of {res_styles}")
-    
+
     def _is_scalar(self):
         if self.prop != "atomic-forces":
             return True
         else:
             return False
-    
+
     def to_xml_element(self):
         xml = ET.Element(f"{self.prop}")
         xml.set("fit", f"{self.fit}".lower())
@@ -81,47 +81,47 @@ class ARFitProperty(InputList):
             if self.max_val is not None:
                 xml.set("min", f"{self.max_val}")
         return xml
-    
+
     @staticmethod
     def _parse_final_value(line):
         if line.startswith("atomic-forces avg/max"):
             return "atomic-forces", None
         else:
             line = line.split()
-            return line[0].rstrip(":"), float(line[1])
+            return line[0], float(line[1])
 
 
 
 class ARFitPropertyList(InputList):
     def __init__(self):
         super().__init__(table_name="Fit-Parameters")
-        
+
     def add_FitProperty(
-        self,
-        prop,
-        target_value,
-        fit=True,
-        relax=False,
-        relative_weight=1,
-        residual_style="squared-relative",
-        output=True,
-        tolerance=None,
-        min_val=None,
-        max_val=None,
+            self,
+            prop,
+            target_value,
+            fit=True,
+            relax=False,
+            relative_weight=1,
+            residual_style="squared-relative",
+            output=True,
+            tolerance=None,
+            min_val=None,
+            max_val=None,
     ):
         self[prop] = ARFitProperty(
             prop = prop,
             target_value = target_value,
             fit = fit,
             relax = relax,
-            relative_weight = relative_weight,            
+            relative_weight = relative_weight,
             residual_style = residual_style,
             output = output,
             tolerance = tolerance,
             min_val = min_val,
             max_val = max_val,
         )
-    
+
     def to_xml_element(self):
         properties = ET.Element("properties")
         for p in self.values():

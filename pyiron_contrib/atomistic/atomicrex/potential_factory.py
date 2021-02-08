@@ -29,6 +29,7 @@ class AbstractPotential(InputList):
 
 class LJPotential(AbstractPotential):
     def __init__(self, sigma=None, epsilon=None, cutoff=None, species=None, identifier=None):
+        super().__init__()
         self.sigma = sigma
         self.epsilon = epsilon
         self.cutoff = cutoff
@@ -58,6 +59,7 @@ class LJPotential(AbstractPotential):
 
 class EAMPotential(AbstractPotential):
     def __init__(self, identifier=None, export_file=None, rho_range_factor=None, resolution=None, species=None):
+        super().__init__()
         self.pair_interactions = InputList(table_name="pair_interactions")
         self.electron_densities = InputList(table_name="electron_densities")
         self.embedding_energies = InputList(table_name="embedding_energies")

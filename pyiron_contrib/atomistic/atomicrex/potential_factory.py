@@ -23,7 +23,7 @@ class ARPotFactory(PyironFactory):
 
 
 class AbstractPotential(InputList):
-    def __init__(table_name="potential"):
+    def __init__(self, table_name="potential"):
         super().__init__(table_name=table_name)
 
 

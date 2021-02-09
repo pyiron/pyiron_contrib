@@ -33,6 +33,8 @@ JOB_CLASS_DICT['MonteCarloMaster'] = 'pyiron_contrib.atomistic.interactive.monte
 JOB_CLASS_DICT['RandSpg'] = 'pyiron_contrib.atomistic.atomistics.structures.randspg'
 JOB_CLASS_DICT['Fenics'] = 'pyiron_contrib.continuum.fenics.job.generic'
 JOB_CLASS_DICT['FenicsLinearElastic'] = 'pyiron_contrib.continuum.fenics.job.elastic'
+JOB_CLASS_DICT['TrainingContainer'] = 'pyiron_contrib.atomistic.atomistics.job.trainingcontainer'
+
 
 from ._version import get_versions
 

@@ -1,0 +1,16 @@
+channels:
+  - conda-forge
+dependencies:
+  - ase
+  - coveralls
+  - coverage
+  - codacy-coverage
+  - matplotlib
+  - fenics
+  - mshr
+  - numpy
+  - pyiron
+  - scipy
+  - seaborn
+  - scikit-image
+  - papermill

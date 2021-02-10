@@ -3,6 +3,7 @@
 # Distributed under the terms of "New BSD License", see the LICENSE file.
 
 from __future__ import print_function
+from itertools import islice
 import numpy as np
 import os
 import pandas as pd
@@ -217,7 +218,7 @@ class Mlip(GenericJob):
             if ham.__name__ == "TrainingContainer":
                 job = ham.to_object()
                 pd = job.to_pandas()
-                for name, atoms, energy, forces, _ in pd.iter_tuples(index=False):
+                for name, atoms, energy, forces, _ in islice(pd.itertuples(index=False), start, end, delta):
                     atoms = ase_to_pyiron(atoms)
                     indices_lst.append(atoms.indices)
                     position_lst.append(atoms.positions)

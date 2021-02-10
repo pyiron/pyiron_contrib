@@ -22,6 +22,7 @@ If you have a lot of precomputed structures you may also add them in bulk from a
 >>> container.include_dataset(df)
 
 You can retrieve the full database with :method:`~.TrainingContainer.to_pandas()` like this
+
 >>> container.to_pandas()
 name    atoms   energy  forces  number_of_atoms
 Fe_bcc  ...
@@ -86,6 +87,7 @@ class TrainingContainer(GenericJob):
         Export list of structure to pandas table for external fitting codes.
 
         The table contains the following columns:
+            - 'name': human-readable name of the structure
             - 'ase_atoms': the structure as a :class:`.Atoms` object
             - 'energy': the energy of the full structure
             - 'forces': the per atom forces as a :class:`numpy.ndarray`, shape Nx3

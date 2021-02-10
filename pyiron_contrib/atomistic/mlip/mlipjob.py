@@ -5,7 +5,7 @@
 import os
 import shutil
 from pyiron_atomistics.atomistics.job.atomistic import AtomisticGenericJob
-from pyiron_mpie.mlip.mlip import write_cfg, read_cgfs
+from pyiron_contrib.atomistic.mlip.mlip import write_cfg, read_cgfs
 from pyiron_base import GenericParameters
 
 __author__ = "Jan Janssen"

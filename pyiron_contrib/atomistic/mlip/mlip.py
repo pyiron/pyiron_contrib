@@ -212,7 +212,7 @@ class Mlip(GenericJob):
                 end = value['time_step_end']+1
                 delta = value['time_step_delta']
             else:
-                start, end, delta = 0, -1, 1
+                start, end, delta = 0, None, 1
             time_step = start
             # HACK: until the training container has a proper HDF5 interface
             if ham.__name__ == "TrainingContainer":

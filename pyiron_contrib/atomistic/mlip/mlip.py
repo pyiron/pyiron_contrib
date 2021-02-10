@@ -9,7 +9,7 @@ import pandas as pd
 import posixpath
 import scipy.constants
 from pyiron_base import Settings, GenericParameters, GenericJob
-from pyiron_mpie.mlip.cfgs import savecfgs, loadcfgs, Cfg
+from pyiron_contrib.atomistic.mlip.cfgs import savecfgs, loadcfgs, Cfg
 
 __author__ = "Jan Janssen"
 __copyright__ = "Copyright 2020, Max-Planck-Institut für Eisenforschung GmbH - " \

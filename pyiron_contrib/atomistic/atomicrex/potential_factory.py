@@ -23,18 +23,19 @@ class ARPotFactory(PyironFactory):
 
 
 class AbstractPotential(InputList):
-    def __init__(self, table_name="potential"):
-        super().__init__(table_name=table_name)
+    def __init__(self, init=None, table_name="potential"):
+        super().__init__(init, table_name=table_name)
 
 
 class LJPotential(AbstractPotential):
-    def __init__(self, sigma=None, epsilon=None, cutoff=None, species=None, identifier=None):
-        super().__init__()
-        self.sigma = sigma
-        self.epsilon = epsilon
-        self.cutoff = cutoff
-        self.species = species
-        self.identifier = identifier
+    def __init__(self, init=None, sigma=None, epsilon=None, cutoff=None, species=None, identifier=None):
+        super().__init__(init=init)
+        if init is None:
+            self.sigma = sigma
+            self.epsilon = epsilon
+            self.cutoff = cutoff
+            self.species = species
+            self.identifier = identifier
 
     def write_xml_file(self, directory):
         lj = ET.Element("lennard-jones")
@@ -58,16 +59,17 @@ class LJPotential(AbstractPotential):
 
 
 class EAMPotential(AbstractPotential):
-    def __init__(self, identifier=None, export_file=None, rho_range_factor=None, resolution=None, species=None):
-        super().__init__()
-        self.pair_interactions = InputList(table_name="pair_interactions")
-        self.electron_densities = InputList(table_name="electron_densities")
-        self.embedding_energies = InputList(table_name="embedding_energies")
-        self.identifier = identifier
-        self.export_file = export_file
-        self.rho_range_factor = rho_range_factor
-        self.resolution = resolution
-        self.species = species
+    def __init__(self, init=None, identifier=None, export_file=None, rho_range_factor=None, resolution=None, species=None):
+        super().__init__(init=init)
+        if init is None:
+            self.pair_interactions = InputList(table_name="pair_interactions")
+            self.electron_densities = InputList(table_name="electron_densities")
+            self.embedding_energies = InputList(table_name="embedding_energies")
+            self.identifier = identifier
+            self.export_file = export_file
+            self.rho_range_factor = rho_range_factor
+            self.resolution = resolution
+            self.species = species
 
     def write_xml_file(self, directory):
 

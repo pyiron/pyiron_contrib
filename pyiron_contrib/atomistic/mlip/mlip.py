@@ -9,7 +9,7 @@ import os
 import pandas as pd
 import posixpath
 import scipy.constants
-from pyiron_base import Settings, GenericParameters, GenericJob
+from pyiron_base import Settings, GenericParameters, GenericJob, Executable
 from pyiron_atomistics import ase_to_pyiron
 from pyiron_contrib.atomistic.mlip.cfgs import savecfgs, loadcfgs, Cfg
 
@@ -38,6 +38,18 @@ class Mlip(GenericJob):
         self.input = MlipParameter()
         self._command_line = CommandLine()
 
+    def _executable_activate(self, enforce=False):
+        if self._executable is None or enforce:
+            if len(self.__module__.split(".")) > 1:
+                self._executable = Executable(
+                    codename=self.__name__,
+                    module=self.__module__.split(".")[-2],
+                    path_binary_codes=s.resource_paths,
+                )
+            else:
+                self._executable = Executable(
+                    codename=self.__name__, path_binary_codes=s.resource_paths
+                )
     @property
     def calculation_dataframe(self):
         job_id_lst, time_step_start_lst, time_step_end_lst, time_step_delta_lst = self._job_dict_lst(self._job_dict)

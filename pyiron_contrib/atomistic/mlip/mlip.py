@@ -9,6 +9,7 @@ import pandas as pd
 import posixpath
 import scipy.constants
 from pyiron_base import Settings, GenericParameters, GenericJob
+from pyiron_atomistics import ase_to_pyiron
 from pyiron_contrib.atomistic.mlip.cfgs import savecfgs, loadcfgs, Cfg
 
 __author__ = "Jan Janssen"
@@ -212,6 +213,19 @@ class Mlip(GenericJob):
             else:
                 start, end, delta = 0, -1, 1
             time_step = start
+            # HACK: until the training container has a proper HDF5 interface
+            if ham.__name__ == "TrainingContainer":
+                job = ham.to_object()
+                pd = job.to_pandas()
+                for name, atoms, energy, forces, _ in pd.iter_tuples(index=False):
+                    atoms = ase_to_pyiron(atoms)
+                    indices_lst.append(atoms.indices)
+                    position_lst.append(atoms.positions)
+                    forces_lst.append(forces)
+                    cell_lst.append(atoms.cell)
+                    energy_lst.append(energy)
+                    track_lst.append(name)
+                continue
             original_dict = {el: ind for ind, el in enumerate(sorted(ham['input/structure/species']))}
             species_dict = {ind: original_dict[el] for ind, el in enumerate(ham['input/structure/species'])}
             if ham.__name__ in ['Vasp', 'ThermoIntDftEam', 'ThermoIntDftMtp', 'ThermoIntVasp']:

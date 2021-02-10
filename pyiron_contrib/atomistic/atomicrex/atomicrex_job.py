@@ -45,21 +45,17 @@ class Atomicrex(PotentialFittingBase):
         self.output = Output()
         self.factories = Factories()
 
-
     def to_hdf(self, hdf=None, group_name=None):
         super().to_hdf(hdf=hdf, group_name=group_name)
-        self.input.to_hdf(hdf=self._hdf5)
-        self.potential.to_hdf(hdf=self._hdf5)
-        self.structures.to_hdf(hdf=self._hdf5)
-        return
+        self.input.to_hdf(hdf=self.project_hdf5)
+        self.potential.to_hdf(hdf=self.project_hdf5)
+        self.structures.to_hdf(hdf=self.project_hdf5)
 
     def from_hdf(self, hdf=None, group_name=None):
         super().from_hdf(hdf=hdf, group_name=group_name)
-        self.input.from_hdf(hdf=self._hdf5)
+        self.input.from_hdf(hdf=self.project_hdf5)
         self.potential = self.project_hdf5["potential"].to_object()
-        self.structures.from_hdf(hdf=self._hdf5)
-        return
-
+        self.structures.from_hdf(hdf=self.project_hdf5)
 
     @property
     def publication(self):

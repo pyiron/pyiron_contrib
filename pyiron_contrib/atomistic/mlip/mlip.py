@@ -194,105 +194,23 @@ class Mlip(GenericJob):
         with open(file_name, 'w') as f:
             f.writelines(lines_modified)
 
-    def _write_test_set(self, file_name='testing.cfg', cwd=None):
-        if cwd is not None:
-            file_name = posixpath.join(cwd, file_name)
-        indices_lst, position_lst, forces_lst, cell_lst, energy_lst, track_lst, stress_lst = [], [], [], [], [], [], []
-        for job_id in self._job_dict.keys():
-            ham = self.project.inspect(job_id)
-            time_step = 0
-            original_dict = {el: ind for ind, el in enumerate(sorted(ham['input/structure/species']))}
-            species_dict = {ind: original_dict[el] for ind, el in enumerate(ham['input/structure/species'])}
-            if ham.__name__ in ['Vasp', 'ThermoIntDftEam', 'ThermoIntDftMtp', 'ThermoIntVasp']:
-                if len(ham['output/outcar/stresses']) != 0:
-                    for position, forces, cell, energy, stresses, volume in zip(ham['output/generic/positions'],
-                                                                                ham['output/generic/forces'],
-                                                                                ham['output/generic/cells'],
-                                                                                ham['output/generic/dft/energy_free'],
-                                                                                ham['output/outcar/stresses'],
-                                                                                ham['output/generic/volume']):
-                        indices_lst.append([species_dict[el] for el in ham['input/structure/indices']])
-                        position_lst.append(position)
-                        forces_lst.append(forces)
-                        cell_lst.append(cell)
-                        energy_lst.append(energy)
-                        stress_lst.append(stresses * volume / gpa_to_ev_ang)
-                        track_lst.append(str(ham.job_id) + '_' + str(time_step))
-                        time_step += 1
-                else:
-                    for position, forces, cell, energy in zip(ham['output/generic/positions'],
-                                                              ham['output/generic/forces'],
-                                                              ham['output/generic/cells'],
-                                                              ham['output/generic/dft/energy_free']):
-                        indices_lst.append([species_dict[el] for el in ham['input/structure/indices']])
-                        position_lst.append(position)
-                        forces_lst.append(forces)
-                        cell_lst.append(cell)
-                        energy_lst.append(energy)
-                        track_lst.append(str(ham.job_id) + '_' + str(time_step))
-                        time_step += 1
-            elif ham.__name__ in ['Lammps', 'LammpsInt2', 'LammpsMlip']:
-                for position, forces, cell, energy, stresses, volume in zip(ham['output/generic/positions'],
-                                                                            ham['output/generic/forces'],
-                                                                            ham['output/generic/cells'],
-                                                                            ham['output/generic/energy_pot'],
-                                                                            ham['output/generic/pressures'],
-                                                                            ham['output/generic/volume']):
-                    indices_lst.append([species_dict[el] for el in ham['input/structure/indices']])
-                    position_lst.append(position)
-                    forces_lst.append(forces)
-                    cell_lst.append(cell)
-                    energy_lst.append(energy)
-                    stress_lst.append(self.stress_tensor_components(stresses * volume))
-                    track_lst.append(str(ham.job_id) + '_' + str(time_step))
-                    time_step += 1
-            else:
-                for position, forces, cell, energy, stresses, volume in zip(ham['output/generic/positions'],
-                                                                            ham['output/generic/forces'],
-                                                                            ham['output/generic/cells'],
-                                                                            ham['output/generic/energy_pot'],
-                                                                            ham['output/generic/pressures'],
-                                                                            ham['output/generic/volume']):
-                    indices_lst.append([species_dict[el] for el in ham['input/structure/indices']])
-                    position_lst.append(position)
-                    forces_lst.append(forces)
-                    cell_lst.append(cell)
-                    energy_lst.append(energy)
-                    stress_lst.append(self.stress_tensor_components(stresses * volume))
-                    track_lst.append(str(ham.job_id) + '_' + str(time_step))
-                    time_step += 1
-        write_cfg(file_name=file_name,
-                  indices_lst=indices_lst,
-                  position_lst=position_lst,
-                  cell_lst=cell_lst,
-                  forces_lst=forces_lst,
-                  energy_lst=energy_lst,
-                  track_lst=track_lst,
-                  stress_lst=stress_lst)
-        total_lst = []
-        for ind_lst in indices_lst:
-            if isinstance(ind_lst, list):
-                total_lst += ind_lst
-            elif isinstance(ind_lst, np.ndarray):
-                total_lst += ind_lst.tolist()
-            else:
-                raise TypeError()
-        return np.max(total_lst) + 1
-
     @staticmethod
     def stress_tensor_components(stresses):
         return np.array([stresses[0][0], stresses[1][1], stresses[2][2],
                          stresses[1][2], stresses[0][1], stresses[0][2]]) * gpa_to_ev_ang
 
-    def _write_training_set(self, file_name='training.cfg', cwd=None):
+    def _write_configurations(self, file_name='training.cfg', cwd=None, respect_step=True, return_max_index=False):
         if cwd is not None:
             file_name = posixpath.join(cwd, file_name)
         indices_lst, position_lst, forces_lst, cell_lst, energy_lst, track_lst, stress_lst = [], [], [], [], [], [], []
         for job_id, value in self._job_dict.items():
             ham = self.project.inspect(job_id)
-            start = value['time_step_start']
-            end = value['time_step_end']+1
-            delta = value['time_step_delta']
+            if respect_step:
+                start = value['time_step_start']
+                end = value['time_step_end']+1
+                delta = value['time_step_delta']
+            else:
+                start, end, delta = 0, -1, 1
             time_step = start
             original_dict = {el: ind for ind, el in enumerate(sorted(ham['input/structure/species']))}
             species_dict = {ind: original_dict[el] for ind, el in enumerate(ham['input/structure/species'])}
@@ -362,6 +280,23 @@ class Mlip(GenericJob):
                   energy_lst=energy_lst,
                   track_lst=track_lst,
                   stress_lst=stress_lst)
+        if return_max_index:
+            total_lst = []
+            for ind_lst in indices_lst:
+                if isinstance(ind_lst, list):
+                    total_lst += ind_lst
+                elif isinstance(ind_lst, np.ndarray):
+                    total_lst += ind_lst.tolist()
+                else:
+                    raise TypeError()
+            return np.max(total_lst) + 1
+
+    def _write_test_set(self, file_name='testing.cfg', cwd=None):
+        return self._write_configurations(file_name=file_name, cwd=cwd, respect_step=False, return_max_index=True)
+
+    def _write_training_set(self, file_name='training.cfg', cwd=None):
+        self._write_configurations(file_name=file_name, cwd=cwd, respect_step=True)
+
 
     @staticmethod
     def _job_dict_lst(job_dict):

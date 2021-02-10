@@ -40,6 +40,7 @@ class TrainingContainer(GenericJob):
 
     def __init__(self, project, job_name):
         super().__init__(project=project, job_name=job_name)
+        self.__name__ = "TrainingContainer"
         self._table = pd.DataFrame({
             "name": [],
             "atoms": [],

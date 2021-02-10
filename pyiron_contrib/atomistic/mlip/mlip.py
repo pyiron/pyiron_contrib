@@ -238,75 +238,87 @@ class Mlip(GenericJob):
                     cell_lst.append(atoms.cell)
                     energy_lst.append(energy)
                     track_lst.append(name)
-                continue
-            original_dict = {el: ind for ind, el in enumerate(sorted(ham['input/structure/species']))}
-            species_dict = {ind: original_dict[el] for ind, el in enumerate(ham['input/structure/species'])}
-            if ham.__name__ in ['Vasp', 'ThermoIntDftEam', 'ThermoIntDftMtp', 'ThermoIntVasp']:
-                if len(ham['output/outcar/stresses']) != 0:
-                    for position, forces, cell, energy, stresses, volume in zip(ham['output/generic/positions'][start:end:delta],
-                                                                                ham['output/generic/forces'][start:end:delta],
-                                                                                ham['output/generic/cells'][start:end:delta],
-                                                                                ham['output/generic/dft/energy_free'][start:end:delta],
-                                                                                ham['output/outcar/stresses'][start:end:delta],
-                                                                                ham['output/generic/volume'][start:end:delta]):
+            elif ham.__name__ in [
+                'Vasp', 'ThermoIntDftEam', 'ThermoIntDftMtp', 'ThermoIntVasp', 'Lammps', 'LammpsInt2', 'LammpsMlip'
+            ]:
+                original_dict = {el: ind for ind, el in enumerate(sorted(ham['input/structure/species']))}
+                species_dict = {ind: original_dict[el] for ind, el in enumerate(ham['input/structure/species'])}
+                if ham.__name__ in ['Vasp', 'ThermoIntDftEam', 'ThermoIntDftMtp', 'ThermoIntVasp']:
+                    if len(ham['output/outcar/stresses']) != 0:
+                        for position, forces, cell, energy, stresses, volume in zip(
+                            ham['output/generic/positions'][start:end:delta],
+                            ham['output/generic/forces'][start:end:delta],
+                            ham['output/generic/cells'][start:end:delta],
+                            ham['output/generic/dft/energy_free'][start:end:delta],
+                            ham['output/outcar/stresses'][start:end:delta],
+                            ham['output/generic/volume'][start:end:delta]
+                        ):
+                            indices_lst.append([species_dict[el] for el in ham['input/structure/indices']])
+                            position_lst.append(position)
+                            forces_lst.append(forces)
+                            cell_lst.append(cell)
+                            energy_lst.append(energy)
+                            stress_lst.append(stresses * volume / gpa_to_ev_ang)
+                            track_lst.append(str(ham.job_id) + '_' + str(time_step))
+                            time_step += delta
+                    else:
+                        for position, forces, cell, energy in zip(
+                            ham['output/generic/positions'][start:end:delta],
+                            ham['output/generic/forces'][start:end:delta],
+                            ham['output/generic/cells'][start:end:delta],
+                            ham['output/generic/dft/energy_free'][start:end:delta]
+                        ):
+                            indices_lst.append([species_dict[el] for el in ham['input/structure/indices']])
+                            position_lst.append(position)
+                            forces_lst.append(forces)
+                            cell_lst.append(cell)
+                            energy_lst.append(energy)
+                            track_lst.append(str(ham.job_id) + '_' + str(time_step))
+                            time_step += delta
+                elif ham.__name__ in ['Lammps', 'LammpsInt2', 'LammpsMlip']:
+                    for position, forces, cell, energy, stresses, volume in zip(
+                        ham['output/generic/positions'][start:end:delta],
+                        ham['output/generic/forces'][start:end:delta],
+                        ham['output/generic/cells'][start:end:delta],
+                        ham['output/generic/energy_pot'][start:end:delta],
+                        ham['output/generic/pressures'][start:end:delta],
+                        ham['output/generic/volume'][start:end:delta]
+                    ):
                         indices_lst.append([species_dict[el] for el in ham['input/structure/indices']])
                         position_lst.append(position)
                         forces_lst.append(forces)
                         cell_lst.append(cell)
                         energy_lst.append(energy)
-                        stress_lst.append(stresses * volume / gpa_to_ev_ang)
+                        stress_lst.append(self.stress_tensor_components(stresses * volume))
                         track_lst.append(str(ham.job_id) + '_' + str(time_step))
                         time_step += delta
                 else:
-                    for position, forces, cell, energy in zip(ham['output/generic/positions'][start:end:delta],
-                                                              ham['output/generic/forces'][start:end:delta],
-                                                              ham['output/generic/cells'][start:end:delta],
-                                                              ham['output/generic/dft/energy_free'][start:end:delta]):
+                    for position, forces, cell, energy, stresses, volume in zip(
+                        ham['output/generic/positions'][start:end:delta],
+                        ham['output/generic/forces'][start:end:delta],
+                        ham['output/generic/cells'][start:end:delta],
+                        ham['output/generic/energy_pot'][start:end:delta],
+                        ham['output/generic/pressures'][start:end:delta],
+                        ham['output/generic/volume'][start:end:delta]
+                    ):
                         indices_lst.append([species_dict[el] for el in ham['input/structure/indices']])
                         position_lst.append(position)
                         forces_lst.append(forces)
                         cell_lst.append(cell)
                         energy_lst.append(energy)
+                        stress_lst.append(self.stress_tensor_components(stresses * volume))
                         track_lst.append(str(ham.job_id) + '_' + str(time_step))
                         time_step += delta
-            elif ham.__name__ in ['Lammps', 'LammpsInt2', 'LammpsMlip']:
-                for position, forces, cell, energy, stresses, volume in zip(ham['output/generic/positions'][start:end:delta],
-                                                                            ham['output/generic/forces'][start:end:delta],
-                                                                            ham['output/generic/cells'][start:end:delta],
-                                                                            ham['output/generic/energy_pot'][start:end:delta],
-                                                                            ham['output/generic/pressures'][start:end:delta],
-                                                                            ham['output/generic/volume'][start:end:delta]):
-                    indices_lst.append([species_dict[el] for el in ham['input/structure/indices']])
-                    position_lst.append(position)
-                    forces_lst.append(forces)
-                    cell_lst.append(cell)
-                    energy_lst.append(energy)
-                    stress_lst.append(self.stress_tensor_components(stresses * volume))
-                    track_lst.append(str(ham.job_id) + '_' + str(time_step))
-                    time_step += delta
-            else:
-                for position, forces, cell, energy, stresses, volume in zip(ham['output/generic/positions'][start:end:delta],
-                                                                            ham['output/generic/forces'][start:end:delta],
-                                                                            ham['output/generic/cells'][start:end:delta],
-                                                                            ham['output/generic/energy_pot'][start:end:delta],
-                                                                            ham['output/generic/pressures'][start:end:delta],
-                                                                            ham['output/generic/volume'][start:end:delta]):
-                    indices_lst.append([species_dict[el] for el in ham['input/structure/indices']])
-                    position_lst.append(position)
-                    forces_lst.append(forces)
-                    cell_lst.append(cell)
-                    energy_lst.append(energy)
-                    stress_lst.append(self.stress_tensor_components(stresses * volume))
-                    track_lst.append(str(ham.job_id) + '_' + str(time_step))
-                    time_step += delta
-        write_cfg(file_name=file_name,
-                  indices_lst=indices_lst,
-                  position_lst=position_lst,
-                  cell_lst=cell_lst,
-                  forces_lst=forces_lst,
-                  energy_lst=energy_lst,
-                  track_lst=track_lst,
-                  stress_lst=stress_lst)
+        write_cfg(
+            file_name=file_name,
+            indices_lst=indices_lst,
+            position_lst=position_lst,
+            cell_lst=cell_lst,
+            forces_lst=forces_lst,
+            energy_lst=energy_lst,
+            track_lst=track_lst,
+            stress_lst=stress_lst
+        )
         if return_max_index:
             total_lst = []
             for ind_lst in indices_lst:

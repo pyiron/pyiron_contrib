@@ -5,6 +5,11 @@ from pyiron_base import PyironFactory, InputList
 
 
 class FunctionFactory(PyironFactory):
+    """
+    Class to conveniently create different function objects.
+    for detailed information about the function visit the
+    atomicrex documentation.
+    """    
     @staticmethod
     def user_function(identifier, input_variable="r", species=["*", "*"], is_screening_function=False):
         return UserFunction(identifier, input_variable=input_variable, species=species, is_screening_function=is_screening_function)
@@ -47,7 +52,10 @@ class FunctionFactory(PyironFactory):
 
 
 class SpecialFunction(InputList):
-    def __init__(self, identifier, species=["*", "*"], is_screening_function=False):
+    """
+    Functions defined within atomicrex should inherit from this class
+    """    
+    def __init__(self, identifier, species=["*", "*"], is_screening_function=False):  
         super().__init__(table_name=f"special_function_{identifier}")
         self.species = species
         self.parameters = FunctionParameterList()
@@ -77,6 +85,9 @@ class SpecialFunction(InputList):
 
 
 class Poly(InputList):
+    """
+    Polynomial interpolation function.
+    """    
     def __init__(self, identifier, cutoff, species):
         super().__init__(table_name=f"Poly_{identifier}")
         self.identifier = identifier
@@ -93,6 +104,9 @@ class Poly(InputList):
 
 
 class Spline(InputList):
+    """
+    Spline interpolation function
+    """
     def __init__(self, identifier, cutoff, derivative_left, derivative_right, species):
         super().__init__(table_name=f"Spline_{identifier}")
         self.identifier = identifier
@@ -305,6 +319,10 @@ class Gaussian(SpecialFunction):
 
 
 class UserFunction(InputList):
+    """
+    Analytic functions that are not implemented in atomicrex
+    can be provided as user functions.
+    """    
     def __init__(self, identifier, input_variable, species, is_screening_function):
         super().__init__(table_name=f"user_func_{identifier}")
         self.input_variable = input_variable
@@ -347,6 +365,12 @@ class UserFunction(InputList):
 
 
 class FunctionParameter(InputList):
+    """
+    Function parameter. For detailed information
+    about the attributes see the atomicrex documentation.
+    Objects should only be created using the add_parameter method
+    of the FunctionParameterList class.
+    """    
     def __init__(self, param, start_val, enabled, reset, min_val, max_val, fitable, tag=None):
         self.param = param
         self.start_val = start_val
@@ -376,6 +400,22 @@ class FunctionParameterList(InputList):
         super().__init__(table_name="FunctionParameterList")
 
     def add_parameter(self, param, start_val, enabled=True, reset=False, min_val=None, max_val=None, tag=None, fitable=True):
+        """
+        Add a function parameter named param to a function.
+        This needs to be done manually for user functions and
+        not for special functions.
+
+        Args:
+            param (str): Name of the parameter. Must exactly match the name in the function expression.
+            start_val (float): Starting value of the parameter
+            enabled (bool, optional): Determines if the paremeter is varied during fitting. Defaults to True.
+            reset (bool, optional): Determine if the parameter should be reset every iteration
+            Can help with global optimization. Defaults to False.
+            min_val (float, optional): Highly recommended for global optimization. Defaults to None.
+            max_val (float, optional): Highly recommended for global optimization. Defaults to None.
+            tag (str, optional): [description]. Only necessary for ABOP potentials .Defaults to None.
+            fitable (bool, optional): [description]. Changing could cause bugs. Defaults to True.
+        """        
         self[param] = FunctionParameter(
             param,
             start_val,
@@ -386,8 +426,11 @@ class FunctionParameterList(InputList):
             tag=tag,
             fitable=fitable,
         )
-
+        
     def fit_dofs_to_xml_element(self):
+        """Internal function
+        Returns fit dofs as atomicrex xml element.
+        """        
         fit_dof = ET.Element("fit-dof")
         for param in self.values():
             if param.fitable:
@@ -396,6 +439,9 @@ class FunctionParameterList(InputList):
 
 
 class PolyCoeff(FunctionParameter):
+    """
+    Function parameter, but for polynomial interpolation.
+    """    
     def __init__(self, n, start_val, enabled, reset, min_val, max_val):
         super().__init__(
             param="coeff",
@@ -418,6 +464,17 @@ class PolyCoeffList(InputList):
         super().__init__(table_name="PolyCoeffList")
 
     def add_coeff(self, n, start_val, enabled=True, reset=False, min_val=None, max_val=None):
+        """
+        Add a term in the form of a*x^n.
+
+        Args:
+            n (int): Order n of the coefficient
+            start_val (float): Starting value of a. 
+            enabled (bool, optional): Determines if it should be fitted. Defaults to True.
+            reset (bool, optional): Determines if it should be reset after each iteration. Defaults to False.
+            min_val (float, optional): Highly recommended for global optimization. Defaults to None.
+            max_val (float, optional): Highly recommended for global optimization. Defaults to None.
+        """        
         self[f"coeff_{n}"] = PolyCoeff(
             n,
             start_val,
@@ -435,6 +492,9 @@ class PolyCoeffList(InputList):
 
 
 class Node(FunctionParameter):
+    """
+    Function parameter, but for spline interpolation.
+    """
     def __init__(self, x, start_val, enabled, reset, min_val, max_val):
         super().__init__(
             param="node",
@@ -459,6 +519,17 @@ class NodeList(InputList):
         super().__init__(table_name="NodeList")
 
     def add_node(self, x, start_val, enabled=True, reset=False, min_val=None, max_val=None):
+        """
+        Add a node to the spline interpolation function.
+
+        Args:
+            x (float): x coordinate of the node. Does not change during fitting.
+            start_val (float): Initial y coordinate of the node.
+            enabled (bool, optional): Determines if y is changed during fitting. Defaults to True.
+            reset (bool, optional): Determines if y should be reset every iteration. Defaults to False.
+            min_val (float, optional): Highly recommended for global optimization. Defaults to None.
+            max_val (float, optional): Highly recommended for global optimization. Defaults to None.
+        """        
         x = float(x)
         self[f"node_{x}"] = Node(
             x=x,

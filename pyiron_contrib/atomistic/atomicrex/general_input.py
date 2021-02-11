@@ -12,6 +12,10 @@ from pyiron_contrib.atomistic.atomicrex.function_factory import FunctionFactory
 
 
 class GeneralARInput(InputList):
+    """
+    Class to store general input of an atomicrex job,
+    f.e. the fit algorithm.
+    """    
     def __init__(self, table_name="general_input"):
         super().__init__(table_name="general_input")
         self.name = "Atomicrex Job"
@@ -24,6 +28,12 @@ class GeneralARInput(InputList):
         self.enable_fitting = True
 
     def _write_xml_file(self, directory):
+        """Internal function.
+        Write the main input xml file in a directory.   
+
+        Args:
+            directory (str): Working directory
+        """        
         job = ET.Element("job")
 
         name = ET.SubElement(job, "name")
@@ -76,6 +86,10 @@ class GeneralARInput(InputList):
 
 
 class AlgorithmFactory(PyironFactory):
+    """
+    Factory class to conveniently acces the different
+    fitting algorithms available in atomicrex.
+    """    
 
     @staticmethod
     def ar_lbfgs(conv_threshold=1e-10, max_iter=50, gradient_epsilon=None):
@@ -121,8 +135,12 @@ class AlgorithmFactory(PyironFactory):
     def gn_isres(stopval=1e-10, maxeval=50, maxtime=None, ftol_rel=None, ftol_abs=None, xtol_rel=None, seed=None):
         return GN_ISRES(stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed)
 
-### Class to inherit from if more algorithms will be implemented in atomicrex at some point they can be implemented similar to the AR_LBFGS class
+
 class AtomicrexAlgorithm(InputList):
+    """
+    Class to inherit from. If more algorithms will be implemented in atomicrex
+    at some point they can be implemented similar to the AR_LBFGS class.
+    """    
     def __init__(self, conv_threshold, max_iter, gradient_epsilon, name):
         super().__init__(table_name="fitting_algorithm")
         self.conv_threshold = conv_threshold
@@ -131,6 +149,9 @@ class AtomicrexAlgorithm(InputList):
         self.name = name
 
     def _to_xml_element(self):
+        """Internal function.
+        Converts the algorithm to an xml element
+        """        
         algo = ET.Element(self.name)
         algo.set("conv-threshold", f"{self.conv_threshold}")
         algo.set("max-iter", f"{self.max_iter}")
@@ -140,25 +161,41 @@ class AtomicrexAlgorithm(InputList):
 
 
 class AR_LBFGS(AtomicrexAlgorithm):
+    """
+    Use the atomicrex implementation of the LBFGS minimizer.
+    """    
     def __init__(self, conv_threshold, max_iter, gradient_epsilon):
         super().__init__(conv_threshold, max_iter, gradient_epsilon, name="BFGS")
 
 
 class SpaMinimizer:
+    """
+    Global optimizer implemented in atomicrex.
+    Should be used in combination with a local minimizer.
+    See the atomicrex documentation for details.
+    """    
     def __init__(self, spa_iterations, seed):
         self.spa_iterations = spa_iterations
         self.seed = seed
         self.local_minimizer = None
 
     def _to_xml_element(self):
+        """Internal function.
+        Converts the algorithm to a xml element
+        and returns it
+        """     
         spa = ET.Element("spa")
         spa.set("max-iter", f"{self.spa_iterations}")
         spa.set("seed", f"{self.seed}")
-        spa.append(self.local_minimizer._to_xml_element())
+        if self.local_minimizer is not None:
+            spa.append(self.local_minimizer._to_xml_element())
         return spa
 
 
 class NloptAlgorithm(InputList):
+    """
+    Nlopt algorithms should inherit from this class.
+    """    
     def __init__(self, stopval, maxeval, maxtime, ftol_rel, ftol_abs, xtol_rel, name, seed):
         super().__init__(table_name="fitting_algorithm")
         self.stopval = stopval
@@ -171,6 +208,10 @@ class NloptAlgorithm(InputList):
         self.name = name
 
     def _to_xml_element(self):
+        """Internal Function.
+        Converts the algorithm to a xml element
+        and returns it
+        """        
         nlopt = ET.Element("nlopt")
         nlopt.set("algorithm", self.name)
         if self.stopval is not None:

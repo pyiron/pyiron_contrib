@@ -7,6 +7,10 @@ from pyiron_contrib.atomistic.atomicrex.function_factory import FunctionFactory
 from pyiron_contrib.atomistic.atomicrex.utility_functions import write_pretty_xml
 
 class ARPotFactory(PyironFactory):
+    """
+    Factory class providing convenient acces to fittable potentials types.
+    TODO: add other potential types supported by atomicrex.
+    """
     @staticmethod
     def eam_potential(identifier="EAM", export_file="output.eam.fs", rho_range_factor=2.0, resolution=10000, species=["*","*"]):
         return EAMPotential(
@@ -23,11 +27,18 @@ class ARPotFactory(PyironFactory):
 
 
 class AbstractPotential(InputList):
+    """Potentials should inherit from this class for hdf5 storage.
+    """    
     def __init__(self, init=None, table_name="potential"):
         super().__init__(init, table_name=table_name)
 
 
 class LJPotential(AbstractPotential):
+    """
+    Lennard Jones potential. Lacking some functionality,
+    mostly implemented for testing and demonstatration purposes.
+    TODO: Implement missing functionality.
+    """    
     def __init__(self, init=None, sigma=None, epsilon=None, cutoff=None, species=None, identifier=None):
         super().__init__(init=init)
         if init is None:
@@ -38,6 +49,9 @@ class LJPotential(AbstractPotential):
             self.identifier = identifier
 
     def write_xml_file(self, directory):
+        """
+        Internal function to create xml element.
+        """        
         lj = ET.Element("lennard-jones")
         lj.set("id", f"{self.identifier}")
         lj.set("species-a", self.species["a"])
@@ -59,6 +73,18 @@ class LJPotential(AbstractPotential):
 
 
 class EAMPotential(AbstractPotential):
+    """
+    Embedded-Atom-Method potential.
+    Usage: Create using the potential factory class.
+    Add functions defined using the function_factory
+    to self.pair_interactions, self.electron_densities
+    and self.embedding_energies in dictionary style,
+    using the identifier of the function as key.
+    Example:
+    eam.pair_interactions["V"] = morse_function
+
+    """    
+
     def __init__(self, init=None, identifier=None, export_file=None, rho_range_factor=None, resolution=None, species=None):
         super().__init__(init=init)
         if init is None:
@@ -72,7 +98,9 @@ class EAMPotential(AbstractPotential):
             self.species = species
 
     def write_xml_file(self, directory):
-
+        """
+        Internal function to convert to an xml element
+        """        
         eam = ET.Element("eam")
         eam.set("id", f"{self.identifier}")
         eam.set("species-a", f"{self.species[0]}")
@@ -111,6 +139,16 @@ class EAMPotential(AbstractPotential):
         write_pretty_xml(eam, filename)
 
     def _parse_final_parameters(self, lines):
+        """
+        Internal Function.
+        Parse function parameters from atomicrex output.
+
+        Args:
+            lines (list[str]): atomicrex output lines
+
+        Raises:
+            KeyError: Raises if a parsed parameter can't be matched to a function.
+        """        
         for l in lines:
             identifier, param, value = self._parse_parameter_line(l)
             if identifier in self.pair_interactions:
@@ -122,7 +160,7 @@ class EAMPotential(AbstractPotential):
                 self.embedding_energies[identifier].parameters[param].final_value = value
             else:
 
-                raise ValueError(
+                raise KeyError(
                     f"Can't find {identifier} in potential, probably something went wrong during parsing.\n"
                     "Fitting parameters of screening functions probably doesn't work right now"
                 )
@@ -130,9 +168,19 @@ class EAMPotential(AbstractPotential):
 
     @staticmethod
     def _parse_parameter_line(line):
-        # Parse output line that looks like:
-        # EAM[EAM].V_CuCu[morse-B].delta: 0.0306585 [-0.5:0.5]
-        # EAM[EAM].CuCu_rho[spline].node[1].y: 2.10988 [1:3]
+        """
+        Internal Function.
+        Parses the function identifier, name and final value of a function parameter
+        from an atomicrex output line looking like:
+        EAM[EAM].V_CuCu[morse-B].delta: 0.0306585 [-0.5:0.5]
+        EAM[EAM].CuCu_rho[spline].node[1].y: 2.10988 [1:3]
+
+        Defined as staticmethod because it can probably be reused for other potential types.
+
+        TODO: Add parsing of polynomial parameters.
+        Returns:
+            [(str, str, float): [description]
+        """        
 
         line = line.strip().split()
         value = float(line[1])

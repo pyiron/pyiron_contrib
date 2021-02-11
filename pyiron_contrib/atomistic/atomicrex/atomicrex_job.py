@@ -15,8 +15,6 @@ from pyiron_contrib.atomistic.atomicrex.potential_factory import ARPotFactory, A
 from pyiron_contrib.atomistic.atomicrex.output import Output
 from pyiron_contrib.atomistic.atomicrex.function_factory import FunctionFactory
 
-
-
 s = Settings()
 
 ## Class defined for future addition of other codes
@@ -27,6 +25,8 @@ class PotentialFittingBase(GenericJob):
 
 
 class Atomicrex(PotentialFittingBase):
+    """Class to set up and run atomicrex jobs
+    """    
     def __init__(self, project, job_name):
         super().__init__(project, job_name)
 
@@ -46,12 +46,16 @@ class Atomicrex(PotentialFittingBase):
         self.factories = Factories()
 
     def to_hdf(self, hdf=None, group_name=None):
+        """Internal function to store the job in hdf5 format
+        """        
         super().to_hdf(hdf=hdf, group_name=group_name)
         self.input.to_hdf(hdf=self.project_hdf5)
         self.potential.to_hdf(hdf=self.project_hdf5)
         self.structures.to_hdf(hdf=self.project_hdf5)
 
     def from_hdf(self, hdf=None, group_name=None):
+        """Internal function to reload the job object from hdf5
+        """        
         super().from_hdf(hdf=hdf, group_name=group_name)
         self.input.from_hdf(hdf=self.project_hdf5)
         self.potential = self.project_hdf5["potential"].to_object()
@@ -76,6 +80,11 @@ class Atomicrex(PotentialFittingBase):
         }
 
     def collect_output(self, cwd=None):
+        """Internal function that parses the output of an atomicrex job
+
+        Args:
+            cwd ([string], optional): Working directory. Defaults to None.
+        """        
         #self.input.from_hdf(self._hdf5)
         if cwd is None:
             cwd = self.working_directory
@@ -102,9 +111,16 @@ class Atomicrex(PotentialFittingBase):
 
 
     def convergence_check(self):
+        """Internal function, TODO
+        """        
         return
 
     def write_input(self, directory=None):
+        """Internal function that writes input files
+
+        Args:
+            directory ([string], optional): Working directory. Defaults to None.
+        """        
         if directory is None:
             directory = self.working_directory
         self.input._write_xml_file(directory = directory)
@@ -112,6 +128,13 @@ class Atomicrex(PotentialFittingBase):
         self.structures.write_xml_file(directory = directory)
 
     def _executable_activate(self, enforce=False):
+        """
+        Internal function that sets up and Executable() object 
+        and finds executables available in pyiron resources/atomicrex/bin
+
+        Args:
+            enforce (bool, optional): [description]. Defaults to False.
+        """        
         if self._executable is None or enforce:
             if len(self.__module__.split(".")) > 1:
                 self._executable = Executable(
@@ -126,6 +149,10 @@ class Atomicrex(PotentialFittingBase):
 
 
 class Factories:
+    """
+    Provides conventient acces to other factory classes.
+    Functionality to set up an atomicrex job can be found here.
+    """    
     def __init__(self):
         self.potentials = ARPotFactory()
         self.functions = FunctionFactory()

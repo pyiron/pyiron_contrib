@@ -10,6 +10,10 @@ from pyiron_contrib.atomistic.atomicrex.utility_functions import write_pretty_xm
 
 
 class StructureList(object):
+    """
+    Possible container class to inherit from in other potential fitting interfaces.
+    Probably obsolete if StructureContainer or something similar gets developed.
+    """    
     def __init__(self):
         self._structure_lst = []
 
@@ -62,6 +66,15 @@ class StructureList(object):
 
 ### This is probably useless like this because forces can't be passed.
 def structure_to_xml_element(structure):
+    """
+    Converts an ase/pyiron atoms object to an atomicrex xml element
+    Right now forces can't be passed in the xml file, so this is not really helpful.
+    Args:
+        structure (Atoms): ase or pyiron Atoms
+
+    Returns:
+        (ET.Element, ET.Element): atomicrex structure xml
+    """    
     pbc = ET.Element("pbc")
     pbc.set("x", f"{structure.pbc[0]}".lower())
     pbc.set("y", f"{structure.pbc[1]}".lower())
@@ -88,9 +101,11 @@ def structure_to_xml_element(structure):
 
 
 class ARStructure(object):
-    #def __new__(cls, *args, **kwargs):
-    #    instance = super().__new__(cls)
-    #    object.__setattr__(instance, "structure", Atoms())
+    """
+    Class that contains a pyiron structure, an ARFitPropertyList
+    and some attributes that define the fitting procedure.
+    Provides internal helper methods.
+    """
 
     def __init__(self, structure=None, fit_properties=None, identifier=None, relative_weight=1, clamp=True,):
         self._structure = None
@@ -123,11 +138,19 @@ class ARStructure(object):
             raise ValueError("fit_properties have to be an ARFitPropertyList")
         self._fit_properties = fit_properties
 
-    #@fit_properties.getter
-    #def fit_properties(self):
-    #    return self._fit_properties
-
     def _write_poscar_return_xml(self, directory):
+        """
+        Internal function that writes the structure in an extended POSCAR
+        format that contains forces. Returns an atomicrex xml
+        element that references the POSCAR file and contains additional
+        information like the fit properties.
+
+        Args:
+            directory (string): Working directory
+
+        Returns:
+            [ElementTree xml element]: xml element referencing POSCAR, contains additional information
+        """        
         forces = self.fit_properties["atomic-forces"].target_value
         write_modified_poscar(self.identifier, self.structure, forces, directory)
         return structure_meta_xml(
@@ -138,6 +161,9 @@ class ARStructure(object):
         )
 
     def to_hdf(self, hdf=None, group_name="arstructure"):
+        """
+        Internal function 
+        """        
         with hdf.open(group_name) as hdf_s_lst:
             self.structure.to_hdf(hdf=hdf_s_lst, group_name="structure")
             self.fit_properties.to_hdf(hdf=hdf_s_lst, group_name="fit_properties")
@@ -146,6 +172,9 @@ class ARStructure(object):
             hdf_s_lst["clamp"] = self.clamp
 
     def from_hdf(self, hdf=None, group_name="arstructure"):
+        """
+        Internal function 
+        """    
         with hdf.open(group_name) as hdf_s_lst:
             structure = Atoms()
             structure.from_hdf(hdf_s_lst, group_name="structure")
@@ -158,25 +187,57 @@ class ARStructure(object):
 
 
 class ARStructureList(object):
+    """
+    Container class for AR structures. structures attribute
+    of the atomicrex job class.
+    Provides functions for internal use and a convenient way
+    to add additional structures to the atomicrex job.
+    """    
     def __init__(self):
         self._structure_dict = {}
 
     def add_structure(self, structure, identifier, fit_properties=None, relative_weight=1, clamp=True):
+        """
+        Provides a convenient way to add additional
+        structures to the job.
+        
+        Args:
+            structure (Pyiron Atoms): structure that should be added.
+            identifier (string): ID string. Must be unique or overwrites the old structure.
+            fit_properties ([ARFitPropertyList], optional): Fit Properties can be conveniently added after appending the structure. Defaults to None.
+            relative_weight (int, optional): Assigns a weight for the objective function. Defaults to 1.
+            clamp (bool, optional): Clamp the structure (Do not relax it). Defaults to True.
+
+        Raises:
+            ValueError: Raises if structure is not a pyiron atoms instance.
+
+        Returns:
+            [ARStructure]: Acces to the atomicrex structure in the structure list.
+        """        
         if isinstance(structure, Atoms):
             if fit_properties is None:
                 fit_properties = ARFitPropertyList()
             ar_struct = ARStructure(structure, fit_properties, identifier, relative_weight=relative_weight, clamp=clamp)
             return self._add_ARstructure(ar_struct)
         else:
-            raise ValueError("Structure has to be an ARStructure instance")
+            raise ValueError("Structure has to be a Pyiron Atoms instance")
 
-    ## Split into another function to be able to implement some checks later
     def _add_ARstructure(self, structure):
+        """Internal helper function to be able to implement some more checks later on
+        """        
         identifier = f"{structure.identifier}"
         self._structure_dict[identifier] = structure
         return self._structure_dict[identifier]
 
     def write_xml_file(self, directory, name="structures.xml"):
+        """
+        Internal helper function that write an atomicrex style
+        xml file containg all structures.
+
+        Args:
+            directory (string): Working directory.
+            name (str, optional): . Defaults to "structures.xml".
+        """        
         root = ET.Element("group")
         for s in self._structure_dict.values():
             root.append(s._write_poscar_return_xml(directory))
@@ -184,11 +245,17 @@ class ARStructureList(object):
         write_pretty_xml(root, filename)
 
     def to_hdf(self, hdf=None, group_name="arstructurelist"):
+        """
+        Internal function 
+        """    
         with hdf.open(group_name) as hdf_s_lst:
             for k, v in self._structure_dict.items():
                 v.to_hdf(hdf=hdf_s_lst, group_name=k)
 
     def from_hdf(self, hdf=None, group_name="arstructurelist"):
+        """
+        Internal function 
+        """        
         with hdf.open(group_name) as hdf_s_lst:
             for g in sorted(hdf_s_lst.list_groups()):
                 s = ARStructure()
@@ -196,6 +263,13 @@ class ARStructureList(object):
                 self._structure_dict[g] = s
 
     def _parse_final_properties(self, struct_lines):
+        """
+        Internal function that parses the values of fitted properties
+        calculated with the final iteration of the fitted potential.
+
+        Args:
+            struct_lines (list[str]): lines from atomicrex output that contain structure information.
+        """        
         for l in struct_lines:
             l = l.strip()
             if l.startswith("Structure"):
@@ -208,6 +282,16 @@ class ARStructureList(object):
 
 
 def write_modified_poscar(identifier, structure, forces, directory):
+    """
+    Internal function. Writes an ase or pyiron structure
+    and corresponding forces in a modified POSCAR file.
+
+    Args:
+        identifier (str): Unique identifier used for the filename.
+        structure (Atoms): ase or pyiron atoms object. 
+        forces (array or list[list]): atomic forces. Must be in same order as positions.
+        directory (str): Working directory.
+    """    
     filename = posixpath.join(directory, f"POSCAR_{identifier}")
     with open(filename, 'w') as f:
         # Elements as system name
@@ -229,14 +313,13 @@ def write_modified_poscar(identifier, structure, forces, directory):
         f.write('\n')
 
         # Number of elements per type
-
         for elem in elements:
             symbols = structure.get_chemical_symbols()
             n = len(symbols[symbols==elem])
             f.write(f'{n}    ')
         f.write('\n')
 
-        # Scaled or cartesian coordinates
+        # Scaled coordinates
         coordinates = structure.get_scaled_positions()
         f.write('Direct\n')
 
@@ -255,6 +338,24 @@ def structure_meta_xml(
         fit_properties,
         mod_poscar = True,
 ):
+    """
+    Internal function. Creates xml element with
+    scalar properties, weight and
+    reference to POSCAR containg structure and forces.
+
+    Args:
+        identifier (str): Unique identifier.
+        relative_weight (float): weight in objective function
+        clamp (bool): clamp the structure (no relaxation) 
+        mod_poscar (bool, optional): Combine with poscar file. Defaults to True.
+
+    Raises:
+        NotImplementedError: mod_poscar has to be True, because forces can't
+        be provided in xml format in atomicrex yet.
+
+    Returns:
+        [ElementTree xml element]: atomicrex structure xml element.
+    """
 
     struct_xml = ET.Element("user-structure")
     struct_xml.set("id", f"{identifier}")

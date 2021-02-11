@@ -1,7 +1,14 @@
 __version__ = "0.1"
 __all__ = []
 
-from pyiron import Project
+import warnings
+
+try:
+	from pyiron import Project
+except:
+	warnings.warn("pyiron module not found, importing Project from pyiron_base")
+	from pyiron_base import Project
+
 from pyiron_base import JOB_CLASS_DICT
 
 # Make classes available for new pyiron version
@@ -24,6 +31,10 @@ JOB_CLASS_DICT['Mixer'] = 'pyiron_contrib.atomistic.interactive.mixer'
 JOB_CLASS_DICT['ParameterMaster'] = 'pyiron_contrib.atomistic.dft.parametermaster'
 JOB_CLASS_DICT['MonteCarloMaster'] = 'pyiron_contrib.atomistic.interactive.montecarlo'
 JOB_CLASS_DICT['RandSpg'] = 'pyiron_contrib.atomistic.atomistics.structures.randspg'
+JOB_CLASS_DICT['Fenics'] = 'pyiron_contrib.continuum.fenics.job.generic'
+JOB_CLASS_DICT['FenicsLinearElastic'] = 'pyiron_contrib.continuum.fenics.job.elastic'
+JOB_CLASS_DICT['TrainingContainer'] = 'pyiron_contrib.atomistic.atomistics.job.trainingcontainer'
+
 
 from ._version import get_versions
 

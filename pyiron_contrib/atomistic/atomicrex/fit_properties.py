@@ -4,6 +4,16 @@ from pyiron_base import InputList
 
 
 class ARFitProperty(InputList):
+    """
+    Class to describe properties that can be fitted using atomicrex.
+    Property and target value have to be given,
+    the other parameters control details of the fitting procedure.
+    For more information what they do visit the atomicrex documentation.
+    
+    Direct interaction with this class shouldn't be necessary.
+    To conveniently create ARFitProperty objects use the
+    ARFitPropertList add_fit_property method.
+    """    
     def __init__(
             self,
             prop=None,
@@ -42,6 +52,14 @@ class ARFitProperty(InputList):
 
     @prop.setter
     def prop(self, prop):
+        """Only allow properties that can be fitted using atomicrex
+
+        Args:
+            prop (string): name of the property
+
+        Raises:
+            ValueError: Given property can not be fitted using atomicrex.
+        """    
         fittable_properties = [
             "atomic-energy",
             "atomic-forces",
@@ -61,6 +79,14 @@ class ARFitProperty(InputList):
 
     @residual_style.setter
     def residual_style(self, residual_style):
+        """Residual styles available in atomicrex
+
+        Args:
+            residual_style (string): [description]
+
+        Raises:
+            ValueError: [description]
+        """        
         res_styles = ["squared", "squared-relative", "absolute-diff"]
         if residual_style in res_styles:
             self._residual_style = residual_style
@@ -68,6 +94,12 @@ class ARFitProperty(InputList):
             raise ValueError(f"residual style has to be one of {res_styles}")
 
     def _is_scalar(self):
+        """
+        Internal helper function, scalar properties are provided in the structure xml
+        and vector properties (atomic forces) in the structure file
+        Returns:
+            [bool]: True if scalar, False if vector property.
+        """        
         if self.prop != "atomic-forces":
             return True
         else:
@@ -90,6 +122,16 @@ class ARFitProperty(InputList):
 
     @staticmethod
     def _parse_final_value(line):
+        """
+        Parses the final values of properties used in the fitting process from
+        atomicrex output.
+
+        Args:
+            line (string): string from atomicrex output containing final value of some property
+
+        Returns:
+            [(string, float)]: property, final value
+        """        
         if line.startswith("atomic-forces avg/max"):
             return "atomic-forces", None
         else:
@@ -99,6 +141,11 @@ class ARFitProperty(InputList):
 
 
 class ARFitPropertyList(InputList):
+    """
+    InputList of ARFitProperties that additionally provides utility functions
+    that allow convenient addition of fit properties to a structure.
+    Also provides internal functionality.
+    """
     def __init__(self, *args, **kwargs):
         super().__init__(table_name="fit_property", *args, **kwargs)
 
@@ -115,6 +162,26 @@ class ARFitPropertyList(InputList):
             min_val=None,
             max_val=None,
     ):
+        """
+        Adds a fittable property to the fit properties
+        of an atomicrex structure.
+        Default values should be ok for most cases,
+        but it is strongly recommended to check the purpose
+        of each argument in the atomicrex documentation.
+
+        Args:
+            prop (string): property to be fitted
+            target_value (float):
+            fit (bool, optional): Include the property in the fit procedure. Defaults to True.
+            relax (bool, optional): Calculate before or after structure relaxation. Defaults to False.
+            relative_weight (int, optional): Weight for the objective function. Defaults to 1.
+            residual_style (str, optional): See atomicrex documentation. Defaults to "squared-relative".
+            output (bool, optional): Determines if the value is written to output.
+            Could cause parsing problems if False. Defaults to True.
+            tolerance (float, optional): See atomicrex documentation. Defaults to None.
+            min_val ([type], optional): [description]. Defaults to None.
+            max_val ([type], optional): [description]. Defaults to None.
+        """    
         self[prop] = ARFitProperty(
             prop = prop,
             target_value = target_value,
@@ -129,6 +196,8 @@ class ARFitPropertyList(InputList):
         )
 
     def to_xml_element(self):
+        """Internal helper function converting the list into an atomicrex xml element.
+        """        
         properties = ET.Element("properties")
         for p in self.values():
             properties.append(p.to_xml_element)

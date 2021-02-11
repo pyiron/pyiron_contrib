@@ -153,7 +153,6 @@ class EAMPotential(AbstractPotential):
             identifier, param, value = self._parse_parameter_line(l)
             if identifier in self.pair_interactions:
                 self.pair_interactions[identifier].parameters[param].final_value = value
-
             elif identifier in self.electron_densities:
                 self.electron_densities[identifier].parameters[param].final_value = value
             elif identifier in self.embedding_energies:

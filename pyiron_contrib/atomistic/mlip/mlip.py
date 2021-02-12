@@ -230,14 +230,15 @@ class Mlip(GenericJob):
             if ham.__name__ == "TrainingContainer":
                 job = ham.to_object()
                 pd = job.to_pandas()
-                for name, atoms, energy, forces, _ in islice(pd.itertuples(index=False), start, end, delta):
+                for time_step, (name, atoms, energy, forces, _) in islice(enumerate(pd.itertuples(index=False)),
+                                                                          start, end, delta):
                     atoms = ase_to_pyiron(atoms)
                     indices_lst.append(atoms.indices)
                     position_lst.append(atoms.positions)
                     forces_lst.append(forces)
                     cell_lst.append(atoms.cell)
                     energy_lst.append(energy)
-                    track_lst.append(name)
+                    track_lst.append(str(ham.job_id) + "_" + str(time_step))
                 continue
             original_dict = {el: ind for ind, el in enumerate(sorted(ham['input/structure/species']))}
             species_dict = {ind: original_dict[el] for ind, el in enumerate(ham['input/structure/species'])}

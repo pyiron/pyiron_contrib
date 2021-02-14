@@ -90,6 +90,10 @@ class Atomicrex(PotentialFittingBase):
             cwd = self.working_directory
         filepath = f"{cwd}/error.out"
         
+        finished_triggered = False
+        params_triggered = False
+        structures_triggered = False
+
         with open(filepath, "r") as f:
             final_parameter_lines = []
             final_property_lines = []
@@ -101,11 +105,10 @@ class Atomicrex(PotentialFittingBase):
                     return
 
                 elif not finished_triggered and l.startswith("Iterations"):
-                    l = l.split()
-                    self.output.iterations = int(l[1])
-                    self.output.residual = float(l[3])
-                    final_lines = f.readlines()
-                    finished_triggered = True
+                        l = l.split()
+                        self.output.iterations = int(l[1])
+                        self.output.residual = float(l[3])
+                        finished_triggered = True
                 
                 elif finished_triggered and l.startswith("Potential parameters"):
                     # Get the number of dofs
@@ -125,7 +128,7 @@ class Atomicrex(PotentialFittingBase):
                      
                 elif structures_triggered:
                     if not l.startswith("---"):
-                        final_parameter_lines.append(l)
+                        final_property_lines.append(l)
                     else:
                         # Collecting structure information finished, hand over structures class
                         self.structures._parse_final_properties(final_property_lines)

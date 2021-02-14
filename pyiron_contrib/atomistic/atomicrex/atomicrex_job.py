@@ -91,35 +91,46 @@ class Atomicrex(PotentialFittingBase):
         filepath = f"{cwd}/error.out"
         
         with open(filepath, "r") as f:
+            final_parameter_lines = []
+            final_property_lines = []
+
             for l in f:
                 if l.startswith("ERROR"):
                     self.status.aborted=True
                     self.output.error = l
                     return
 
-                elif l.startswith("Iterations"):
+                elif not finished_triggered and l.startswith("Iterations"):
                     l = l.split()
                     self.output.iterations = int(l[1])
                     self.output.residual = float(l[3])
                     final_lines = f.readlines()
+                    finished_triggered = True
+                
+                elif finished_triggered and l.startswith("Potential parameters"):
+                    # Get the number of dofs
+                    n_fit_dofs = int(l.split("=")[1][:-3])
+                    params_triggered = True
+                
+                elif params_triggered:
+                    if not l.startswith("---"):
+                        final_parameter_lines.append(l)
+                    else:
+                        # Collecting lines with final parameters finished, hand over to the potential class
+                        self.potential._parse_final_parameters(final_parameter_lines)
+                        params_triggered = False
+                
+                elif finished_triggered and l.startswith("Computing"):
+                    structures_triggered = True
+                     
+                elif structures_triggered:
+                    if not l.startswith("---"):
+                        final_parameter_lines.append(l)
+                    else:
+                        # Collecting structure information finished, hand over structures class
+                        self.structures._parse_final_properties(final_property_lines)
+                        structures_triggered = False
 
-        # Get the number of dofs
-        n_fit_dofs = int(final_lines[1].split("=")[1][:-3])
-        # Use number of dofs to get relevant lines for final parameters
-        self.potential._parse_final_parameters(final_lines[2:2+n_fit_dofs])
-
-        # Iterate over final lines to get relevant lines for final structures
-        search_lines = final_lines[3+n_fit_dofs:]
-        for i, l in enumerate(search_lines):
-            if l.startswith("Computing structure"):
-                struct_start = i+1
-                break
-        for i, l in enumerate(search_lines[struct_start:]):
-            if l.startswith("---"):
-                struct_end = struct_start + i
-                break
-        self.structures._parse_final_properties(search_lines[struct_start:struct_end])
-       
 
     def convergence_check(self):
         """Internal function, TODO

@@ -531,7 +531,8 @@ class NodeList(InputList):
             max_val (float, optional): Highly recommended for global optimization. Defaults to None.
         """        
         x = float(x)
-        self[f"node_{x}"] = Node(
+        key = f"node_{x}"
+        self[key] = Node(
             x=x,
             start_val=start_val,
             enabled=enabled,
@@ -539,9 +540,31 @@ class NodeList(InputList):
             min_val=min_val,
             max_val=max_val,
         )
+        return self[key]
 
     def _to_xml_element(self):
         nodes = ET.Element("nodes")
         for node in self.values():
             nodes.append(node._to_xml_element())
         return nodes
+
+    def create_from_arrays(self, x, y, min_vals=None, max_vals=None):
+        """
+        Convenience function to create nodes from lists or arrays of values.
+        Allows to easily start the fitting process with physically motivated values
+        or values taken from previous potentials.
+        Creates len(x) nodes at position x with starting values y.
+        All given arrays must have the same length.
+
+        Args:
+            x (list or array): x values of the nodes
+            y (list or array): corresponding y (starting) values
+            min_vals ([type], optional): Highly recommended for global optimization. Defaults to None.
+            max_vals ([type], optional): Highly recommended for global optimization. Defaults to None.
+        """
+        for i in range(len(x)):
+            node = self.add_node(x[i], y[i])
+            if min_vals is not None:
+                node.min_val = min_vals[i]
+            if max_vals is not None:
+                node.max_val = max_vals[i]

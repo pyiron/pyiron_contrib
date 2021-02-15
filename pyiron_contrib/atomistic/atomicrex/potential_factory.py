@@ -31,6 +31,9 @@ class AbstractPotential(InputList):
     """    
     def __init__(self, init=None, table_name="potential"):
         super().__init__(init, table_name=table_name)
+    
+    def copy_final_to_initial_params(self):
+        raise NotImplementedError("Should be implemented in the subclass.")
 
 
 class LJPotential(AbstractPotential):
@@ -96,7 +99,16 @@ class EAMPotential(AbstractPotential):
             self.rho_range_factor = rho_range_factor
             self.resolution = resolution
             self.species = species
-
+    
+    def copy_final_to_start_params(self):
+        for functions in (self.pair_interactions, self.electron_densities, self.embedding_energies):
+            for f_id, f in functions:
+                for p_key, param in f.parameters:
+                    if param.final_value is not None:
+                        param.start_val = param.final_val
+                    else:
+                        raise ValueError(f"Final Value of {p_key} in {f_id} is None")
+        
     def write_xml_file(self, directory):
         """
         Internal function to convert to an xml element

@@ -100,7 +100,7 @@ class EAMPotential(AbstractPotential):
             self.resolution = resolution
             self.species = species
     
-    def copy_final_to_start_params(self):
+    def copy_final_to_initial_params(self):
         """
         Copies final values of function paramters to start values.
         This f.e. allows to continue global with local minimization.

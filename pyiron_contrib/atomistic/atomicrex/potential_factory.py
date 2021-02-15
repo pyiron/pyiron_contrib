@@ -101,14 +101,16 @@ class EAMPotential(AbstractPotential):
             self.species = species
     
     def copy_final_to_start_params(self):
+        """
+        Copies final values of function paramters to start values.
+        This f.e. allows to continue global with local minimization.
+        """        
         for functions in (self.pair_interactions, self.electron_densities, self.embedding_energies):
-            for f_id, f in functions:
-                for p_key, param in f.parameters:
-                    if param.final_value is not None:
-                        param.start_val = param.final_val
-                    else:
-                        raise ValueError(f"Final Value of {p_key} in {f_id} is None")
-        
+            for f in functions.values():
+                for param in f.parameters.values():
+                    param.copy_final_to_start_value()
+
+
     def write_xml_file(self, directory):
         """
         Internal function to convert to an xml element

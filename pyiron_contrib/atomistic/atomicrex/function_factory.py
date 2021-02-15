@@ -1,4 +1,5 @@
 import xml.etree.ElementTree as ET
+import copy
 
 from pyiron_base import PyironFactory, InputList
 
@@ -394,6 +395,21 @@ class FunctionParameter(InputList):
             root.set("tag", f"{self.tag}")
         return root
 
+    def copy_final_to_start_value(self):
+        """
+        Copies the final value to start_val.
+
+        Raises:
+            ValueError: Raises if fitting of the parameter is enabled,
+                        but the final value is None. This should only be the case
+                        if the job aborted or was not run yet.
+        """        
+        if self.enabled:
+            if self.final_value is None:
+                raise ValueError(f"Fitting is enabled for {self.param}, but final value is None.")
+            else:
+                self.start_val = copy.copy(self.final_value)
+            
 
 class FunctionParameterList(InputList):
     def __init__(self):

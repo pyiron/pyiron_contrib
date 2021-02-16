@@ -1,8 +1,9 @@
 import posixpath
 import xml.etree.ElementTree as ET
 
-from pyiron_base import PyironFactory, InputList
+import pandas as pd
 
+from pyiron_base import PyironFactory, InputList
 from pyiron_contrib.atomistic.atomicrex.function_factory import FunctionFactory
 from pyiron_contrib.atomistic.atomicrex.utility_functions import write_pretty_xml
 
@@ -33,6 +34,9 @@ class AbstractPotential(InputList):
         super().__init__(init, table_name=table_name)
     
     def copy_final_to_initial_params(self):
+        raise NotImplementedError("Should be implemented in the subclass.")
+
+    def to_lammps_pd_df(self):
         raise NotImplementedError("Should be implemented in the subclass.")
 
 
@@ -109,6 +113,13 @@ class EAMPotential(AbstractPotential):
             for f in functions.values():
                 for param in f.parameters.values():
                     param.copy_final_to_start_value()
+
+    def potential_to_lammps_pd_df(self):
+        potential = pd.DataFrame({
+            "Name": [self.identifier],
+            "Filename":  "O",
+        })
+
 
 
     def write_xml_file(self, directory):
@@ -197,11 +208,11 @@ class EAMPotential(AbstractPotential):
 
         line = line.strip().split()
         value = float(line[1])
-        info = line[0].split(".")
+        info = line[0].split("].")
         identifier = info[1].split("[")[0]
         param = info[2]
         if param.startswith("node"):
-            x = float(param.split("[")[1].rstrip("]"))
+            x = float(param.split("[")[1])
             param = f"node_{x}"
         else:
             param = param.rstrip(":")

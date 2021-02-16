@@ -1,4 +1,5 @@
 import xml.etree.ElementTree as ET
+import copy
 
 from pyiron_base import PyironFactory, InputList
 
@@ -394,6 +395,21 @@ class FunctionParameter(InputList):
             root.set("tag", f"{self.tag}")
         return root
 
+    def copy_final_to_start_value(self):
+        """
+        Copies the final value to start_val.
+
+        Raises:
+            ValueError: Raises if fitting of the parameter is enabled,
+                        but the final value is None. This should only be the case
+                        if the job aborted or was not run yet.
+        """        
+        if self.enabled:
+            if self.final_value is None:
+                raise ValueError(f"Fitting is enabled for {self.param}, but final value is None.")
+            else:
+                self.start_val = copy.copy(self.final_value)
+            
 
 class FunctionParameterList(InputList):
     def __init__(self):
@@ -531,7 +547,8 @@ class NodeList(InputList):
             max_val (float, optional): Highly recommended for global optimization. Defaults to None.
         """        
         x = float(x)
-        self[f"node_{x}"] = Node(
+        key = f"node_{x}"
+        self[key] = Node(
             x=x,
             start_val=start_val,
             enabled=enabled,
@@ -539,9 +556,31 @@ class NodeList(InputList):
             min_val=min_val,
             max_val=max_val,
         )
+        return self[key]
 
     def _to_xml_element(self):
         nodes = ET.Element("nodes")
         for node in self.values():
             nodes.append(node._to_xml_element())
         return nodes
+
+    def create_from_arrays(self, x, y, min_vals=None, max_vals=None):
+        """
+        Convenience function to create nodes from lists or arrays of values.
+        Allows to easily start the fitting process with physically motivated values
+        or values taken from previous potentials.
+        Creates len(x) nodes at position x with starting values y.
+        All given arrays must have the same length.
+
+        Args:
+            x (list or array): x values of the nodes
+            y (list or array): corresponding y (starting) values
+            min_vals ([type], optional): Highly recommended for global optimization. Defaults to None.
+            max_vals ([type], optional): Highly recommended for global optimization. Defaults to None.
+        """
+        for i in range(len(x)):
+            node = self.add_node(x[i], y[i])
+            if min_vals is not None:
+                node.min_val = min_vals[i]
+            if max_vals is not None:
+                node.max_val = max_vals[i]

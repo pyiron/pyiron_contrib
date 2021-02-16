@@ -31,6 +31,9 @@ class AbstractPotential(InputList):
     """    
     def __init__(self, init=None, table_name="potential"):
         super().__init__(init, table_name=table_name)
+    
+    def copy_final_to_initial_params(self):
+        raise NotImplementedError("Should be implemented in the subclass.")
 
 
 class LJPotential(AbstractPotential):
@@ -96,6 +99,17 @@ class EAMPotential(AbstractPotential):
             self.rho_range_factor = rho_range_factor
             self.resolution = resolution
             self.species = species
+    
+    def copy_final_to_initial_params(self):
+        """
+        Copies final values of function paramters to start values.
+        This f.e. allows to continue global with local minimization.
+        """        
+        for functions in (self.pair_interactions, self.electron_densities, self.embedding_energies):
+            for f in functions.values():
+                for param in f.parameters.values():
+                    param.copy_final_to_start_value()
+
 
     def write_xml_file(self, directory):
         """

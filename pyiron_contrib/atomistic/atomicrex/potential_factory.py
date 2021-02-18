@@ -126,14 +126,6 @@ class EAMPotential(AbstractPotential):
                 for param in f.parameters.values():
                     param.copy_final_to_start_value()
 
-    def potential_to_lammps_pd_df(self):
-        potential = pd.DataFrame({
-            "Name": [self.identifier],
-            "Filename":  "O",
-        })
-
-
-
     def _potential_as_pd_df(self, job):
         """
         Makes the tabulated eam potential written by atomicrex usable

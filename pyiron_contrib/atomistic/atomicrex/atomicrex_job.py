@@ -172,6 +172,13 @@ class Atomicrex(PotentialFittingBase):
                     codename=self.__name__, path_binary_codes=s.resource_paths
                 )
 
+    def potential_as_pd_df(self):
+        """
+        Return the fitted potential as a pandas dataframe,
+        which can be used for lammps calculations.
+        """        
+        return self.potential._potential_as_pd_df(job=self)
+
 
 class Factories:
     """

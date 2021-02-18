@@ -35,6 +35,18 @@ class AbstractPotential(InputList):
     
     def copy_final_to_initial_params(self):
         raise NotImplementedError("Should be implemented in the subclass.")
+    
+    def _potential_as_pd_df(self, job):
+        """
+        Internal function used to convert a fitted potential in a pandas datafram
+        that can be used with lammps calculations.
+        Since the formatting is different for every type of potential
+        this has to be implemented in the child classes
+
+        Args:
+            job (pyiron_job): Takes the fit job as argument, to obtain f.e. the working directory.
+        """ 
+        raise NotImplementedError("Should be implemented in the subclass")
 
     def to_lammps_pd_df(self):
         raise NotImplementedError("Should be implemented in the subclass.")
@@ -114,13 +126,30 @@ class EAMPotential(AbstractPotential):
                 for param in f.parameters.values():
                     param.copy_final_to_start_value()
 
-    def potential_to_lammps_pd_df(self):
-        potential = pd.DataFrame({
-            "Name": [self.identifier],
-            "Filename":  "O",
-        })
+    def _potential_as_pd_df(self, job):
+        """
+        Makes the tabulated eam potential written by atomicrex usable
+        for pyiron lammps jobs.
+        """
+        if self.export_file is None:
+            raise ValueError("export_file must be set to use the potential with lammps")
 
+        species = [el for el in job.input.atom_types.keys()]
+        species_str = ""
+        for s in species:
+            species_str += f"{s} "
 
+        pot = pd.DataFrame({
+            "Name": f"{self.identifier}",
+            "Filename": [[f"{job.working_directory}/{self.export_file}"]],
+            'Model': ['Custom'],
+            "Species": [species],
+            "Config": [[
+                "pair_style eam/fs\n",
+                f"pair_coeff * * {job.working_directory}/{self.export_file} {species_str}\n",
+                ]]
+        })    
+        return pot
 
     def write_xml_file(self, directory):
         """

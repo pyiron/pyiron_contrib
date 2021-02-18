@@ -147,7 +147,7 @@ class EAMPotential(AbstractPotential):
                 f"pair_coeff * * {job.working_directory}/{self.export_file} {species_str}\n",
                 ]]
         })    
-
+        return pot
 
     def write_xml_file(self, directory):
         """

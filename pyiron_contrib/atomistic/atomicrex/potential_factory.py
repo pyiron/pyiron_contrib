@@ -48,6 +48,9 @@ class AbstractPotential(InputList):
         """ 
         raise NotImplementedError("Should be implemented in the subclass")
 
+    def to_lammps_pd_df(self):
+        raise NotImplementedError("Should be implemented in the subclass.")
+
 
 class LJPotential(AbstractPotential):
     """
@@ -122,6 +125,13 @@ class EAMPotential(AbstractPotential):
             for f in functions.values():
                 for param in f.parameters.values():
                     param.copy_final_to_start_value()
+
+    def potential_to_lammps_pd_df(self):
+        potential = pd.DataFrame({
+            "Name": [self.identifier],
+            "Filename":  "O",
+        })
+
 
 
     def _potential_as_pd_df(self, job):
@@ -235,11 +245,11 @@ class EAMPotential(AbstractPotential):
 
         line = line.strip().split()
         value = float(line[1])
-        info = line[0].split(".")
+        info = line[0].split("].")
         identifier = info[1].split("[")[0]
         param = info[2]
         if param.startswith("node"):
-            x = float(param.split("[")[1].rstrip("]"))
+            x = float(param.split("[")[1])
             param = f"node_{x}"
         else:
             param = param.rstrip(":")

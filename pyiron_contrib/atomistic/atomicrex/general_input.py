@@ -15,18 +15,37 @@ class GeneralARInput(InputList):
     """
     Class to store general input of an atomicrex job,
     f.e. the fit algorithm.
-    """    
+    """  
     def __init__(self, table_name="general_input"):
         super().__init__(table_name="general_input")
         self.name = "Atomicrex Job"
         self.verbosity = "medium"
         self.real_precision = 16
         self.validate_potentials = False
-        self.atom_types = {}
+        self.atom_types = {}      
         self.fit_algorithm = AR_LBFGS(conv_threshold=1e-10, max_iter=50, gradient_epsilon=1e-8)
         self.output_interval = 100
         self.enable_fitting = True
 
+    @property
+    def atom_types(self):
+        """
+        Dictionary used to specify elements in the fit job.
+        Entries should use the element as key and None or a (mass, index) tuple as value.
+        Examples:
+        {"Cu", None}
+        {"Cu", (63.546, 29)}
+        If value is None the mass and index are taken from the ase package.
+
+        Returns:
+            [dict]: Dict of elements.
+        """        
+        return self._atom_types
+    
+    @atom_types.setter
+    def atom_types(self, atom_types):
+        self._atom_types = atom_types
+        
     def _write_xml_file(self, directory):
         """Internal function.
         Write the main input xml file in a directory.   

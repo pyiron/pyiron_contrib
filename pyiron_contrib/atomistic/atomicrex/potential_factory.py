@@ -9,7 +9,7 @@ from pyiron_contrib.atomistic.atomicrex.utility_functions import write_pretty_xm
 
 class ARPotFactory(PyironFactory):
     """
-    Factory class providing convenient acces to fittable potentials types.
+    Factory class providing convenient acces to fittable potential types.
     TODO: add other potential types supported by atomicrex.
     """
     @staticmethod

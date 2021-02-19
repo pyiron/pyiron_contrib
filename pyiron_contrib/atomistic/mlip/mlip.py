@@ -81,7 +81,10 @@ class Mlip(GenericJob):
                                   'time_step_delta': time_step_delta}
 
     def write_input(self):
-        restart_file_lst = [os.path.basename(f) for f in self._restart_file_list] + list(self._restart_file_dict.values())
+        restart_file_lst = [
+                os.path.basename(f)
+                for f in self._restart_file_list
+            ] + list(self._restart_file_dict.values())
         if 'testing.cfg' not in restart_file_lst:
             species_count = self._write_test_set(file_name='testing.cfg', cwd=self.working_directory)
         elif self.input['filepath'] != 'auto':
@@ -91,6 +94,8 @@ class Mlip(GenericJob):
         if 'training.cfg' not in restart_file_lst:
             self._write_training_set(file_name='training.cfg', cwd=self.working_directory)
         self._copy_potential(species_count=species_count, file_name='start.mtp', cwd=self.working_directory)
+        if self.version != '1.0.0':
+            self._command_line.activate_postprocessing()
         self._command_line[0] = self._command_line[0].replace('energy_auto', str(self.input['energy-weight']))
         self._command_line[0] = self._command_line[0].replace('force_auto', str(self.input['force-weight']))
         self._command_line[0] = self._command_line[0].replace('stress_auto', str(self.input['stress-weight']))
@@ -143,11 +148,18 @@ class Mlip(GenericJob):
         super(Mlip, self).from_hdf(hdf=hdf, group_name=group_name)
         self.input.from_hdf(self._hdf5)
         with self._hdf5.open('input') as hdf_input:
-            for job_id, start, end, delta in zip(hdf_input["job_id_list"],
-                                                 hdf_input["time_step_start_lst"],
-                                                 hdf_input["time_step_end_lst"],
-                                                 hdf_input["time_step_delta_lst"]):
-                self.add_job_to_fitting(job_id=job_id, time_step_start=start, time_step_end=end, time_step_delta=delta)
+            for job_id, start, end, delta in zip(
+                    hdf_input["job_id_list"],
+                    hdf_input["time_step_start_lst"],
+                    hdf_input["time_step_end_lst"],
+                    hdf_input["time_step_delta_lst"]
+            ):
+                self.add_job_to_fitting(
+                    job_id=job_id,
+                    time_step_start=start,
+                    time_step_end=end,
+                    time_step_delta=delta
+                )
 
     def get_suggested_number_of_configuration(self, species_count=None, multiplication_factor=2.0):
         if self.input['filepath'] == 'auto':
@@ -375,6 +387,7 @@ max_dist 5.0
 '''
         self.load_string(file_content)
 
+
 class CommandLine(GenericParameters):
     def __init__(self, input_file_name=None, **qwargs):
         super(CommandLine, self).__init__(input_file_name=input_file_name,
@@ -386,10 +399,17 @@ class CommandLine(GenericParameters):
         if file_content is None:
             file_content = '''\
 $MLP_COMMAND_PARALLEL train --energy-weight=energy_auto --force-weight=force_auto --stress-weight=stress_auto --max-iter=iteration_auto start.mtp training.cfg > training.log
-# $MLP_COMMAND_SERIAL calc-grade Trained.mtp_ training.cfg testing.cfg grades.cfg --mvs-filename=state.mvs > grading.log
-# $MLP_COMMAND_SERIAL select-add Trained.mtp_ training.cfg testing.cfg diff.cfg > select.log
-# cp training.cfg training_new.cfg 
-# cat diff.cfg >> training_new.cfg
+'''
+        self.load_string(file_content)
+
+    def activate_postprocessing(self, file_content=None):
+        if file_content is None:
+            file_content = '''\
+$MLP_COMMAND_PARALLEL train --energy-weight=energy_auto --force-weight=force_auto --stress-weight=stress_auto --max-iter=iteration_auto start.mtp training.cfg > training.log
+$MLP_COMMAND_SERIAL calc-grade Trained.mtp_ training.cfg testing.cfg grades.cfg --mvs-filename=state.mvs > grading.log
+$MLP_COMMAND_SERIAL select-add Trained.mtp_ training.cfg testing.cfg diff.cfg > select.log
+cp training.cfg training_new.cfg 
+cat diff.cfg >> training_new.cfg
 '''
         self.load_string(file_content)
 
@@ -405,8 +425,15 @@ def write_cfg(file_name, indices_lst, position_lst, cell_lst, forces_lst=None, e
     if energy_lst is None or len(energy_lst) == 0:
         energy_lst = [None] * len(position_lst)
     cfg_lst = []
-    for indices, position, forces, cell, energy, stress, track_str in zip(indices_lst, position_lst, forces_lst,
-                                                                          cell_lst, energy_lst, stress_lst, track_lst):
+    for indices, position, forces, cell, energy, stress, track_str in zip(
+            indices_lst,
+            position_lst,
+            forces_lst,
+            cell_lst,
+            energy_lst,
+            stress_lst,
+            track_lst
+    ):
         cfg_object = Cfg()
         cfg_object.pos = position
         cfg_object.lat = cell
@@ -435,9 +462,11 @@ def read_cgfs(file_name):
         if cgf.forces is not None:
             forces.append(cgf.forces)
         if cgf.stresses is not None:
-            stress.append([[cgf.stresses[0], cgf.stresses[5], cgf.stresses[4]],
-                           [cgf.stresses[5], cgf.stresses[1], cgf.stresses[3]],
-                           [cgf.stresses[4], cgf.stresses[3], cgf.stresses[2]]])
+            stress.append([
+                [cgf.stresses[0], cgf.stresses[5], cgf.stresses[4]],
+                [cgf.stresses[5], cgf.stresses[1], cgf.stresses[3]],
+                [cgf.stresses[4], cgf.stresses[3], cgf.stresses[2]]
+            ])
         if cgf.grade is not None:
             grades.append(cgf.grade)
         if cgf.desc is not None:

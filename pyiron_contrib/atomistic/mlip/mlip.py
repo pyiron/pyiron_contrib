@@ -102,11 +102,20 @@ class Mlip(GenericJob):
 
     def collect_output(self):
         file_name = os.path.join(self.working_directory, 'diff.cfg')
-        _, _, _, _, _, _, _, job_id_diff_lst, timestep_diff_lst = read_cgfs(file_name)
+        if os.path.exists(file_name):
+            _, _, _, _, _, _, _, job_id_diff_lst, timestep_diff_lst = read_cgfs(file_name)
+        else:
+            job_id_diff_lst, timestep_diff_lst = [], []
         file_name = os.path.join(self.working_directory, 'selected.cfg')
-        _, _, _, _, _, _, _, job_id_new_training_lst, timestep_new_training_lst = read_cgfs(file_name)
+        if os.path.exists(file_name):
+            _, _, _, _, _, _, _, job_id_new_training_lst, timestep_new_training_lst = read_cgfs(file_name)
+        else:
+            job_id_new_training_lst, timestep_new_training_lst = [], []
         file_name = os.path.join(self.working_directory, 'grades.cfg')
-        _, _, _, _, _, _, grades_lst, job_id_grades_lst, timestep_grades_lst = read_cgfs(file_name)
+        if os.path.exists(file_name):
+            _, _, _, _, _, _, grades_lst, job_id_grades_lst, timestep_grades_lst = read_cgfs(file_name)
+        else:
+            grades_lst, job_id_grades_lst, timestep_grades_lst = [], [], []
         with self.project_hdf5.open('output') as hdf5_output:
             hdf5_output['grades'] = grades_lst
             hdf5_output['job_id'] = job_id_grades_lst
@@ -388,10 +397,10 @@ class CommandLine(GenericParameters):
         if file_content is None:
             file_content = '''\
 $MLP_COMMAND_PARALLEL train --energy-weight=energy_auto --force-weight=force_auto --stress-weight=stress_auto --max-iter=iteration_auto start.mtp training.cfg > training.log
-$MLP_COMMAND_SERIAL calc-grade Trained.mtp_ training.cfg testing.cfg grades.cfg --mvs-filename=state.mvs > grading.log
-$MLP_COMMAND_SERIAL select-add Trained.mtp_ training.cfg testing.cfg diff.cfg > select.log
-cp training.cfg training_new.cfg 
-cat diff.cfg >> training_new.cfg
+# $MLP_COMMAND_SERIAL calc-grade Trained.mtp_ training.cfg testing.cfg grades.cfg --mvs-filename=state.mvs > grading.log
+# $MLP_COMMAND_SERIAL select-add Trained.mtp_ training.cfg testing.cfg diff.cfg > select.log
+# cp training.cfg training_new.cfg 
+# cat diff.cfg >> training_new.cfg
 '''
         self.load_string(file_content)
 

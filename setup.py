@@ -47,7 +47,7 @@ setup(
             'mshr==2019.1.0',
         ],
         'image': ['scikit-image==0.18.1'],
-    }
+    },
     cmdclass=versioneer.get_cmdclass(),
     
 )

@@ -52,6 +52,7 @@ class Atomicrex(PotentialFittingBase):
         self.input.to_hdf(hdf=self.project_hdf5)
         self.potential.to_hdf(hdf=self.project_hdf5)
         self.structures.to_hdf(hdf=self.project_hdf5)
+        self.output.to_hdf(hdf=self.project_hdf5)
 
     def from_hdf(self, hdf=None, group_name=None):
         """Internal function to reload the job object from hdf5
@@ -60,6 +61,7 @@ class Atomicrex(PotentialFittingBase):
         self.input.from_hdf(hdf=self.project_hdf5)
         self.potential = self.project_hdf5["potential"].to_object()
         self.structures.from_hdf(hdf=self.project_hdf5)
+        self.output.from_hdf(hdf=self.project_hdf5)
 
     @property
     def publication(self):
@@ -102,7 +104,6 @@ class Atomicrex(PotentialFittingBase):
                 if l.startswith("ERROR"):
                     self.status.aborted=True
                     self.output.error = l
-                    return
 
                 elif not finished_triggered and l.startswith("Iterations"):
                         l = l.split()
@@ -133,7 +134,7 @@ class Atomicrex(PotentialFittingBase):
                         # Collecting structure information finished, hand over structures class
                         self.structures._parse_final_properties(final_property_lines)
                         structures_triggered = False
-
+        self.to_hdf()
 
     def convergence_check(self):
         """Internal function, TODO

@@ -16,8 +16,8 @@ class GeneralARInput(InputList):
     Class to store general input of an atomicrex job,
     f.e. the fit algorithm.
     """  
-    def __init__(self, table_name="general_input"):
-        super().__init__(table_name="general_input")
+    def __init__(self, table_name="general_input", *args, **kwargs):
+        super().__init__(table_name="general_input", *args, **kwargs)
         self.name = "Atomicrex Job"
         self.verbosity = "medium"
         self.real_precision = 16
@@ -97,11 +97,6 @@ class GeneralARInput(InputList):
 
         file_name = posixpath.join(directory, "main.xml")
         write_pretty_xml(job, file_name)
-
-    def to_hdf(self, hdf=None, group_name=None):
-        super().to_hdf(hdf=hdf, group_name=group_name)
-
-
 
 
 class AlgorithmFactory(PyironFactory):

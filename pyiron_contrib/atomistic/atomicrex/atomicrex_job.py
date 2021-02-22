@@ -83,31 +83,56 @@ class Atomicrex(PotentialFittingBase):
         """Internal function that parses the output of an atomicrex job
 
         Args:
-            cwd ([string], optional): Working directory. Defaults to None.
+            cwd (str, optional): Working directory. Defaults to None.
         """        
         #self.input.from_hdf(self._hdf5)
         if cwd is None:
             cwd = self.working_directory
-
         filepath = f"{cwd}/error.out"
-        with open(filepath) as f:
-            lines = f.readlines()
-        l_index_params = None
-        l_index_complete = None
-        for i, line in enumerate(lines):
-            if line.startswith("ERROR"):
-                self.status.aborted=True
-                self.output.error = line
-                return
-            if line.startswith("Potential parameters"):
-                l_index_params = i
-            if line.startswith("Fitting process complete."):
-                l_index_complete = i
-                struct_lines = self.output._get_structure_lines(l_index_complete, lines)
-                parameter_lines = self.output._get_parameter_lines(l_index_params, lines)
-                self.structures._parse_final_properties(struct_lines)
-                self.potential._parse_final_parameters(parameter_lines)
-                break
+        
+        finished_triggered = False
+        params_triggered = False
+        structures_triggered = False
+
+        with open(filepath, "r") as f:
+            final_parameter_lines = []
+            final_property_lines = []
+
+            for l in f:
+                if l.startswith("ERROR"):
+                    self.status.aborted=True
+                    self.output.error = l
+                    return
+
+                elif not finished_triggered and l.startswith("Iterations"):
+                        l = l.split()
+                        self.output.iterations = int(l[1])
+                        self.output.residual = float(l[3])
+                        finished_triggered = True
+                
+                elif finished_triggered and l.startswith("Potential parameters"):
+                    # Get the number of dofs
+                    n_fit_dofs = int(l.split("=")[1][:-3])
+                    params_triggered = True
+                
+                elif params_triggered:
+                    if not l.startswith("---"):
+                        final_parameter_lines.append(l)
+                    else:
+                        # Collecting lines with final parameters finished, hand over to the potential class
+                        self.potential._parse_final_parameters(final_parameter_lines)
+                        params_triggered = False
+                
+                elif finished_triggered and l.startswith("Computing"):
+                    structures_triggered = True
+                     
+                elif structures_triggered:
+                    if not l.startswith("---"):
+                        final_property_lines.append(l)
+                    else:
+                        # Collecting structure information finished, hand over structures class
+                        self.structures._parse_final_properties(final_property_lines)
+                        structures_triggered = False
 
 
     def convergence_check(self):
@@ -146,6 +171,13 @@ class Atomicrex(PotentialFittingBase):
                 self._executable = Executable(
                     codename=self.__name__, path_binary_codes=s.resource_paths
                 )
+
+    def potential_as_pd_df(self):
+        """
+        Return the fitted potential as a pandas dataframe,
+        which can be used for lammps calculations.
+        """        
+        return self.potential._potential_as_pd_df(job=self)
 
 
 class Factories:

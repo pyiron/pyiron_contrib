@@ -1,14 +1,15 @@
 import posixpath
 import xml.etree.ElementTree as ET
 
-from pyiron_base import PyironFactory, InputList
+import pandas as pd
 
+from pyiron_base import PyironFactory, InputList
 from pyiron_contrib.atomistic.atomicrex.function_factory import FunctionFactory
 from pyiron_contrib.atomistic.atomicrex.utility_functions import write_pretty_xml
 
 class ARPotFactory(PyironFactory):
     """
-    Factory class providing convenient acces to fittable potentials types.
+    Factory class providing convenient acces to fittable potential types.
     TODO: add other potential types supported by atomicrex.
     """
     @staticmethod
@@ -31,6 +32,24 @@ class AbstractPotential(InputList):
     """    
     def __init__(self, init=None, table_name="potential"):
         super().__init__(init, table_name=table_name)
+    
+    def copy_final_to_initial_params(self):
+        raise NotImplementedError("Should be implemented in the subclass.")
+    
+    def _potential_as_pd_df(self, job):
+        """
+        Internal function used to convert a fitted potential in a pandas datafram
+        that can be used with lammps calculations.
+        Since the formatting is different for every type of potential
+        this has to be implemented in the child classes
+
+        Args:
+            job (pyiron_job): Takes the fit job as argument, to obtain f.e. the working directory.
+        """ 
+        raise NotImplementedError("Should be implemented in the subclass")
+
+    def to_lammps_pd_df(self):
+        raise NotImplementedError("Should be implemented in the subclass.")
 
 
 class LJPotential(AbstractPotential):
@@ -96,6 +115,41 @@ class EAMPotential(AbstractPotential):
             self.rho_range_factor = rho_range_factor
             self.resolution = resolution
             self.species = species
+    
+    def copy_final_to_initial_params(self):
+        """
+        Copies final values of function paramters to start values.
+        This f.e. allows to continue global with local minimization.
+        """        
+        for functions in (self.pair_interactions, self.electron_densities, self.embedding_energies):
+            for f in functions.values():
+                for param in f.parameters.values():
+                    param.copy_final_to_start_value()
+
+    def _potential_as_pd_df(self, job):
+        """
+        Makes the tabulated eam potential written by atomicrex usable
+        for pyiron lammps jobs.
+        """
+        if self.export_file is None:
+            raise ValueError("export_file must be set to use the potential with lammps")
+
+        species = [el for el in job.input.atom_types.keys()]
+        species_str = ""
+        for s in species:
+            species_str += f"{s} "
+
+        pot = pd.DataFrame({
+            "Name": f"{self.identifier}",
+            "Filename": [[f"{job.working_directory}/{self.export_file}"]],
+            'Model': ['Custom'],
+            "Species": [species],
+            "Config": [[
+                "pair_style eam/fs\n",
+                f"pair_coeff * * {job.working_directory}/{self.export_file} {species_str}\n",
+                ]]
+        })    
+        return pot
 
     def write_xml_file(self, directory):
         """
@@ -153,7 +207,6 @@ class EAMPotential(AbstractPotential):
             identifier, param, value = self._parse_parameter_line(l)
             if identifier in self.pair_interactions:
                 self.pair_interactions[identifier].parameters[param].final_value = value
-
             elif identifier in self.electron_densities:
                 self.electron_densities[identifier].parameters[param].final_value = value
             elif identifier in self.embedding_energies:
@@ -184,11 +237,11 @@ class EAMPotential(AbstractPotential):
 
         line = line.strip().split()
         value = float(line[1])
-        info = line[0].split(".")
+        info = line[0].split("].")
         identifier = info[1].split("[")[0]
         param = info[2]
         if param.startswith("node"):
-            x = float(param.split("[")[1].rstrip("]"))
+            x = float(param.split("[")[1])
             param = f"node_{x}"
         else:
             param = param.rstrip(":")

@@ -111,7 +111,8 @@ class ARFitProperty(InputList):
         #xml.set("relax", f"{self.relax}".lower())
         xml.set("relative-weight", f"{self.relative_weight}")
         if self.tolerance is not None:
-                xml.set("tolerance", f"{self.tolerance}")
+            xml.set("tolerance", f"{self.tolerance}")
+        
         if self._is_scalar():
             xml.set("target", f"{self.target_value}")
             if self.min_val is not None:
@@ -120,10 +121,12 @@ class ARFitProperty(InputList):
                 xml.set("min", f"{self.max_val}")
             xml.set("residual-style", f"{self.residual_style}")
         else:
-            if self.residual_style != "squared" and self.residual_style != "absolute-diff":
-                raise ValueError("Residual style for atomic-forces must be squared or absolute-diff")
+            if self.residual_style == "squared-relative":
+                raise ValueError("Squared-relative residual style is not implemented for forces in atomicrex")
             if self.min_val is not None or self.max_val is not None:
                 raise ValueError("Min and Max val can only be given for scalar properties")
+            else:
+                xml.set("residual-style", f"{self.residual_style}")
         return xml
 
     @staticmethod

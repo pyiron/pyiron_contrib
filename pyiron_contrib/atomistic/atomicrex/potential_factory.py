@@ -48,9 +48,6 @@ class AbstractPotential(InputList):
         """ 
         raise NotImplementedError("Should be implemented in the subclass")
 
-    def to_lammps_pd_df(self):
-        raise NotImplementedError("Should be implemented in the subclass.")
-
 
 class LJPotential(AbstractPotential):
     """

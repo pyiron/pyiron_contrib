@@ -10,7 +10,6 @@ from pyiron_contrib.atomistic.atomicrex.utility_functions import write_pretty_xm
 from pyiron_contrib.atomistic.atomicrex.potential_factory import ARPotFactory
 from pyiron_contrib.atomistic.atomicrex.function_factory import FunctionFactory
 
-
 class GeneralARInput(InputList):
     """
     Class to store general input of an atomicrex job,
@@ -22,29 +21,10 @@ class GeneralARInput(InputList):
         self.verbosity = "medium"
         self.real_precision = 16
         self.validate_potentials = False
-        self.atom_types = {}      
+        self.atom_types = AtomTypes()      
         self.fit_algorithm = AtomicrexAlgorithm(conv_threshold=1e-10, max_iter=50, gradient_epsilon=1e-8, name="BFGS")
         self.output_interval = 100
         self.enable_fitting = True
-
-    @property
-    def atom_types(self):
-        """
-        Dictionary used to specify elements in the fit job.
-        Entries should use the element as key and None or a (mass, index) tuple as value.
-        Examples:
-        {"Cu", None}
-        {"Cu", (63.546, 29)}
-        If value is None the mass and index are taken from the ase package.
-
-        Returns:
-            [dict]: Dict of elements.
-        """        
-        return self._atom_types
-    
-    @atom_types.setter
-    def atom_types(self, atom_types):
-        self._atom_types = atom_types
         
     def _write_xml_file(self, directory):
         """Internal function.
@@ -97,6 +77,21 @@ class GeneralARInput(InputList):
 
         file_name = posixpath.join(directory, "main.xml")
         write_pretty_xml(job, file_name)
+
+
+class AtomTypes(InputList):
+    """
+        InputList used to specify elements in the fit job.
+        Elements can be added using dictionary or attribute syntax.
+        Their value should None or a (mass, index) tuple as value.
+        If value is None the mass and index are taken from the ase package.
+        Examples:
+        job.input.atom_types.Cu = None
+        job.input.atom_types["Cu"] = None 
+        job.input.atom_types.Cu = (63.546, 29)
+    """
+    def __init__(self):
+        super().__init__(table_name="AtomTypes")
 
 
 class AlgorithmFactory(PyironFactory):

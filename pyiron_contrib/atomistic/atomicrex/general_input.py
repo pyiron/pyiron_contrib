@@ -155,8 +155,8 @@ class AtomicrexAlgorithm(InputList):
     Class to inherit from. If more algorithms will be implemented in atomicrex
     at some point they can be implemented similar to the AR_LBFGS class.
     """    
-    def __init__(self, conv_threshold, max_iter, gradient_epsilon, name):
-        super().__init__(table_name="fitting_algorithm")
+    def __init__(self, conv_threshold, max_iter, gradient_epsilon, name, *args. **kwargs):
+        super().__init__(table_name="fitting_algorithm", *args, **kwargs)
         self.conv_threshold = conv_threshold
         self.max_iter = max_iter
         self.gradient_epsilon = gradient_epsilon
@@ -210,8 +210,8 @@ class NloptAlgorithm(InputList):
     """
     Nlopt algorithms should inherit from this class.
     """    
-    def __init__(self, stopval, maxeval, maxtime, ftol_rel, ftol_abs, xtol_rel, name, seed):
-        super().__init__(table_name="fitting_algorithm")
+    def __init__(self, stopval, maxeval, maxtime, ftol_rel, ftol_abs, xtol_rel, name, seed, *args, **kwargs):
+        super().__init__(table_name="fitting_algorithm", *args, **kwargs)
         self.stopval = stopval
         self.maxeval = maxeval
         self.maxtime = maxtime

@@ -90,8 +90,8 @@ class AtomTypes(InputList):
         job.input.atom_types["Cu"] = None 
         job.input.atom_types.Cu = (63.546, 29)
     """
-    def __init__(self):
-        super().__init__(table_name="AtomTypes")
+    def __init__(self, *args, **kwargs):
+        super().__init__(table_name="AtomTypes", *args, **kwargs)
 
 
 class AlgorithmFactory(PyironFactory):

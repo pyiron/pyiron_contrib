@@ -23,7 +23,7 @@ class GeneralARInput(InputList):
         self.real_precision = 16
         self.validate_potentials = False
         self.atom_types = {}      
-        self.fit_algorithm = AR_LBFGS(conv_threshold=1e-10, max_iter=50, gradient_epsilon=1e-8)
+        self.fit_algorithm = AtomicrexAlgorithm(conv_threshold=1e-10, max_iter=50, gradient_epsilon=1e-8, name="BFGS")
         self.output_interval = 100
         self.enable_fitting = True
 
@@ -107,7 +107,7 @@ class AlgorithmFactory(PyironFactory):
 
     @staticmethod
     def ar_lbfgs(conv_threshold=1e-10, max_iter=50, gradient_epsilon=None):
-        return AR_LBFGS(conv_threshold=conv_threshold, max_iter=max_iter, gradient_epsilon=gradient_epsilon)
+        return AtomicrexAlgorithm(name="BFGS", conv_threshold=conv_threshold, max_iter=max_iter, gradient_epsilon=gradient_epsilon)
 
     @staticmethod
     def ar_spa(spa_iterations=20, seed=42):
@@ -115,39 +115,75 @@ class AlgorithmFactory(PyironFactory):
 
     @staticmethod
     def ld_lbfgs(stopval=1e-10, maxeval=50, maxtime=None, ftol_rel=None, ftol_abs=None, xtol_rel=None, seed=None):
-        return LD_LBFGS(stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed)
+        return NloptAlgorithm(name="LD_LBFGS", stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed)
 
     @staticmethod
     def ld_mma(stopval=1e-10, maxeval=50, maxtime=None, ftol_rel=None, ftol_abs=None, xtol_rel=None, seed=None):
-        return LD_MMA(stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed)
+        return NloptAlgorithm(name="LD_MMA", stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed)
+    
+    @staticmethod
+    def ld_ccsaq(stopval=1e-10, maxeval=50, maxtime=None, ftol_rel=None, ftol_abs=None, xtol_rel=None, seed=None):
+        return NloptAlgorithm(name="LD_CCSAQ", stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed)
+
+    @staticmethod
+    def ld_slsqp(stopval=1e-10, maxeval=50, maxtime=None, ftol_rel=None, ftol_abs=None, xtol_rel=None, seed=None):
+        return NloptAlgorithm(name="LD_SLSQP", stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed)
+    
+    @staticmethod
+    def ld_var1(stopval=1e-10, maxeval=50, maxtime=None, ftol_rel=None, ftol_abs=None, xtol_rel=None, seed=None):
+        return NloptAlgorithm(name="LD_VAR1", stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed)
+
+    @staticmethod
+    def ld_var2(stopval=1e-10, maxeval=50, maxtime=None, ftol_rel=None, ftol_abs=None, xtol_rel=None, seed=None):
+        return NloptAlgorithm(name="LD_VAR2", stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed)
+
+    @staticmethod
+    def ln_cobyla(stopval=1e-10, maxeval=50, maxtime=None, ftol_rel=None, ftol_abs=None, xtol_rel=None, seed=None):
+        return NloptAlgorithm(name="LN_COBYLA", stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed)
+
+    @staticmethod
+    def ln_bobyqa(stopval=1e-10, maxeval=50, maxtime=None, ftol_rel=None, ftol_abs=None, xtol_rel=None, seed=None):
+        return NloptAlgorithm(name="LN_BOBYQA", stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed)
+    
+    @staticmethod
+    def ln_newuoa(stopval=1e-10, maxeval=50, maxtime=None, ftol_rel=None, ftol_abs=None, xtol_rel=None, seed=None):
+        return NloptAlgorithm(name="LN_NEWUOA", stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed)
+    
+    @staticmethod
+    def ln_newuoa_bound(stopval=1e-10, maxeval=50, maxtime=None, ftol_rel=None, ftol_abs=None, xtol_rel=None, seed=None):
+        return NloptAlgorithm(name="LN_NEWUOA_BOUND", stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed)
+    
+    @staticmethod
+    def ln_praxis(stopval=1e-10, maxeval=50, maxtime=None, ftol_rel=None, ftol_abs=None, xtol_rel=None, seed=None):
+        return NloptAlgorithm(name="LN_PRAXIS", stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed)
 
     @staticmethod
     def ln_neldermead(stopval=1e-10, maxeval=50, maxtime=None, ftol_rel=None, ftol_abs=None, xtol_rel=None, seed=None):
-        return LN_NELDERMEAD(stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed)
+        return NloptAlgorithm(name="LN_NELDERMEAD", stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed)
 
     @staticmethod
     def ln_sbplx(stopval=1e-10, maxeval=50, maxtime=None, ftol_rel=None, ftol_abs=None, xtol_rel=None, seed=None):
-        return LN_SBPLX(stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed)
+        return NloptAlgorithm(name="LN_SBPLX", stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed)
 
     @staticmethod
     def gn_crs2_lm(stopval=1e-10, maxeval=50, maxtime=None, ftol_rel=None, ftol_abs=None, xtol_rel=None, seed=None):
-        return GN_CRS2_LM(stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed)
+        return NloptAlgorithm(name="GN_CRS2_LM", stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed)
 
     @staticmethod
     def gn_esch(stopval=1e-10, maxeval=50, maxtime=None, ftol_rel=None, ftol_abs=None, xtol_rel=None, seed=None):
-        return GN_ESCH(stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed)
+        return NloptAlgorithm(name="GN_ESCH", stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed)
 
     @staticmethod
     def gn_direct(stopval=1e-10, maxeval=50, maxtime=None, ftol_rel=None, ftol_abs=None, xtol_rel=None, seed=None):
-        return GN_DIRECT(stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed)
+        return NloptAlgorithm(name="GN_DIRECT", stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed)
 
     @staticmethod
     def gn_direct_l(stopval=1e-10, maxeval=50, maxtime=None, ftol_rel=None, ftol_abs=None, xtol_rel=None, seed=None):
-        return GN_DIRECT_L(stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed)
+        return NloptAlgorithm(name="GN_DIRECT_L", stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed)
 
     @staticmethod
     def gn_isres(stopval=1e-10, maxeval=50, maxtime=None, ftol_rel=None, ftol_abs=None, xtol_rel=None, seed=None):
-        return GN_ISRES(stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed)
+        return NloptAlgorithm(name="GN_ISRES", stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed)
 
 
 class AtomicrexAlgorithm(InputList):
@@ -155,8 +191,8 @@ class AtomicrexAlgorithm(InputList):
     Class to inherit from. If more algorithms will be implemented in atomicrex
     at some point they can be implemented similar to the AR_LBFGS class.
     """    
-    def __init__(self, conv_threshold, max_iter, gradient_epsilon, name):
-        super().__init__(table_name="fitting_algorithm")
+    def __init__(self, conv_threshold, max_iter, gradient_epsilon, name, *args, **kwargs):
+        super().__init__(table_name="fitting_algorithm", *args, **kwargs)
         self.conv_threshold = conv_threshold
         self.max_iter = max_iter
         self.gradient_epsilon = gradient_epsilon
@@ -172,14 +208,6 @@ class AtomicrexAlgorithm(InputList):
         if self.gradient_epsilon is not None:
             algo.set("gradient-epsilon", f"{self.gradient_epsilon}")
         return algo
-
-
-class AR_LBFGS(AtomicrexAlgorithm):
-    """
-    Use the atomicrex implementation of the LBFGS minimizer.
-    """    
-    def __init__(self, conv_threshold, max_iter, gradient_epsilon):
-        super().__init__(conv_threshold, max_iter, gradient_epsilon, name="BFGS")
 
 
 class SpaMinimizer:
@@ -210,10 +238,10 @@ class NloptAlgorithm(InputList):
     """
     Nlopt algorithms should inherit from this class.
     """    
-    def __init__(self, stopval, maxeval, maxtime, ftol_rel, ftol_abs, xtol_rel, name, seed):
-        super().__init__(table_name="fitting_algorithm")
+    def __init__(self, stopval, max_iter, maxtime, ftol_rel, ftol_abs, xtol_rel, name, seed, *args, **kwargs):
+        super().__init__(table_name="fitting_algorithm", *args, **kwargs)
         self.stopval = stopval
-        self.maxeval = maxeval
+        self.max_iter = max_iter
         self.maxtime = maxtime
         self.ftol_rel = ftol_rel
         self.ftol_abs = ftol_abs
@@ -230,8 +258,8 @@ class NloptAlgorithm(InputList):
         nlopt.set("algorithm", self.name)
         if self.stopval is not None:
             nlopt.set("stopval", f"{self.stopval}")
-        if self.maxeval is not None:
-            nlopt.set("maxeval", f"{self.maxeval}")
+        if self.max_iter is not None:
+            nlopt.set("maxeval", f"{self.max_iter}")
         if self.maxtime is not None:
             nlopt.set("maxtime", f"{self.maxtime}")
         if self.ftol_rel is not None:
@@ -242,38 +270,34 @@ class NloptAlgorithm(InputList):
             nlopt.set("xtol_rel", f"{self.xtol_rel}")
         return nlopt
 
-class LD_LBFGS(NloptAlgorithm):
-    def __init__(self, stopval, maxeval, maxtime, ftol_rel, ftol_abs, xtol_rel, seed):
-        super().__init__(stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed, name="LD_LBFGS")
 
-class LD_MMA(NloptAlgorithm):
-    def __init__(self, stopval, maxeval, maxtime, ftol_rel, ftol_abs, xtol_rel, seed):
-        super().__init__(stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed, name="LD_MMA")
+class NloptGlobalLocal(NloptAlgorithm):
+    """
+    Nlopt global optimizers that additionally need a local minimizer similar to the spa algorithm implemented in atomicrex
+    """    
+    def __init__(self, stopval, max_iter, maxtime, ftol_rel, ftol_abs, xtol_rel, name, seed, *args, **kwargs):
+        super().__init__(
+            stopval=stopval,
+            max_iter=max_iter,
+            maxtime=maxtime,
+            ftol_rel=ftol_rel,
+            ftol_abs=ftol_abs,
+            xtol_rel=xtol_rel,
+            name=name,
+            seed=seed,
+            *args,
+            **kwargs)
+        self.local_minimizer = None
 
-class LN_NELDERMEAD(NloptAlgorithm):
-    def __init__(self, stopval, maxeval, maxtime, ftol_rel, ftol_abs, xtol_rel, seed):
-        super().__init__(stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed, name="LN_NELDERMEAD")
-
-class LN_SBPLX(NloptAlgorithm):
-    def __init__(self, stopval, maxeval, maxtime, ftol_rel, ftol_abs, xtol_rel, seed):
-        super().__init__(stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed, name="LN_SBPLX")
-
-class GN_CRS2_LM(NloptAlgorithm):
-    def __init__(self, stopval, maxeval, maxtime, ftol_rel, ftol_abs, xtol_rel, seed):
-        super().__init__(stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed, name="GN_CRS2_LM")
-
-class GN_ESCH(NloptAlgorithm):
-    def __init__(self, stopval, maxeval, maxtime, ftol_rel, ftol_abs, xtol_rel, seed):
-        super().__init__(stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed, name="GN_ESCH")
-
-class GN_DIRECT(NloptAlgorithm):
-    def __init__(self, stopval, maxeval, maxtime, ftol_rel, ftol_abs, xtol_rel, seed):
-        super().__init__(stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed, name="GN_DIRECT")
-
-class GN_DIRECT_L(NloptAlgorithm):
-    def __init__(self, stopval, maxeval, maxtime, ftol_rel, ftol_abs, xtol_rel, seed):
-        super().__init__(stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed, name="GN_DIRECT_L")
-
-class GN_ISRES(NloptAlgorithm):
-    def __init__(self, stopval, maxeval, maxtime, ftol_rel, ftol_abs, xtol_rel, seed):
-        super().__init__(stopval=stopval, maxeval=maxeval, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed, name="GN_ISRES")
+    def _to_xml_element(self):
+        """Internal Function.
+        Converts the algorithm to a xml element
+        and returns it
+        """ 
+        if self.local_minimizer is None:
+            raise ValueError("This global minimzer needs an additional local minimzer")
+        nlopt = super()._to_xml_element()
+        local = self.local_minimizer._to_xml_element()
+        nlopt.append(local)
+        return nlopt
+        

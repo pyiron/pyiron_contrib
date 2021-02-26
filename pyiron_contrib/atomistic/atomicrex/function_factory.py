@@ -36,8 +36,8 @@ class FunctionFactory(PyironFactory):
         return ExpGaussian(identifier, cutoff, stddev, alpha, exponent, species=species, is_screening_function=is_screening_function)
 
     @staticmethod
-    def morse_A(identifier, D0, r0, beta, species=["*","*"]):
-        return MorseA(identifier, D0, r0, beta, species=species)
+    def morse_A(identifier, D0, r0, alpha, species=["*","*"]):
+        return MorseA(identifier, D0, r0, alpha, species=species)
 
     @staticmethod
     def morse_B(identifier, D0, r0, beta, S, delta, species=["*","*"]):

@@ -76,7 +76,13 @@ class SpecialFunction(InputList):
         for param in self.parameters.values():
             p = ET.SubElement(root, f"{param.param}")
             p.text = f"{param.start_val}"
-        root.append(self.parameters.fit_dofs_to_xml_element())
+        
+        # This if condition is to prevent an error with the expA screening function
+        # It is a bit hacky and if another function with only 1 parameter is added
+        # it probably has to be rewritten 
+        if len(self.parameters.values()) > 1:
+            root.append(self.parameters.fit_dofs_to_xml_element())
+
         if not self.is_screening_function:
             if self.screening is not None:
                 root.append(self.screening._to_xml_element())
@@ -354,7 +360,7 @@ class UserFunction(InputList):
             p = ET.SubElement(root, "param")
             p.set("name", f"{param.param}")
             p.text = f"{param.start_val}"
-
+        
         root.append(self.parameters.fit_dofs_to_xml_element())
 
         if not self.is_screening_function:
@@ -446,13 +452,12 @@ class FunctionParameterList(InputList):
     def fit_dofs_to_xml_element(self):
         """Internal function
         Returns fit dofs as atomicrex xml element.
-        """        
+        """     
         fit_dof = ET.Element("fit-dof")
         for param in self.values():
             if param.fitable:
                 fit_dof.append(param._to_xml_element())
         return fit_dof
-
 
 class PolyCoeff(FunctionParameter):
     """

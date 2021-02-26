@@ -203,7 +203,7 @@ class ExpGaussian(SpecialFunction):
 
 
 class MorseA(SpecialFunction):
-    def __init__(self, identifier, D0, r0, beta, species):
+    def __init__(self, identifier, D0, r0, alpha, species):
         super().__init__(identifier, species=species, is_screening_function=False)
         self.parameters.add_parameter(
             "D0",
@@ -216,8 +216,8 @@ class MorseA(SpecialFunction):
             enabled=True,
         )
         self.parameters.add_parameter(
-            "beta",
-            start_val=beta,
+            "alpha",
+            start_val=alpha,
             enabled=True,
         )
     def _to_xml_element(self):

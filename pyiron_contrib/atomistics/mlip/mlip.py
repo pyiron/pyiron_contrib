@@ -65,6 +65,21 @@ class Mlip(GenericJob):
         if os.path.exists(pot) and os.path.exists(states):
             return [pot, states]
 
+    def potential_dataframe(self, elements):
+        """
+        :class:`pandas.DataFrame`: potential dataframe for lammps jobs
+        """
+        if self.status.finished:
+            return pd.DataFrame({
+                        'Name': [''.join(elements)],
+                        'Filename': [[self.potential_files[0]]],
+                        'Model': ['Custom'],
+                        'Species': [elements],
+                        'Config': [['pair_style mlip mlip.ini\n',
+                                    'pair_coeff * *\n'
+                        ]]
+            })
+
     def set_input_to_read_only(self):
         """
         This function enforces read-only mode for the input classes, but it has to be implement in the individual

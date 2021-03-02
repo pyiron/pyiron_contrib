@@ -29,10 +29,10 @@ Fe_bcc  ...
 """
 
 import pandas as pd
-
-from pyiron_atomistics import pyiron_to_ase
+from pyiron_atomistics import pyiron_to_ase, ase_to_pyiron
 from pyiron_atomistics.atomistics.structure.atoms import Atoms
 from pyiron_base import GenericJob
+
 
 class TrainingContainer(GenericJob):
     """
@@ -97,6 +97,26 @@ class TrainingContainer(GenericJob):
             :class:`pandas.DataFrame`: collected structures
         """
         return self._table
+
+    def get_data_list(self, filter_function=None):
+        """
+        Returns the data as lists of pyiron structures, energies, forces, and the number of atoms
+
+        Args:
+            filter_function (function): Function applied to the dataset (which is a pandas DataFrame) to filter it
+
+        Returns:
+            tuple: list of structures, energies, forces, and the number of atoms
+        """
+        if filter_function is None:
+            data_table = self._table
+        else:
+            data_table = filter_function(self._table)
+        structure_list = data_table.atoms.apply(ase_to_pyiron).to_list()
+        energy_list = data_table.energy.to_list()
+        force_list = data_table.forces.to_list()
+        num_atoms_list = data_table.number_of_atoms.to_list()
+        return structure_list, energy_list, force_list, num_atoms_list
 
     def write_input(self):
         pass

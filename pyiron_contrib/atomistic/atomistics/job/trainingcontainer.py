@@ -98,7 +98,7 @@ class TrainingContainer(GenericJob):
         """
         return self._table
 
-    def get_data_list(self, filter_function=None):
+    def to_list(self, filter_function=None):
         """
         Returns the data as lists of pyiron structures, energies, forces, and the number of atoms
 

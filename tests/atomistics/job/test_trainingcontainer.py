@@ -34,13 +34,13 @@ class TestTrainingContainer(unittest.TestCase):
         energy = 0.01
         self.container.include_structure(basis_2, energy=energy, forces=force, name="repeated")
         self.container.run()
-        structure_list, energy_list, forces_list, num_atoms = self.container.get_data_list()
+        structure_list, energy_list, forces_list, num_atoms = self.container.to_list()
         self.assertEqual(len(structure_list), 2)
         self.assertEqual(structure_list[0], basis_1)
         self.assertEqual(structure_list[1], basis_2)
         self.assertEqual(num_atoms, [1, 2])
         self.assertEqual(energy_list, [0.0, 0.01])
-        structure_list, energy_list, _, _ = self.container.get_data_list(filter_function=
+        structure_list, energy_list, _, _ = self.container.to_list(filter_function=
                                                                          lambda df: df[df.number_of_atoms > 1])
         self.assertEqual(len(structure_list), 1)
         self.assertEqual(energy_list[0], 0.01)

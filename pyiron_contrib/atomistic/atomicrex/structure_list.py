@@ -285,19 +285,21 @@ class ARStructureList(object):
                 else:
                     force_vec_triggered = False
                     s.fit_properties["atomic-forces"].final_value = final_forces
-
-            elif l.startswith("Structure"):
-                s_id = l.split("'")[1]
-                s = self._structure_dict[s_id]
             
-            else:
-                if not l.startswith("atomic-forces avg/max:"):
-                    prop, f_val = ARFitProperty._parse_final_value(line=l)
-                    if prop in s.fit_properties:
-                        s.fit_properties[prop].final_value = f_val
+            # This has to be if and not else because it has to run in the same iteration. Empty lines get skipped.
+            if not force_vec_triggered and l:
+                if l.startswith("Structure"):
+                    s_id = l.split("'")[1]
+                    s = self._structure_dict[s_id]
+            
                 else:
-                    force_vec_triggered = True
-                    final_forces = np.zeros((len(s.structure), 3))
+                    if not l.startswith("atomic-forces avg/max:"):
+                        prop, f_val = ARFitProperty._parse_final_value(line=l)
+                        if prop in s.fit_properties:
+                            s.fit_properties[prop].final_value = f_val
+                    else:
+                        force_vec_triggered = True
+                        final_forces = np.empty((len(s.structure), 3))
 
 
 

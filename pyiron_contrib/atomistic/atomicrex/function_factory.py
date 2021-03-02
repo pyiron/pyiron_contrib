@@ -359,7 +359,7 @@ class UserFunction(InputList):
         for param in self.parameters.values():
             p = ET.SubElement(root, "param")
             p.set("name", f"{param.param}")
-            p.text = f"{param.start_val}"
+            p.text = f"{param.start_val:.6g}"
         
         root.append(self.parameters.fit_dofs_to_xml_element())
 
@@ -394,9 +394,9 @@ class FunctionParameter(InputList):
         root.set("enabled", f"{self.enabled}".lower())
         root.set("reset", f"{self.reset}".lower())
         if self.min_val is not None:
-            root.set("min", f"{self.min_val}")
+            root.set("min", f"{self.min_val:.6g}")
         if self.max_val is not None:
-            root.set("max", f"{self.max_val}")
+            root.set("max", f"{self.max_val:.6g}")
         if self.tag is not None:
             root.set("tag", f"{self.tag}")
         return root
@@ -530,8 +530,8 @@ class Node(FunctionParameter):
 
     def _to_xml_element(self):
         node = super()._to_xml_element()
-        node.set("x", f"{self.x}")
-        node.set("y", f"{self.start_val}")
+        node.set("x", f"{self.x:.6g}")
+        node.set("y", f"{self.start_val:.6g}")
         return node
 
 
@@ -552,6 +552,8 @@ class NodeList(InputList):
             max_val (float, optional): Highly recommended for global optimization. Defaults to None.
         """        
         x = float(x)
+        # atomicrex rounds output to 6 digits, so this is done here to prevent issues when reading the output.
+        x = round(x, 6)
         key = f"node_{x}"
         self[key] = Node(
             x=x,

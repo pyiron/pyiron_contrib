@@ -36,6 +36,7 @@ JOB_CLASS_DICT['FenicsLinearElastic'] = 'pyiron_contrib.continuum.fenics.job.ela
 JOB_CLASS_DICT['TrainingContainer'] = 'pyiron_contrib.atomistic.atomistics.job.trainingcontainer'
 JOB_CLASS_DICT['RandomDisMaster'] = 'pyiron_contrib.atomistic.mlip.masters'
 JOB_CLASS_DICT['RandomMDMaster'] = 'pyiron_contrib.atomistic.mlip.masters'
+JOB_CLASS_DICT['RunnerFit'] = 'pyiron_contrib.atomistic.runner.job'
 JOB_CLASS_DICT['MlipSelect'] = 'pyiron_contrib.atomistic.mlip.mlipselect'
 JOB_CLASS_DICT['Mlip'] = 'pyiron_contrib.atomistic.mlip.mlip'
 JOB_CLASS_DICT['LammpsMlip'] = 'pyiron_contrib.atomistic.mlip.lammps'

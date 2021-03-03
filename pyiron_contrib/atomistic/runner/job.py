@@ -89,7 +89,7 @@ class RunnerFit(GenericJob):
                     p = atoms.positions * AngstromToBohr
                     ff = forces * ElectronVoltToHartree / AngstromToBohr
                     for i in range(len(atoms)):
-                        f.write(f"atom {p[i, 0]:13.08f} {p[i, 1]:13.08f} {p[i, 1]:13.08f}")
+                        f.write(f"atom {p[i, 0]:13.08f} {p[i, 1]:13.08f} {p[i, 2]:13.08f}")
                         f.write(f" {atoms.elements[i].Abbreviation} 0.0 0.0")
                         f.write(f" {ff[i, 0]:13.08f} {ff[i, 1]:13.08f} {ff[i, 2]:13.08f}\n")
                     f.write(f"energy {energy * ElectronVoltToHartree}\n")

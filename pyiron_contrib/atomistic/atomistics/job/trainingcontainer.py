@@ -28,6 +28,8 @@ name    atoms   energy  forces  number_of_atoms
 Fe_bcc  ...
 """
 
+from warnings import catch_warnings
+
 import pandas as pd
 from pyiron_atomistics import pyiron_to_ase, ase_to_pyiron
 from pyiron_atomistics.atomistics.structure.atoms import Atoms
@@ -49,6 +51,19 @@ class TrainingContainer(GenericJob):
             "forces": [],
             "number_of_atoms": []
         })
+
+    def include_job(self, job, iteration_step=-1):
+        """
+        Add structure, energy and forces from job.
+
+        Args:
+            job (:class:`.AtomisticGenericJob`): job to take structure from
+            iteration_step (int, optional): if job has multiple steps, this selects which to add
+        """
+        self.include_structure(job.get_structure(iteration_step=iteration_step),
+                               energy=job.output.energy_pot[iteration_step],
+                               forces=job.output.forces[iteration_step],
+                               name=job.name)
 
     def include_structure(self, structure, energy, forces=None, name=None):
         """
@@ -81,6 +96,30 @@ class TrainingContainer(GenericJob):
             - forces (Nx3 array of float): per atom forces, where N is the number of atoms in the structure
         """
         self._table = self._table.append(dataset, ignore_index=True)
+
+    def get_structure(self, iteration_step=-1):
+        """
+        Returns a structure from the training set.
+
+        Args:
+            iteration_step (int, optional): index of the structure in training set
+
+        Returns:
+            :class:`.Atoms`: pyiron structure
+        """
+        return ase_to_pyiron(self._table.atoms[iteration_step])
+
+    def get_elements(self):
+        """
+        Return a list of chemical elements in the training set.
+
+        Returns:
+            :class:`list`: list of unique elements in the training set as strings of their standard abbreviations
+        """
+        elements = set()
+        for s in self._table.atoms:
+            elements.update(s.get_chemical_symbols())
+        return list(elements)
 
     def to_pandas(self):
         """
@@ -133,7 +172,8 @@ class TrainingContainer(GenericJob):
 
     def to_hdf(self, hdf=None, group_name=None):
         super().to_hdf(hdf=hdf, group_name=group_name)
-        self._table.to_hdf(self.project_hdf5.file_name, self.name + "/output/structure_table")
+        with catch_warnings():
+            self._table.to_hdf(self.project_hdf5.file_name, self.name + "/output/structure_table")
 
     def from_hdf(self, hdf=None, group_name=None):
         super().from_hdf(hdf=hdf, group_name=group_name)

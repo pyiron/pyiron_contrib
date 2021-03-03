@@ -82,15 +82,15 @@ class RunnerFit(GenericJob):
                 for atoms, energy, forces, _ in zip(*container.to_list()):
                     f.write("begin\n")
                     c = np.array(atoms.cell) * AngstromToBohr
-                    f.write(f"lattice {c[0][0]} {c[0][1]} {c[0][2]}\n")
-                    f.write(f"lattice {c[1][0]} {c[1][1]} {c[1][2]}\n")
-                    f.write(f"lattice {c[2][0]} {c[2][1]} {c[2][2]}\n")
+                    f.write(f"lattice {c[0][0]:13.08f} {c[0][1]:13.08f} {c[0][2]:13.08f}\n")
+                    f.write(f"lattice {c[1][0]:13.08f} {c[1][1]:13.08f} {c[1][2]:13.08f}\n")
+                    f.write(f"lattice {c[2][0]:13.08f} {c[2][1]:13.08f} {c[2][2]:13.08f}\n")
                     p = atoms.positions * AngstromToBohr
                     ff = forces * ElectronVoltToHartree / AngstromToBohr
                     for i in range(len(atoms)):
-                        f.write(f"atom {p[i, 0]} {p[i, 1]} {p[i, 1]}")
+                        f.write(f"atom {p[i, 0]:13.08f} {p[i, 1]:13.08f} {p[i, 1]:13.08f}")
                         f.write(f" {atoms.elements[i].Abbreviation} 0.0 0.0")
-                        f.write(f" {ff[i, 0]} {ff[i, 1]} {ff[i, 2]}\n")
+                        f.write(f" {ff[i, 0]:13.08f} {ff[i, 1]:13.08f} {ff[i, 2]:13.08f}\n")
                     f.write(f"energy {energy * ElectronVoltToHartree}\n")
                     f.write("charge 0.0\nend\n")
 

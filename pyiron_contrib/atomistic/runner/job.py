@@ -6,6 +6,8 @@
 
 from pyiron_base import GenericJob, Executable, Settings
 
+import numpy as np
+
 __author__ = "Marvin Poul"
 __copyright__ = "Copyright 2020, Max-Planck-Institut für Eisenforschung GmbH - " \
                 "Computational Materials Design (CM) Department"
@@ -77,7 +79,7 @@ class RunnerFit(GenericJob):
                 container = self.project.load(id)
                 for atoms, energy, forces, _ in zip(*container.to_list()):
                     f.write("begin\n")
-                    c = atoms.cell.to_numpy() * AngstromToBohr
+                    c = np.array(atoms.cell) * AngstromToBohr
                     f.write(f"lattice {c[0][0]} {c[0][1]} {c[0][2]}\n")
                     f.write(f"lattice {c[1][0]} {c[1][1]} {c[1][2]}\n")
                     f.write(f"lattice {c[2][0]} {c[2][1]} {c[2][2]}\n")

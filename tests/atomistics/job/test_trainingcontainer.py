@@ -46,4 +46,7 @@ class TestTrainingContainer(unittest.TestCase):
         self.assertEqual(energy_list[0], 0.01)
 
     def test_elements(self):
-        self.assertEqual(self.container.get_elements(), ['Al'])
+        self.container.include_structure(
+                structure=self.project.create_ase_bulk("Al"), energy=0.0, forces=[[0,0,0]], name="unit_again"
+        )
+        self.assertEqual(self.container.get_elements(), ["Al"])

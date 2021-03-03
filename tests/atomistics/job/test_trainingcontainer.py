@@ -44,3 +44,6 @@ class TestTrainingContainer(unittest.TestCase):
                                                                          lambda df: df[df.number_of_atoms > 1])
         self.assertEqual(len(structure_list), 1)
         self.assertEqual(energy_list[0], 0.01)
+
+    def test_elements(self):
+        self.assertEqual(self.container.get_elements(), ['Al'])

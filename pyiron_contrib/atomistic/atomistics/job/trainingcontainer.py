@@ -96,6 +96,18 @@ class TrainingContainer(GenericJob):
         """
         self._table = self._table.append(dataset, ignore_index=True)
 
+    def get_structure(self, iteration_step=-1):
+        """
+        Returns a structure from the training set.
+
+        Args:
+            iteration_step (int, optional): index of the structure in training set
+
+        Returns:
+            :class:`.Atoms`: pyiron structure
+        """
+        return ase_to_pyiron(self._table.atoms[iteration_step])
+
     def to_pandas(self):
         """
         Export list of structure to pandas table for external fitting codes.

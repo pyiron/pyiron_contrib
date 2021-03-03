@@ -50,6 +50,18 @@ class TrainingContainer(GenericJob):
             "number_of_atoms": []
         })
 
+    def include_job(self, job, iteration_step=-1):
+        """
+        Add structure, energy and forces from job.
+
+        Args:
+            job (:class:`.AtomisticGenericJob`): job to take structure from
+            iteration_step (int, optional): if job has multiple steps, this selects which to add
+        """
+        self.include_structure(job.get_structure(iteration_step=iteration_step),
+                               energy=job.output.energy_pot[-1], forces=job.output.forces[-1],
+                               name=job.name)
+
     def include_structure(self, structure, energy, forces=None, name=None):
         """
         Add new structure to structure list and save energy and forces with it.

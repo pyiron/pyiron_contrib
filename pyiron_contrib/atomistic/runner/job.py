@@ -110,7 +110,10 @@ class RunnerFit(GenericJob):
             f.write(input_template)
 
     @property
-    def potential_dataframe(self):
+    def get_lammps_potential(self):
+        """
+        :class:`pandas.DataFrame`: dataframe compatible with :attribute:`.LammpsInteractive.potential`
+        """
         if not self.status.finished:
             raise RuntimeError("Job must have successfully finished before potential files can be copied!")
         weight_file = glob(f'{self.working_directory}/weights.*.data')[0]

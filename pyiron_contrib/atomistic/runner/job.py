@@ -19,7 +19,7 @@ AngstromToBohr = 1.88972612
 ElectronVoltToHartree = 0.03674932218
 
 
-class Runner(GenericJob):
+class RunnerFit(GenericJob):
     def __init__(self, project, job_name):
         super().__init__(project, job_name) 
         self._training_ids = []

@@ -4,6 +4,8 @@
 """
 """
 
+import os.path
+
 from pyiron_base import GenericJob, Executable, Settings
 
 import numpy as np

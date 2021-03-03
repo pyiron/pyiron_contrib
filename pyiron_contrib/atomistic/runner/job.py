@@ -110,7 +110,7 @@ class RunnerFit(GenericJob):
             f.write(input_template.format(element=self.input.element))
 
     @property
-    def get_lammps_potential(self):
+    def lammps_potential(self):
         """
         :class:`pandas.DataFrame`: dataframe compatible with :attribute:`.LammpsInteractive.potential`
         """

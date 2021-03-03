@@ -107,7 +107,7 @@ class RunnerFit(GenericJob):
                     f.write("charge 0.0\nend\n")
 
         with open(os.path.join(self.working_directory, "input.nn"), "w") as f:
-            f.write(input_template)
+            f.write(input_template.format(element=self.input.element))
 
     @property
     def get_lammps_potential(self):
@@ -164,7 +164,7 @@ input_template = """### ########################################################
 nn_type_short 1                           # 1=Behler-Parrinello
 runner_mode 1                             # 1=calculate symmetry functions, 2=fitting mode, 3=predicition mode
 number_of_elements 1                      # number of elements
-elements Cu                               # specification of elements
+elements {element}                               # specification of elements
 random_seed 10                            # integer seed for random number generator                         
 random_number_type 6                      # 6 recommended       
 
@@ -185,20 +185,20 @@ test_fraction 0.10000                     # threshold for splitting between fitt
 ### symmetry function definitions (all modes): 
 ########################################################################################################################
 cutoff_type 1
-symfunction_short Cu  2 Cu     0.000000      0.000000     12.000000
-symfunction_short Cu  2 Cu     0.006000      0.000000     12.000000
-symfunction_short Cu  2 Cu     0.016000      0.000000     12.000000
-symfunction_short Cu  2 Cu     0.040000      0.000000     12.000000
-symfunction_short Cu  2 Cu     0.109000      0.000000     12.000000
+symfunction_short {element}  2 {element}     0.000000      0.000000     12.000000
+symfunction_short {element}  2 {element}     0.006000      0.000000     12.000000
+symfunction_short {element}  2 {element}     0.016000      0.000000     12.000000
+symfunction_short {element}  2 {element}     0.040000      0.000000     12.000000
+symfunction_short {element}  2 {element}     0.109000      0.000000     12.000000
 
-symfunction_short Cu  3 Cu Cu     0.00000       1.000000      1.000000     12.000000
-symfunction_short Cu  3 Cu Cu     0.00000       1.000000      2.000000     12.000000
-symfunction_short Cu  3 Cu Cu     0.00000       1.000000      4.000000     12.000000
-symfunction_short Cu  3 Cu Cu     0.00000       1.000000     16.000000     12.000000
-symfunction_short Cu  3 Cu Cu     0.00000      -1.000000      1.000000     12.000000
-symfunction_short Cu  3 Cu Cu     0.00000      -1.000000      2.000000     12.000000
-symfunction_short Cu  3 Cu Cu     0.00000      -1.000000      4.000000     12.000000
-symfunction_short Cu  3 Cu Cu     0.00000      -1.000000     16.000000     12.000000
+symfunction_short {element}  3 {element} {element}     0.00000       1.000000      1.000000     12.000000
+symfunction_short {element}  3 {element} {element}     0.00000       1.000000      2.000000     12.000000
+symfunction_short {element}  3 {element} {element}     0.00000       1.000000      4.000000     12.000000
+symfunction_short {element}  3 {element} {element}     0.00000       1.000000     16.000000     12.000000
+symfunction_short {element}  3 {element} {element}     0.00000      -1.000000      1.000000     12.000000
+symfunction_short {element}  3 {element} {element}     0.00000      -1.000000      2.000000     12.000000
+symfunction_short {element}  3 {element} {element}     0.00000      -1.000000      4.000000     12.000000
+symfunction_short {element}  3 {element} {element}     0.00000      -1.000000     16.000000     12.000000
 
 ########################################################################################################################
 ### fitting (mode 2):general inputs for short range AND electrostatic part:

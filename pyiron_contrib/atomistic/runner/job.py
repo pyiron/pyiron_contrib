@@ -75,7 +75,7 @@ class RunnerFit(GenericJob):
         with open("input.data", "w") as f:
             for id in self._training_ids:
                 container = self.project.load(id)
-                for atoms, energy, forces, _ in zip(container.to_list()):
+                for atoms, energy, forces, _ in zip(*container.to_list()):
                     f.write("begin\n")
                     c = atoms.cell.to_numpy() * AngstromToBohr
                     f.write(f"lattice {c[0][0]} {c[0][1]} {c[0][2]}\n")

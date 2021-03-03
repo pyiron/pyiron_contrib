@@ -61,7 +61,8 @@ class TrainingContainer(GenericJob):
             iteration_step (int, optional): if job has multiple steps, this selects which to add
         """
         self.include_structure(job.get_structure(iteration_step=iteration_step),
-                               energy=job.output.energy_pot[-1], forces=job.output.forces[-1],
+                               energy=job.output.energy_pot[iteration_step],
+                               forces=job.output.forces[iteration_step],
                                name=job.name)
 
     def include_structure(self, structure, energy, forces=None, name=None):

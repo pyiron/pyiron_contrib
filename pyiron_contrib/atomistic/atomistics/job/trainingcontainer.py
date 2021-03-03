@@ -108,6 +108,18 @@ class TrainingContainer(GenericJob):
         """
         return ase_to_pyiron(self._table.atoms[iteration_step])
 
+    def get_elements(self):
+        """
+        Return a list of chemical elements in the training set.
+
+        Returns:
+            :class:`list`: list of unique elements in the training set as strings of their standard abbreviations
+        """
+        elements = set()
+        for s in self._table.atoms:
+            elements.update(s.get_chemical_symbols())
+        return list(elements)
+
     def to_pandas(self):
         """
         Export list of structure to pandas table for external fitting codes.

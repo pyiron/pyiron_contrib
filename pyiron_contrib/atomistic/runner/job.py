@@ -1,9 +1,10 @@
-from pyiron_base import GenericJob, Executable
 # Copyright (c) Max-Planck-Institut für Eisenforschung GmbH - Computational Materials Design (CM) Department
 # Distributed under the terms of "New BSD License", see the LICENSE file.
 
 """
 """
+
+from pyiron_base import GenericJob, Executable, Settings
 
 __author__ = "Marvin Poul"
 __copyright__ = "Copyright 2020, Max-Planck-Institut für Eisenforschung GmbH - " \
@@ -14,6 +15,7 @@ __email__ = "poul@mpie.de"
 __status__ = "development"
 __date__ = "March 3, 2021"
 
+s = Settings()
 
 AngstromToBohr = 1.88972612
 ElectronVoltToHartree = 0.03674932218

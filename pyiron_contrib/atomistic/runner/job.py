@@ -7,9 +7,10 @@
 import os.path
 from glob import glob
 
-from pyiron_base import GenericJob, Executable, Settings
+from pyiron_base import GenericJob, Executable, Settings, InputList
 
 import numpy as np
+import pandas as pd
 
 __author__ = "Marvin Poul"
 __copyright__ = "Copyright 2020, Max-Planck-Institut für Eisenforschung GmbH - " \
@@ -30,6 +31,9 @@ class RunnerFit(GenericJob):
     def __init__(self, project, job_name):
         super().__init__(project, job_name) 
         self._training_ids = []
+
+        self.input = InputList(table_name="input")
+        self.input.element = "Cu"
 
         s.publication_add(self.publication)
 

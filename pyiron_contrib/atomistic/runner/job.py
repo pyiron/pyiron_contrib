@@ -2,6 +2,7 @@
 # Distributed under the terms of "New BSD License", see the LICENSE file.
 
 """
+Demonstrator job for the RuNNer Neural Network Potential.
 """
 
 import os.path
@@ -78,6 +79,12 @@ class RunnerFit(GenericJob):
         }
 
     def add_job_to_fitting(self, job):
+        """
+        Add a job to the training database.  Currently only :class:`.TrainingContainer` are supported.
+
+        Args:
+            job (:class:`.TrainingContainer`): job to add to database
+        """
         self._training_ids.append(job.id)
 
     def write_input(self):
@@ -127,19 +134,6 @@ class RunnerFit(GenericJob):
             self._executable = Executable(
                 codename="runner", module="runner", path_binary_codes=s.resource_paths
             )
-
-    # def to_hdf(self, hdf=None, group_name=None): 
-    #     super().to_hdf(
-    #         hdf=hdf,
-    #         group_name=group_name
-    #    )
-
-    # def from_hdf(self, hdf=None, group_name=None): 
-    #     super().from_hdf(
-    #         hdf=hdf,
-    #        group_name=group_name
-    #    )
-
 
 input_template = """### ####################################################################################################################
 ### This is the input file for the RuNNer tutorial (POTENTIALS WORKSHOP 2021-03-10) 

@@ -137,8 +137,7 @@ class RunnerFit(GenericJob):
     #    )
 
 
-input_template = """ 
-### ####################################################################################################################
+input_template = """### ####################################################################################################################
 ### This is the input file for the RuNNer tutorial (POTENTIALS WORKSHOP 2021-03-10) 
 ### This input file is intended for release version 1.2
 ### RuNNer is hosted at www.gitlab.com. The most recent version can only be found in this repository.

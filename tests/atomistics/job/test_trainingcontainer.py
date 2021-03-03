@@ -15,7 +15,6 @@ class TestTrainingContainer(unittest.TestCase):
     def setUpClass(cls):
         cls.execution_path = os.path.dirname(os.path.abspath(__file__))
         cls.project = Project(os.path.join(cls.execution_path, "test_training"))
-        cls.container = cls.project.create.job.TrainingContainer("test")
 
     @classmethod
     def tearDownClass(cls):
@@ -24,7 +23,8 @@ class TestTrainingContainer(unittest.TestCase):
         project.remove_jobs_silently(recursive=True)
         project.remove(enable=True)
 
-    def test_include_structure(self):
+    def setUp(self):
+        self.container = self.project.create.job.TrainingContainer("test")
         basis_1 = self.project.create_ase_bulk("Al")
         force = [[0.0, 0.0, 0.0]]
         energy = 0.0
@@ -34,6 +34,11 @@ class TestTrainingContainer(unittest.TestCase):
         energy = 0.01
         self.container.include_structure(basis_2, energy=energy, forces=force, name="repeated")
         self.container.run()
+
+    def tearDown(self):
+        del self.container
+
+    def test_include_structure(self):
         structure_list, energy_list, forces_list, num_atoms = self.container.to_list()
         self.assertEqual(len(structure_list), 2)
         self.assertEqual(structure_list[0], basis_1)
@@ -46,7 +51,10 @@ class TestTrainingContainer(unittest.TestCase):
         self.assertEqual(energy_list[0], 0.01)
 
     def test_elements(self):
-        self.container.include_structure(
-                structure=self.project.create_ase_bulk("Al"), energy=0.0, forces=[[0,0,0]], name="unit_again"
-        )
         self.assertEqual(self.container.get_elements(), ["Al"])
+
+    def test_get_structure(self):
+        self.assertEqual(len(self.container.get_structure(iteration_step=0)), 1,
+                         "get_structure() returned wrong structure.")
+        self.assertEqual(len(self.container.get_structure(iteration_step=1)), 2,
+                         "get_structure() returned wrong structure.")

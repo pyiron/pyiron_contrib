@@ -28,6 +28,8 @@ name    atoms   energy  forces  number_of_atoms
 Fe_bcc  ...
 """
 
+from warnings import catch_warnings
+
 import pandas as pd
 from pyiron_atomistics import pyiron_to_ase, ase_to_pyiron
 from pyiron_atomistics.atomistics.structure.atoms import Atoms
@@ -145,7 +147,8 @@ class TrainingContainer(GenericJob):
 
     def to_hdf(self, hdf=None, group_name=None):
         super().to_hdf(hdf=hdf, group_name=group_name)
-        self._table.to_hdf(self.project_hdf5.file_name, self.name + "/output/structure_table")
+        with catch_warnings():
+            self._table.to_hdf(self.project_hdf5.file_name, self.name + "/output/structure_table")
 
     def from_hdf(self, hdf=None, group_name=None):
         super().from_hdf(hdf=hdf, group_name=group_name)

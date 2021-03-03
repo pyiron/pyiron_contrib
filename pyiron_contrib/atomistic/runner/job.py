@@ -5,6 +5,7 @@
 """
 
 import os.path
+from glob import glob
 
 from pyiron_base import GenericJob, Executable, Settings
 
@@ -96,6 +97,22 @@ class RunnerFit(GenericJob):
 
         with open(os.path.join(self.working_directory, "input.nn"), "w") as f:
             f.write(input_template)
+
+    @property
+    def potential_dataframe(self):
+        if not self.status.finished:
+            raise RuntimeError("Job must have successfully finished before potential files can be copied!")
+        weight_file = glob(f'{self.working_directory}/weights.*.data')[0]
+        return pd.DataFrame({
+                    'Name': ['RuNNer-Cu'],
+                    'Filename': [[f'{self.working_directory}/input.nn',
+                                  weight_file,
+                                  f'{self.working_directory}/scaling.data']],
+                    'Model': ['RuNNer'],
+                    'Species': [['Cu']],
+                    'Config': [['pair_style nnp dir "./" showew no showewsum 0 resetew no maxew 100 cflength 1.8897261328 cfenergy 0.0367493254 emap "1:Cu"\n',
+                                'pair_coeff * * 12\n']]
+                  })
 
     def collect_output(self):
         pass

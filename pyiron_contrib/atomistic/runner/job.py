@@ -74,7 +74,7 @@ class RunnerFit(GenericJob):
         self._training_ids.append(job.id)
 
     def write_input(self):
-        with open("input.data", "w") as f:
+        with open(os.path.join(self.working_directory, "input.data"), "w") as f:
             for id in self._training_ids:
                 container = self.project.load(id)
                 for atoms, energy, forces, _ in zip(*container.to_list()):
@@ -92,7 +92,7 @@ class RunnerFit(GenericJob):
                     f.write(f"energy {energy * ElectronVoltToHartree}\n")
                     f.write("charge 0.0\nend\n")
 
-        with open("input.nn", "w") as f:
+        with open(os.path.join(self.working_directory, "input.nn"), "w") as f:
             f.write(input_template)
 
     def collect_output(self):

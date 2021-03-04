@@ -26,6 +26,7 @@ class ARFitProperty(InputList):
             tolerance=None,
             min_val=None,
             max_val=None,
+            output_all=None,
             *args,
             **kwargs
     ):
@@ -44,7 +45,7 @@ class ARFitProperty(InputList):
         self.min_val = min_val
         self.max_val = max_val
         self.final_value = None
-
+        self.output_all = output_all
 
     @property
     def prop(self):
@@ -125,6 +126,8 @@ class ARFitProperty(InputList):
                 raise ValueError("Squared-relative residual style is not implemented for forces in atomicrex")
             if self.min_val is not None or self.max_val is not None:
                 raise ValueError("Min and Max val can only be given for scalar properties")
+            if self.output_all:
+                xml.set("output-all", f"{self.output_all}".lower())
             else:
                 xml.set("residual-style", f"{self.residual_style}")
         return xml
@@ -170,6 +173,7 @@ class ARFitPropertyList(InputList):
             tolerance=None,
             min_val=None,
             max_val=None,
+            output_all=True,
     ):
         """
         Adds a fittable property to the fit properties
@@ -188,8 +192,10 @@ class ARFitPropertyList(InputList):
             output (bool, optional): Determines if the value is written to output.
             Could cause parsing problems if False. Defaults to True.
             tolerance (float, optional): See atomicrex documentation. Defaults to None.
-            min_val ([type], optional): [description]. Defaults to None.
-            max_val ([type], optional): [description]. Defaults to None.
+            min_val (float, optional): Only scalar properties, if relaxation enabled. Defaults to None.
+            max_val (float, optional): Only scalar properties, if relaxation enabled. Defaults to None.
+            output_all (bool, optional): Only vector properties. Determines if full vector is written to output. Defaults to True.
+
         """    
         self[prop] = ARFitProperty(
             prop = prop,
@@ -202,6 +208,7 @@ class ARFitPropertyList(InputList):
             tolerance = tolerance,
             min_val = min_val,
             max_val = max_val,
+            output_all=output_all,
         )
 
     def to_xml_element(self):

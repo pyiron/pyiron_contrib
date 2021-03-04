@@ -1,6 +1,7 @@
 import posixpath
 import xml.etree.ElementTree as ET
 
+import numpy as np
 from ase import Atoms as ASEAtoms
 from pyiron_base import InputList
 from pyiron import pyiron_to_ase, ase_to_pyiron, Atoms
@@ -269,16 +270,37 @@ class ARStructureList(object):
 
         Args:
             struct_lines (list[str]): lines from atomicrex output that contain structure information.
-        """        
+        """ 
+        force_vec_triggered = False   
         for l in struct_lines:
             l = l.strip()
-            if l.startswith("Structure"):
-                s_id = l.split("'")[1]
-                s = self._structure_dict[s_id]
-            else:
-                prop, f_val = ARFitProperty._parse_final_value(line=l)
-                if prop in s.fit_properties:
-                    s.fit_properties[prop].final_value = f_val
+            
+            if force_vec_triggered:
+                if l.startswith("atomic-forces:"):
+                    l = l.split()
+                    index = int(l[1])
+                    final_forces[index, 0] = float(l[2].lstrip("(").rstrip(","))
+                    final_forces[index, 1] = float(l[3].rstrip(","))
+                    final_forces[index, 2] = float(l[4].rstrip(")"))
+                else:
+                    force_vec_triggered = False
+                    s.fit_properties["atomic-forces"].final_value = final_forces
+            
+            # This has to be if and not else because it has to run in the same iteration. Empty lines get skipped.
+            if not force_vec_triggered and l:
+                if l.startswith("Structure"):
+                    s_id = l.split("'")[1]
+                    s = self._structure_dict[s_id]
+            
+                else:
+                    if not l.startswith("atomic-forces avg/max:"):
+                        prop, f_val = ARFitProperty._parse_final_value(line=l)
+                        if prop in s.fit_properties:
+                            s.fit_properties[prop].final_value = f_val
+                    else:
+                        force_vec_triggered = True
+                        final_forces = np.empty((len(s.structure), 3))
+
 
 
 def write_modified_poscar(identifier, structure, forces, directory):

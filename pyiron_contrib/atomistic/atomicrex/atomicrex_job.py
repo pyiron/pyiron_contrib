@@ -7,6 +7,8 @@ import posixpath
 import os
 import subprocess
 
+import pandas as pd
+
 from pyiron_base import GenericJob, Settings, PyironFactory, Executable
 
 from pyiron_contrib.atomistic.atomicrex.general_input import GeneralARInput, AlgorithmFactory
@@ -44,6 +46,29 @@ class Atomicrex(PotentialFittingBase):
         self._working_directory = None
         self.output = Output()
         self.factories = Factories()
+        
+
+    ## Temporary workaround for the workshop
+    ## Hardcoded Cu as species since recovering atom_types from hdf does not work correctly right now
+    @property
+    def lammps_potential(self):
+        species = ["Cu"]
+        species_str = ""
+        for s in species:
+            species_str += f"{s} "
+
+        pot = pd.DataFrame({
+            "Name": f"{self.potential.identifier}",
+            "Filename": [[f"{self.working_directory}/{self.potential.export_file}"]],
+            'Model': ['Custom'],
+            "Species": [species],
+            "Config": [[
+                "pair_style eam/fs\n",
+                f"pair_coeff * * {self.working_directory}/{self.potential.export_file} {species_str}\n",
+                ]]
+        })    
+        return pot
+
 
     def to_hdf(self, hdf=None, group_name=None):
         """Internal function to store the job in hdf5 format

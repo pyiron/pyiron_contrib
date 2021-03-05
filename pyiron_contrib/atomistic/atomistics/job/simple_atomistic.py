@@ -51,14 +51,14 @@ class SimpleAtomistic(GenericInteractive):  # Create a custom job class
 
     def interactive_pressures_getter(self):
         forces = self.potential.get_forces(v=self.neigh.vecs, r=self.neigh.distances, per_atom=True)
-        r = self.neigh.vecs
+        r = -self.neigh.vecs
         V = self.structure.get_volume()
         return np.einsum('nki,nkj->ij', r, forces)/V
 
     def interactive_positions_setter(self, positions):
         self.uptodate = False
 
-    def interactive_cells_setter(self, cell);
+    def interactive_cells_setter(self, cell):
         self.uptodate = False
 
     def interactive_indices_setter(self, indices):

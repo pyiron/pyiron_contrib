@@ -27,9 +27,20 @@ class SimplePotential(InputList):
             return self.coeff[key]
     
     def update_coeff(self, pairs):
-        for k in self.coeff.keys():
-            if type(self.coeff[k])==InputList:
-                self._matrix[k] = np.vectorize(self.coeff[k].__getitem__)(pairs).T
+        for k,v in self.coeff.items():
+            if type(v)==InputList:
+                self._matrix[k] = np.array([[v.get(pp, 0) for pp in p] for p in pairs])
             else:
                 self._matrix[k] = self.coeff[k]
         self._uptodate = True
+
+    def get_energy(self, r):
+        return self._get_energy(np.atleast_2d(r))
+
+    def get_forces(self, v, r=None, per_atom=False):
+        if r is None:
+            r = np.linalg.norm(v, axis=-1)
+        v[r>self._matrix['cutoff']] = 0
+        return self._get_forces(
+            v=np.atleast_3d(v), r=np.atleast_2d(r), per_atom=per_atom
+        ).squeeze()

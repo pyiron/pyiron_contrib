@@ -2,6 +2,7 @@
 # Copyright (c) Max-Planck-Institut für Eisenforschung GmbH - Computational Materials Design (CM) Department
 # Distributed under the terms of "New BSD License", see the LICENSE file.
 
+import numpy as np
 from pyiron_contrib.atomistic.atomistics.potential.simple_potential import SimplePotential
 
 class LennardJones(SimplePotential):   

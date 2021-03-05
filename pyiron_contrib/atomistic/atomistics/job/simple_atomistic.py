@@ -12,6 +12,7 @@ class SimpleAtomistic(GenericInteractive):  # Create a custom job class
         self.cutoff = 3
         self.potential = None
         self._neighbor_chemical_symbols = None
+        self.uptodate = False
 
     def interactive_initialize_interface(self):
         pass
@@ -23,11 +24,13 @@ class SimpleAtomistic(GenericInteractive):  # Create a custom job class
 
     def run_if_interactive(self):
         super(SimpleAtomistic, self).run_if_interactive()
-        self._update_neighbors()
-        c_old = self._neighbor_chemical_symbols
-        c_new = self.neigh.chemical_symbols
-        if c_old is None or c_old.shape!=c_new.shape or not self.potential._uptodate or np.any(c_old!=c_new):
-            self.potential.update_coeff(self._get_chemical_pairs())
+        if not self.uptodate:
+            self._update_neighbors()
+            c_old = self._neighbor_chemical_symbols
+            c_new = self.neigh.chemical_symbols
+            if c_old is None or c_old.shape!=c_new.shape or not self.potential._uptodate or np.any(c_old!=c_new):
+                self.potential.update_coeff(self._get_chemical_pairs())
+        self.uptodate = True
         self.interactive_collect()
 
     def _update_neighbors(self):
@@ -51,5 +54,14 @@ class SimpleAtomistic(GenericInteractive):  # Create a custom job class
         r = self.neigh.vecs
         V = self.structure.get_volume()
         return np.einsum('nki,nkj->ij', r, forces)/V
+
+    def interactive_positions_setter(self, positions):
+        self.uptodate = False
+
+    def interactive_cells_setter(self, cell);
+        self.uptodate = False
+
+    def interactive_indices_setter(self, indices):
+        self.uptodate = False
 
 

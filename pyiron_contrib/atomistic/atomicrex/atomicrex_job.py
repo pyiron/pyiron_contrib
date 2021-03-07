@@ -71,6 +71,17 @@ class Atomicrex(PotentialFittingBase):
         return pot
 
 
+    def plot_final_potential(self):
+        """
+        Plot the fitted potential.
+        Returns the matplotlib objects to change the look of the plot.
+
+        Returns:
+            [matplotlib figure, axis]: [description]
+        """        
+        return self.potential.plot_final_potential(self)
+
+
     def to_hdf(self, hdf=None, group_name=None):
         """Internal function to store the job in hdf5 format
         """        

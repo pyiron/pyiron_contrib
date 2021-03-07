@@ -47,6 +47,9 @@ class AbstractPotential(InputList):
             job (pyiron_job): Takes the fit job as argument, to obtain f.e. the working directory.
         """ 
         raise NotImplementedError("Should be implemented in the subclass")
+    
+    def plot_final_potential(self):
+        raise NotImplementedError("Should be implemented in the subclass")
 
 
 class LJPotential(AbstractPotential):

@@ -7,6 +7,7 @@ import posixpath
 import os
 import subprocess
 
+import numpy as np
 import pandas as pd
 
 from pyiron_base import GenericJob, Settings, PyironFactory, Executable
@@ -121,6 +122,16 @@ class Atomicrex(PotentialFittingBase):
         params_triggered = False
         structures_triggered = False
 
+        # Allocate numpy arrays for iterations and residual
+        # I assume this is better than appending to a list if many iterations are done
+        residuals = np.zeros(self.input.fit_algorithm.max_iter)
+       
+        # Since every step is written out in atomicrex arange can be used.
+        # Needs to be adapted when atomicrex output is changed to write only every xth step.
+        # Unsinged 32 bit int should be enough or this will overflow anyway in most cases.
+        iterations = np.arange(start=1, stop=self.input.fit_algorithm.max_iter+1, dtype=np.uintc)
+        iter_index = 0
+
         with open(filepath, "r") as f:
             final_parameter_lines = []
             final_property_lines = []
@@ -129,36 +140,47 @@ class Atomicrex(PotentialFittingBase):
                 if l.startswith("ERROR"):
                     self.status.aborted=True
                     self.output.error = l
-
-                elif not finished_triggered and l.startswith("Iterations"):
+                
+                elif not finished_triggered:         
+                    if l.startswith("Iterations"):
                         l = l.split()
-                        self.output.iterations = int(l[1])
-                        self.output.residual = float(l[3])
                         finished_triggered = True
-                
-                elif finished_triggered and l.startswith("Potential parameters"):
-                    # Get the number of dofs
-                    n_fit_dofs = int(l.split("=")[1][:-3])
-                    params_triggered = True
-                
-                elif params_triggered:
-                    if not l.startswith("---"):
-                        final_parameter_lines.append(l)
+                        self.output.residual = residuals[0:iter_index]
+                        self.output.iterations = iterations[0:iter_index]
                     else:
-                        # Collecting lines with final parameters finished, hand over to the potential class
-                        self.potential._parse_final_parameters(final_parameter_lines)
-                        params_triggered = False
+                        l = l.split()
+                        try:
+                            if l[1] == "iter=":
+                                residuals[iter_index] = float(l[-1])
+                                iter_index  += 1
+                        except IndexError:
+                            continue
                 
-                elif finished_triggered and l.startswith("Computing"):
-                    structures_triggered = True
+                else: # if finished_triggered
+                    if l.startswith("Potential parameters"):
+                        # Get the number of dofs
+                        n_fit_dofs = int(l.split("=")[1][:-3])
+                        params_triggered = True
+                
+                    elif params_triggered:
+                        if not l.startswith("---"):
+                            final_parameter_lines.append(l)
+                        else:
+                            # Collecting lines with final parameters finished, hand over to the potential class
+                            self.potential._parse_final_parameters(final_parameter_lines)
+                            params_triggered = False
+                
+                    elif l.startswith("Computing"):
+                        structures_triggered = True
                      
-                elif structures_triggered:
-                    if not l.startswith("---"):
-                        final_property_lines.append(l)
-                    else:
-                        # Collecting structure information finished, hand over structures class
-                        self.structures._parse_final_properties(final_property_lines)
-                        structures_triggered = False
+                    elif structures_triggered:
+                        if not l.startswith("---"):
+                            final_property_lines.append(l)
+                        else:
+                            # Collecting structure information finished, hand over structures class
+                            self.structures._parse_final_properties(final_property_lines)
+                            structures_triggered = False
+
         self.to_hdf()
 
     def convergence_check(self):

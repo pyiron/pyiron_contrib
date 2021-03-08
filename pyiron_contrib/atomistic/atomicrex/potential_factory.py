@@ -1,7 +1,9 @@
 import posixpath
 import xml.etree.ElementTree as ET
 
+import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
 from pyiron_base import PyironFactory, InputList
 from pyiron_contrib.atomistic.atomicrex.function_factory import FunctionFactory
@@ -46,6 +48,9 @@ class AbstractPotential(InputList):
         Args:
             job (pyiron_job): Takes the fit job as argument, to obtain f.e. the working directory.
         """ 
+        raise NotImplementedError("Should be implemented in the subclass")
+    
+    def _plot_final_potential(self):
         raise NotImplementedError("Should be implemented in the subclass")
 
 
@@ -215,6 +220,87 @@ class EAMPotential(AbstractPotential):
                     "Fitting parameters of screening functions probably doesn't work right now"
                 )
 
+    def plot_final_potential(self, job, filename=None):
+        """
+        Plots the the fitted potential. Reads the necessary data from eam.fs file (funcfl format used by lammps),
+        therefore does not work if no table is written. Can be used with disabled fitting to plot functions that
+        can't be plotted directly like splines.
+
+        Args:
+            job (AtomicrexJob): Instance of the job to construct filename.
+            filename (str, optional): If a filename is given this eam is plotted instead of the fitted one. Defaults to None.
+        """        
+
+
+        # Read the cotents of the eam file
+        # this is copy pasted from one of my old scripts and could probably be reworked
+        elements = {}
+        
+        if filename is None:
+            filename = f"{job.working_directory}/{self.export_file}"
+
+        with open(filename, "r") as f:
+            # skip comment lines
+            for _ in range(3):
+                f.readline()
+            
+            element_list =  f.readline().split()
+            for element in element_list[1:]:
+                elements[element] = {}
+            
+            Nrho, drho, Nr, dr, cutoff = f.readline().split()
+            Nrho = int(Nrho)
+            drho = float(drho)
+            Nr = int(Nr)
+            dr = float(dr)
+            cutoff = float(cutoff)
+
+            rho_values = np.linspace(0,Nrho*drho, Nrho, endpoint=False)
+            r_values = np.linspace(0, Nr*dr, Nr, endpoint=False)
+
+            for element in elements:
+                # skip a line with unnecessary information
+                f.readline()
+                elements[element]["F"] = np.fromfile(f, count=Nrho, sep=" ")
+                for rho_element in elements:
+                    elements[element]["rho_{}{}".format(element, rho_element)] = np.fromfile(f, count = Nr, sep=" ")
+
+            # V_ij = V_ji so it is written only once in the file => avoid attempts to read it twice
+            # with a list of elements where it has been read
+            # TODO: Have another look how to do this checking
+            V_written = []
+            for element in elements:
+                for V_element in elements:
+                    elementV_element = "{}{}".format(element, V_element)
+                    V_elementelement = "{}{}".format(V_element, element)
+                    if not elementV_element in V_written and not V_elementelement in V_written:
+                        elements[element]["V_{}".format(elementV_element)] = np.fromfile(f, count = Nr, sep=" ")
+                        # The tabulated values are not V(r) but V(r) * r, so they are divided by r here,
+                        # with exception of the first value to prevent division by 0.
+                        elements[element]["V_{}".format(elementV_element)][1:] = elements[element]["V_{}".format(elementV_element)][1:] / r_values[1:]
+                        V_written.append(elementV_element)
+        
+        # TODO: figure out how to index ax for multiple elements
+        fig, ax = plt.subplots(nrows=3*len(elements), ncols=len(elements), figsize=(len(elements)*8, len(elements)*3*6), squeeze=False)
+        for i, (el, pot_dict) in enumerate(elements.items()):
+            for j, (pot, y) in enumerate(pot_dict.items()):
+                if pot == "F":
+                    xdata = rho_values
+                    xlabel = "$\\rho $ [a.u.]"
+                    k = 0
+                elif "rho" in pot:
+                    xdata = r_values
+                    xlabel = "r [$\AA$]"
+                    k = 1
+                elif "V" in pot:
+                    xdata = r_values[1:]
+                    y = y[1:]
+                    xlabel = "r [$\AA$]"
+                    k = 2
+
+                ax[i+k, 0].plot(xdata, y)
+                ax[i+k, 0].set(ylim=(-5,5), title=f"{el} {pot}", xlabel=xlabel)
+        return fig, ax
 
     @staticmethod
     def _parse_parameter_line(line):

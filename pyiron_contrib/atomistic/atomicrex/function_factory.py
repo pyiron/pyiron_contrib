@@ -1,6 +1,9 @@
 import xml.etree.ElementTree as ET
 import copy
 
+import numpy as np
+import matplotlib.pyplot as plt
+
 from pyiron_base import PyironFactory, InputList
 
 
@@ -54,7 +57,9 @@ class FunctionFactory(PyironFactory):
 
 class SpecialFunction(InputList):
     """
-    Functions defined within atomicrex should inherit from this class
+    Analytic functions defined within atomicrex should inherit from this class
+    https://atomicrex.org/potentials/functions.html#index-1
+    https://atomicrex.org/potentials/functions.html#specialized-functions
     """    
     def __init__(self, identifier, species=["*", "*"], is_screening_function=False):  
         super().__init__(table_name=f"special_function_{identifier}")
@@ -64,7 +69,7 @@ class SpecialFunction(InputList):
         self.identifier = identifier
         if not is_screening_function:
             self.screening = None
-
+            
     def _to_xml_element(self, name):
         if self.is_screening_function:
             screening = ET.Element("screening")
@@ -89,6 +94,12 @@ class SpecialFunction(InputList):
             return root
         else:
             return screening
+    
+    def plot(self):
+        if self.func is None:
+            raise NotImplementedError("A func property needs to be defined in the subclass")
+        else:
+            return plot(self.func)
 
 
 class Poly(InputList):
@@ -137,6 +148,7 @@ class Spline(InputList):
 
 
 class ExpA(SpecialFunction):
+
     def __init__(self, identifier, cutoff, species, is_screening_function):
         super().__init__(identifier, species=species, is_screening_function=is_screening_function)
         self.parameters.add_parameter(
@@ -145,6 +157,10 @@ class ExpA(SpecialFunction):
             enabled=False,
             fitable=False,
         )
+    
+    @property
+    def func(self):
+        return lambda r: np.exp(1/(r-self.parameters.cutoff.start_val))
 
     def _to_xml_element(self):
         return super()._to_xml_element(name="exp-A")
@@ -175,6 +191,15 @@ class ExpB(SpecialFunction):
             enabled=False,
         )
 
+    @property
+    def func(self):
+        return lambda r: np.exp(-np.sign(
+            self.parameters.exponent.start_val) *
+            self.parameters.alpha.start_val /
+            (1-((r-self.parameters.rc.start_val) /
+            self.parameters.cutoff.start_val - self.parameters.rc.start_val) **
+            self.parameters.exponent.start_val ))
+
     def _to_xml_element(self):
         return super()._to_xml_element(name="exp-B")
 
@@ -203,6 +228,7 @@ class ExpGaussian(SpecialFunction):
             start_val=exponent,
             enabled=False,
         )
+        # TODO: add self.func
 
     def _to_xml_element(self):
         return super()._to_xml_element(name="exp-gaussian")
@@ -226,6 +252,14 @@ class MorseA(SpecialFunction):
             start_val=alpha,
             enabled=True,
         )
+
+    @property
+    def func(self):
+        return lambda r: self.parameters.D0.start_val*(
+            np.exp(-2*self.parameters.alpha.start_val*(r-self.parameters.r0.start_val)) -
+            2*np.exp(-self.parameters.alpha.start_val*(r-self.parameters.r0.start_val))
+        )
+
     def _to_xml_element(self):
         return super()._to_xml_element(name="morse-A")
 
@@ -258,6 +292,16 @@ class MorseB(SpecialFunction):
             start_val=delta,
             enabled=True,
         )
+
+    @property
+    def func(self):
+        D0 = self.parameters.D0.start_val
+        r0 = self.parameters.r0.start_val
+        S = self.parameters.S.start_val
+        beta = self.parameters.beta.start_val
+        delta = self.parameters.delta.start_val
+        return lambda r: (D0/(S-1) * np.exp(-beta*np.sqrt(2*S)*(r-r0)) -
+            D0*S/(S-1)*np.exp(-beta*np.sqrt(2/S)*(r-r0)) + delta)
 
     def _to_xml_element(self):
         return super()._to_xml_element(name="morse-B")
@@ -296,6 +340,8 @@ class MorseC(SpecialFunction):
             enabled=True,
         )
 
+    #TODO: add func property
+
     def _to_xml_element(self):
         return super()._to_xml_element(name="morse-C")
 
@@ -321,6 +367,8 @@ class Gaussian(SpecialFunction):
             enabled=True,
         )
 
+    #TODO: add func property
+
     def _to_xml_element(self):
         return super()._to_xml_element(name="morse-A")
 
@@ -329,6 +377,8 @@ class UserFunction(InputList):
     """
     Analytic functions that are not implemented in atomicrex
     can be provided as user functions.
+    All parameters defined in the function should be added using the
+    UserFunction.parameters.add_parameter() method.
     """    
     def __init__(self, identifier, input_variable, species, is_screening_function):
         super().__init__(table_name=f"user_func_{identifier}")
@@ -458,6 +508,7 @@ class FunctionParameterList(InputList):
             if param.fitable:
                 fit_dof.append(param._to_xml_element())
         return fit_dof
+
 
 class PolyCoeff(FunctionParameter):
     """
@@ -591,3 +642,13 @@ class NodeList(InputList):
                 node.min_val = min_vals[i]
             if max_vals is not None:
                 node.max_val = max_vals[i]
+
+
+def plot(func, x=np.linspace(0.01, 7.0, 351)):
+    y = func(x)
+    fig, ax = plt.subplots(figsize=(10, 7))
+    ax.plot(x, y)
+    #These defaults should be fine for most potentials
+    ax.set(xlim=[0.0, 7.0], ylim=[-3.0, 3.0], xlabel="r [$\AA$]", ylabel="func(r)")
+    return fig, ax
+    

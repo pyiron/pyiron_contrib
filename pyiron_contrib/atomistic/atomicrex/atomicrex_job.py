@@ -152,7 +152,7 @@ class Atomicrex(PotentialFittingBase):
                     self.status.aborted=True
                     self.output.error = l
                 
-                elif not finished_triggered:         
+                elif not finished_triggered:
                     if l.startswith("Iterations"):
                         l = l.split()
                         finished_triggered = True

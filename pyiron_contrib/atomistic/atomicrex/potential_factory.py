@@ -262,7 +262,7 @@ class EAMPotential(AbstractPotential):
                 # skip a line with unnecessary information
                 f.readline()
                 elements[element]["F"] = np.fromfile(f, count=Nrho, sep=" ")
-                for rho_element in elements:                        
+                for rho_element in elements:
                     elements[element]["rho_{}{}".format(element, rho_element)] = np.fromfile(f, count = Nr, sep=" ")
 
             # V_ij = V_ji so it is written only once in the file => avoid attempts to read it twice

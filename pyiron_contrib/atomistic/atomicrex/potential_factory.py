@@ -223,7 +223,7 @@ class EAMPotential(AbstractPotential):
     def plot_final_potential(self, job, filename=None):
         """
         Plots the the fitted potential. Reads the necessary data from eam.fs file (funcfl format used by lammps),
-        therefore does not work if no table is written. Can be used with disabled fitting to plot functions that 
+        therefore does not work if no table is written. Can be used with disabled fitting to plot functions that
         can't be plotted directly like splines.
 
         Args:
@@ -277,7 +277,7 @@ class EAMPotential(AbstractPotential):
                         elements[element]["V_{}".format(elementV_element)] = np.fromfile(f, count = Nr, sep=" ")
                         # The tabulated values are not V(r) but V(r) * r, so they are divided by r here,
                         # with exception of the first value to prevent division by 0.
-                        elements[element]["V_{}".format(elementV_element)][1:] = elements[element]["V_{}".format(elementV_element)][1:] / r_values[1:]  
+                        elements[element]["V_{}".format(elementV_element)][1:] = elements[element]["V_{}".format(elementV_element)][1:] / r_values[1:]
                         V_written.append(elementV_element)
         
         # TODO: figure out how to index ax for multiple elements

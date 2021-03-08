@@ -197,8 +197,8 @@ class ExpB(SpecialFunction):
             self.parameters.exponent.start_val) *
             self.parameters.alpha.start_val /
             (1-((r-self.parameters.rc.start_val) /
-            self.parameters.cutoff.start_val - self.parameters.rc.start_val) ** 
-            self.parameters.exponent.start_val ))   
+            self.parameters.cutoff.start_val - self.parameters.rc.start_val) **
+            self.parameters.exponent.start_val ))  
 
     def _to_xml_element(self):
         return super()._to_xml_element(name="exp-B")

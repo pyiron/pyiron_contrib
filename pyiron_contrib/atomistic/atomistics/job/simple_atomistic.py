@@ -9,7 +9,6 @@ class SimpleAtomistic(GenericInteractive):  # Create a custom job class
     def __init__(self, project, job_name):
         super().__init__(project, job_name)
         self.neigh = None
-        self.cutoff = 3
         self.potential = None
         self._neighbor_chemical_symbols = None
         self.uptodate = False
@@ -34,7 +33,7 @@ class SimpleAtomistic(GenericInteractive):  # Create a custom job class
         self.interactive_collect()
 
     def _update_neighbors(self):
-        self.neigh = self.structure.get_neighbors(num_neighbors=None, cutoff_radius=self.cutoff)
+        self.neigh = self.structure.get_neighbors(num_neighbors=None, cutoff_radius=self.potential.coeff.cutoff)
 
     def _get_chemical_pairs(self):
         c = self.structure.get_chemical_symbols()
@@ -53,7 +52,7 @@ class SimpleAtomistic(GenericInteractive):  # Create a custom job class
         forces = self.potential.get_forces(v=self.neigh.vecs, r=self.neigh.distances, per_atom=True)
         r = -self.neigh.vecs
         V = self.structure.get_volume()
-        return np.einsum('nki,nkj->ij', r, forces)/V
+        return 0.5*np.einsum('nki,nkj->ij', r, forces)/V
 
     def interactive_positions_setter(self, positions):
         self.uptodate = False

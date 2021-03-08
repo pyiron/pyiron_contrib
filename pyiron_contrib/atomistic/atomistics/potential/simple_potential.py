@@ -8,7 +8,7 @@ import numpy as np
 class SimplePotential(InputList):
     def __init__(self):
         self.coeff = InputList()
-        self._matrix = InputList()
+        self._matrix = {}
         self._uptodate = False
 
     def append_coeff(self, key, value, element_one=None, element_two=None):

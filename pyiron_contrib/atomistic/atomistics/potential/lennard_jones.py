@@ -10,7 +10,7 @@ class LennardJones(SimplePotential):
         epsilon = self._matrix['epsilon']
         sigma = self._matrix['sigma']
         cutoff = self._matrix['cutoff']
-        return epsilon*((sigma/r)**12-(sigma/r)**6)*(r<=cutoff)
+        return 0.5*epsilon*((sigma/r)**12-(sigma/r)**6)*(r<=cutoff)
 
     def _get_energy(self, r):
         E = np.sum(self._potential(r)-self._potential(self._matrix['cutoff']))
@@ -20,7 +20,7 @@ class LennardJones(SimplePotential):
         epsilon = self._matrix['epsilon']
         sigma = self._matrix['sigma']
         cutoff = self._matrix['cutoff']
-        f = epsilon*sigma**2*(12*(sigma/r)**10-6*(sigma/r)**4)*(r<=cutoff)
+        f = epsilon/sigma**2*(12*(sigma/r)**14-6*(sigma/r)**8)*(r<=cutoff)
         if per_atom:
             return -np.einsum('ijk,ij->ijk', v, f)
         else:

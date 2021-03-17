@@ -34,8 +34,8 @@ setup(
         'matplotlib==3.3.4',
         'numpy==1.20.1',
         'pyiron_base==0.2.2',
-        'scipy==1.6.0',
-        'seaborn==0.11.1',
+        'scipy==1.6.1',
+        'seaborn==0.11.1'
     ],
     extras_require={
         'atomistic': [

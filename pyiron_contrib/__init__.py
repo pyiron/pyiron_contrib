@@ -34,6 +34,14 @@ JOB_CLASS_DICT['RandSpg'] = 'pyiron_contrib.atomistic.atomistics.structures.rand
 JOB_CLASS_DICT['Fenics'] = 'pyiron_contrib.continuum.fenics.job.generic'
 JOB_CLASS_DICT['FenicsLinearElastic'] = 'pyiron_contrib.continuum.fenics.job.elastic'
 JOB_CLASS_DICT['TrainingContainer'] = 'pyiron_contrib.atomistic.atomistics.job.trainingcontainer'
+JOB_CLASS_DICT['RandomDisMaster'] = 'pyiron_contrib.atomistic.mlip.masters'
+JOB_CLASS_DICT['RandomMDMaster'] = 'pyiron_contrib.atomistic.mlip.masters'
+JOB_CLASS_DICT['RunnerFit'] = 'pyiron_contrib.atomistic.runner.job'
+JOB_CLASS_DICT['MlipSelect'] = 'pyiron_contrib.atomistic.mlip.mlipselect'
+JOB_CLASS_DICT['Mlip'] = 'pyiron_contrib.atomistic.mlip.mlip'
+JOB_CLASS_DICT['LammpsMlip'] = 'pyiron_contrib.atomistic.mlip.lammps'
+JOB_CLASS_DICT['MlipJob'] = 'pyiron_contrib.atomistic.mlip.mlipjob'
+JOB_CLASS_DICT['Atomicrex'] = 'pyiron_contrib.atomistic.atomicrex.atomicrex_job'
 
 
 from ._version import get_versions

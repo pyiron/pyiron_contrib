@@ -29,8 +29,7 @@ jobs:
     - name: Setup
       shell: bash -l {0}
       run: |
-        pip install --pre pyiron pyiron_base
-        pip install --pre pyiron pyiron_atomistics
+        pip install --pre pyiron pyiron_base pyiron_atomistics
         pip install --no-deps .
     - name: Test
       shell: bash -l {0}

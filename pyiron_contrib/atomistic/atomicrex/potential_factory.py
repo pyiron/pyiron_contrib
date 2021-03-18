@@ -24,6 +24,16 @@ class ARPotFactory(PyironFactory):
             species=species,
         )
 
+
+    @staticmethod
+    def meam_potential(identifier="MEAM", export_file="meam.out", species=["*", "*"]):
+        return MEAMPotential(
+            identifier=identifier,
+            export_file=export_file,
+            species=species,
+        )
+
+
     @staticmethod
     def lennard_jones_potential(sigma, epsilon, cutoff, species={"a": "*", "b": "*"}, identifier="LJ"):
         return LJPotential(sigma, epsilon, cutoff, species=species, identifier=identifier)
@@ -206,7 +216,7 @@ class EAMPotential(AbstractPotential):
             KeyError: Raises if a parsed parameter can't be matched to a function.
         """        
         for l in lines:
-            identifier, param, value = self._parse_parameter_line(l)
+            identifier, param, value = _parse_parameter_line(l)
             if identifier in self.pair_interactions:
                 self.pair_interactions[identifier].parameters[param].final_value = value
             elif identifier in self.electron_densities:
@@ -302,30 +312,145 @@ class EAMPotential(AbstractPotential):
                 ax[i+k, 0].set(ylim=(-5,5), title=f"{el} {pot}", xlabel=xlabel)
         return fig, ax
 
-    @staticmethod
-    def _parse_parameter_line(line):
+
+class MEAMPotential(AbstractPotential):
+    def __init__(self, init=None, identifier=None, export_file=None, species=None):
+        super().__init__(init=init)
+        if init is None:
+            self.pair_interactions = InputList(table_name="pair_interactions")
+            self.electron_densities = InputList(table_name="electron_densities")
+            self.embedding_energies = InputList(table_name="embedding_energies")
+            self.f_functions = InputList(table_name="f_functions")
+            self.g_functions = InputList(table_name="g_functions")
+            self.identifier = identifier
+            self.export_file = export_file
+            self.species = species
+
+    def copy_final_to_initial_params(self):
+        """
+        Copies final values of function paramters to start values.
+        This f.e. allows to continue global with local minimization.
+        """        
+        for functions in (
+            self.pair_interactions,
+            self.electron_densities,
+            self.embedding_energies,
+            self.f_functions,
+            self.g_functions
+            ):
+            for f in functions.values():
+                for param in f.parameters.values():
+                    param.copy_final_to_start_value()
+    
+
+    def write_xml_file(self, directory):
+        """
+        Internal function to convert to an xml element
+        """        
+        meam = ET.Element("meam")
+        meam.set("id", f"{self.identifier}")
+        meam.set("species-a", f"{self.species[0]}")
+        meam.set("species-b", f"{self.species[1]}")
+
+        if self.export_file:
+            export = ET.SubElement(meam, "export-functions")
+            export.text = f"{self.export_file}"
+
+        mapping = ET.SubElement(meam, "mapping")
+        functions = ET.SubElement(meam, "functions")
+
+        for pot in self.pair_interactions.values():
+            pair_interaction = ET.SubElement(mapping, "pair-interaction")
+            pair_interaction.set("species-a", f"{pot.species[0]}")
+            pair_interaction.set("species-b", f"{pot.species[1]}")
+            pair_interaction.set("function", f"{pot.identifier}")
+            functions.append(pot._to_xml_element())
+
+        for pot in self.electron_densities.values():
+            electron_density = ET.SubElement(mapping, "electron-density")
+            electron_density.set("species-a", f"{pot.species[0]}")
+            electron_density.set("species-b", f"{pot.species[1]}")
+            electron_density.set("function", f"{pot.identifier}")
+            functions.append(pot._to_xml_element())
+
+        for pot in self.f_functions.values():
+            f_function = ET.SubElement(mapping, "f-function")
+            f_function.set("species-a", f"{pot.species[0]}")
+            f_function.set("species-b", f"{pot.species[1]}")
+            f_function.set("species-c", f"{pot.species[2]}")
+            f_function.set("function", f"{pot.identifier}")
+            functions.append(pot._to_xml_element())
+        
+        for pot in self.g_functions.values():
+            g_function = ET.SubElement(mapping, "g-function")
+            g_function.set("species-a", f"{pot.species[0]}")
+            g_function.set("species-b", f"{pot.species[1]}")
+            g_function.set("function", f"{pot.identifier}")
+            functions.append(pot._to_xml_element())
+
+        for pot in self.embedding_energies.values():
+            embedding_energy = ET.SubElement(mapping, "embedding-energy")
+            embedding_energy.set("species", f"{pot.species[0]}")
+            embedding_energy.set("function", f"{pot.identifier}")
+            functions.append(pot._to_xml_element())
+
+        filename = posixpath.join(directory, "potential.xml")
+        write_pretty_xml(meam, filename)
+
+
+    def _parse_final_parameters(self, lines):
         """
         Internal Function.
-        Parses the function identifier, name and final value of a function parameter
-        from an atomicrex output line looking like:
-        EAM[EAM].V_CuCu[morse-B].delta: 0.0306585 [-0.5:0.5]
-        EAM[EAM].CuCu_rho[spline].node[1].y: 2.10988 [1:3]
+        Parse function parameters from atomicrex output.
 
-        Defined as staticmethod because it can probably be reused for other potential types.
+        Args:
+            lines (list[str]): atomicrex output lines
 
-        TODO: Add parsing of polynomial parameters.
-        Returns:
-            [(str, str, float): [description]
+        Raises:
+            KeyError: Raises if a parsed parameter can't be matched to a function.
         """        
+        for l in lines:
+            identifier, param, value = self._parse_parameter_line(l)
+            if identifier in self.pair_interactions:
+                self.pair_interactions[identifier].parameters[param].final_value = value
+            elif identifier in self.electron_densities:
+                self.electron_densities[identifier].parameters[param].final_value = value
+            elif identifier in self.f_functions:
+                self.f_functions[identifier].parameters[param].final_value = value
+            elif identifier in self.g_functions:
+                self.g_functions[identifier].parameters[param].final_value = value
+            elif identifier in self.embedding_energies:
+                self.embedding_energies[identifier].parameters[param].final_value = value
+            else:
+                raise KeyError(
+                    f"Can't find {identifier} in potential, probably something went wrong during parsing.\n"
+                    "Fitting parameters of screening functions probably doesn't work right now"
+                )
 
-        line = line.strip().split()
-        value = float(line[1])
-        info = line[0].split("].")
-        identifier = info[1].split("[")[0]
-        param = info[2]
-        if param.startswith("node"):
-            x = float(param.split("[")[1])
-            param = f"node_{x}"
-        else:
-            param = param.rstrip(":")
-        return identifier, param, value
+
+def _parse_parameter_line(line):
+    """
+    Internal Function.
+    Parses the function identifier, name and final value of a function parameter
+    from an atomicrex output line looking like:
+    EAM[EAM].V_CuCu[morse-B].delta: 0.0306585 [-0.5:0.5]
+    EAM[EAM].CuCu_rho[spline].node[1].y: 2.10988 [1:3]
+
+    Defined as staticmethod because it can probably be reused for other potential types.
+
+    TODO: Add parsing of polynomial parameters.
+    Returns:
+        [(str, str, float): [description]
+    """        
+
+    line = line.strip().split()
+    value = float(line[1])
+    info = line[0].split("].")
+    identifier = info[1].split("[")[0]
+    param = info[2]
+    if param.startswith("node"):
+        x = float(param.split("[")[1])
+        param = f"node_{x}"
+    else:
+        param = param.rstrip(":")
+    return identifier, param, value

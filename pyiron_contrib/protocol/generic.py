@@ -632,13 +632,13 @@ class Protocol(CompoundVertex, GenericJob):
 
     def execute(self):
         super(Protocol, self).execute()
-        self.protocol_finished.fire()
 
     def run_static(self):
         """If this CompoundVertex is the highest level, it can be run as a regular pyiron job."""
         self.status.running = True
         self.execute()
         self.status.collect = True  # Assume modal for now
+        self.protocol_finished.fire()
         self.run()  # This is an artifact of inheriting from GenericJob, to get all that run functionality
 
     def run(self, delete_existing_job=False, repair=False, debug=False, run_mode=None, continue_run=False):

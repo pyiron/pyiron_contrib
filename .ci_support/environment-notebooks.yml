@@ -9,6 +9,6 @@ dependencies:
   - numpy
   - scipy
   - seaborn
-  - scikit-image
   - papermill
   - pyiron_atomistics
+  - lammps

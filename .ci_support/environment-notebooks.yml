@@ -6,8 +6,6 @@ dependencies:
   - coverage
   - codacy-coverage
   - matplotlib
-  - fenics
-  - mshr
   - numpy
   - pyiron
   - scipy

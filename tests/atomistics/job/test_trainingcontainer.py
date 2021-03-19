@@ -4,7 +4,7 @@
 
 import os
 import unittest
-from pyiron import Project
+from pyiron_atomistics import Project
 import pyiron_contrib
 print(pyiron_contrib.__file__)
 
@@ -25,11 +25,11 @@ class TestTrainingContainer(unittest.TestCase):
 
     def setUp(self):
         self.container = self.project.create.job.TrainingContainer("test")
-        self.basis_1 = self.project.create_ase_bulk("Al")
+        self.basis_1 = self.project.create.structure.ase.bulk("Al")
         force = [[0.0, 0.0, 0.0]]
         energy = 0.0
         self.container.include_structure(self.basis_1, energy=energy, forces=force, name="unitcell")
-        self.basis_2 = self.project.create_ase_bulk("Al").repeat([2, 1, 1])
+        self.basis_2 = self.project.create.structure.ase.bulk("Al").repeat([2, 1, 1])
         force = [[0.0, 0.0, 0.0], [0.0, 0.0, 0.01]]
         energy = 0.01
         self.container.include_structure(self.basis_2, energy=energy, forces=force, name="repeated")

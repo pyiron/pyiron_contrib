@@ -9,8 +9,8 @@ import numpy as np
 import time
 from abc import abstractmethod
 from multiprocessing import Process, Manager
-from pyiron.vasp.interactive import VaspInteractive
-from pyiron.sphinx.interactive import SphinxInteractive
+from pyiron_atomistics.vasp.interactive import VaspInteractive
+from pyiron_atomistics.sphinx.interactive import SphinxInteractive
 
 """
 A command class for running multiple of the same node

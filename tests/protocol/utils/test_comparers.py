@@ -4,7 +4,7 @@
 
 import unittest
 import numpy as np
-from pyiron.atomistics.structure.atoms import Atoms
+from pyiron_atomistics.atomistics.structure.atoms import Atoms
 from pyiron_contrib.protocol.utils.comparers import Comparer
 
 

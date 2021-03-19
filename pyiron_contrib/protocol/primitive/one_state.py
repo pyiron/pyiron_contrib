@@ -12,7 +12,7 @@ from scipy.constants import physical_constants
 from scipy.integrate import simps
 from ase.geometry import get_distances
 
-from pyiron import Project
+from pyiron_atomistics import Project
 from pyiron_atomistics.atomistics.job.interactive import GenericInteractive
 from pyiron_atomistics.lammps.lammps import LammpsInteractive
 from pyiron_contrib.protocol.generic import PrimitiveVertex

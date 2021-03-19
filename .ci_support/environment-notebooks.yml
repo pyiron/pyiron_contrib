@@ -11,3 +11,4 @@ dependencies:
   - seaborn
   - scikit-image
   - papermill
+  - pyiron_atomistics

@@ -7,7 +7,6 @@ dependencies:
   - codacy-coverage
   - matplotlib
   - numpy
-  - pyiron
   - scipy
   - seaborn
   - scikit-image

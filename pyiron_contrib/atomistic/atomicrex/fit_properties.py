@@ -1,9 +1,9 @@
 import xml.etree.ElementTree as ET
 
-from pyiron_base import InputList
+from pyiron_base import DataContainer
 
 
-class ARFitProperty(InputList):
+class ARFitProperty(DataContainer):
     """
     Class to describe properties that can be fitted using atomicrex.
     Property and target value have to be given,
@@ -152,9 +152,9 @@ class ARFitProperty(InputList):
 
 
 
-class ARFitPropertyList(InputList):
+class ARFitPropertyList(DataContainer):
     """
-    InputList of ARFitProperties that additionally provides utility functions
+    DataContainer of ARFitProperties that additionally provides utility functions
     that allow convenient addition of fit properties to a structure.
     Also provides internal functionality.
     """

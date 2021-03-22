@@ -12,7 +12,7 @@ from os.path import abspath
 
 from pyiron_contrib.image.image import Image
 from pyiron_contrib.image.utils import DistributingList
-from pyiron_base.generic.inputlist import InputList
+from pyiron_base.generic.inputlist import DataContainer
 
 from pyiron_contrib.image.custom_filters import brightness_filter
 
@@ -45,8 +45,8 @@ class ImageJob(GenericJob):
         super(ImageJob, self).__init__(project, job_name)
         self.__name__ = "ImageJob"
         self._images = DistributingList()
-        self.input = InputList(table_name ="input")
-        self.output = InputList(table_name ="output")
+        self.input = DataContainer(table_name ="input")
+        self.output = DataContainer(table_name ="output")
 
 
     @property

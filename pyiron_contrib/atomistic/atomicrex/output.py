@@ -1,6 +1,6 @@
-from pyiron_base import InputList
+from pyiron_base import DataContainer
 
-class Output(InputList):
+class Output(DataContainer):
     """
     Class to store general output quantities.
     Final properties and function parameter values are stored within

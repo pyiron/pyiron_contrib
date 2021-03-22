@@ -4,13 +4,13 @@ import posixpath
 import numpy as np
 from ase.data import atomic_masses, atomic_numbers
 
-from pyiron_base import InputList, PyironFactory
+from pyiron_base import DataContainer, PyironFactory
 
 from pyiron_contrib.atomistic.atomicrex.utility_functions import write_pretty_xml
 from pyiron_contrib.atomistic.atomicrex.potential_factory import ARPotFactory
 from pyiron_contrib.atomistic.atomicrex.function_factory import FunctionFactory
 
-class GeneralARInput(InputList):
+class GeneralARInput(DataContainer):
     """
     Class to store general input of an atomicrex job,
     f.e. the fit algorithm.
@@ -79,9 +79,9 @@ class GeneralARInput(InputList):
         write_pretty_xml(job, file_name)
 
 
-class AtomTypes(InputList):
+class AtomTypes(DataContainer):
     """
-        InputList used to specify elements in the fit job.
+        DataContainer used to specify elements in the fit job.
         Elements can be added using dictionary or attribute syntax.
         Their value should None or a (mass, index) tuple as value.
         If value is None the mass and index are taken from the ase package.
@@ -181,7 +181,7 @@ class AlgorithmFactory(PyironFactory):
         return NloptAlgorithm(name="GN_ISRES", stopval=stopval, max_iter=max_iter, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed)
 
 
-class AtomicrexAlgorithm(InputList):
+class AtomicrexAlgorithm(DataContainer):
     """
     Class to inherit from. If more algorithms will be implemented in atomicrex
     at some point they can be implemented similar to the AR_LBFGS class.
@@ -229,7 +229,7 @@ class SpaMinimizer:
         return spa
 
 
-class NloptAlgorithm(InputList):
+class NloptAlgorithm(DataContainer):
     """
     Nlopt algorithms should inherit from this class.
     """    

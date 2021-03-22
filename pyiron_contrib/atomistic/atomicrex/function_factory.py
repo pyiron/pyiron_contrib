@@ -4,7 +4,7 @@ import copy
 import numpy as np
 import matplotlib.pyplot as plt
 
-from pyiron_base import PyironFactory, InputList
+from pyiron_base import PyironFactory, DataContainer
 
 
 
@@ -55,7 +55,7 @@ class FunctionFactory(PyironFactory):
         return Gaussian(identifier, prefactor, eta, mu, species)
 
 
-class SpecialFunction(InputList):
+class SpecialFunction(DataContainer):
     """
     Analytic functions defined within atomicrex should inherit from this class
     https://atomicrex.org/potentials/functions.html#index-1
@@ -102,7 +102,7 @@ class SpecialFunction(InputList):
             return plot(self.func)
 
 
-class Poly(InputList):
+class Poly(DataContainer):
     """
     Polynomial interpolation function.
     """    
@@ -121,7 +121,7 @@ class Poly(InputList):
         return poly
 
 
-class Spline(InputList):
+class Spline(DataContainer):
     """
     Spline interpolation function
     """
@@ -373,7 +373,7 @@ class Gaussian(SpecialFunction):
         return super()._to_xml_element(name="morse-A")
 
 
-class UserFunction(InputList):
+class UserFunction(DataContainer):
     """
     Analytic functions that are not implemented in atomicrex
     can be provided as user functions.
@@ -421,7 +421,7 @@ class UserFunction(InputList):
             return screening
 
 
-class FunctionParameter(InputList):
+class FunctionParameter(DataContainer):
     """
     Function parameter. For detailed information
     about the attributes see the atomicrex documentation.
@@ -467,7 +467,7 @@ class FunctionParameter(InputList):
                 self.start_val = copy.copy(self.final_value)
             
 
-class FunctionParameterList(InputList):
+class FunctionParameterList(DataContainer):
     def __init__(self):
         super().__init__(table_name="FunctionParameterList")
 
@@ -531,7 +531,7 @@ class PolyCoeff(FunctionParameter):
         root.set("n", self.n)
 
 
-class PolyCoeffList(InputList):
+class PolyCoeffList(DataContainer):
     def __init__(self):
         super().__init__(table_name="PolyCoeffList")
 
@@ -586,7 +586,7 @@ class Node(FunctionParameter):
         return node
 
 
-class NodeList(InputList):
+class NodeList(DataContainer):
     def __init__(self):
         super().__init__(table_name="NodeList")
 

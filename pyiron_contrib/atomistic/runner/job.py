@@ -8,7 +8,7 @@ Demonstrator job for the RuNNer Neural Network Potential.
 import os.path
 from glob import glob
 
-from pyiron_base import GenericJob, Executable, Settings, InputList
+from pyiron_base import GenericJob, Executable, Settings, DataContainer
 
 import numpy as np
 import pandas as pd
@@ -33,7 +33,7 @@ class RunnerFit(GenericJob):
         super().__init__(project, job_name) 
         self._training_ids = []
 
-        self.input = InputList(table_name="input")
+        self.input = DataContainer(table_name="input")
         self.input.element = "Cu"
 
         s.publication_add(self.publication)

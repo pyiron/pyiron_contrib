@@ -317,11 +317,11 @@ class MEAMPotential(AbstractPotential):
     def __init__(self, init=None, identifier=None, export_file=None, species=None):
         super().__init__(init=init)
         if init is None:
-            self.pair_interactions = InputList(table_name="pair_interactions")
-            self.electron_densities = InputList(table_name="electron_densities")
-            self.embedding_energies = InputList(table_name="embedding_energies")
-            self.f_functions = InputList(table_name="f_functions")
-            self.g_functions = InputList(table_name="g_functions")
+            self.pair_interactions = DataContainer(table_name="pair_interactions")
+            self.electron_densities = DataContainer(table_name="electron_densities")
+            self.embedding_energies = DataContainer(table_name="embedding_energies")
+            self.f_functions = DataContainer(table_name="f_functions")
+            self.g_functions = DataContainer(table_name="g_functions")
             self.identifier = identifier
             self.export_file = export_file
             self.species = species

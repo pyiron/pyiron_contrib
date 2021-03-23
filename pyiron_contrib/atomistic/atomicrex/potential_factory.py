@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from pyiron_base import PyironFactory, InputList
+from pyiron_base import PyironFactory, DataContainer
 from pyiron_contrib.atomistic.atomicrex.function_factory import FunctionFactory
 from pyiron_contrib.atomistic.atomicrex.utility_functions import write_pretty_xml
 
@@ -29,7 +29,7 @@ class ARPotFactory(PyironFactory):
         return LJPotential(sigma, epsilon, cutoff, species=species, identifier=identifier)
 
 
-class AbstractPotential(InputList):
+class AbstractPotential(DataContainer):
     """Potentials should inherit from this class for hdf5 storage.
     """    
     def __init__(self, init=None, table_name="potential"):
@@ -109,9 +109,9 @@ class EAMPotential(AbstractPotential):
     def __init__(self, init=None, identifier=None, export_file=None, rho_range_factor=None, resolution=None, species=None):
         super().__init__(init=init)
         if init is None:
-            self.pair_interactions = InputList(table_name="pair_interactions")
-            self.electron_densities = InputList(table_name="electron_densities")
-            self.embedding_energies = InputList(table_name="embedding_energies")
+            self.pair_interactions = DataContainer(table_name="pair_interactions")
+            self.electron_densities = DataContainer(table_name="electron_densities")
+            self.embedding_energies = DataContainer(table_name="embedding_energies")
             self.identifier = identifier
             self.export_file = export_file
             self.rho_range_factor = rho_range_factor

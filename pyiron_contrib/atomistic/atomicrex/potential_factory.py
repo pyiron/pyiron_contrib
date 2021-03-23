@@ -377,7 +377,6 @@ class MEAMPotential(AbstractPotential):
             f_function = ET.SubElement(mapping, "f-function")
             f_function.set("species-a", f"{pot.species[0]}")
             f_function.set("species-b", f"{pot.species[1]}")
-            f_function.set("species-c", f"{pot.species[2]}")
             f_function.set("function", f"{pot.identifier}")
             functions.append(pot._to_xml_element())
         
@@ -385,6 +384,7 @@ class MEAMPotential(AbstractPotential):
             g_function = ET.SubElement(mapping, "g-function")
             g_function.set("species-a", f"{pot.species[0]}")
             g_function.set("species-b", f"{pot.species[1]}")
+            g_function.set("species-c", f"{pot.species[2]}")
             g_function.set("function", f"{pot.identifier}")
             functions.append(pot._to_xml_element())
 
@@ -410,7 +410,7 @@ class MEAMPotential(AbstractPotential):
             KeyError: Raises if a parsed parameter can't be matched to a function.
         """        
         for l in lines:
-            identifier, param, value = self._parse_parameter_line(l)
+            identifier, param, value = _parse_parameter_line(l)
             if identifier in self.pair_interactions:
                 self.pair_interactions[identifier].parameters[param].final_value = value
             elif identifier in self.electron_densities:

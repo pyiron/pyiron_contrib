@@ -137,8 +137,9 @@ class Spline(InputList):
     def _to_xml_element(self):
         spline = ET.Element("spline")
         spline.set("id", self.identifier)
-        cutoff = ET.SubElement(spline, "cutoff")
-        cutoff.text = f"{self.cutoff}"
+        if self.cutoff is not None:
+            cutoff = ET.SubElement(spline, "cutoff")
+            cutoff.text = f"{self.cutoff}"
         der_l = ET.SubElement(spline, "derivative-left")
         der_l.text = f"{self.derivative_left}"
         der_r = ET.SubElement(spline, "derivative-right")

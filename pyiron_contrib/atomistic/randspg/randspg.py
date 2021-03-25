@@ -7,9 +7,9 @@ from __future__ import print_function
 import os
 import posixpath
 
-from pyiron.atomistics.structure.atoms import Atoms
+from pyiron_atomistics.atomistics.structure.atoms import Atoms
 from pyiron_base import GenericParameters, GenericJob
-from pyiron.vasp.structure import read_atoms
+from pyiron_atomistics.vasp.structure import read_atoms
 
 __author__ = "Jan Janssen"
 __copyright__ = "Copyright 2020, Max-Planck-Institut für Eisenforschung GmbH - " \

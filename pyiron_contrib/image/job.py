@@ -12,7 +12,7 @@ from os.path import abspath
 
 from pyiron_contrib.image.image import Image
 from pyiron_contrib.image.utils import DistributingList
-from pyiron_base.generic.inputlist import DataContainer
+from pyiron_base import DataContainer
 
 from pyiron_contrib.image.custom_filters import brightness_filter
 

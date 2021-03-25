@@ -68,7 +68,7 @@ class MlipDescriptors(GenericJob):
 
         cfgs = []
         container = self.project.load(self.input.structure_container_id)
-        for structure in container.structure_lst:
+        for structure in container.structure_lst.values():
             c = Cfg()
             c.pos = structure.position
             c.lat = structure.cell
@@ -81,7 +81,7 @@ class MlipDescriptors(GenericJob):
 
         def parse(f):
             s = f.readline()
-            while s != '':
+            while s != "":
                 N = int(s)
                 M = int(f.readline().split()[-1])
                 x = np.empty((N,M))

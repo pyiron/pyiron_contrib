@@ -70,7 +70,7 @@ class MlipDescriptors(GenericJob):
         container = self.project.load(self.input.structure_container_id)
         for structure in container.structure_lst.values():
             c = Cfg()
-            c.pos = structure.position
+            c.pos = structure.positions
             c.lat = structure.cell
             c.types = structure.indices
             cfgs.append(c)

@@ -12,3 +12,4 @@ dependencies:
   - scikit-image
   - papermill
   - pyiron_atomistics
+  - randspg

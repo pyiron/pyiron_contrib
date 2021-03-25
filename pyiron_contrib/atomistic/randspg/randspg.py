@@ -8,7 +8,7 @@ import os
 import posixpath
 
 from pyiron.atomistics.structure.atoms import Atoms
-from pyiron_base import GenericParameters, GenericJob
+from pyiron_base import GenericParameters, GenericJob, Executable, Settings
 from pyiron.vasp.structure import read_atoms
 
 __author__ = "Jan Janssen"
@@ -19,6 +19,8 @@ __maintainer__ = "Jan Janssen"
 __email__ = "janssen@mpie.de"
 __status__ = "development"
 __date__ = "Sep 1, 2017"
+
+s = Settings()
 
 
 class RandSpg(GenericJob):
@@ -52,6 +54,26 @@ class RandSpg(GenericJob):
             return self._lst_of_struct
         else:
             return []
+
+    def _executable_activate(self, enforce=False):
+        """
+        Internal function that sets up and Executable() object
+        and finds executables available in pyiron resources/atomicrex/bin
+
+        Args:
+            enforce (bool, optional): [description]. Defaults to False.
+        """
+        if self._executable is None or enforce:
+            if len(self.__module__.split(".")) > 1:
+                self._executable = Executable(
+                    codename=self.__name__,
+                    module=self.__module__.split(".")[-2],
+                    path_binary_codes=s.resource_paths,
+                )
+            else:
+                self._executable = Executable(
+                    codename=self.__name__, path_binary_codes=s.resource_paths
+                )
 
     def set_input_to_read_only(self):
         """

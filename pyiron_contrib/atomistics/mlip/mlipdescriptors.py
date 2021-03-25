@@ -75,7 +75,7 @@ class MlipDescriptors(GenericJob):
             c.types = structure.indices
             cfgs.append(c)
 
-        savecfgs(file_name=os.path.join(self.working_directory, _INPUT_PATH), cfgs=cfgs)
+        savecfgs(filename=os.path.join(self.working_directory, _INPUT_PATH), cfgs=cfgs)
 
     def collect_output(self):
 

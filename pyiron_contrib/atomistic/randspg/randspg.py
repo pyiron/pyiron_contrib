@@ -149,3 +149,18 @@ outputDir = randSpgOut
 verbosity = r
 '''
         self.load_string(input_str)
+
+    def write_file(self, file_name, cwd=None):
+        """
+        Write GenericParameters to input file
+
+        Args:
+            file_name (str): name of the file, either absolute (then cwd must be None) or relative
+            cwd (str): path name (default: None)
+        """
+        if cwd is not None:
+            file_name = posixpath.join(cwd, file_name)
+
+        with open(file_name, "w") as f:
+            for line in self.get_string_lst():
+                f.write(line.replace("(", "").replace(")", ""))

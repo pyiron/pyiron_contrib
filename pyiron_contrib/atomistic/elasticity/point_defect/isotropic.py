@@ -1,27 +1,9 @@
 import numpy as np
 
-# def displacement_field(
-#     x, dipole_tensor, lame_coefficient, shear_modulus
-# ):
-#     """
-#     displacement field according to the isotropic linear point defect theory.
-#     """
-#     r = np.atleast_2d(x)
-#     R = np.linalg.norm(r, axis=-1)[:,None,None]
-#     p = [
-#         (lame_coefficient+3*shear_modulus)/(lame_coefficient+2*shear_modulus),
-#         (lame_coefficient+shear_modulus)/(lame_coefficient+2*shear_modulus)
-#     ]
-#     G = (p[0]*np.eye(3)+p[1]*np.einsum('ni,nj->nij', r, r))/R
-#     R = R[:,:,:,None]
-#     u = np.einsum('ik,nj->nijk', np.eye(3), r)-np.einsum('ni,nj,nk->nijk', r, r, r)/R**2
-#     u = p[1]*np.einsum('nijk,njik->nijk', u, u)/R**4
-#     u -= np.einsum('nk,nijk,nij->nijk', r, 1/R**2, G)
-#     u /= 8*np.pi*shear_modulus
-#     u = np.einsum('nijk,jk->ni', u, dipole_tensor)
-#     return -np.squeeze(u)
-
 def G(r, poissons_ratio, shear_modulus):
+    """
+    Green's function
+    """
     r = np.array(r).reshape(-1, 3)
     R = np.linalg.norm(r, axis=-1)
     vorfaktor = 1/(16*shear_modulus*np.pi*(1-poissons_ratio))
@@ -30,6 +12,9 @@ def G(r, poissons_ratio, shear_modulus):
     )
 
 def dG(x, poissons_ratio, shear_modulus):
+    """
+    first derivative of the Green's function
+    """
     E = np.eye(3)
     r = np.array(x).reshape(-1, 3)
     R = np.linalg.norm(r, axis=-1)
@@ -43,17 +28,20 @@ def dG(x, poissons_ratio, shear_modulus):
     return np.einsum('nijk,n->nijk', v, 1/R**2)
 
 def ddG(x, poissons_ratio, shear_modulus):
+    """
+    Second derivative of the Green's function
+    """
     E = np.eye(3)
     r = np.array(x).reshape(-1, 3)
     R = np.linalg.norm(r, axis=-1)
     r = np.einsum('ni,n->ni', r, 1/R)
     A = (3-4*poissons_ratio)/(16*np.pi*shear_modulus*(1-poissons_ratio))
     B = 1/(16*np.pi*shear_modulus*(1-poissons_ratio))
-    v = -A*np.einsum('il,jk->ikjl', E, E)
+    v = -A*np.einsum('ik,jl->ijkl', E, E)
     v = v+3*A*np.einsum('ik,nj,nl->nijkl', E, r, r)
     v = v+B*np.einsum('il,jk->ijkl', E, E)
     v -= 3*B*np.einsum('il,nj,nk->nijkl', E, r, r)
-    v += B*np.einsum('ij,kl->nijkl', E, E)
+    v = v+B*np.einsum('ij,kl->ijkl', E, E)
     v -= 3*B*np.einsum('ni,nj,kl->nijkl', r, r, E)
     v -= 3*B*np.einsum('ij,nk,nl->nijkl', E, r, r)
     v -= 3*B*np.einsum('jk,ni,nl->nijkl', E, r, r)

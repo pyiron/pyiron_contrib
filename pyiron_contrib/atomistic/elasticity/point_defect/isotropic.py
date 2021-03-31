@@ -12,7 +12,7 @@ def displacement_field(
         (lame_coefficient+3*shear_modulus)/(lame_coefficient+2*shear_modulus),
         (lame_coefficient+shear_modulus)/(lame_coefficient+2*shear_modulus)
     ]
-    G = p[1]*np.eye(3)+p[2]*np.einsum('ni,nj->nij', r, r)
+    G = p[0]*np.eye(3)+p[1]*np.einsum('ni,nj->nij', r, r)
     u = np.eye(3)[None,:,:]-r[:,:,None]*r[:,None,:]/R**2
     R = R[:,:,:,None]
     u = p[1]*np.einsum('nik,njk->nijk', u, u)/R**2

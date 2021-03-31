@@ -1,22 +1,68 @@
 import numpy as np
 
-def displacement_field(
-    x, dipole_tensor, lame_coefficient, shear_modulus
-):
-    """
-    displacement field according to the isotropic linear point defect theory.
-    """
-    r = np.atleast_2d(x)
-    R = np.linalg.norm(r, axis=-1)[:,None,None]
-    p = [
-        (lame_coefficient+3*shear_modulus)/(lame_coefficient+2*shear_modulus),
-        (lame_coefficient+shear_modulus)/(lame_coefficient+2*shear_modulus)
-    ]
-    G = p[0]*np.eye(3)+p[1]*np.einsum('ni,nj->nij', r, r)
-    u = np.eye(3)[None,:,:]-r[:,:,None]*r[:,None,:]/R**2
-    R = R[:,:,:,None]
-    u = p[1]*np.einsum('nik,njk->nijk', u, u)/R**2
-    u += np.einsum('nk,nijk,nij->nijk', r, 1/R**3, G)
-    u /= 8*np.pi*shear_modulus*R
-    u = -np.einsum('nijk,jk->ni', u, dipole_tensor)
-    return np.squeeze(u)
+# def displacement_field(
+#     x, dipole_tensor, lame_coefficient, shear_modulus
+# ):
+#     """
+#     displacement field according to the isotropic linear point defect theory.
+#     """
+#     r = np.atleast_2d(x)
+#     R = np.linalg.norm(r, axis=-1)[:,None,None]
+#     p = [
+#         (lame_coefficient+3*shear_modulus)/(lame_coefficient+2*shear_modulus),
+#         (lame_coefficient+shear_modulus)/(lame_coefficient+2*shear_modulus)
+#     ]
+#     G = (p[0]*np.eye(3)+p[1]*np.einsum('ni,nj->nij', r, r))/R
+#     R = R[:,:,:,None]
+#     u = np.einsum('ik,nj->nijk', np.eye(3), r)-np.einsum('ni,nj,nk->nijk', r, r, r)/R**2
+#     u = p[1]*np.einsum('nijk,njik->nijk', u, u)/R**4
+#     u -= np.einsum('nk,nijk,nij->nijk', r, 1/R**2, G)
+#     u /= 8*np.pi*shear_modulus
+#     u = np.einsum('nijk,jk->ni', u, dipole_tensor)
+#     return -np.squeeze(u)
+
+def G(r, poissons_ratio, shear_modulus):
+    r = np.array(r).reshape(-1, 3)
+    R = np.linalg.norm(r, axis=-1)
+    vorfaktor = 1/(16*shear_modulus*np.pi*(1-poissons_ratio))
+    return vorfaktor*np.squeeze(
+        ((3-4*poissons_ratio)*np.eye(3)+np.einsum('ni,nj,n->nij', r, r, 1/R**2))/R
+    )
+
+def dG(x, poissons_ratio, shear_modulus):
+    E = np.eye(3)
+    r = np.array(x).reshape(-1, 3)
+    R = np.linalg.norm(r, axis=-1)
+    r = np.einsum('ni,n->ni', r, 1/R)
+    B = 1/(16*np.pi*shear_modulus*(1-poissons_ratio))
+    A = (3-4*poissons_ratio)*B
+    v = -A*np.einsum('ik,nj->nijk', E, r)
+    v += B*np.einsum('ij,nk->nijk', E, r)
+    v += B*np.einsum('jk,ni->nijk', E, r)
+    v -= 3*B*np.einsum('ni,nj,nk->nijk', r, r, r)
+    return np.einsum('nijk,n->nijk', v, 1/R**2)
+
+def ddG(x, poissons_ratio, shear_modulus):
+    E = np.eye(3)
+    r = np.array(x).reshape(-1, 3)
+    R = np.linalg.norm(r, axis=-1)
+    r = np.einsum('ni,n->ni', r, 1/R)
+    A = (3-4*poissons_ratio)/(16*np.pi*shear_modulus*(1-poissons_ratio))
+    B = 1/(16*np.pi*shear_modulus*(1-poissons_ratio))
+    v = -A*np.einsum('il,jk->ikjl', E, E)
+    v = v+3*A*np.einsum('ik,nj,nl->nijkl', E, r, r)
+    v = v+B*np.einsum('il,jk->ijkl', E, E)
+    v -= 3*B*np.einsum('il,nj,nk->nijkl', E, r, r)
+    v += B*np.einsum('ij,kl->nijkl', E, E)
+    v -= 3*B*np.einsum('ni,nj,kl->nijkl', r, r, E)
+    v -= 3*B*np.einsum('ij,nk,nl->nijkl', E, r, r)
+    v -= 3*B*np.einsum('jk,ni,nl->nijkl', E, r, r)
+    v -= 3*B*np.einsum('jl,ni,nk->nijkl', E, r, r)
+    v += 15*B*np.einsum('ni,nj,nk,nl->nijkl', r, r, r, r)
+    return np.einsum('nijkl,n->nijkl', v, 1/R**3)
+
+def displacement_field(r, dipole_tensor, poissons_ratio, shear_modulus):
+    return -np.einsum('nijk,kj->ni', dG(r, poissons_ratio=poissons_ratio, shear_modulus=shear_modulus), dipole_tensor).squeeze()
+
+def strain_field(r, dipole_tensor, poissons_ratio, shear_modulus):
+    return -np.einsum('nijkl,kl->nij', ddG(r, poissons_ratio=poissons_ratio, shear_modulus=shear_modulus), dipole_tensor).squeeze()

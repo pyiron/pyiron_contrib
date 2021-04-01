@@ -50,7 +50,13 @@ def ddG(x, poissons_ratio, shear_modulus):
     return np.einsum('nijkl,n->nijkl', v, 1/R**3)
 
 def displacement_field(r, dipole_tensor, poissons_ratio, shear_modulus):
-    return -np.einsum('nijk,kj->ni', dG(r, poissons_ratio=poissons_ratio, shear_modulus=shear_modulus), dipole_tensor).squeeze()
+    return -np.einsum(
+        'nijk,kj->ni', dG(r, poissons_ratio=poissons_ratio, shear_modulus=shear_modulus), dipole_tensor
+    ).reshape(r.shape)
 
 def strain_field(r, dipole_tensor, poissons_ratio, shear_modulus):
-    return -np.einsum('nijkl,kl->nij', ddG(r, poissons_ratio=poissons_ratio, shear_modulus=shear_modulus), dipole_tensor).squeeze()
+    v = -np.einsum(
+        'nijkl,kl->nij', ddG(r, poissons_ratio=poissons_ratio, shear_modulus=shear_modulus), dipole_tensor
+    )
+    v = 0.5*(v+np.einsum('nij->nji', v))
+    return v.reshape(r.shape+(3,))

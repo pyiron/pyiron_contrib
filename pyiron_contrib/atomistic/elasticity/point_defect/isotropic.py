@@ -1,9 +1,7 @@
 import numpy as np
 
 def G(r, poissons_ratio, shear_modulus):
-    """
-    Green's function
-    """
+    """ Green's function """
     r = np.array(r).reshape(-1, 3)
     R = np.linalg.norm(r, axis=-1)
     vorfaktor = 1/(16*shear_modulus*np.pi*(1-poissons_ratio))
@@ -12,9 +10,7 @@ def G(r, poissons_ratio, shear_modulus):
     )
 
 def dG(x, poissons_ratio, shear_modulus):
-    """
-    first derivative of the Green's function
-    """
+    """ first derivative of the Green's function """
     E = np.eye(3)
     r = np.array(x).reshape(-1, 3)
     R = np.linalg.norm(r, axis=-1)
@@ -28,9 +24,7 @@ def dG(x, poissons_ratio, shear_modulus):
     return np.einsum('nijk,n->nijk', v, 1/R**2)
 
 def ddG(x, poissons_ratio, shear_modulus):
-    """
-    Second derivative of the Green's function
-    """
+    """ Second derivative of the Green's function """
     E = np.eye(3)
     r = np.array(x).reshape(-1, 3)
     R = np.linalg.norm(r, axis=-1)
@@ -50,13 +44,36 @@ def ddG(x, poissons_ratio, shear_modulus):
     return np.einsum('nijkl,n->nijkl', v, 1/R**3)
 
 def displacement_field(r, dipole_tensor, poissons_ratio, shear_modulus):
-    return -np.einsum(
-        'nijk,kj->ni', dG(r, poissons_ratio=poissons_ratio, shear_modulus=shear_modulus), dipole_tensor
-    ).reshape(r.shape)
+    if dipole_tensor.shape==(3,):
+        return -np.einsum(
+            'nijk,kj->ni', dG(r, poissons_ratio=poissons_ratio, shear_modulus=shear_modulus), dipole_tensor*np.eye(3)
+        ).reshape(r.shape)
+    elif dipole_tensor.shape==(3,3,)
+        return -np.einsum(
+            'nijk,kj->ni', dG(r, poissons_ratio=poissons_ratio, shear_modulus=shear_modulus), dipole_tensor
+        ).reshape(r.shape)
+    elif dipole_tensor.shape==(len(r),3,3,)
+        return -np.einsum(
+            'nijk,nkj->ni', dG(r, poissons_ratio=poissons_ratio, shear_modulus=shear_modulus), dipole_tensor
+        ).reshape(r.shape)
+    else:
+        raise ValueError('dipole tensor must be a 3d vector 3x3 matrix or Nx3x3 matrix')
 
 def strain_field(r, dipole_tensor, poissons_ratio, shear_modulus):
-    v = -np.einsum(
-        'nijkl,kl->nij', ddG(r, poissons_ratio=poissons_ratio, shear_modulus=shear_modulus), dipole_tensor
-    )
+    if dipole_tensor.shape==(3,):
+        v = -np.einsum(
+            'nijkl,kl->nij', ddG(r, poissons_ratio=poissons_ratio, shear_modulus=shear_modulus), dipole_tensor*np.eye(3)
+        )
+    elif dipole_tensor.shape==(3,3,):
+        v = -np.einsum(
+            'nijkl,kl->nij', ddG(r, poissons_ratio=poissons_ratio, shear_modulus=shear_modulus), dipole_tensor
+        )
+    elif dipole_tensor.shape==(len(r),3,3,)
+        v = -np.einsum(
+            'nijkl,nkl->nij', ddG(r, poissons_ratio=poissons_ratio, shear_modulus=shear_modulus), dipole_tensor
+        )
+    else:
+        raise ValueError('dipole tensor must be a 3d vector 3x3 matrix or Nx3x3 matrix')
     v = 0.5*(v+np.einsum('nij->nji', v))
     return v.reshape(r.shape+(3,))
+

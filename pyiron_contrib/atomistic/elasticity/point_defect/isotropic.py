@@ -59,9 +59,9 @@ def displacement_field(r, dipole_tensor, poissons_ratio, shear_modulus, min_dist
         return -np.einsum(
             'nijk,kj->ni', g_tmp, dipole_tensor
         ).reshape(r.shape)
-    elif dipole_tensor.shape==(len(r),3,3,):
+    elif dipole_tensor.shape==(r.shape+(3,)):
         return -np.einsum(
-            'nijk,nkj->ni', g_tmp, dipole_tensor
+            'nijk,nkj->ni', g_tmp, dipole_tensor.reshape(-1, 3, 3)
         ).reshape(r.shape)
     else:
         raise ValueError('dipole tensor must be a 3d vector 3x3 matrix or Nx3x3 matrix')
@@ -76,9 +76,9 @@ def strain_field(r, dipole_tensor, poissons_ratio, shear_modulus, min_distance=0
         v = -np.einsum(
             'nijkl,kl->nij', g_tmp, dipole_tensor
         )
-    elif dipole_tensor.shape==(len(r),3,3,):
+    elif dipole_tensor.shape==(r.shape+(3,)):
         v = -np.einsum(
-            'nijkl,nkl->nij', g_tmp, dipole_tensor
+            'nijkl,nkl->nij', g_tmp, dipole_tensor.reshape(-1,3,3)
         )
     else:
         raise ValueError('dipole tensor must be a 3d vector 3x3 matrix or Nx3x3 matrix')

@@ -19,6 +19,7 @@ from pyiron_base import Settings, DataContainer, GenericJob, Executable
 from .cfgs import Cfg, savecfgs
 
 import os.path
+import shutil
 
 # This class expects the job executable to read the potential and configurations and write the descriptors to a few
 # hard-coded paths
@@ -65,6 +66,10 @@ class MlipDescriptors(GenericJob):
 
     def write_input(self):
         self._create_working_directory()
+
+        potential = self.project.load(self.input.potential_job_id)
+        shutil.copy2(potential.potential_files[0],
+                     os.path.join(self.working_directory, _POTENTIAL_PATH))
 
         cfgs = []
         container = self.project.load(self.input.structure_container_id)

@@ -21,6 +21,8 @@ from .cfgs import Cfg, savecfgs
 import os.path
 import shutil
 
+import numpy as np
+
 # This class expects the job executable to read the potential and configurations and write the descriptors to a few
 # hard-coded paths
 _POTENTIAL_PATH="potential.mtp"

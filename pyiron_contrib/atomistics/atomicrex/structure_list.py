@@ -6,8 +6,8 @@ from ase import Atoms as ASEAtoms
 from pyiron_base import DataContainer
 from pyiron import pyiron_to_ase, ase_to_pyiron, Atoms
 
-from pyiron_contrib.atomistic.atomicrex.fit_properties import ARFitPropertyList, ARFitProperty
-from pyiron_contrib.atomistic.atomicrex.utility_functions import write_pretty_xml
+from pyiron_contrib.atomistics.atomicrex.fit_properties import ARFitPropertyList, ARFitProperty
+from pyiron_contrib.atomistics.atomicrex.utility_functions import write_pretty_xml
 
 
 class StructureList(object):

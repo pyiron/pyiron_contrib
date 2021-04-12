@@ -12,11 +12,11 @@ import pandas as pd
 
 from pyiron_base import GenericJob, Settings, PyironFactory, Executable
 
-from pyiron_contrib.atomistic.atomicrex.general_input import GeneralARInput, AlgorithmFactory
-from pyiron_contrib.atomistic.atomicrex.structure_list import ARStructureList
-from pyiron_contrib.atomistic.atomicrex.potential_factory import ARPotFactory, AbstractPotential
-from pyiron_contrib.atomistic.atomicrex.output import Output
-from pyiron_contrib.atomistic.atomicrex.function_factory import FunctionFactory
+from pyiron_contrib.atomistics.atomicrex.general_input import GeneralARInput, AlgorithmFactory
+from pyiron_contrib.atomistics.atomicrex.structure_list import ARStructureList
+from pyiron_contrib.atomistics.atomicrex.potential_factory import ARPotFactory, AbstractPotential
+from pyiron_contrib.atomistics.atomicrex.output import Output
+from pyiron_contrib.atomistics.atomicrex.function_factory import FunctionFactory
 
 s = Settings()
 

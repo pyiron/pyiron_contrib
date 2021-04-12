@@ -6,8 +6,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from pyiron_base import PyironFactory, DataContainer
-from pyiron_contrib.atomistic.atomicrex.function_factory import FunctionFactory
-from pyiron_contrib.atomistic.atomicrex.utility_functions import write_pretty_xml
+from pyiron_contrib.atomistics.atomicrex.function_factory import FunctionFactory
+from pyiron_contrib.atomistics.atomicrex.utility_functions import write_pretty_xml
 
 class ARPotFactory(PyironFactory):
     """

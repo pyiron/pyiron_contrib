@@ -95,6 +95,10 @@ class SpecialFunction(DataContainer):
         else:
             return screening
     
+    @property
+    def func(self):
+        return None
+
     def plot(self):
         if self.func is None:
             raise NotImplementedError("A func property needs to be defined in the subclass")
@@ -229,7 +233,16 @@ class ExpGaussian(SpecialFunction):
             start_val=exponent,
             enabled=False,
         )
-        # TODO: add self.func
+    
+    @property
+    def func(self):
+        cutoff = self.parameters["cutoff"].start_val
+        stddev = self.parameters["stddev"].start_val
+        alpha = self.parameters["alpha"].start_val
+        exponent = self.parameters["exponent"].start_val
+        return lambda r: np.exp(-np.sign(exponent)*
+        alpha/(1-(r/cutoff)**exponent)) * np.exp(-r**2/(2*stddev**2))/(stddev*np.sqrt(2*np.pi))
+
 
     def _to_xml_element(self):
         return super()._to_xml_element(name="exp-gaussian")
@@ -341,7 +354,14 @@ class MorseC(SpecialFunction):
             enabled=True,
         )
 
-    #TODO: add func property
+    @property
+    def func(self):
+        A = self.parameters["A"].start_val
+        B = self.parameters["B"].start_val
+        mu = self.parameters["mu"].start_val
+        param_lambda = self.parameters["lambda"].start_val
+        delta = self.parameters["delta"].start_val
+        return lambda r: A*np.exp(-param_lambda*r)-B*np.exp(-mu*r)+delta
 
     def _to_xml_element(self):
         return super()._to_xml_element(name="morse-C")
@@ -368,10 +388,15 @@ class Gaussian(SpecialFunction):
             enabled=True,
         )
 
-    #TODO: add func property
+    @property
+    def func(self):
+        prefactor = self.parameters["prefactor"].start_val
+        eta = self.parameters["eta"].start_val
+        mu = self.parameters["mu"].start_val
+        return lambda r: prefactor*np.exp(-eta*(r-mu)**2)
 
     def _to_xml_element(self):
-        return super()._to_xml_element(name="morse-A")
+        return super()._to_xml_element(name="gaussian")
 
 
 class UserFunction(DataContainer):

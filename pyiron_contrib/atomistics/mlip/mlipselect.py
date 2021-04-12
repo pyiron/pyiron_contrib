@@ -3,7 +3,7 @@
 # Distributed under the terms of "New BSD License", see the LICENSE file.
 
 import os
-from pyiron_contrib.atomistic.mlip.mlip import Mlip, read_cgfs
+from pyiron_contrib.atomistics.mlip.mlip import Mlip, read_cgfs
 
 __author__ = "Jan Janssen"
 __copyright__ = "Copyright 2020, Max-Planck-Institut für Eisenforschung GmbH - " \

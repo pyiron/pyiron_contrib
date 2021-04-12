@@ -5,7 +5,7 @@
 import os
 from pyiron.lammps.base import Input
 from pyiron.lammps.interactive import LammpsInteractive
-from pyiron_contrib.atomistic.mlip.mlip import read_cgfs
+from pyiron_contrib.atomistics.mlip.mlip import read_cgfs
 from pyiron_base import GenericParameters
 
 __author__ = "Jan Janssen"

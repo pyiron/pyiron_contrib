@@ -6,9 +6,9 @@ from ase.data import atomic_masses, atomic_numbers
 
 from pyiron_base import DataContainer, PyironFactory
 
-from pyiron_contrib.atomistic.atomicrex.utility_functions import write_pretty_xml
-from pyiron_contrib.atomistic.atomicrex.potential_factory import ARPotFactory
-from pyiron_contrib.atomistic.atomicrex.function_factory import FunctionFactory
+from pyiron_contrib.atomistics.atomicrex.utility_functions import write_pretty_xml
+from pyiron_contrib.atomistics.atomicrex.potential_factory import ARPotFactory
+from pyiron_contrib.atomistics.atomicrex.function_factory import FunctionFactory
 
 class GeneralARInput(DataContainer):
     """

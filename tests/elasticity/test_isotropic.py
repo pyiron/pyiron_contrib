@@ -4,8 +4,8 @@
 
 import unittest
 import numpy as np
-from pyiron_contrib.atomistic.elasticity.point_defect.isotropic import displacement_field
-from pyiron_contrib.atomistic.elasticity.point_defect.isotropic import strain_field
+from pyiron_contrib.atomistics.elasticity.point_defect.isotropic import displacement_field
+from pyiron_contrib.atomistics.elasticity.point_defect.isotropic import strain_field
 
 
 class TestIsotropic(unittest.TestCase):

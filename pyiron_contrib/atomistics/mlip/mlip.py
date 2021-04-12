@@ -11,7 +11,7 @@ import posixpath
 import scipy.constants
 from pyiron_base import Settings, GenericParameters, GenericJob, Executable
 from pyiron_atomistics import ase_to_pyiron
-from pyiron_contrib.atomistic.mlip.cfgs import savecfgs, loadcfgs, Cfg
+from pyiron_contrib.atomistics.mlip.cfgs import savecfgs, loadcfgs, Cfg
 
 __author__ = "Jan Janssen"
 __copyright__ = "Copyright 2020, Max-Planck-Institut für Eisenforschung GmbH - " \

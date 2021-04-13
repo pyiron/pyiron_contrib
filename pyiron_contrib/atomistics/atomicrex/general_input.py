@@ -15,17 +15,31 @@ class GeneralARInput(DataContainer):
     Class to store general input of an atomicrex job,
     f.e. the fit algorithm.
     """  
-    def __init__(self, table_name="general_input", *args, **kwargs):
-        super().__init__(table_name="general_input", *args, **kwargs)
-        self.name = "Atomicrex Job"
-        self.verbosity = "medium"
-        self.real_precision = 16
-        self.validate_potentials = False
-        self.atom_types = AtomTypes()      
-        self.fit_algorithm = AtomicrexAlgorithm(conv_threshold=1e-10, max_iter=50, gradient_epsilon=1e-8, name="BFGS")
-        self.output_interval = 100
-        self.enable_fitting = True
+    def __init__(
+        self,
+        table_name="general_input",
+        name="Atomicrex Job",
+        verbosity="medium",
+        real_precision = 16,
+        valdiate_potentials = False,
+        atom_types = None,
+        fit_algorithm = None,
+        output_interval = 10000,
+        enable_fitting = True,
+        ):
         
+        super().__init__(table_name="general_input",)
+        
+        self.name = name
+        self.verbosity = verbosity
+        self.real_precision = real_precision
+        self.validate_potentials = valdiate_potentials
+        self.atom_types = AtomTypes()      
+        self.fit_algorithm = fit_algorithm
+        self.output_interval = output_interval
+        self.enable_fitting = enable_fitting
+        
+
     def _write_xml_file(self, directory):
         """Internal function.
         Write the main input xml file in a directory.   
@@ -233,7 +247,17 @@ class NloptAlgorithm(DataContainer):
     """
     Nlopt algorithms should inherit from this class.
     """    
-    def __init__(self, stopval, max_iter, maxtime, ftol_rel, ftol_abs, xtol_rel, name, seed, *args, **kwargs):
+    def __init__(
+        self,
+        name=None,
+        seed=None,
+        stopval=None,
+        max_iter=None,
+        maxtime=None,
+        ftol_rel=None,
+        ftol_abs=None,
+        xtol_rel=None,
+        *args, **kwargs):
         super().__init__(table_name="fitting_algorithm", *args, **kwargs)
         self.stopval = stopval
         self.max_iter = max_iter

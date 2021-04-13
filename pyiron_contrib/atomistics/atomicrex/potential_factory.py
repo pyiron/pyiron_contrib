@@ -116,7 +116,15 @@ class EAMPotential(AbstractPotential):
 
     """    
 
-    def __init__(self, init=None, identifier=None, export_file=None, rho_range_factor=None, resolution=None, species=None):
+    def __init__(
+        self,
+        init=None,
+        identifier=None,
+        export_file=None,
+        rho_range_factor=None,
+        resolution=None,
+        species=None):
+        
         super().__init__(init=init)
         if init is None:
             self.pair_interactions = DataContainer(table_name="pair_interactions")

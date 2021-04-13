@@ -61,7 +61,7 @@ class SpecialFunction(DataContainer):
     https://atomicrex.org/potentials/functions.html#index-1
     https://atomicrex.org/potentials/functions.html#specialized-functions
     """    
-    def __init__(self, identifier=None, species=["*", "*"], is_screening_function=False):  
+    def __init__(self, identifier=None, species=["*", "*"], is_screening_function=False):
         super().__init__(table_name=f"special_function_{identifier}")
         self.species = species
         self.parameters = FunctionParameterList()

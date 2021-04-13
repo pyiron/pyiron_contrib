@@ -61,7 +61,7 @@ class SpecialFunction(DataContainer):
     https://atomicrex.org/potentials/functions.html#index-1
     https://atomicrex.org/potentials/functions.html#specialized-functions
     """    
-    def __init__(self, identifier, species=["*", "*"], is_screening_function=False):  
+    def __init__(self, identifier=None, species=["*", "*"], is_screening_function=False):  
         super().__init__(table_name=f"special_function_{identifier}")
         self.species = species
         self.parameters = FunctionParameterList()
@@ -110,7 +110,7 @@ class Poly(DataContainer):
     """
     Polynomial interpolation function.
     """    
-    def __init__(self, identifier, cutoff, species):
+    def __init__(self, identifier=None, cutoff=None, species=["*", "*"]):
         super().__init__(table_name=f"Poly_{identifier}")
         self.identifier = identifier
         self.cutoff = cutoff
@@ -129,7 +129,14 @@ class Spline(DataContainer):
     """
     Spline interpolation function
     """
-    def __init__(self, identifier, cutoff, derivative_left, derivative_right, species):
+    def __init__(
+        self,
+        identifier=None,
+        cutoff=None,
+        derivative_left=0,
+        derivative_right=0,
+        species = ["*", "*"]
+        ):
         super().__init__(table_name=f"Spline_{identifier}")
         self.identifier = identifier
         self.cutoff = cutoff
@@ -154,7 +161,7 @@ class Spline(DataContainer):
 
 class ExpA(SpecialFunction):
 
-    def __init__(self, identifier, cutoff, species, is_screening_function):
+    def __init__(self, identifier=None, cutoff=None, species=["*", "*"], is_screening_function=True):
         super().__init__(identifier, species=species, is_screening_function=is_screening_function)
         self.parameters.add_parameter(
             "cutoff",
@@ -172,7 +179,16 @@ class ExpA(SpecialFunction):
 
 
 class ExpB(SpecialFunction):
-    def __init__(self, identifier, cutoff,  rc, alpha, exponent, species, is_screening_function):
+    def __init__(
+        self,
+        identifier = None,
+        cutoff = None,
+        rc = None,
+        alpha = None,
+        exponent = None,
+        species = None,
+        is_screening_function = True
+        ):
         super().__init__(identifier, species=species, is_screening_function=is_screening_function)
         self.parameters.add_parameter(
             "cutoff",
@@ -210,7 +226,16 @@ class ExpB(SpecialFunction):
 
 
 class ExpGaussian(SpecialFunction):
-    def __init__(self, identifier, cutoff, stddev, alpha, exponent, species, is_screening_function):
+    def __init__(
+        self,
+        identifier=None,
+        cutoff=None,
+        stddev=None,
+        alpha=None,
+        exponent=None,
+        species=["*", "*"],
+        is_screening_function=True
+        ):
         super().__init__(identifier, species=species, is_screening_function=is_screening_function)
         self.parameters.add_parameter(
             "cutoff",
@@ -249,7 +274,7 @@ class ExpGaussian(SpecialFunction):
 
 
 class MorseA(SpecialFunction):
-    def __init__(self, identifier, D0, r0, alpha, species):
+    def __init__(self, identifier=None, D0=None, r0=None, alpha=None, species=["*", "*"]):
         super().__init__(identifier, species=species, is_screening_function=False)
         self.parameters.add_parameter(
             "D0",
@@ -279,7 +304,7 @@ class MorseA(SpecialFunction):
 
 
 class MorseB(SpecialFunction):
-    def __init__(self, identifier, D0, r0, beta, S, delta, species):
+    def __init__(self, identifier=None, D0=None, r0=None, beta=None, S=None, delta=None, species=["*", "*"]):
         super().__init__(identifier, species=species, is_screening_function=False)
         self.parameters.add_parameter(
             "D0",
@@ -322,7 +347,7 @@ class MorseB(SpecialFunction):
 
 
 class MorseC(SpecialFunction):
-    def __init__(self, identifier, A, B, mu, lambda_val, delta, species=["*", "*"]):
+    def __init__(self, identifier=None, A=None, B=None, mu=None, lambda_val=None, delta=None, species=["*", "*"]):
         super().__init__(identifier, species=species, is_screening_function=False)
         self.parameters.add_parameter(
             "A",
@@ -368,7 +393,7 @@ class MorseC(SpecialFunction):
 
 
 class Gaussian(SpecialFunction):
-    def __init__(self, identifier, prefactor, eta, mu, species):
+    def __init__(self, identifier=None, prefactor=None, eta=None, mu=None, species=None):
         super().__init__(identifier, species=species, is_screening_function=False)
         self.parameters.add_parameter(
             "prefactor",
@@ -406,7 +431,7 @@ class UserFunction(DataContainer):
     All parameters defined in the function should be added using the
     UserFunction.parameters.add_parameter() method.
     """    
-    def __init__(self, identifier, input_variable, species, is_screening_function):
+    def __init__(self, identifier=None, input_variable=None, species=["*", "*"], is_screening_function=False):
         super().__init__(table_name=f"user_func_{identifier}")
         self.input_variable = input_variable
         self.identifier = identifier
@@ -454,7 +479,16 @@ class FunctionParameter(DataContainer):
     Objects should only be created using the add_parameter method
     of the FunctionParameterList class.
     """    
-    def __init__(self, param, start_val, enabled, reset, min_val, max_val, fitable, tag=None):
+    def __init__(
+        self,
+        param=None,
+        start_val=None,
+        enabled=True,
+        reset=False,
+        min_val=None,
+        max_val=None,
+        fitable=True,
+        tag=None):
         self.param = param
         self.start_val = start_val
         self.enabled = enabled
@@ -540,7 +574,7 @@ class PolyCoeff(FunctionParameter):
     """
     Function parameter, but for polynomial interpolation.
     """    
-    def __init__(self, n, start_val, enabled, reset, min_val, max_val):
+    def __init__(self, n=None, start_val=None, enabled=True, reset=False, min_val=None, max_val=None):
         super().__init__(
             param="coeff",
             start_val=start_val,
@@ -593,7 +627,7 @@ class Node(FunctionParameter):
     """
     Function parameter, but for spline interpolation.
     """
-    def __init__(self, x, start_val, enabled, reset, min_val, max_val):
+    def __init__(self, x=None, start_val=None, enabled=True, reset=False, min_val=None, max_val=None):
         super().__init__(
             param="node",
             start_val=start_val,

@@ -200,7 +200,7 @@ class AtomicrexAlgorithm(DataContainer):
     Class to inherit from. If more algorithms will be implemented in atomicrex
     at some point they can be implemented similar to the AR_LBFGS class.
     """    
-    def __init__(self, conv_threshold, max_iter, gradient_epsilon, name, *args, **kwargs):
+    def __init__(self, conv_threshold=None, max_iter=None, gradient_epsilon=None, name=None, *args, **kwargs):
         super().__init__(table_name="fitting_algorithm", *args, **kwargs)
         self.conv_threshold = conv_threshold
         self.max_iter = max_iter

@@ -52,7 +52,7 @@ class FunctionFactory(PyironFactory):
 
     @staticmethod
     def gaussian(identifier, prefactor, eta, mu, species=["*", "*"]):
-        return Gaussian(identifier, prefactor, eta, mu, species)
+        return GaussianFunc(identifier, prefactor, eta, mu, species)
 
 
 class SpecialFunction(DataContainer):
@@ -392,7 +392,8 @@ class MorseC(SpecialFunction):
         return super()._to_xml_element(name="morse-C")
 
 
-class Gaussian(SpecialFunction):
+## Renamed GaussianFunc to not mess with the gaussian code when loading from hdf5
+class GaussianFunc(SpecialFunction):
     def __init__(self, identifier=None, prefactor=None, eta=None, mu=None, species=None):
         super().__init__(identifier, species=species, is_screening_function=False)
         self.parameters.add_parameter(

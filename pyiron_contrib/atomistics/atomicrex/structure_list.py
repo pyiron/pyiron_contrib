@@ -319,9 +319,9 @@ class ARStructureList(object):
 
 def write_modified_poscar(identifier, structure, forces, directory):
     """
-    Internal function. Writes an ase or pyiron structure
+    Internal function. Writes a pyiron structure
     and corresponding forces in a modified POSCAR file.
-
+    DOES NOT WORK WITH ASE STRUCTURES.
     Args:
         identifier (str): Unique identifier used for the filename.
         structure (Atoms): ase or pyiron atoms object. 
@@ -332,7 +332,8 @@ def write_modified_poscar(identifier, structure, forces, directory):
     with open(filename, 'w') as f:
         # Elements as system name
         elements = []
-        for elem in structure.get_chemical_symbols():
+        symbols = structure.get_chemical_symbols()
+        for elem in symbols:
             if not elem in elements: elements.append(elem)
         f.write(f"{elements}\n")
 
@@ -350,7 +351,6 @@ def write_modified_poscar(identifier, structure, forces, directory):
 
         # Number of elements per type
         for elem in elements:
-            symbols = structure.get_chemical_symbols()
             n = len(symbols[symbols==elem])
             f.write(f'{n}    ')
         f.write('\n')

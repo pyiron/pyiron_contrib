@@ -49,28 +49,6 @@ class Atomicrex(PotentialFittingBase):
         self.factories = Factories()
         
 
-    ## Temporary workaround for the workshop
-    ## Hardcoded Cu as species since recovering atom_types from hdf does not work correctly right now
-    @property
-    def lammps_potential(self):
-        species = ["Cu"]
-        species_str = ""
-        for s in species:
-            species_str += f"{s} "
-
-        pot = pd.DataFrame({
-            "Name": f"{self.potential.identifier}",
-            "Filename": [[f"{self.working_directory}/{self.potential.export_file}"]],
-            'Model': ['Custom'],
-            "Species": [species],
-            "Config": [[
-                "pair_style eam/fs\n",
-                f"pair_coeff * * {self.working_directory}/{self.potential.export_file} {species_str}\n",
-                ]]
-        })    
-        return pot
-
-
     def plot_final_potential(self):
         """
         Plot the fitted potential.
@@ -230,6 +208,16 @@ class Atomicrex(PotentialFittingBase):
                 self._executable = Executable(
                     codename=self.__name__, path_binary_codes=s.resource_paths
                 )
+
+    # Leftover of the potentials workshop.
+    # Maybe this property will be used in unified interface
+    # to several fitting codes in the future
+    # instead of the potential_as_pd_df function
+    @property
+    def lammps_potential(self):
+        pot = self.potential_as_pd_df()
+        return pot
+
 
     def potential_as_pd_df(self):
         """

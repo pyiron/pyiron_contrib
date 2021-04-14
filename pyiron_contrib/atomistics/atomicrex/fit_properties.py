@@ -128,8 +128,7 @@ class ARFitProperty(DataContainer):
                 raise ValueError("Min and Max val can only be given for scalar properties")
             if self.output_all:
                 xml.set("output-all", f"{self.output_all}".lower())
-            else:
-                xml.set("residual-style", f"{self.residual_style}")
+            xml.set("residual-style", f"{self.residual_style}")
         return xml
 
     @staticmethod

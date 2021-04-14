@@ -139,7 +139,7 @@ class ARStructure(object):
             raise ValueError("fit_properties have to be an ARFitPropertyList")
         self._fit_properties = fit_properties
 
-    def _write_poscar_return_xml(self, directory):
+    def _write_poscar_return_xml(self, directory, struct_file_path):
         """
         Internal function that writes the structure in an extended POSCAR
         format that contains forces. Returns an atomicrex xml
@@ -148,17 +148,25 @@ class ARStructure(object):
 
         Args:
             directory (string): Working directory
-
+            struct_file_path (string): path to a directory containing structure files. If None structure files are written in working directory
         Returns:
             [ElementTree xml element]: xml element referencing POSCAR, contains additional information
         """        
-        forces = self.fit_properties["atomic-forces"].target_value
-        write_modified_poscar(self.identifier, self.structure, forces, directory)
+        if struct_file_path is None:
+            forces = self.fit_properties["atomic-forces"].target_value
+            write_modified_poscar(
+                identifier = self.identifier,
+                structure = self.structure,
+                forces=forces,
+                directory=directory
+                )
+
         return structure_meta_xml(
-            self.identifier,
-            self.relative_weight,
-            self.clamp,
-            self.fit_properties
+            identifier = self.identifier,
+            relative_weight = self.relative_weight,
+            clamp = self.clamp,
+            fit_properties = self.fit_properties,
+            struct_file_path = struct_file_path,
         )
 
     def to_hdf(self, hdf=None, group_name="arstructure"):
@@ -196,6 +204,12 @@ class ARStructureList(object):
     """    
     def __init__(self):
         self._structure_dict = {}
+
+        # This allows to give a path where structures are stored in atomicrex POSCAR format
+        # It modifies the write input function to prevent a lot of file io and slow down performance
+        # If it is not given a file is written for every structure of the job.
+        self.struct_file_path = None
+
 
     def add_structure(self, structure, identifier, fit_properties=None, relative_weight=1, clamp=True):
         """
@@ -241,7 +255,7 @@ class ARStructureList(object):
         """        
         root = ET.Element("group")
         for s in self._structure_dict.values():
-            root.append(s._write_poscar_return_xml(directory))
+            root.append(s._write_poscar_return_xml(directory, self.struct_file_path))
         filename = posixpath.join(directory, name)
         write_pretty_xml(root, filename)
 
@@ -358,19 +372,21 @@ def structure_meta_xml(
         relative_weight,
         clamp, ## Not sure if and how this combines with relax in the ARFitParameter sets
         fit_properties,
+        struct_file_path,
         mod_poscar = True,
+        
 ):
     """
     Internal function. Creates xml element with
-    scalar properties, weight and
-    reference to POSCAR containg structure and forces.
+    scalar properties, weight and reference to POSCAR
+    containg structure and forces.
 
     Args:
         identifier (str): Unique identifier.
         relative_weight (float): weight in objective function
         clamp (bool): clamp the structure (no relaxation) 
         mod_poscar (bool, optional): Combine with poscar file. Defaults to True.
-
+        struct_file_path (string): path to POSCAR file
     Raises:
         NotImplementedError: mod_poscar has to be True, because forces can't
         be provided in xml format in atomicrex yet.
@@ -385,7 +401,10 @@ def structure_meta_xml(
 
     if mod_poscar:
         poscar_file = ET.SubElement(struct_xml, "poscar-file")
-        poscar_file.text = f"POSCAR_{identifier}"
+        if struct_file_path is None:
+            poscar_file.text = f"POSCAR_{identifier}"
+        else:
+            poscar_file.text = f"{struct_file_path}POSCAR_{identifier}"
     else:
         #    struct_xml.extend(structure_to_xml_element(structure))
         raise NotImplementedError(

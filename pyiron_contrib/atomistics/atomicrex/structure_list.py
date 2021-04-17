@@ -169,25 +169,27 @@ class ARStructure(object):
             struct_file_path = struct_file_path,
         )
 
-    def to_hdf(self, hdf=None, group_name="arstructure"):
+    def to_hdf(self, hdf=None, group_name="arstructure", full_hdf=True):
         """
-        Internal function 
+        Internal function
         """        
         with hdf.open(group_name) as hdf_s_lst:
-            self.structure.to_hdf(hdf=hdf_s_lst, group_name="structure")
+            if full_hdf:
+                self.structure.to_hdf(hdf=hdf_s_lst, group_name="structure")
             self.fit_properties.to_hdf(hdf=hdf_s_lst, group_name="fit_properties")
             hdf_s_lst["relative_weight"] = self.relative_weight
             hdf_s_lst["identifier"] = self.identifier
             hdf_s_lst["clamp"] = self.clamp
 
-    def from_hdf(self, hdf=None, group_name="arstructure"):
+    def from_hdf(self, hdf=None, group_name="arstructure", full_hdf=True):
         """
         Internal function 
         """    
         with hdf.open(group_name) as hdf_s_lst:
-            structure = Atoms()
-            structure.from_hdf(hdf_s_lst, group_name="structure")
-            self.structure = structure
+            if full_hdf:
+                structure = Atoms()
+                structure.from_hdf(hdf_s_lst, group_name="structure")
+                self.structure = structure
             self.fit_properties = ARFitPropertyList()
             self.fit_properties.from_hdf(hdf=hdf_s_lst, group_name="fit_properties")
             self.relative_weight = hdf_s_lst["relative_weight"]
@@ -209,7 +211,7 @@ class ARStructureList(object):
         # It modifies the write input function to prevent a lot of file io and slow down performance
         # If it is not given a file is written for every structure of the job.
         self.struct_file_path = None
-
+        self.full_structure_to_hdf = True
 
     def add_structure(self, structure, identifier, fit_properties=None, relative_weight=1, clamp=True):
         """
@@ -264,17 +266,26 @@ class ARStructureList(object):
         Internal function 
         """    
         with hdf.open(group_name) as hdf_s_lst:
+            hdf_s_lst["struct_file_path"] = self.struct_file_path
+            hdf_s_lst["full_structure_to_hdf"] = self.full_structure_to_hdf
             for k, v in self._structure_dict.items():
-                v.to_hdf(hdf=hdf_s_lst, group_name=k)
+                v.to_hdf(hdf=hdf_s_lst, group_name=k, full_hdf=self.full_structure_to_hdf)
 
     def from_hdf(self, hdf=None, group_name="arstructurelist"):
         """
         Internal function 
         """        
         with hdf.open(group_name) as hdf_s_lst:
+            # compatibility with my old jobs. find a way to write this to hdf for them and delete try except block
+            try:
+                self.struct_file_path = hdf_s_lst["struct_file_path"]
+                self.full_structure_to_hdf = hdf_s_lst["full_structure_to_hdf"]
+            except ValueError:
+                pass
+
             for g in sorted(hdf_s_lst.list_groups()):
                 s = ARStructure()
-                s.from_hdf(hdf=hdf_s_lst, group_name=g)
+                s.from_hdf(hdf=hdf_s_lst, group_name=g, full_hdf=self.full_structure_to_hdf)
                 self._structure_dict[g] = s
 
     def _parse_final_properties(self, struct_lines):

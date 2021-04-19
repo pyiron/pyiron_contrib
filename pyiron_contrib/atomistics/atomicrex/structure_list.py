@@ -10,10 +10,17 @@ from pyiron_contrib.atomistics.atomicrex.fit_properties import ARFitPropertyList
 from pyiron_contrib.atomistics.atomicrex.utility_functions import write_pretty_xml
 
 
+class MinimalStructure:
+    def __init__(self, species, flattened_cell, flattened_positions):
+        self.cell = cell
+        self.species = species
+        self.positions = positions
+
+
+
 class StructureList(object):
     """
-    Possible container class to inherit from in other potential fitting interfaces.
-    Probably obsolete if StructureContainer or something similar gets developed.
+    
     """    
     def __init__(self):
         self._structure_lst = []

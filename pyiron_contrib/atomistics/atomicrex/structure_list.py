@@ -11,65 +11,93 @@ from pyiron_contrib.atomistics.atomicrex.utility_functions import write_pretty_x
 
 
 class MinimalStructure:
-    def __init__(self, species, flattened_cell, flattened_positions):
+    def __init__(self, symbols, flattened_cell, flattened_positions):
         self.cell = cell
-        self.species = species
+        self.symbols = symbols
         self.positions = positions
 
 
-
-class StructureList(object):
+class FlattenedStructureContainer:
     """
     
     """    
-    def __init__(self):
-        self._structure_lst = []
+    def __init__(self, num_structures=0, num_atoms=0):
+        self.num_structures = num_structures
+        self.num_atoms = num_atoms
+        # store the starting index for properties with unknown length like positions for the currently added structure
+        self.vector_start_index = 0
+        # store the index for properties of known size
+        self.known_size_index = 0
 
-    def add_structure(self, structure, **kw_properties):
-        if isinstance(structure, ASEAtoms):
-            i = structure.info
-            structure = ase_to_pyiron(structure)
-            structure.info = i
-        elif isinstance(structure, Atoms):
-            pass
-        else:
-            raise ValueError("Structures have to be supplied as pyiron or ase atoms")
+        self._init_arrays()
 
-        structure.info.update(kw_properties)
-        self._structure_lst.append(structure)
 
-    def to_hdf(self, hdf, group_name="structure_list"):
+    def _init_arrays(self):
+        self.symbols = np.full(self.num_atoms, "XX", dtype=np.dtype("U2"))# 2 character unicode array for chemical symbols
+        self.positions = np.empty((self.num_atoms, 3))
+        self.cells = np.empty((self.num_structures, 3, 3))
+        self.start_indices = np.empty(self.num_structures)
+        self.identifiers = np.empty(self.num_atoms, dtype=np.dtype("U20"))
+
+    def add_structure(self, structure, identifier):
+        # len of structure to index into the initialized arrays
+        n = len(structure)
+        i = self.vector_start_index + n
+
+        self.symbols[self.vector_start_index:i] = np.array(structure.symbols)
+        self.positions[self.vector_start_index:i] = structure.positions
+        self.cells[self.vector_start_index:i] = structure.cell.array
+        
+        self.start_indices[self.known_size_index] = self.vector_start_index
+        self.identifiers[self.known_size_index] = identifier
+
+        # Set vector_start_index and increase known_size_index
+        self.vector_start_index = i
+        self.known_size_index += 1
+
+
+    def to_hdf(self, hdf, group_name="flattened_structures"):
+        if self.symbols[-1] == "XX":
+            raise ValueError("Initialized arrays are not filled with values")
+
         with hdf.open(group_name) as hdf_s_lst:
-            for k, struct in enumerate(self._structure_lst):
-                struct.to_hdf(hdf=hdf_s_lst, group=f"structure_{k}")
 
-    def from_hdf(self, hdf, group_name="structure_list"):
+            #hdf_s_lst.create_dataset("symbols", data=self.symbols)
+            #hdf_s_lst.create_dataset("positions", data=self.positions)
+            #hdf_s_lst.create_dataset("cells", data=self.cells)
+            #hdf_s_lst.create_dataset("start_indices", data=self.start_indices)
+            #hdf_s_lst.create_dataset("identifiers", data=self.identifiers)
+            hdf_s_lst["symbols"] = self.symbols
+            hdf_s_lst["positions"] = self.positions
+            hdf_s_lst["cells"] = self.cells
+            hdf_s_lst["start_indices"] = self.start_indices
+            hdf_s_lst["identifiers"] = self.identifiers
+
+
+            hdf_s_lst["num_atoms"] =  self.num_atoms
+            hdf_s_lst["num_structures"] = self.num_structures
+
+
+    def from_hdf(self, hdf, group_name="flattened_structures"):
         with hdf.open(group_name) as hdf_s_lst:
-            for g in sorted(hdf_s_lst.list_groups()):
-                structure = Atoms()
-                structure.from_hdf(hdf, group_name = g)
-                self.append(structure)
+            self.num_structures = hdf_s_lst["num_structures"]
+            self.num_atoms = hdf_s_lst["num_atoms"]
+            _init_arrays()
+            
+            hdf_s_lst["symbols"].read_direct(self.symbols)
+            hdf_s_lst["positions"].read_direct(self.positions)
+            hdf_s_lst["cells"].read_direct(self.cells)
+            hdf_s_lst["start_indices"].read_direct(self.start_indices)
+            hdf_s_lst["identifiers"].read_direct(self.identifiers)
 
-    def to_ase_db(self, db):
-        print("NOT TESTED FUNCTION")
-        for struct in self.structures:
-            struct = pyiron_to_ase(struct)
-            db.write(atoms=struct, forces=self.forces, key_value_pairs=struct.info)
 
-    def from_ase_db(self, db):
-        for row in db.select():
-            kvp = row.key_value_pairs
-            if "pyiron_id" in kvp.keys():
-                p_id = kvp["pyiron_id"]
-            else:
-                raise KeyError("pyiron_id has to be supplied as key in row to transform to structure list")
-            i = row.data
-            i.update(kvp)
-            a = row.toatoms()
-            structure = ase_to_pyiron(a)
-            structure.info = i
-            print(i)
-            self[f"pyiron_id{p_id}"] = structure
+class FlattenedScalarProperty:
+    pass
+
+
+class FlattenedVectorProperty(FlattenedScalarProperty):
+    pass
+
 
 
 ### This is probably useless like this because forces can't be passed.
@@ -115,7 +143,7 @@ class ARStructure(object):
     Provides internal helper methods.
     """
 
-    def __init__(self, structure=None, fit_properties=None, identifier=None, relative_weight=1, clamp=True,):
+    def __init__(self, structure=None, fit_properties=None, identifier=None, relative_weight=1, clamp=True, fit=True):
         self._structure = None
         self._fit_properties = None
         if structure is not None:
@@ -125,6 +153,7 @@ class ARStructure(object):
         self.identifier = identifier
         self.relative_weight = relative_weight
         self.clamp = clamp
+        self.fit = fit
 
     @property
     def structure(self):
@@ -173,6 +202,7 @@ class ARStructure(object):
             relative_weight = self.relative_weight,
             clamp = self.clamp,
             fit_properties = self.fit_properties,
+            fit = self.fit,
             struct_file_path = struct_file_path,
         )
 
@@ -220,7 +250,7 @@ class ARStructureList(object):
         self.struct_file_path = None
         self.full_structure_to_hdf = True
 
-    def add_structure(self, structure, identifier, fit_properties=None, relative_weight=1, clamp=True):
+    def add_structure(self, structure, identifier, fit_properties=None, relative_weight=1, clamp=True, fit=True):
         """
         Provides a convenient way to add additional
         structures to the job.
@@ -391,6 +421,7 @@ def structure_meta_xml(
         clamp, ## Not sure if and how this combines with relax in the ARFitParameter sets
         fit_properties,
         struct_file_path,
+        fit,
         mod_poscar = True,
         
 ):
@@ -416,6 +447,7 @@ def structure_meta_xml(
     struct_xml = ET.Element("user-structure")
     struct_xml.set("id", f"{identifier}")
     struct_xml.set("relative-weight", f"{relative_weight}")
+    struct_xml.set("fit", f"{fit}".lower())
 
     if mod_poscar:
         poscar_file = ET.SubElement(struct_xml, "poscar-file")

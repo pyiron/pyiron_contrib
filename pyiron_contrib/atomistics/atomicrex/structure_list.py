@@ -8,52 +8,70 @@ from pyiron import pyiron_to_ase, ase_to_pyiron, Atoms
 
 from pyiron_contrib.atomistics.atomicrex.fit_properties import ARFitPropertyList, ARFitProperty
 from pyiron_contrib.atomistics.atomicrex.utility_functions import write_pretty_xml
+from pyiron_contrib.atomistics.atomicrex.fit_properties import FlattenedARProperty, FlattenedARVectorProperty
 
-
-class MinimalStructure:
-    def __init__(self, symbols, flattened_cell, flattened_positions):
-        self.cell = cell
-        self.symbols = symbols
-        self.positions = positions
+# TODO: Develop a useful MinimalStructure class for  
+# 
+#class MinimalStructure:
+#    def __init__(self, symbols, cell, positions):
+#        self.cell = cell
+#        self.symbols = symbols
+#        self.positions = positions
 
 
 class FlattenedStructureContainer:
     """
-    
+    Class that can write and read lots of structures from and to hdf quickly.
+    This is done by storing positions, cells, etc. into large arrays instead of writing every structure into a new group.
+    Structures are stored together with an identifier that should be unique.
+    The class has to be initialized with the number of structures and the total number of atoms in all structures.
+    This allows to preallocate the necessary arrays and therefore prevents reallocations.
+
+    TODO: Alternatively preallocate arrays with large default values (f.e. 1e6 atoms) then use resize to shrink them?
     """    
     def __init__(self, num_structures=0, num_atoms=0):
         self.num_structures = num_structures
         self.num_atoms = num_atoms
-        # store the starting index for properties with unknown length like positions for the currently added structure
-        self.vector_start_index = 0
-        # store the index for properties of known size
-        self.known_size_index = 0
+        # store the starting index for properties with unknown length
+        self.current_atom_index = 0
+        # store the index for properties of known size, stored at the same index as the structure
+        self.current_structure_index = 0
+        # Also store indices of structure recently added
+        self.prev_structure_index = 0
+        self.prev_atom_index = 0
+        
 
         self._init_arrays()
 
 
     def _init_arrays(self):
-        self.symbols = np.full(self.num_atoms, "XX", dtype=np.dtype("U2"))# 2 character unicode array for chemical symbols
+        self.symbols = np.full(self.num_atoms, "XX", dtype=np.dtype("S2"))# 2 character unicode array for chemical symbols
         self.positions = np.empty((self.num_atoms, 3))
         self.cells = np.empty((self.num_structures, 3, 3))
         self.start_indices = np.empty(self.num_structures)
-        self.identifiers = np.empty(self.num_atoms, dtype=np.dtype("U20"))
+        self.identifiers = np.empty(self.num_atoms, dtype=np.dtype("S20"))
+
 
     def add_structure(self, structure, identifier):
         # len of structure to index into the initialized arrays
         n = len(structure)
-        i = self.vector_start_index + n
+        i = self.current_atom_index + n
 
-        self.symbols[self.vector_start_index:i] = np.array(structure.symbols)
-        self.positions[self.vector_start_index:i] = structure.positions
-        self.cells[self.vector_start_index:i] = structure.cell.array
+        self.symbols[self.current_atom_index:i] = np.array(structure.symbols)
+        self.positions[self.current_atom_index:i] = structure.positions
+        self.cells[self.current_atom_index:i] = structure.cell.array
         
-        self.start_indices[self.known_size_index] = self.vector_start_index
-        self.identifiers[self.known_size_index] = identifier
+        self.start_indices[self.current_structure_index] = self.current_atom_index
+        self.identifiers[self.current_structure_index] = identifier
 
-        # Set vector_start_index and increase known_size_index
-        self.vector_start_index = i
-        self.known_size_index += 1
+        # Maybe it is better to make them attributes?
+        self.prev_structure_index = self.current_structure_index
+        self.prev_atom_index = self.current_atom_index
+
+        # Set new current_atom_index and increase current_structure_index
+        self.current_structure_index += 1
+        self.current_atom_index = i
+        #return last_structure_index, last_atom_index
 
 
     def to_hdf(self, hdf, group_name="flattened_structures"):
@@ -61,19 +79,11 @@ class FlattenedStructureContainer:
             raise ValueError("Initialized arrays are not filled with values")
 
         with hdf.open(group_name) as hdf_s_lst:
-
-            #hdf_s_lst.create_dataset("symbols", data=self.symbols)
-            #hdf_s_lst.create_dataset("positions", data=self.positions)
-            #hdf_s_lst.create_dataset("cells", data=self.cells)
-            #hdf_s_lst.create_dataset("start_indices", data=self.start_indices)
-            #hdf_s_lst.create_dataset("identifiers", data=self.identifiers)
             hdf_s_lst["symbols"] = self.symbols
             hdf_s_lst["positions"] = self.positions
             hdf_s_lst["cells"] = self.cells
             hdf_s_lst["start_indices"] = self.start_indices
             hdf_s_lst["identifiers"] = self.identifiers
-
-
             hdf_s_lst["num_atoms"] =  self.num_atoms
             hdf_s_lst["num_structures"] = self.num_structures
 
@@ -82,25 +92,165 @@ class FlattenedStructureContainer:
         with hdf.open(group_name) as hdf_s_lst:
             self.num_structures = hdf_s_lst["num_structures"]
             self.num_atoms = hdf_s_lst["num_atoms"]
-            _init_arrays()
+
+            self.symbols = hdf_s_lst["symbols"]
+            self.positions = hdf_s_lst["positions"]
+            self.cells = hdf_s_lst["cells"]
+            self.start_indices = hdf_s_lst["start_indices"]
+            self.identifiers = hdf_s_lst["identifiers"]
+
+
+class ARStructureContainer:
+    def __init__(self):
+        self.fit_properties = DataContainer(table_name="fit_properties")
+        # most init can't be done without some information
+        # This allows to preallocate arrays and speed everything up massively
+        # when writing and reading hdf5 files
+
+
+    def init_structure_container(num_structures, num_atoms, fit_properties=["atomic-energy", "atomic-forces"], structure_file_path=None):
+        for p in fit_properties:
+            if p == "atomic-forces"
+                self.fit_properties[p] = FlattenedARVectorProperty(num_structures=num_structures, num_atoms=num_atoms)
+            else:
+                self.fit_properties[p] = FlattenedARProperty(num_structures=num_structures))
+        self._init_structure_container(num_structures, num_atoms)
+        self.structure_file_path = structure_file_path
+
+    def _init_structure_container(self, num_structures, num_atoms):
+        self.structures = FlattenedStructureContainer(num_structures=num_structures, num_atoms=num_atoms)
+        self.fit = np.empty(num_structures, dtype=np.bool8)
+        self.clamp = np.empty(num_structures, dtype=np.bool8)
+        self.relative_weight = np.empty(num_structures)
+
+    def add_structure(self, structure, identifier, fit=True, relative_weight=1, clamp=True):
+        self.structures.add_structure(structure, identifier)
+        self.fit[structures.prev_structure_index] = fit
+        self.relative_weight[structures.prev_structure_index] = relative_weight
+        self.clamp[structures.prev_structure_index] = clamp
+
+    def add_scalar_fit_property(
+        prop,
+        target_value=np.nan,
+        fit=True, relax=False,
+        relative_weight=1,
+        residual_style=0,
+        output=False,
+        tolerance=np.nan,
+        min_val=np.nan,
+        max_val=np.nan,
+        ):
+        self.fit_properties[prop].target_value[self.structures.prev_structure_index] = target_value
+        self.fit_properties[prop].fit[self.structures.prev_structure_index] = fit
+        self.fit_properties[prop].relax[self.structures.prev_structure_index] = relax
+        self.fit_properties[prop].relative_weight[self.structures.prev_structure_index] = relative_weight
+        self.fit_properties[prop].residual_style[self.structures.prev_structure_index] = residual_style
+        self.fit_properties[prop].output[self.structures.prev_structure_index] = output
+        self.fit_properties[prop].tolerance[self.structures.prev_structure_index] = tolerance
+        self.fit_properties[prop].min_val[self.structures.prev_structure_index] = min_val
+        self.fit_properties[prop].max_val[self.structures.prev_structure_index] = max_val
+
+        
+    def add_vector_fit_property(
+        self,
+        prop="atomic-forces",
+        target_value=None,
+        fit=True,
+        relax=False,
+        relative_weight=1,
+        residual_style=0,
+        output=False,
+        tolerance=np.nan,
+        output=True,
+        ):
+        if target_value is not None:
+            self.fit_properties[prop].target_value[self.structures.prev_atom_index] = target_value
+        self.fit_properties[prop].fit[self.structures.prev_structure_index] = fit
+        self.fit_properties[prop].relax[self.structures.prev_structure_index] = relax
+        self.fit_properties[prop].relative_weight[self.structures.prev_structure_index] = relative_weight
+        self.fit_properties[prop].residual_style[self.structures.prev_structure_index] = residual_style
+        self.fit_properties[prop].output[self.structures.prev_structure_index] = output
+        self.fit_properties[prop].tolerance[self.structures.prev_structure_index] = tolerance
+
+
+    def to_hdf(self, hdf, group="structures"):
+        with hdf.open(group) as h:
+            self.structures.to_hdf(hdf=hdf)
+            self.fit_properties.to_hdf(hdf=hdf)
+            h["fit"] = self.fit
+            h["clamp"] = self.clamp
+            h["relative_weight"] = self.relative_weight
+            h["structure_file_path"] = self.structure_file_path
+
+    def from_hdf(self, hdf, group="structures"):
+        with hdf.open(group) as h:
+            num_structures = h["flattened_structures/num_structures"]
+            num_atoms = h["flattened_structures/num_atoms"]
+            self._init_structure_container(num_structures, num_atoms)
+            self.structures.from_hdf(hdf=h)
+            self.fit_properties.from_hdf(hdf=h)
+            self.clamp = h["clamp"]
+            self.fit = h["fit"]
+            self.relative_weight = h["relative_weight"]
+            self.structure_file_path = h["structure_file_path"]
+    
+   
+   def write_xml_file(self, directory, name="structures.xml"):
+        """
+        Internal helper function that write an atomicrex style
+        xml file containg all structures.
+
+        Args:
+            directory (string): Working directory.
+            name (str, optional): . Defaults to "structures.xml".
+        """        
+        root = ET.Element("group")
+        for s in self._structure_dict.values():
+            root.append(s._write_poscar_return_xml(directory, self.struct_file_path))
+        filename = posixpath.join(directory, name)
+        write_pretty_xml(root, filename)
+
+
+    def _parse_final_properties(self, struct_lines):
+        """
+        Internal function that parses the values of fitted properties
+        calculated with the final iteration of the fitted potential.
+
+        Args:
+            struct_lines (list[str]): lines from atomicrex output that contain structure information.
+        """ 
+        force_vec_triggered = False
+        for l in struct_lines:
+            l = l.strip()
             
-            hdf_s_lst["symbols"].read_direct(self.symbols)
-            hdf_s_lst["positions"].read_direct(self.positions)
-            hdf_s_lst["cells"].read_direct(self.cells)
-            hdf_s_lst["start_indices"].read_direct(self.start_indices)
-            hdf_s_lst["identifiers"].read_direct(self.identifiers)
+            if force_vec_triggered:
+                if l.startswith("atomic-forces:"):
+                    l = l.split()
+                    index = int(l[1])
+                    final_forces[index, 0] = float(l[2].lstrip("(").rstrip(","))
+                    final_forces[index, 1] = float(l[3].rstrip(","))
+                    final_forces[index, 2] = float(l[4].rstrip(")"))
+                else:
+                    force_vec_triggered = False
+                    s.fit_properties["atomic-forces"].final_value = final_forces
+            
+            # This has to be if and not else because it has to run in the same iteration. Empty lines get skipped.
+            if not force_vec_triggered and l:
+                if l.startswith("Structure"):
+                    s_id = l.split("'")[1]
+                    s = self._structure_dict[s_id]
+            
+                else:
+                    if not l.startswith("atomic-forces avg/max:"):
+                        prop, f_val = ARFitProperty._parse_final_value(line=l)
+                        if prop in self.fit_properties.keys():
+                            self.fit_properties[prop].final_value = f_val
+                    else:
+                        force_vec_triggered = True
+                        final_forces = np.empty((len(s.structure), 3))
+    
 
-
-class FlattenedScalarProperty:
-    pass
-
-
-class FlattenedVectorProperty(FlattenedScalarProperty):
-    pass
-
-
-
-### This is probably useless like this because forces can't be passed.
+### This is probably useless like this in most cases because forces can't be passed.
 def structure_to_xml_element(structure):
     """
     Converts an ase/pyiron atoms object to an atomicrex xml element
@@ -240,6 +390,8 @@ class ARStructureList(object):
     of the atomicrex job class.
     Provides functions for internal use and a convenient way
     to add additional structures to the atomicrex job.
+
+    Will be replaced with FlattenedStructureContainer or used only for representation of the data
     """    
     def __init__(self):
         self._structure_dict = {}
@@ -249,6 +401,8 @@ class ARStructureList(object):
         # If it is not given a file is written for every structure of the job.
         self.struct_file_path = None
         self.full_structure_to_hdf = True
+        self.num_structures = 0
+        self.num_atoms = 0
 
     def add_structure(self, structure, identifier, fit_properties=None, relative_weight=1, clamp=True, fit=True):
         """
@@ -272,9 +426,12 @@ class ARStructureList(object):
             if fit_properties is None:
                 fit_properties = ARFitPropertyList()
             ar_struct = ARStructure(structure, fit_properties, identifier, relative_weight=relative_weight, clamp=clamp)
+            self.num_structures += 1
+            self.num_atoms += len(structure)
             return self._add_ARstructure(ar_struct)
         else:
             raise ValueError("Structure has to be a Pyiron Atoms instance")
+
 
     def _add_ARstructure(self, structure):
         """Internal helper function to be able to implement some more checks later on
@@ -298,6 +455,16 @@ class ARStructureList(object):
         filename = posixpath.join(directory, name)
         write_pretty_xml(root, filename)
 
+
+    #def to_hdf(self, hdf=None, group_name="arstructurelist"):
+
+    
+
+
+    #def from_hdf(self, hdf=None, group_name="arstructurelist"):
+    
+
+
     def to_hdf(self, hdf=None, group_name="arstructurelist"):
         """
         Internal function 
@@ -308,7 +475,7 @@ class ARStructureList(object):
             for k, v in self._structure_dict.items():
                 v.to_hdf(hdf=hdf_s_lst, group_name=k, full_hdf=self.full_structure_to_hdf)
 
-    def from_hdf(self, hdf=None, group_name="arstructurelist"):
+    def from_hdf(self, hdf=None, group_name="arstructurelist")
         """
         Internal function 
         """        
@@ -324,6 +491,7 @@ class ARStructureList(object):
                 s = ARStructure()
                 s.from_hdf(hdf=hdf_s_lst, group_name=g, full_hdf=self.full_structure_to_hdf)
                 self._structure_dict[g] = s
+
 
     def _parse_final_properties(self, struct_lines):
         """
@@ -380,7 +548,7 @@ def write_modified_poscar(identifier, structure, forces, directory):
     with open(filename, 'w') as f:
         # Elements as system name
         elements = []
-        symbols = structure.get_chemical_symbols()
+        symbols = np.array(structure.symbols)
         for elem in symbols:
             if not elem in elements: elements.append(elem)
         f.write(f"{elements}\n")

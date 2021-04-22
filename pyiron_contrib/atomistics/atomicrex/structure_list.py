@@ -283,22 +283,24 @@ class ARStructureContainer:
                     final_forces[index, 2] = float(l[4].rstrip(")"))
                 else:
                     force_vec_triggered = False
-                    s.fit_properties["atomic-forces"].final_value = final_forces
+                    start_index = self.structures.start_indices[s_index]
+                    self.fit_properties["atomic-forces"].final_value[start_index:start_index+len_struct] = final_forces
             
             # This has to be if and not else because it has to run in the same iteration. Empty lines get skipped.
             if not force_vec_triggered and l:
                 if l.startswith("Structure"):
                     s_id = l.split("'")[1]
-                    s = self._structure_dict[s_id]
-            
+                    s_index = np.nonzero(self.structures.identifiers==s_id)[0][0]
+
                 else:
                     if not l.startswith("atomic-forces avg/max:"):
                         prop, f_val = ARFitProperty._parse_final_value(line=l)
                         if prop in self.fit_properties.keys():
-                            self.fit_properties[prop].final_value = f_val
+                            self.fit_properties[prop].final_value[s_index] = f_val
                     else:
                         force_vec_triggered = True
-                        final_forces = np.empty((len(s.structure), 3))
+                        len_struct = self.structures.len_current_struct[s_index]
+                        final_forces = np.empty((len_struct, 3))
     
 
 ### This is probably useless like this in most cases because forces can't be passed.

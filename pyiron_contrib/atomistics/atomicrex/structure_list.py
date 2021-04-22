@@ -105,7 +105,7 @@ class FlattenedStructureContainer:
 
 class ARStructureContainer:
     def __init__(self):
-        self.fit_properties = DataContainer(table_name="fit_properties")
+        self.fit_properties = {}
         # most init can't be done without some information
         # This allows to preallocate arrays and speed everything up massively
         # when writing and reading hdf5 files
@@ -185,7 +185,11 @@ class ARStructureContainer:
     def to_hdf(self, hdf, group_name="structures"):
         with hdf.open(group_name) as h:
             self.flattened_structures.to_hdf(hdf=h)
-            self.fit_properties.to_hdf(hdf=h)
+
+            h_fit = h.create_group("fit_properties") 
+            for k, v in self.fit_properties.items():
+                v.to_hdf(h_fit, group_name=k)
+            
             h["fit"] = self.fit
             h["clamp"] = self.clamp
             h["relative_weight"] = self.relative_weight
@@ -197,7 +201,16 @@ class ARStructureContainer:
             num_atoms = h["flattened_structures/num_atoms"]
             self._init_structure_container(num_structures, num_atoms)
             self.flattened_structures.from_hdf(hdf=h)
-            self.fit_properties.from_hdf(hdf=h)
+
+            h_fit = h["fit_properties"]
+            for group in h_fit.list_groups():
+                if group == "atomic-forces":
+                    self.fit_properties[group] = FlattenedARVectorProperty(num_structures, num_atoms, group)
+                    self.fit_properties[group].from_hdf(h_fit, group_name=group)
+                else:
+                    self.fit_properties[group] = FlattenedARProperty(num_structures, group)
+                    self.fit_properties[group].from_hdf(h_fit, group_name=group)
+
             self.clamp = h["clamp"]
             self.fit = h["fit"]
             self.relative_weight = h["relative_weight"]

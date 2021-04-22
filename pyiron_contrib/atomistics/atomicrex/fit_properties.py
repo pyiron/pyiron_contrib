@@ -237,7 +237,7 @@ class FlattenedARProperty:
         self._init_arrays()
     
 
-    def _init_arrays(self):    
+    def _init_arrays(self):
         self.target_value = np.full(self.num_structures, np.nan)
         self.fit = np.full(self.num_structures, fill_value=False, dtype=np.bool8)
         self.relative_weight = np.ones(self.num_structures) # default 1
@@ -264,7 +264,16 @@ class FlattenedARProperty:
             h["min_val"] = self.min_val
             h["max_val"] = self.max_val
             h["final_value"] = self.final_value
-            h["ouput"] = self.output
+            h["output"] = self.output
+
+    #def _type_to_hdf(self, hdf):
+    #    """
+    #    Internal helper function to save type and version in hdf root#
+    #
+    #    Args:
+    #        hdf (ProjectHDFio): HDF5 group object
+    #    """
+    #    hdf["TYPE"] = str(type(self))
 
     def from_hdf(self, hdf, group_name=None):
         if group_name is None:
@@ -279,6 +288,7 @@ class FlattenedARProperty:
             self.min_val = h["min_val"]
             self.max_val = h["max_val"]
             self.output = h["output"]
+            self.final_value = h["final_value"]
 
     def to_xml_element(self, index):
         xml = ET.Element(f"{self.prop}")
@@ -347,7 +357,15 @@ class FlattenedARVectorProperty:
             self.tolerance = h["tolerance"]
             self.final_value = h["final_value"]
             self.output = h["output"]
-
+    
+#    def _type_to_hdf(self, hdf):
+#        """
+#        Internal helper function to save type and version in hdf root
+#
+#        Args:
+#            hdf (ProjectHDFio): HDF5 group object
+#        """
+#        hdf["TYPE"] = str(type(self))
     
     def to_xml_element(self, index):
         xml = ET.Element(f"{self.prop}")

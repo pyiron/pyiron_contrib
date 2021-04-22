@@ -263,11 +263,11 @@ class ARStructureContainer:
                     fit_properties_xml.append(flat_prop.to_xml_element(i))
 
                 struct_xml = structure_meta_xml(
-                    identifier=self.flattened_structures.identifier[i],
+                    identifier=self.flattened_structures.identifiers[i],
                     relative_weight=self.relative_weight[i],
                     clamp=self.clamp[i],
                     fit_properties=fit_properties_xml,
-                    struct_file_path=self.struct_file_path,
+                    struct_file_path=self.structure_file_path,
                     fit = self.fit[i],
                 )
                 root.append(struct_xml)

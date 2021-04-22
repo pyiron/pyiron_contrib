@@ -127,16 +127,16 @@ class ARStructureContainer:
         self.structure_file_path = structure_file_path
 
     def _init_structure_container(self, num_structures, num_atoms):
-        self.structures = FlattenedStructureContainer(num_structures=num_structures, num_atoms=num_atoms)
+        self.flattened_structures = FlattenedStructureContainer(num_structures=num_structures, num_atoms=num_atoms)
         self.fit = np.empty(num_structures, dtype=np.bool8)
         self.clamp = np.empty(num_structures, dtype=np.bool8)
         self.relative_weight = np.empty(num_structures)
 
     def add_structure(self, structure, identifier, fit=True, relative_weight=1, clamp=True):
-        self.structures.add_structure(structure, identifier)
-        self.fit[self.structures.prev_structure_index] = fit
-        self.relative_weight[self.structures.prev_structure_index] = relative_weight
-        self.clamp[self.structures.prev_structure_index] = clamp
+        self.flattened_structures.add_structure(structure, identifier)
+        self.fit[self.flattened_structures.prev_structure_index] = fit
+        self.relative_weight[self.flattened_structures.prev_structure_index] = relative_weight
+        self.clamp[self.flattened_structures.prev_structure_index] = clamp
 
     def add_scalar_fit_property(
         self,
@@ -150,15 +150,15 @@ class ARStructureContainer:
         min_val=np.nan,
         max_val=np.nan,
         ):
-        self.fit_properties[prop].target_value[self.structures.prev_structure_index] = target_value
-        self.fit_properties[prop].fit[self.structures.prev_structure_index] = fit
-        self.fit_properties[prop].relax[self.structures.prev_structure_index] = relax
-        self.fit_properties[prop].relative_weight[self.structures.prev_structure_index] = relative_weight
-        self.fit_properties[prop].residual_style[self.structures.prev_structure_index] = residual_style
-        self.fit_properties[prop].output[self.structures.prev_structure_index] = output
-        self.fit_properties[prop].tolerance[self.structures.prev_structure_index] = tolerance
-        self.fit_properties[prop].min_val[self.structures.prev_structure_index] = min_val
-        self.fit_properties[prop].max_val[self.structures.prev_structure_index] = max_val
+        self.fit_properties[prop].target_value[self.flattened_structures.prev_structure_index] = target_value
+        self.fit_properties[prop].fit[self.flattened_structures.prev_structure_index] = fit
+        self.fit_properties[prop].relax[self.flattened_structures.prev_structure_index] = relax
+        self.fit_properties[prop].relative_weight[self.flattened_structures.prev_structure_index] = relative_weight
+        self.fit_properties[prop].residual_style[self.flattened_structures.prev_structure_index] = residual_style
+        self.fit_properties[prop].output[self.flattened_structures.prev_structure_index] = output
+        self.fit_properties[prop].tolerance[self.flattened_structures.prev_structure_index] = tolerance
+        self.fit_properties[prop].min_val[self.flattened_structures.prev_structure_index] = min_val
+        self.fit_properties[prop].max_val[self.flattened_structures.prev_structure_index] = max_val
 
         
     def add_vector_fit_property(
@@ -173,18 +173,18 @@ class ARStructureContainer:
         output=True,
         ):
         if target_value is not None:
-            self.fit_properties[prop].target_value[self.structures.prev_atom_index:self.structures.current_atom_index] = target_value
-        self.fit_properties[prop].fit[self.structures.prev_structure_index] = fit
-        self.fit_properties[prop].relax[self.structures.prev_structure_index] = relax
-        self.fit_properties[prop].relative_weight[self.structures.prev_structure_index] = relative_weight
-        self.fit_properties[prop].residual_style[self.structures.prev_structure_index] = residual_style
-        self.fit_properties[prop].output[self.structures.prev_structure_index] = output
-        self.fit_properties[prop].tolerance[self.structures.prev_structure_index] = tolerance
+            self.fit_properties[prop].target_value[self.flattened_structures.prev_atom_index:self.flattened_structures.current_atom_index] = target_value
+        self.fit_properties[prop].fit[self.flattened_structures.prev_structure_index] = fit
+        self.fit_properties[prop].relax[self.flattened_structures.prev_structure_index] = relax
+        self.fit_properties[prop].relative_weight[self.flattened_structures.prev_structure_index] = relative_weight
+        self.fit_properties[prop].residual_style[self.flattened_structures.prev_structure_index] = residual_style
+        self.fit_properties[prop].output[self.flattened_structures.prev_structure_index] = output
+        self.fit_properties[prop].tolerance[self.flattened_structures.prev_structure_index] = tolerance
 
 
     def to_hdf(self, hdf, group_name="structures"):
         with hdf.open(group_name) as h:
-            self.structures.to_hdf(hdf=h)
+            self.flattened_structures.to_hdf(hdf=h)
             self.fit_properties.to_hdf(hdf=h)
             h["fit"] = self.fit
             h["clamp"] = self.clamp
@@ -196,7 +196,7 @@ class ARStructureContainer:
             num_structures = h["flattened_structures/num_structures"]
             num_atoms = h["flattened_structures/num_atoms"]
             self._init_structure_container(num_structures, num_atoms)
-            self.structures.from_hdf(hdf=h)
+            self.flattened_structures.from_hdf(hdf=h)
             self.fit_properties.from_hdf(hdf=h)
             self.clamp = h["clamp"]
             self.fit = h["fit"]
@@ -217,15 +217,15 @@ class ARStructureContainer:
         if self.structure_file_path is None:
 
             # write POSCAR and xml
-            for i in range(self.structures.num_structures):
-                vec_start = self.structures.start_indices[i]
-                vec_end = self.structures.start_indices[i]+self.structures.len_current_struct[i]
+            for i in range(self.flattened_structures.num_structures):
+                vec_start = self.flattened_structures.start_indices[i]
+                vec_end = self.flattened_structures.start_indices[i]+self.flattened_structures.len_current_struct[i]
                 write_modified_poscar(
-                    identifier=self.structures.identifiers[i],
+                    identifier=self.flattened_structures.identifiers[i],
                     forces=self.fit_properties["atomic-forces"].target_value[vec_start:vec_end],
-                    positions=self.structures.positions[vec_start:vec_end],
-                    symbols=self.structures.symbols[vec_start:vec_end],
-                    cell=self.structures.cells[i],
+                    positions=self.flattened_structures.positions[vec_start:vec_end],
+                    symbols=self.flattened_structures.symbols[vec_start:vec_end],
+                    cell=self.flattened_structures.cells[i],
                     directory=directory
                 )
                 
@@ -234,7 +234,7 @@ class ARStructureContainer:
                     fit_properties_xml.append(flat_prop.to_xml_element(i))
 
                 struct_xml = structure_meta_xml(
-                    identifier=self.structures.identifiers[i],
+                    identifier=self.flattened_structures.identifiers[i],
                     relative_weight=self.relative_weight[i],
                     clamp=self.clamp[i],
                     fit_properties=fit_properties_xml,
@@ -244,13 +244,13 @@ class ARStructureContainer:
                 root.append(struct_xml)
         else:
             # write only xml and use POSCARs written already to some path
-            for i in range(self.structures.num_structures):
+            for i in range(self.flattened_structures.num_structures):
                 fit_properties_xml = ET.Element("properties")
                 for flat_prop in self.fit_properties.values():
                     fit_properties_xml.append(flat_prop.to_xml_element(i))
 
                 struct_xml = structure_meta_xml(
-                    identifier=self.structures.identifier[i],
+                    identifier=self.flattened_structures.identifier[i],
                     relative_weight=self.relative_weight[i],
                     clamp=self.clamp[i],
                     fit_properties=fit_properties_xml,
@@ -283,14 +283,14 @@ class ARStructureContainer:
                     final_forces[index, 2] = float(l[4].rstrip(")"))
                 else:
                     force_vec_triggered = False
-                    start_index = self.structures.start_indices[s_index]
+                    start_index = self.flattened_structures.start_indices[s_index]
                     self.fit_properties["atomic-forces"].final_value[start_index:start_index+len_struct] = final_forces
             
             # This has to be if and not else because it has to run in the same iteration. Empty lines get skipped.
             if not force_vec_triggered and l:
                 if l.startswith("Structure"):
                     s_id = l.split("'")[1]
-                    s_index = np.nonzero(self.structures.identifiers==s_id)[0][0]
+                    s_index = np.nonzero(self.flattened_structures.identifiers==s_id)[0][0]
 
                 else:
                     if not l.startswith("atomic-forces avg/max:"):
@@ -299,7 +299,7 @@ class ARStructureContainer:
                             self.fit_properties[prop].final_value[s_index] = f_val
                     else:
                         force_vec_triggered = True
-                        len_struct = self.structures.len_current_struct[s_index]
+                        len_struct = self.flattened_structures.len_current_struct[s_index]
                         final_forces = np.empty((len_struct, 3))
     
 

@@ -361,6 +361,6 @@ class FlattenedARVectorProperty:
             xml.set("residual-style", f"{Residual_Styles[self.residual_style[index]]}")
             if not np.isnan(self.tolerance[index]):
                 xml.set("tolerance", f"{self.tolerance[index]}")  
-            return xml
+        return xml
 
 

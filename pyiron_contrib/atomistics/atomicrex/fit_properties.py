@@ -246,38 +246,38 @@ class FlattenedARProperty:
         self.residual_style = np.zeros(self.num_structures, dtype=np.uint8) # default 0
         self.relax = np.full(self.num_structures, fill_value=False, dtype=np.bool8) # default False
         self.tolerance = np.full(self.num_structures, fill_value=np.nan)
-        self.min_vals = np.full(self.num_structures, fill_value=np.nan)
-        self.max_vals = np.full(self.num_structures, fill_value=np.nan)
+        self.min_val = np.full(self.num_structures, fill_value=np.nan)
+        self.max_val = np.full(self.num_structures, fill_value=np.nan)
         self.final_value = np.full(self.num_structures, fill_value=np.nan)
         self.output = np.full(self.num_structures, fill_value=False, dtype=np.bool8)
 
-    def to_hdf(self, hdf, group=None):
-        if group is None:
+    def to_hdf(self, hdf, group_name=None):
+        if group_name is None:
             f"{self.property}"
-        with hdf.open(group) as h:
+        with hdf.open(group_name) as h:
             h["target_value"] = self.target_value
             h["fit"] = self.fit
             h["relative_weight"] = self.relative_weight
             h["residual_style"] = self.residual_style
             h["relax"] = self.relax
             h["tolerance"] = self.tolerance
-            h["min_vals"] = self.min_vals
-            h["max_vals"] = self.max_vals
+            h["min_val"] = self.min_val
+            h["max_val"] = self.max_val
             h["final_value"] = self.final_value
             h["ouput"] = self.output
 
-    def from_hdf(self, hdf, group=None):
-        if group is None:
-            group = f"{self.prop}"
-        with hdf.open(group) as h:
+    def from_hdf(self, hdf, group_name=None):
+        if group_name is None:
+            group_name = f"{self.prop}"
+        with hdf.open(group_name) as h:
             self.target_value = h["target_value"]
             self.fit = h["fit"]
             self.relative_weight = h["relative_weight"]
             self.residual_style = h["residual_style"]
             self.relax = h["relax"]
             self.tolerance = h["tolerance"]
-            self.min_vals = h["min_vals"]
-            self.max_vals = h["max_vals"]
+            self.min_val = h["min_val"]
+            self.max_val = h["max_val"]
             self.output = h["output"]
 
     def to_xml_element(self, index):
@@ -290,11 +290,11 @@ class FlattenedARProperty:
             #xml.set("relax", f"{self.relax}".lower())
             xml.set("relative-weight", f"{self.relative_weight[index]}")
             xml.set("residual-style", f"{Residual_Styles[self.residual_style[index]]}")
-            if not self.tolerance[index] is np.nan:
+            if not np.isnan(self.tolerance[index]):
                 xml.set("tolerance", f"{self.tolerance[index]}")
-            if not self.min_val[index] is np.nan:
+            if not np.isnan(self.min_val[index]):
                 xml.set("min", f"{self.min_val[index]}")
-            if not self.max_val[index] is np.nan:
+            if not np.isnan(self.max_val[index]):
                 xml.set("min", f"{self.max_val[index]}")        
         return xml
 
@@ -311,8 +311,8 @@ class FlattenedARVectorProperty:
 
     
     def _init_arrays(self):
-        self.target_value = np.fill((self.num_atoms, 3), np.nan)
-        self.fit = np.full(self.structures, fill_value=False, dtype=np.bool8)
+        self.target_value = np.full((self.num_atoms, 3), np.nan)
+        self.fit = np.full(self.num_structures, fill_value=False, dtype=np.bool8)
         self.relative_weight = np.ones(self.num_structures) # default 1
         # resiudal styles are "squared", "squared-relative" and "absolute-diff"
         # Translate to 0, 1 and 2
@@ -322,11 +322,11 @@ class FlattenedARVectorProperty:
         self.final_value = np.full((self.num_atoms, 3), fill_value=np.nan)
         self.output = np.full(self.num_structures, fill_value=False, dtype=np.bool8)
 
-    def to_hdf(self, hdf, group=None):
-        if self.group is None:
-            group = f"{self.prop}"
-        with hdf.open(group) as h:
-            h["target_value"] = self.target_values
+    def to_hdf(self, hdf, group_name=None):
+        if group_name is None:
+            group_name = f"{self.prop}"
+        with hdf.open(group_name) as h:
+            h["target_value"] = self.target_value
             h["fit"] = self.fit
             h["relative_weight"] = self.relative_weight
             h["residual_style"] = self.residual_style
@@ -335,10 +335,10 @@ class FlattenedARVectorProperty:
             h["final_value"] = self.final_value
             h["output"] = self.output
 
-    def from_hdf(self, hdf, group=None):
-        if group is None:
-            group = f"{self.prop}"
-        with hdf.open(group) as h:
+    def from_hdf(self, hdf, group_name=None):
+        if group_name is None:
+            group_name = f"{self.prop}"
+        with hdf.open(group_name) as h:
             self.target_value = h["target_value"]
             self.fit = h["fit"]
             self.relative_weight = h["relative_weight"]
@@ -359,12 +359,8 @@ class FlattenedARVectorProperty:
             #xml.set("relax", f"{self.relax}".lower())
             xml.set("relative-weight", f"{self.relative_weight[index]}")
             xml.set("residual-style", f"{Residual_Styles[self.residual_style[index]]}")
-            if not self.tolerance[index] is np.nan:
-                xml.set("tolerance", f"{self.tolerance[index]}")
-            if not self.min_val[index] is np.nan:
-                xml.set("min", f"{self.min_val[index]}")
-            if not self.max_val[index] is np.nan:
-                xml.set("min", f"{self.max_val[index]}")        
+            if not np.isnan(self.tolerance[index]):
+                xml.set("tolerance", f"{self.tolerance[index]}")  
             return xml
 
 

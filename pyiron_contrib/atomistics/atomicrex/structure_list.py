@@ -140,12 +140,13 @@ class ARStructureContainer:
 
     def add_scalar_fit_property(
         self,
-        prop,
+        prop="atomic-energy",
         target_value=np.nan,
-        fit=True, relax=False,
+        fit=True,
+        relax=False,
         relative_weight=1,
         residual_style=0,
-        output=False,
+        output=True,
         tolerance=np.nan,
         min_val=np.nan,
         max_val=np.nan,

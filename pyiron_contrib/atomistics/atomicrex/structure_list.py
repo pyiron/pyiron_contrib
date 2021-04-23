@@ -10,8 +10,8 @@ from pyiron_contrib.atomistics.atomicrex.fit_properties import ARFitPropertyList
 from pyiron_contrib.atomistics.atomicrex.utility_functions import write_pretty_xml
 from pyiron_contrib.atomistics.atomicrex.fit_properties import FlattenedARProperty, FlattenedARVectorProperty
 
-# TODO: Develop a useful MinimalStructure class for  
-# 
+# TODO: Develop a useful MinimalStructure class for
+#
 #class MinimalStructure:
 #    def __init__(self, symbols, cell, positions):
 #        self.cell = cell
@@ -187,7 +187,7 @@ class ARStructureContainer:
         with hdf.open(group_name) as h:
             self.flattened_structures.to_hdf(hdf=h)
 
-            h_fit = h.create_group("fit_properties") 
+            h_fit = h.create_group("fit_properties")
             for k, v in self.fit_properties.items():
                 v.to_hdf(h_fit, group_name=k)
             

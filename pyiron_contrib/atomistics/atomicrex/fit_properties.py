@@ -239,17 +239,17 @@ class FlattenedARProperty:
 
     def _init_arrays(self):
         self.target_value = np.full(self.num_structures, np.nan)
-        self.fit = np.full(self.num_structures, fill_value=False, dtype=np.bool8)
+        self.fit = np.full(self.num_structures, fill_value=False, dtype=bool)
         self.relative_weight = np.ones(self.num_structures) # default 1
         # resiudal styles are "squared", "squared-relative" and "absolute-diff"
         # Translate to 0, 1 and 2
         self.residual_style = np.zeros(self.num_structures, dtype=np.uint8) # default 0
-        self.relax = np.full(self.num_structures, fill_value=False, dtype=np.bool8) # default False
+        self.relax = np.full(self.num_structures, fill_value=False, dtype=bool) # default False
         self.tolerance = np.full(self.num_structures, fill_value=np.nan)
         self.min_val = np.full(self.num_structures, fill_value=np.nan)
         self.max_val = np.full(self.num_structures, fill_value=np.nan)
         self.final_value = np.full(self.num_structures, fill_value=np.nan)
-        self.output = np.full(self.num_structures, fill_value=False, dtype=np.bool8)
+        self.output = np.full(self.num_structures, fill_value=False, dtype=bool)
 
     def to_hdf(self, hdf, group_name=None):
         if group_name is None:
@@ -322,15 +322,15 @@ class FlattenedARVectorProperty:
     
     def _init_arrays(self):
         self.target_value = np.full((self.num_atoms, 3), np.nan)
-        self.fit = np.full(self.num_structures, fill_value=False, dtype=np.bool8)
+        self.fit = np.full(self.num_structures, fill_value=False, dtype=bool)
         self.relative_weight = np.ones(self.num_structures) # default 1
         # resiudal styles are "squared", "squared-relative" and "absolute-diff"
         # Translate to 0, 1 and 2
         self.residual_style = np.zeros(self.num_structures, dtype=np.uint8) # default 0
-        self.relax = np.full(self.num_structures, fill_value=False, dtype=np.bool8) # default False
+        self.relax = np.full(self.num_structures, fill_value=False, dtype=bool) # default False
         self.tolerance = np.full(self.num_structures, fill_value=np.nan)
         self.final_value = np.full((self.num_atoms, 3), fill_value=np.nan)
-        self.output = np.full(self.num_structures, fill_value=False, dtype=np.bool8)
+        self.output = np.full(self.num_structures, fill_value=False, dtype=bool)
 
     def to_hdf(self, hdf, group_name=None):
         if group_name is None:

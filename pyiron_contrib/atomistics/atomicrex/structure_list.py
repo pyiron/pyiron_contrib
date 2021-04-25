@@ -129,8 +129,8 @@ class ARStructureContainer:
 
     def _init_structure_container(self, num_structures, num_atoms):
         self.flattened_structures = FlattenedStructureContainer(num_structures=num_structures, num_atoms=num_atoms)
-        self.fit = np.empty(num_structures, dtype=np.bool8)
-        self.clamp = np.empty(num_structures, dtype=np.bool8)
+        self.fit = np.empty(num_structures, dtype=bool)
+        self.clamp = np.empty(num_structures, dtype=bool)
         self.relative_weight = np.empty(num_structures)
 
     def add_structure(self, structure, identifier, fit=True, relative_weight=1, clamp=True):

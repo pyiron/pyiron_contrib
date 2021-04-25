@@ -101,6 +101,7 @@ class FlattenedStructureContainer:
             self.cells = hdf_s_lst["cells"]
             self.start_indices = hdf_s_lst["start_indices"]
             self.identifiers = hdf_s_lst["identifiers"].astype(np.dtype("U20"))
+            self.len_current_struct = hdf_s_lst["len_current_struct"]
 
 
 class ARStructureContainer:
@@ -298,13 +299,7 @@ class ARStructureContainer:
                 else:
                     force_vec_triggered = False
                     start_index = self.flattened_structures.start_indices[s_index]
-                    try:
-                        self.fit_properties["atomic-forces"].final_value[start_index:start_index+len_struct] = final_forces
-                    except ValueError:
-                        print(final_forces.shape)
-                        print(final_forces)
-                        print(start_index)
-                        print(len_struct)
+                    self.fit_properties["atomic-forces"].final_value[start_index:start_index+len_struct] = final_forces
 
             # This has to be if and not else because it has to run in the same iteration. Empty lines get skipped.
             if not force_vec_triggered and l:

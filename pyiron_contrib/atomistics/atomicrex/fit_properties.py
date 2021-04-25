@@ -253,7 +253,7 @@ class FlattenedARProperty:
 
     def to_hdf(self, hdf, group_name=None):
         if group_name is None:
-            f"{self.property}"
+            group_name = f"{self.property}"
         with hdf.open(group_name) as h:
             h["target_value"] = self.target_value
             h["fit"] = self.fit
@@ -380,5 +380,4 @@ class FlattenedARVectorProperty:
             if not np.isnan(self.tolerance[index]):
                 xml.set("tolerance", f"{self.tolerance[index]}")
         return xml
-
 

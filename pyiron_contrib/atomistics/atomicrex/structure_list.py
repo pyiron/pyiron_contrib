@@ -60,7 +60,7 @@ class FlattenedStructureContainer:
         self.len_current_struct[self.current_structure_index] = n
         self.symbols[self.current_atom_index:i] = np.array(structure.symbols)
         self.positions[self.current_atom_index:i] = structure.positions
-        self.cells[self.current_atom_index:i] = structure.cell.array
+        self.cells[self.current_structure_index] = structure.cell.array
         
         self.start_indices[self.current_structure_index] = self.current_atom_index
         self.identifiers[self.current_structure_index] = identifier

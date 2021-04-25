@@ -96,11 +96,11 @@ class FlattenedStructureContainer:
 
             self._init_arrays()
 
-            self.symbols = hdf_s_lst["symbols"]#.astype(np.dtype("U2"))
+            self.symbols = hdf_s_lst["symbols"].astype(np.dtype("U2"))
             self.positions = hdf_s_lst["positions"]
             self.cells = hdf_s_lst["cells"]
             self.start_indices = hdf_s_lst["start_indices"]
-            self.identifiers = hdf_s_lst["identifiers"]#.astype(np.dtype("U20"))
+            self.identifiers = hdf_s_lst["identifiers"].astype(np.dtype("U20"))
 
 
 class ARStructureContainer:

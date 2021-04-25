@@ -298,8 +298,14 @@ class ARStructureContainer:
                 else:
                     force_vec_triggered = False
                     start_index = self.flattened_structures.start_indices[s_index]
-                    self.fit_properties["atomic-forces"].final_value[start_index:start_index+len_struct] = final_forces
-            
+                    try:
+                        self.fit_properties["atomic-forces"].final_value[start_index:start_index+len_struct] = final_forces
+                    except ValueError:
+                        print(final_forces.shape)
+                        print(final_forces)
+                        print(start_index)
+                        print(len_struct)
+
             # This has to be if and not else because it has to run in the same iteration. Empty lines get skipped.
             if not force_vec_triggered and l:
                 if l.startswith("Structure"):

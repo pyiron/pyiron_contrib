@@ -2,7 +2,7 @@
 for f in $(cat .ci_support/exclude); do 
     rm "notebooks/$f";     
 done;
-# execute notebooks
+# execute notebook
 i=0;
 for notebook in $(ls notebooks/*.ipynb); do 
     papermill ${notebook} ${notebook%.*}-out.${notebook##*.} -k "python3" || i=$((i+1));

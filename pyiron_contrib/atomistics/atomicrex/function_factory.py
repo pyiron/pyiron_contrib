@@ -507,7 +507,7 @@ class FunctionParameter(DataContainer):
         else:
             root.set("enabled", "false")
 
-        if self.reset
+        if self.reset:
             root.set("reset", "true")
         else:
             root.set("reset", "false")

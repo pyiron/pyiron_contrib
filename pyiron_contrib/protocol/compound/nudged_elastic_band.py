@@ -236,5 +236,5 @@ class NEB(CompoundVertex):
     get_barrier.__doc__ = get_forward_barrier.__doc__
 
 
-class ProtocolNEB(Protocol, NEB):
+class ProtoNEBSer(Protocol, NEB):
     pass

@@ -110,7 +110,11 @@ class ARFitProperty(DataContainer):
 
     def to_xml_element(self):
         xml = ET.Element(f"{self.prop}")
-        xml.set("fit", f"{self.fit}".lower())
+
+        if self.fit:
+            xml.set("fit", "true")
+        else:
+            xml.set("fit", "false")
         #xml.set("relax", f"{self.relax}".lower())
         xml.set("relative-weight", f"{self.relative_weight}")
         if self.tolerance is not None:
@@ -129,7 +133,7 @@ class ARFitProperty(DataContainer):
             if self.min_val is not None or self.max_val is not None:
                 raise ValueError("Min and Max val can only be given for scalar properties")
             if self.output_all:
-                xml.set("output-all", f"{self.output_all}".lower())
+                xml.set("output-all", "true")
             xml.set("residual-style", f"{self.residual_style}")
         return xml
 
@@ -295,7 +299,7 @@ class FlattenedARProperty:
         if self.output[index]:
             xml.set("output", "true")
         if self.fit[index]:
-            xml.set("fit", f"{self.fit[index]}".lower())
+            xml.set("fit", "true")
             xml.set("target", f"{self.target_value[index]}")
             #xml.set("relax", f"{self.relax}".lower())
             xml.set("relative-weight", f"{self.relative_weight[index]}")

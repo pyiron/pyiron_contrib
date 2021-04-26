@@ -461,7 +461,7 @@ class UserFunction(DataContainer):
         for param in self.parameters.values():
             p = ET.SubElement(root, "param")
             p.set("name", f"{param.param}")
-            p.text = f"{param.start_val:.6g}"
+            p.text = f"{param.start_val:.6g}"#6g formatting because atomicrex output is limited to 6 significant digits, prevents some errors
         
         root.append(self.parameters.fit_dofs_to_xml_element())
 
@@ -502,8 +502,16 @@ class FunctionParameter(DataContainer):
 
     def _to_xml_element(self):
         root = ET.Element(f"{self.param}")
-        root.set("enabled", f"{self.enabled}".lower())
-        root.set("reset", f"{self.reset}".lower())
+        if self.enabled:
+            root.set("enabled", "true")
+        else:
+            root.set("enabled", "false")
+
+        if self.reset
+            root.set("reset", "true")
+        else:
+            root.set("reset", "false")
+
         if self.min_val is not None:
             root.set("min", f"{self.min_val:.6g}")
         if self.max_val is not None:

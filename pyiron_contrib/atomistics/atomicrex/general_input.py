@@ -75,7 +75,10 @@ class GeneralARInput(DataContainer):
             species.set("atomic-number", f"{index}")
 
         fitting = ET.SubElement(job, "fitting")
-        fitting.set("enabled", f"{self.enable_fitting}".lower())
+        if self.enable_fitting:
+            fitting.set("enabled", "true")
+        else:
+            fitting.set("enabled", "false")
         fitting.set("output-interval", f"{self.output_interval}")
         fitting.append(self.fit_algorithm._to_xml_element())
 

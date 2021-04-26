@@ -684,7 +684,10 @@ def structure_meta_xml(
     struct_xml = ET.Element("user-structure")
     struct_xml.set("id", f"{identifier}")
     struct_xml.set("relative-weight", f"{relative_weight}")
-    struct_xml.set("fit", f"{fit}".lower())
+    if fit: 
+        struct_xml.set("fit", "true")
+    else:
+        struct_xml.set("fit", "false")
 
     if mod_poscar:
         poscar_file = ET.SubElement(struct_xml, "poscar-file")

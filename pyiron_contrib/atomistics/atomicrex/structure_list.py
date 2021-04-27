@@ -26,12 +26,10 @@ class FlattenedStructureContainer:
     Structures are stored together with an identifier that should be unique.
     The class has to be initialized with the number of structures and the total number of atoms in all structures.
     This allows to preallocate the necessary arrays and therefore prevents reallocations.
-
-    TODO: Alternatively preallocate arrays with large default values (f.e. 1e6 atoms) then use resize to shrink them?
-    """    
+    """
     def __init__(self, num_structures=0, num_atoms=0):
-        self.num_structures = num_structures
-        self.num_atoms = num_atoms
+        self._num_structures_alloc = num_structures
+        self._num_atoms_alloc = num_atoms
         # store the starting index for properties with unknown length
         self.current_atom_index = 0
         # store the index for properties of known size, stored at the same index as the structure
@@ -39,20 +37,38 @@ class FlattenedStructureContainer:
         # Also store indices of structure recently added
         self.prev_structure_index = 0
         self.prev_atom_index = 0
-        
+
         self._init_arrays()
 
 
     def _init_arrays(self):
-        self.symbols = np.full(self.num_atoms, "XX", dtype=np.dtype("U2"))# 2 character unicode array for chemical symbols
-        self.positions = np.empty((self.num_atoms, 3))
-        self.cells = np.empty((self.num_structures, 3, 3))
-        self.start_indices = np.empty(self.num_structures, dtype=np.int32)
-        self.len_current_struct = np.empty(self.num_structures, dtype=np.int32)
-        self.identifiers = np.empty(self.num_atoms, dtype=np.dtype("U20"))
+        self.symbols = np.full(self._num_atoms_alloc, "XX", dtype=np.dtype("U2"))# 2 character unicode array for chemical symbols
+        self.positions = np.empty((self._num_atoms_alloc, 3))
+        self.cells = np.empty((self.__num_structures_alloc_alloc, 3, 3))
+        self.start_indices = np.empty(self.__num_structures_alloc_alloc, dtype=np.int32)
+        self.len_current_struct = np.empty(self.__num_structures_alloc_alloc, dtype=np.int32)
+        self.identifiers = np.empty(self.__num_structures_alloc_alloc, dtype=np.dtype("U20"))
 
+    def _resize_atoms(self, new):
+        self._num_atoms_alloc = new
+        self.symbols.resize(new)
+        self.positions.resize( (new, 3) )
+
+    def _resize_structures(self, new):
+        self._num_structures_alloc = new
+        self.cells.resize( (new, 3, 3) )
+        self.start_indices.resize(new)
+        self.len_current_struct.resize(new)
+        self.identifiers.resize(new)
 
     def add_structure(self, structure, identifier):
+
+        new_atoms = self.current_atom_index + len(structure)
+        if new_atoms >= self._num_atoms_alloc:
+            self._resize_atoms(max(new_atoms, self._num_atoms_alloc * 2))
+        if self.current_atom_index + 1 >= self._num_structures_alloc:
+            self._resize_structures(self._num_structures_alloc * 2)
+
         # len of structure to index into the initialized arrays
         n = len(structure)
         i = self.current_atom_index + n
@@ -61,7 +77,7 @@ class FlattenedStructureContainer:
         self.symbols[self.current_atom_index:i] = np.array(structure.symbols)
         self.positions[self.current_atom_index:i] = structure.positions
         self.cells[self.current_structure_index] = structure.cell.array
-        
+
         self.start_indices[self.current_structure_index] = self.current_atom_index
         self.identifiers[self.current_structure_index] = identifier
 
@@ -75,8 +91,9 @@ class FlattenedStructureContainer:
 
 
     def to_hdf(self, hdf, group_name="flattened_structures"):
-        if self.symbols[-1] == "XX":
-            raise ValueError("Initialized arrays are not filled with values")
+        # truncate arrays to necessary size before writing
+        self._resize_atoms(self.current_atom_index)
+        self._resize_structures(self.current_structure_index)
 
         with hdf.open(group_name) as hdf_s_lst:
             hdf_s_lst["symbols"] = self.symbols.astype(np.dtype("S2"))
@@ -84,15 +101,15 @@ class FlattenedStructureContainer:
             hdf_s_lst["cells"] = self.cells
             hdf_s_lst["start_indices"] = self.start_indices
             hdf_s_lst["identifiers"] = self.identifiers.astype(np.dtype("S20"))
-            hdf_s_lst["num_atoms"] =  self.num_atoms
-            hdf_s_lst["num_structures"] = self.num_structures
+            hdf_s_lst["num_atoms"] =  self._num_atoms_alloc
+            hdf_s_lst["num_structures"] = self._num_structures_alloc
             hdf_s_lst["len_current_struct"] = self.len_current_struct
 
 
     def from_hdf(self, hdf, group_name="flattened_structures"):
         with hdf.open(group_name) as hdf_s_lst:
-            self.num_structures = hdf_s_lst["num_structures"]
-            self.num_atoms = hdf_s_lst["num_atoms"]
+            self._num_structures_alloc = hdf_s_lst["num_structures"]
+            self._num_atoms_alloc = hdf_s_lst["num_atoms"]
 
             self._init_arrays()
 

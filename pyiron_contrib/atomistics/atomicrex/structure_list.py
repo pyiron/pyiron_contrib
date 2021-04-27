@@ -31,9 +31,9 @@ class FlattenedStructureContainer:
         self._num_structures_alloc = num_structures
         self._num_atoms_alloc = num_atoms
         # store the starting index for properties with unknown length
-        self.current_atom_index = 0
+        self.num_atoms = 0
         # store the index for properties of known size, stored at the same index as the structure
-        self.current_structure_index = 0
+        self.num_structures = 0
         # Also store indices of structure recently added
         self.prev_structure_index = 0
         self.prev_atom_index = 0
@@ -63,37 +63,37 @@ class FlattenedStructureContainer:
 
     def add_structure(self, structure, identifier):
 
-        new_atoms = self.current_atom_index + len(structure)
+        new_atoms = self.num_atoms + len(structure)
         if new_atoms >= self._num_atoms_alloc:
             self._resize_atoms(max(new_atoms, self._num_atoms_alloc * 2))
-        if self.current_atom_index + 1 >= self._num_structures_alloc:
+        if self.num_atoms + 1 >= self._num_structures_alloc:
             self._resize_structures(self._num_structures_alloc * 2)
 
         # len of structure to index into the initialized arrays
         n = len(structure)
-        i = self.current_atom_index + n
+        i = self.num_atoms + n
 
-        self.len_current_struct[self.current_structure_index] = n
-        self.symbols[self.current_atom_index:i] = np.array(structure.symbols)
-        self.positions[self.current_atom_index:i] = structure.positions
-        self.cells[self.current_structure_index] = structure.cell.array
+        self.len_current_struct[self.num_structures] = n
+        self.symbols[self.num_atoms:i] = np.array(structure.symbols)
+        self.positions[self.num_atoms:i] = structure.positions
+        self.cells[self.num_structures] = structure.cell.array
 
-        self.start_indices[self.current_structure_index] = self.current_atom_index
-        self.identifiers[self.current_structure_index] = identifier
+        self.start_indices[self.num_structures] = self.num_atoms
+        self.identifiers[self.num_structures] = identifier
 
-        self.prev_structure_index = self.current_structure_index
-        self.prev_atom_index = self.current_atom_index
+        self.prev_structure_index = self.num_structures
+        self.prev_atom_index = self.num_atoms
 
-        # Set new current_atom_index and increase current_structure_index
-        self.current_structure_index += 1
-        self.current_atom_index = i
+        # Set new num_atoms and increase num_structures
+        self.num_structures += 1
+        self.num_atoms = i
         #return last_structure_index, last_atom_index
 
 
     def to_hdf(self, hdf, group_name="flattened_structures"):
         # truncate arrays to necessary size before writing
-        self._resize_atoms(self.current_atom_index)
-        self._resize_structures(self.current_structure_index)
+        self._resize_atoms(self.num_atoms)
+        self._resize_structures(self.num_structures)
 
         with hdf.open(group_name) as hdf_s_lst:
             hdf_s_lst["symbols"] = self.symbols.astype(np.dtype("S2"))

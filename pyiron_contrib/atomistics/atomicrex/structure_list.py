@@ -37,12 +37,13 @@ class FlattenedStructureContainer:
             num_structures (int): pre-allocation for per structure arrays
             num_atoms (int): pre-allocation for per atoms arrays
         """
-        self._num_structures_alloc = num_structures
-        self._num_atoms_alloc = num_atoms
+        # tracks allocated versed as yet used number of structures/atoms
+        self._num_structures_alloc = self.num_structures = num_structures
+        self._num_atoms_alloc = self.num_atoms = num_atoms
         # store the starting index for properties with unknown length
-        self.num_atoms = 0
+        self.current_atom_index = 0
         # store the index for properties of known size, stored at the same index as the structure
-        self.num_structures = 0
+        self.current_structure_index = 0
         # Also store indices of structure recently added
         self.prev_structure_index = 0
         self.prev_atom_index = 0
@@ -72,30 +73,35 @@ class FlattenedStructureContainer:
 
     def add_structure(self, structure, identifier):
 
-        new_atoms = self.num_atoms + len(structure)
+        new_atoms = self.current_atom_index + len(structure)
         if new_atoms >= self._num_atoms_alloc:
             self._resize_atoms(max(new_atoms, self._num_atoms_alloc * 2))
-        if self.num_atoms + 1 >= self._num_structures_alloc:
+        if self.current_structure_index + 1 >= self._num_structures_alloc:
             self._resize_structures(self._num_structures_alloc * 2)
+
+        if new_atoms >= self.num_atoms:
+            self.num_atoms = new_atoms
+        if self.current_structure_index + 1 >= self.num_structures:
+            self.num_structures += 1
 
         # len of structure to index into the initialized arrays
         n = len(structure)
-        i = self.num_atoms + n
+        i = self.current_atom_index + n
 
-        self.len_current_struct[self.num_structures] = n
-        self.symbols[self.num_atoms:i] = np.array(structure.symbols)
-        self.positions[self.num_atoms:i] = structure.positions
-        self.cells[self.num_structures] = structure.cell.array
+        self.symbols[self.current_atom_index:i] = np.array(structure.symbols)
+        self.positions[self.current_atom_index:i] = structure.positions
 
-        self.start_indices[self.num_structures] = self.num_atoms
-        self.identifiers[self.num_structures] = identifier
+        self.len_current_struct[self.current_structure_index] = n
+        self.cells[self.current_structure_index] = structure.cell.array
+        self.start_indices[self.current_structure_index] = self.current_atom_index
+        self.identifiers[self.current_structure_index] = identifier
 
-        self.prev_structure_index = self.num_structures
-        self.prev_atom_index = self.num_atoms
+        self.prev_structure_index = self.current_structure_index
+        self.prev_atom_index = self.current_atom_index
 
-        # Set new num_atoms and increase num_structures
-        self.num_structures += 1
-        self.num_atoms = i
+        # Set new current_atom_index and increase current_structure_index
+        self.current_structure_index += 1
+        self.current_atom_index = i
         #return last_structure_index, last_atom_index
 
 

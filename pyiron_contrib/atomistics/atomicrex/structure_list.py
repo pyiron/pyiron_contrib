@@ -53,10 +53,10 @@ class FlattenedStructureContainer:
     def _init_arrays(self):
         self.symbols = np.full(self._num_atoms_alloc, "XX", dtype=np.dtype("U2"))# 2 character unicode array for chemical symbols
         self.positions = np.empty((self._num_atoms_alloc, 3))
-        self.cells = np.empty((self.__num_structures_alloc_alloc, 3, 3))
-        self.start_indices = np.empty(self.__num_structures_alloc_alloc, dtype=np.int32)
-        self.len_current_struct = np.empty(self.__num_structures_alloc_alloc, dtype=np.int32)
-        self.identifiers = np.empty(self.__num_structures_alloc_alloc, dtype=np.dtype("U20"))
+        self.cells = np.empty((self.__num_structures_alloc, 3, 3))
+        self.start_indices = np.empty(self.__num_structures_alloc, dtype=np.int32)
+        self.len_current_struct = np.empty(self.__num_structures_alloc, dtype=np.int32)
+        self.identifiers = np.empty(self.__num_structures_alloc, dtype=np.dtype("U20"))
 
     def _resize_atoms(self, new):
         self._num_atoms_alloc = new

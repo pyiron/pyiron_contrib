@@ -103,33 +103,32 @@ class FlattenedStructureContainer:
             self.identifiers = hdf_s_lst["identifiers"].astype(np.dtype("U20"))
             self.len_current_struct = hdf_s_lst["len_current_struct"]
 
-    def get_structure(self, iteration_step=-1, wrap=False):
+    def get_structure(self, index_or_identifier=-1):
         """
         Create pyiron Atoms object from saved arrays.
 
         Args:
-            iteration_step (int, str): if str then must one of the identifiers given to :method:`.add_structure`
-                                       otherwise must be and integer in range [-N, N) where N the number of structures
-                                       stored in the container
-            wrap (bool): unused
+            index_or_identifier (int, str): if str then must one of the identifiers given to :method:`.add_structure`
+                                            otherwise must be and integer in range [-N, N) where N the number of
+                                            structures stored in the container
 
         Returns:
-            :class:`pyiron_atomistics.atomistics.structure.atoms.Atoms`: request structure
+            :class:`pyiron_atomistics.atomistics.structure.atoms.Atoms`: requested structure
         """
-        if isinstance(iteration_step, str):
+        if isinstance(index_or_identifier, str):
             try:
-                iteration_step = np.where(self.identifiers == iteration_step)[0][0]
+                index = np.where(self.identifiers == index_or_identifier)[0][0]
             except IndexError:
-                raise IndexError(f"No structure named {iteration_step} found in structure container.") from None
-        if iteration_step < 0:
-            iteration_step += self.num_structures
-        if not (0 <= iteration_step < self.num_structures):
-            raise IndexError(f"Index {iteration_step} not in in range [-{self.num_structures}, {self.num_structures})")
-        I = self.start_indices[iteration_step]
-        E = (self.start_indices[iteration_step + 1] if iteration_step != self.num_structures - 1 else self.num_atoms)
-        return Atoms(symbols=self.symbols[I:E],
-                     cell=self.cells[iteration_step],
-                     positions=self.positions[I:E])
+                raise IndexError(f"No structure named {index_or_identifier} found in structure container.") from None
+        else:
+            index = index_or_identifier
+        if index < 0:
+            index += self.num_structures
+        if not (0 <= index < self.num_structures):
+            raise IndexError(f"Index {index} not in in range [-{self.num_structures}, {self.num_structures})")
+        I = self.start_indices[index]
+        E = I + self.len_current_struct[I]
+        return Atoms(symbols=self.symbols[I:E], cell=self.cells[index], positions=self.positions[I:E])
 
 
 

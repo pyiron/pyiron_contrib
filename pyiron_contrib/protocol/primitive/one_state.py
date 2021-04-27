@@ -213,10 +213,6 @@ class ExternalHamiltonian(PrimitiveVertex):
 
         if self._job is None:
             self._reload()
-        elif not self._job.interactive_is_activated():
-            self._job.status.running = True
-            self._job.interactive_open()
-            self._job.interactive_initialize_interface()
 
         if isinstance(self._job, LammpsInteractive) and self._fast_lammps_mode:
             if positions is not None:
@@ -258,13 +254,13 @@ class ExternalHamiltonian(PrimitiveVertex):
             job.structure = structure
         if isinstance(job, GenericInteractive):
             job.interactive_open()
+            job.run_if_interactive()
             if isinstance(job, LammpsInteractive) and fast_lammps_mode:
                 # Note: This might be done by default at some point in LammpsInteractive,
                 # and could then be removed here
                 job.interactive_flush_frequency = 10 ** 10
                 job.interactive_write_frequency = 10 ** 10
-            job.calc_static()
-            job.run()
+            job.save()
         else:
             raise TypeError('Job of class {} is not compatible.'.format(ref_job.__class__))
 
@@ -276,8 +272,7 @@ class ExternalHamiltonian(PrimitiveVertex):
         """
         pr = Project(path=self._job_project_path)
         self._job = pr.load(self._job_name)
-        self._job.interactive_open()
-        self._job.interactive_initialize_interface()
+        self._job.run_if_interactive()
 
     def _get_interactive_value(self, key):
         """
@@ -358,8 +353,8 @@ class CreateJob(ExternalHamiltonian):
         super(CreateJob, self).finish()
         if all(v is not None for v in [self._project_path, self._job_names]):
             pr = Project(path=self._project_path[-1])
-            for jn in self._job_names:
-                job = pr.load(jn)
+            for name in self._job_names:
+                job = pr.load(name)
                 if isinstance(job, GenericInteractive):
                     job.interactive_close()
                     job.status.finished = True

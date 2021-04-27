@@ -22,12 +22,21 @@ from pyiron_contrib.atomistics.atomicrex.fit_properties import FlattenedARProper
 class FlattenedStructureContainer:
     """
     Class that can write and read lots of structures from and to hdf quickly.
-    This is done by storing positions, cells, etc. into large arrays instead of writing every structure into a new group.
-    Structures are stored together with an identifier that should be unique.
-    The class has to be initialized with the number of structures and the total number of atoms in all structures.
-    This allows to preallocate the necessary arrays and therefore prevents reallocations.
+
+    This is done by storing positions, cells, etc. into large arrays instead of writing every structure into a new
+    group.  Structures are stored together with an identifier that should be unique.  The class can be initialized with
+    the number of structures and the total number of atoms in all structures, but re-allocates memory as necessary when
+    more (or larger) structures are added than initially anticipated.
     """
+
     def __init__(self, num_structures=0, num_atoms=0):
+        """
+        Create new structure container.
+
+        Args:
+            num_structures (int): pre-allocation for per structure arrays
+            num_atoms (int): pre-allocation for per atoms arrays
+        """
         self._num_structures_alloc = num_structures
         self._num_atoms_alloc = num_atoms
         # store the starting index for properties with unknown length

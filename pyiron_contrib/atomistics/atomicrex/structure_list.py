@@ -103,6 +103,34 @@ class FlattenedStructureContainer:
             self.identifiers = hdf_s_lst["identifiers"].astype(np.dtype("U20"))
             self.len_current_struct = hdf_s_lst["len_current_struct"]
 
+    def get_structure(self, index_or_identifier=-1):
+        """
+        Create pyiron Atoms object from saved arrays.
+
+        Args:
+            index_or_identifier (int, str): if str then must one of the identifiers given to :method:`.add_structure`
+                                            otherwise must be and integer in range [-N, N) where N the number of
+                                            structures stored in the container
+
+        Returns:
+            :class:`pyiron_atomistics.atomistics.structure.atoms.Atoms`: requested structure
+        """
+        if isinstance(index_or_identifier, str):
+            try:
+                index = np.where(self.identifiers == index_or_identifier)[0][0]
+            except IndexError:
+                raise IndexError(f"No structure named {index_or_identifier} found in structure container.") from None
+        else:
+            index = index_or_identifier
+        if index < 0:
+            index += self.num_structures
+        if not (0 <= index < self.num_structures):
+            raise IndexError(f"Index {index} not in in range [-{self.num_structures}, {self.num_structures})")
+        I = self.start_indices[index]
+        E = I + self.len_current_struct[I]
+        return Atoms(symbols=self.symbols[I:E], cell=self.cells[index], positions=self.positions[I:E])
+
+
 
 class ARStructureContainer:
     def __init__(self):

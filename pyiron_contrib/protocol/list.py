@@ -216,8 +216,9 @@ class SerialList(ListVertex):
     """
     A list of commands which are run in serial.
     """
-    def __init__(self, child_type):
+    def __init__(self, child_type, sleep_time=0):
         super(SerialList, self).__init__(child_type=child_type)
+        self.sleep_time = sleep_time
 
     def command(self, n_children):
         """This controls how the commands are run and is about logistics."""
@@ -226,9 +227,13 @@ class SerialList(ListVertex):
 
         for child in self.children:
             child.execute()
+        stop_time = time.time()
 
         output_data = self._extract_output_data_from_children()
         return output_data
+
+    def finish(self):
+        super(SerialList, self).finish()
 
 
 class AutoList(ParallelList, SerialList):

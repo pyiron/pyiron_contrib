@@ -83,6 +83,8 @@ class Counter(PrimitiveVertex):
     Increments by one at each execution. Can be made to increment from a specific value.
     Input attributes:
         add_counts (int): A specific value from which to increment. (Default is 0.)
+        max_counts (int): Reset the counter to 1, if the this value is crossed. 1, because the step at which the
+            counter is called also counts! (Default is 1e10.)
     Output attributes:
         n_counts (int): How many executions have passed. (Default is 0.)
     """
@@ -90,13 +92,16 @@ class Counter(PrimitiveVertex):
     def __init__(self, name=None):
         super(Counter, self).__init__(name=name)
         self.input.default.add_counts = 0
+        self.input.default.max_counts = 1e10
         self.output.n_counts = [0]
 
-    def command(self, add_counts):
-        if add_counts > 0:
+    def command(self, add_counts, max_counts):
+        if add_counts > 0:  # increment from a value
             count = self.output.n_counts[-1] + add_counts
-        else:
+        else:  # regular increment
             count = self.output.n_counts[-1] + 1
+        if count > max_counts:  # counter reset
+            count = 1
         return {
             'n_counts': count
         }
@@ -1412,20 +1417,19 @@ class TILDPostProcess(PrimitiveVertex):
         fep_free_energy_se (float): The standard error calculated via free energy perturbation.
     """
 
-    # def command(self, lambda_pairs, tild_mean, tild_std, fep_exp_mean, fep_exp_std, temperature, n_samples):
-    def command(self, lambda_pairs, tild_mean, tild_std, temperature, n_samples):
+    def command(self, lambda_pairs, tild_mean, tild_std, fep_exp_mean, fep_exp_std, temperature, n_samples):
 
         tild_fe_mean, tild_fe_std, tild_fe_se = self.get_tild_free_energy(lambda_pairs, tild_mean, tild_std,
                                                                           n_samples)
-        # fep_fe_mean, fep_fe_std, fep_fe_se = self.get_fep_free_energy(fep_exp_mean, fep_exp_std, n_samples,
-        #                                                               temperature)
+        fep_fe_mean, fep_fe_std, fep_fe_se = self.get_fep_free_energy(fep_exp_mean, fep_exp_std, n_samples,
+                                                                      temperature)
         return {
             'tild_free_energy_mean': tild_fe_mean,
             'tild_free_energy_std': tild_fe_std,
             'tild_free_energy_se': tild_fe_se,
-            # 'fep_free_energy_mean': fep_fe_mean,
-            # 'fep_free_energy_std': fep_fe_std,
-            # 'fep_free_energy_se': fep_fe_se
+            'fep_free_energy_mean': fep_fe_mean,
+            'fep_free_energy_std': fep_fe_std,
+            'fep_free_energy_se': fep_fe_se
 
         }
 
@@ -1442,21 +1446,21 @@ class TILDPostProcess(PrimitiveVertex):
 
         return float(mean), float(std), float(se)
 
-    # @staticmethod
-    # def get_fep_free_energy(fep_exp_mean, fep_exp_std, n_samples, temperature):
-    #     fep_exp_se = fep_exp_std / np.sqrt(n_samples)
-    #     y = unumpy.uarray(fep_exp_mean, fep_exp_std)
-    #     y_se = unumpy.uarray(fep_exp_mean, fep_exp_se)
-    #     free_energy = 0
-    #     free_energy_se = 0
-    #     for (val, val_se) in zip(y, y_se):
-    #         free_energy += -KB * temperature * unumpy.log(val)
-    #         free_energy_se += -KB * temperature * unumpy.log(val_se)
-    #     mean = unumpy.nominal_values(free_energy)
-    #     std = unumpy.std_devs(free_energy)
-    #     se = unumpy.std_devs(free_energy_se)
-    #
-    #     return float(mean), float(std), float(se)
+    @staticmethod
+    def get_fep_free_energy(fep_exp_mean, fep_exp_std, n_samples, temperature):
+        fep_exp_se = fep_exp_std / np.sqrt(n_samples)
+        y = unumpy.uarray(fep_exp_mean, fep_exp_std)
+        y_se = unumpy.uarray(fep_exp_mean, fep_exp_se)
+        free_energy = 0
+        free_energy_se = 0
+        for (val, val_se) in zip(y, y_se):
+            free_energy += -KB * temperature * unumpy.log(val)
+            free_energy_se += -KB * temperature * unumpy.log(val_se)
+        mean = unumpy.nominal_values(free_energy)
+        std = unumpy.std_devs(free_energy)
+        se = unumpy.std_devs(free_energy_se)
+
+        return float(mean), float(std), float(se)
 
 
 class BerendsenBarostat(PrimitiveVertex):

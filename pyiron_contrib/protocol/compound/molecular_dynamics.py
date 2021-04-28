@@ -210,7 +210,7 @@ class MolecularDynamics(CompoundVertex):
         }
 
 
-class ProtocolMD(Protocol, MolecularDynamics):
+class ProtoMD(Protocol, MolecularDynamics):
     pass
 
 
@@ -362,7 +362,7 @@ class ConfinedMD(MolecularDynamics):
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
 
 
-class ProtocolConfinedMD(Protocol, ConfinedMD):
+class ProtoConfinedMD(Protocol, ConfinedMD):
     pass
 
 
@@ -502,5 +502,5 @@ class HarmonicMD(CompoundVertex):
         }
 
 
-class ProtocolHarmonicMD(Protocol, HarmonicMD):
+class ProtoHarmMD(Protocol, HarmonicMD):
     pass

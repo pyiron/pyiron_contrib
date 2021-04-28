@@ -409,7 +409,7 @@ class FTSEvolution(CompoundVertex):
     get_barrier.__doc__ = get_forward_barrier.__doc__
 
 
-class ProtocolFTSEvolution(Protocol, FTSEvolution):
+class ProtoFTSEvoSer(Protocol, FTSEvolution):
     pass
 
 
@@ -763,5 +763,5 @@ class FTSEvolutionParallel(FTSEvolution):
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
 
 
-class ProtocolFTSEvolutionParallel(Protocol, FTSEvolutionParallel):
+class ProtoFTSEvoPar(Protocol, FTSEvolutionParallel):
     pass

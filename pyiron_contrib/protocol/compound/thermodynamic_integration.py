@@ -408,7 +408,7 @@ class HarmonicTILD(_TILDParent):
         return f
 
 
-class ProtocolHarmonicTILD(Protocol, HarmonicTILD):
+class ProtoHarmTILDSer(Protocol, HarmonicTILD):
     pass
 
 
@@ -841,7 +841,7 @@ class HarmonicTILDParallel(HarmonicTILD):
         return np.array(~o.mean_diff[-1]), ~o.std_diff[-1] / np.sqrt(~o.n_samples[-1])
 
 
-class ProtocolHarmonicTILDParallel(Protocol, HarmonicTILDParallel):
+class ProtoHarmTILDPar(Protocol, HarmonicTILDParallel):
     pass
 
 
@@ -1189,7 +1189,7 @@ class VacancyTILD(_TILDParent):
         }
 
 
-class ProtocolVacancyTILD(Protocol, VacancyTILD):
+class ProtoVacTILDSer(Protocol, VacancyTILD):
     pass
 
 
@@ -1688,7 +1688,7 @@ class VacancyTILDParallel(VacancyTILD):
         return np.array(~o.mean_diff[-1]), ~o.std_diff[-1] / np.sqrt(~o.n_samples[-1])
 
 
-class ProtocolVacancyTILDParallel(Protocol, VacancyTILDParallel):
+class ProtoVacTILDPar(Protocol, VacancyTILDParallel):
     pass
 
 
@@ -2135,5 +2135,5 @@ class VacancyFormation(VacancyTILDParallel):
         return np.array(vertex.mean_diff[-1]), vertex.std_diff[-1] / np.sqrt(vertex.n_samples[-1])
 
 
-class ProtocolVacancyFormation(Protocol, VacancyFormation):
+class ProtoVacForm(Protocol, VacancyFormation):
     pass

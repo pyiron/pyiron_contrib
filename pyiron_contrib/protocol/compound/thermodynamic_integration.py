@@ -14,8 +14,8 @@ from pyiron_contrib.protocol.list import SerialList, ParallelList
 from pyiron_contrib.protocol.utils import Pointer
 from pyiron_contrib.protocol.primitive.one_state import BuildMixingPairs, ComputeFormationEnergy, Counter, CreateJob,\
     CutoffDistance, DeleteAtom, ExternalHamiltonian, FEPExponential, HarmonicHamiltonian, \
-    Overwrite, RemoveJob, RandomVelocity, Slice, SphereReflection, TILDPostProcess, Transpose, \
-    VerletPositionUpdate, VerletVelocityUpdate, WeightedSum, WelfordOnline, Zeros
+    Overwrite, RemoveJob, RandomVelocity, Slice, SphereReflection, SphereReflectionPerAtom, TILDPostProcess, \
+    Transpose, VerletPositionUpdate, VerletVelocityUpdate, WeightedSum, WelfordOnline, Zeros
 from pyiron_contrib.protocol.primitive.two_state import AnyVertex, IsGEq, IsLEq, ModIsZero
 
 # Define physical constants that will be used in this script
@@ -147,8 +147,9 @@ class HarmonicTILD(_TILDParent):
         id_.custom_lambdas = None
         id_.force_constants = None
         id_.spring_constant = None
-        id_.cutoff_factor = 0.5
-        id_.use_reflection = True
+        id_.cutoff_factor = 0.48
+        id_.cutoff_distance = None
+        id_.use_reflection = False
         id_.zero_k_energy = None
         id_._total_steps = 0
 
@@ -2136,4 +2137,395 @@ class VacancyFormation(VacancyTILDParallel):
 
 
 class ProtoVacForm(Protocol, VacancyFormation):
+    pass
+
+
+class _TILDLambdaEvolution(CompoundVertex):
+    """
+    A sub-protocol for TILDParallel for the evolution of each lambda/integration point. This sub-protocol can be
+        executed in serial using SerialList, and parallel over multiple cores using ParallelList.
+    """
+
+    def define_vertices(self):
+        # Graph components
+        g = self.graph
+        g.check_steps = IsGEq()
+        g.verlet_positions = VerletPositionUpdate()
+        g.reflect = SphereReflectionPerAtom()
+        g.calc_static_a = ExternalHamiltonian()
+        g.calc_static_b = ExternalHamiltonian()
+        g.mix = WeightedSum()
+        g.verlet_velocities = VerletVelocityUpdate()
+        g.check_thermalized = IsGEq()
+        g.average_temp = WelfordOnline()
+        g.check_sampling_period = ModIsZero()
+        g.addition = WeightedSum()
+        g.average_tild = WelfordOnline()
+        g.clock = Counter()
+
+    def define_execution_flow(self):
+        # Execution flow
+        g = self.graph
+        g.make_pipeline(
+            g.check_steps, 'false',
+            g.clock,
+            g.verlet_positions,
+            g.reflect,
+            g.calc_static_a,
+            g.calc_static_b,
+            g.mix,
+            g.verlet_velocities,
+            g.check_thermalized, 'true',
+            g.average_temp,
+            g.check_sampling_period, 'true',
+            g.addition,
+            g.average_tild,
+            g.check_steps
+        )
+        g.make_edge(g.check_thermalized, g.check_steps, 'false')
+        g.make_edge(g.check_sampling_period, g.check_steps, 'false')
+        g.starting_vertex = g.check_steps
+        g.restarting_vertex = g.check_steps
+
+    def define_information_flow(self):
+        # Data flow
+        g = self.graph
+        gp = Pointer(self.graph)
+        ip = Pointer(self.input)
+
+        # check_steps
+        g.check_steps.input.target = gp.clock.output.n_counts[-1]
+        g.check_steps.input.threshold = ip.n_sub_steps
+
+        # verlet_positions
+        g.verlet_positions.input.default.positions = ip.positions
+        g.verlet_positions.input.default.velocities = ip.velocities
+        g.verlet_positions.input.default.forces = ip.forces
+
+        g.verlet_positions.input.positions = gp.reflect.output.positions[-1]
+        g.verlet_positions.input.velocities = gp.verlet_velocities.output.velocities[-1]
+        g.verlet_positions.input.forces = gp.mix.output.weighted_sum[-1]
+        g.verlet_positions.input.masses = ip.structure.get_masses
+        g.verlet_positions.input.time_step = ip.time_step
+        g.verlet_positions.input.temperature = ip.temperature
+        g.verlet_positions.input.temperature_damping_timescale = ip.temperature_damping_timescale
+
+        # reflect
+        g.reflect.input.use_reflection = ip.use_reflection
+        g.reflect.input.default.previous_positions = ip.positions
+        g.reflect.input.default.previous_velocities = ip.velocities
+        g.reflect.input.default.total_steps = ip.total_steps
+        g.reflect.input.default.cutoff_distance = ip.cutoff_distance
+
+        g.reflect.input.reference_positions = ip.structure.positions
+        g.reflect.input.positions = gp.verlet_positions.output.positions[-1]
+        g.reflect.input.velocities = gp.verlet_positions.output.velocities[-1]
+        g.reflect.input.previous_positions = gp.reflect.output.positions[-1]
+        g.reflect.input.previous_velocities = gp.verlet_velocities.output.velocities[-1]
+        g.reflect.input.structure = ip.structure
+        g.reflect.input.cutoff_factor = ip.cutoff_factor
+        g.reflect.input.total_steps = gp.reflect.output.total_steps[-1]
+        g.reflect.input.cutoff_distance = gp.reflect.output.cutoff_distance[-1]
+
+        # calc_static_a
+        g.calc_static_a.input.structure = ip.structure
+        g.calc_static_a.input.project_path = ip.project_path_a
+        g.calc_static_a.input.job_name = ip.job_name_a
+        g.calc_static_a.input.positions = gp.reflect.output.positions[-1]
+
+        # calc_static_b
+        g.calc_static_b.input.structure = ip.structure
+        g.calc_static_b.input.project_path = ip.project_path_b
+        g.calc_static_b.input.job_name = ip.job_name_b
+        g.calc_static_b.input.positions = gp.reflect.output.positions[-1]
+
+        # mix
+        g.mix.input.vectors = [
+            gp.calc_static_b.output.forces[-1],
+            gp.calc_static_a.output.forces[-1]
+        ]
+        g.mix.input.weights = ip.coupling_weights
+
+        # verlet_velocities
+        g.verlet_velocities.input.velocities = gp.reflect.output.velocities[-1]
+        g.verlet_velocities.input.forces = gp.mix.output.weighted_sum[-1]
+        g.verlet_velocities.input.masses = ip.structure.get_masses
+        g.verlet_velocities.input.time_step = ip.time_step
+        g.verlet_velocities.input.temperature = ip.temperature
+        g.verlet_velocities.input.temperature_damping_timescale = ip.temperature_damping_timescale
+
+        # check_thermalized
+        g.check_thermalized.input.default.target = gp.reflect.output.total_steps[-1]
+        g.check_thermalized.input.threshold = ip.thermalization_steps
+
+        # average_temp
+        g.average_temp.input.default.mean = ip.average_temp_mean
+        g.average_temp.input.default.std = ip.average_temp_std
+        g.average_temp.input.default.n_samples = ip.average_temp_n_samples
+        g.average_temp.input.mean = gp.average_temp.output.mean[-1]
+        g.average_temp.input.std = gp.average_temp.output.std[-1]
+        g.average_temp.input.n_samples = gp.average_temp.output.n_samples[-1]
+        g.average_temp.input.sample = gp.verlet_velocities.output.instant_temperature[-1]
+
+        # check_sampling_period
+        g.check_sampling_period.input.target = gp.reflect.output.total_steps[-1]
+        g.check_sampling_period.input.default.mod = ip.sampling_period
+
+        # addition
+        g.addition.input.vectors = [
+            gp.calc_static_b.output.energy_pot[-1],
+            gp.calc_static_a.output.energy_pot[-1]
+        ]
+        g.addition.input.weights = [1, -1]
+
+        # average_tild
+        g.average_tild.input.default.mean = ip.average_tild_mean
+        g.average_tild.input.default.std = ip.average_tild_std
+        g.average_tild.input.default.n_samples = ip.average_tild_n_samples
+        g.average_tild.input.mean = gp.average_tild.output.mean[-1]
+        g.average_tild.input.std = gp.average_tild.output.std[-1]
+        g.average_tild.input.n_samples = gp.average_tild.output.n_samples[-1]
+        g.average_tild.input.sample = gp.addition.output.weighted_sum[-1]
+
+        self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
+
+    def get_output(self):
+        gp = Pointer(self.graph)
+        return {
+            'cutoff_distance': ~gp.reflect.output.cutoff_distance[-1],
+            'temperature_mean': ~gp.average_temp.output.mean[-1],
+            'temperature_std': ~gp.average_temp.output.std[-1],
+            'temperature_n_samples': ~gp.average_temp.output.n_samples[-1],
+            'positions': ~gp.reflect.output.positions[-1],
+            'velocities': ~gp.verlet_velocities.output.velocities[-1],
+            'forces': ~gp.mix.output.weighted_sum[-1],
+            'total_steps': ~gp.reflect.output.total_steps[-1],
+            'mean_diff': ~gp.average_tild.output.mean[-1],
+            'std_diff': ~gp.average_tild.output.std[-1],
+            'n_samples': ~gp.average_tild.output.n_samples[-1]
+        }
+
+
+class TILDParallel(HarmonicTILD):
+    """
+    A version of HarmonicTILD where the evolution of each integration point is executed in parallel, thus giving a
+        substantial speed-up. A free energy perturbation standard error convergence exit criterion can be applied,
+        that is unavailable in the serial version of the HarmonicTILD protocol.
+        Maximum efficiency for parallelization can be achieved by setting the number of cores the job can use to
+        the number of lambdas, ie., cores / lambdas = 1. Setting the number of cores greater than the number of
+        lambdas gives zero gain, and is wasteful if cores % lambdas != 0.
+    Input attributes:
+        sleep_time (float): A delay in seconds for database access of results. For sqlite, a non-zero delay maybe
+            required. (Default is 0 seconds, no delay.)
+        convergence_check_steps (int): Check for convergence once every `convergence_check_steps'. (Default is
+            once every 10 steps.)
+        default_free_energy_se (float): Initialize default free energy standard error to pass into the child
+            protocol. (Default is None.)
+        fe_tol (float): The free energy standard error tolerance. This is the convergence criterion in eV. (Default
+            is 0.01 eV)
+    Output attributes:
+    For inherited input and output attributes, refer the `HarmonicTILD` protocol.
+    """
+
+    def __init__(self, **kwargs):
+        super(TILDParallel, self).__init__(**kwargs)
+
+        id_ = self.input.default
+        # Default values
+        id_.sleep_time = 0
+        id_.convergence_check_steps = 10
+        id_.default_free_energy_se = 1
+        id_.fe_tol = 0.01
+        id_._project_path = None
+        id_._job_name = None
+        id_._mean = None
+        id_._std = None
+        id_._n_samples = None
+
+    def define_vertices(self):
+        # Graph components
+        g = self.graph
+        ip = Pointer(self.input)
+        g.build_lambdas = BuildMixingPairs()
+        g.initial_forces = Zeros()
+        g.initial_velocities = SerialList(RandomVelocity)
+        g.check_steps = IsGEq()
+        g.check_convergence = IsLEq()
+        g.create_jobs_a = CreateJob()
+        g.create_jobs_b = CreateJob()
+        g.run_lambda_points = ParallelList(_TILDLambdaEvolution, sleep_time=ip.sleep_time)
+        g.clock = Counter()
+        g.post = TILDPostProcess()
+        g.exit = AnyVertex()
+
+    def define_execution_flow(self):
+        # Execution flow
+        g = self.graph
+        g.make_pipeline(
+            g.build_lambdas,
+            g.initial_forces,
+            g.initial_velocities,
+            g.create_jobs_a,
+            g.create_jobs_b,
+            g.check_steps, 'false',
+            g.check_convergence, 'false',
+            g.run_lambda_points,
+            g.clock,
+            g.post,
+            g.exit
+        )
+        g.make_edge(g.check_steps, g.exit, 'true')
+        g.make_edge(g.check_convergence, g.exit, 'true')
+        g.make_edge(g.exit, g.check_steps, 'false')
+        g.starting_vertex = g.build_lambdas
+        g.restarting_vertex = g.create_jobs_a
+
+    def define_information_flow(self):
+        # Data flow
+        g = self.graph
+        gp = Pointer(self.graph)
+        ip = Pointer(self.input)
+
+        # build_lambdas
+        g.build_lambdas.input.n_lambdas = ip.n_lambdas
+        g.build_lambdas.input.custom_lambdas = ip.custom_lambdas
+
+        # initial_forces
+        g.initial_forces.input.shape = ip.structure.positions.shape
+
+        # initial_velocities
+        g.initial_velocities.input.n_children = ip.n_lambdas
+        g.initial_velocities.direct.temperature = ip.temperature
+        g.initial_velocities.direct.masses = ip.structure.get_masses
+        g.initial_velocities.direct.overheat_fraction = ip.overheat_fraction
+
+        # create_jobs_a
+        g.create_jobs_a.input.n_images = ip.n_lambdas
+        g.create_jobs_a.input.ref_job_full_path = ip.ref_job_a_full_path
+        g.create_jobs_a.input.structure = ip.structure
+
+        # create_jobs_b
+        g.create_jobs_b.input.n_images = ip.n_lambdas
+        g.create_jobs_b.input.ref_job_full_path = ip.ref_job_b_full_path
+        g.create_jobs_b.input.structure = ip.structure
+
+        # check_steps
+        g.check_steps.input.target = gp.clock.output.n_counts[-1]
+        g.check_steps.input.threshold = ip.n_steps
+
+        # check_convergence
+        g.check_convergence.input.default.target = ip.default_free_energy_se
+        g.check_convergence.input.target = gp.post.output.fep_free_energy_se[-1]
+        g.check_convergence.input.threshold = ip.fe_tol
+
+        # run_lambda_points - initialize
+        g.run_lambda_points.input.n_children = ip.n_lambdas
+
+        # run_lambda_points - verlet_positions
+        g.run_lambda_points.direct.time_step = ip.time_step
+        g.run_lambda_points.direct.temperature = ip.temperature
+        g.run_lambda_points.direct.temperature_damping_timescale = ip.temperature_damping_timescale
+        g.run_lambda_points.direct.structure = ip.structure
+
+        g.run_lambda_points.direct.default.positions = ip.structure.positions
+        g.run_lambda_points.broadcast.default.velocities = gp.initial_velocities.output.velocities[-1]
+        g.run_lambda_points.direct.default.forces = gp.initial_forces.output.zeros[-1]
+
+        g.run_lambda_points.broadcast.positions = gp.run_lambda_points.output.positions[-1]
+        g.run_lambda_points.broadcast.velocities = gp.run_lambda_points.output.velocities[-1]
+        g.run_lambda_points.broadcast.forces = gp.run_lambda_points.output.forces[-1]
+
+        # run_lambda_points - reflect
+        g.run_lambda_points.direct.default.total_steps = ip._total_steps
+        g.run_lambda_points.direct.default.cutoff_distance = ip.cutoff_distance
+        g.run_lambda_points.broadcast.total_steps = gp.run_lambda_points.output.total_steps[-1]
+        g.run_lambda_points.broadcast.cutoff_distance = gp.run_lambda_points.output.cutoff_distance[-1]
+        g.run_lambda_points.direct.cutoff_factor = ip.cutoff_factor
+        g.run_lambda_points.direct.use_reflection = ip.use_reflection
+
+        # run_lambda_points - calc_static_a
+        g.run_lambda_points.broadcast.project_path_a = gp.create_jobs_a.output.project_path[-1]
+        g.run_lambda_points.broadcast.job_name_a = gp.create_jobs_a.output.job_names[-1]
+
+        # run_lambda_points - calc_static_b
+        g.run_lambda_points.broadcast.project_path_b = gp.create_jobs_b.output.project_path[-1]
+        g.run_lambda_points.broadcast.job_name_b = gp.create_jobs_b.output.job_names[-1]
+
+        # run_lambda_points - mix
+        g.run_lambda_points.broadcast.coupling_weights = gp.build_lambdas.output.lambda_pairs[-1]
+
+        # run_lambda_points - verlet_velocities
+        # takes inputs already specified
+
+        # run_lambda_points - check_thermalized
+        g.run_lambda_points.direct.thermalization_steps = ip.thermalization_steps
+
+        # run_lambda_points - check_sampling_period
+        g.run_lambda_points.direct.sampling_period = ip.sampling_period
+
+        # run_lambda_points - average_temp
+        g.run_lambda_points.direct.default.average_temp_mean = ip._mean
+        g.run_lambda_points.direct.default.average_temp_std = ip._std
+        g.run_lambda_points.direct.default.average_temp_n_samples = ip._n_samples
+        g.run_lambda_points.broadcast.average_temp_mean = gp.run_lambda_points.output.temperature_mean[-1]
+        g.run_lambda_points.broadcast.average_temp_std = gp.run_lambda_points.output.temperature_std[-1]
+        g.run_lambda_points.broadcast.average_temp_n_samples = gp.run_lambda_points.output.temperature_n_samples[-1]
+
+        # run_lambda_points - addition
+        # no parent inputs
+
+        # run_lambda_points - average_tild
+        g.run_lambda_points.direct.default.average_tild_mean = ip._mean
+        g.run_lambda_points.direct.default.average_tild_std = ip._std
+        g.run_lambda_points.direct.default.average_tild_n_samples = ip._n_samples
+        g.run_lambda_points.broadcast.average_tild_mean = gp.run_lambda_points.output.mean_diff[-1]
+        g.run_lambda_points.broadcast.average_tild_std = gp.run_lambda_points.output.std_diff[-1]
+        g.run_lambda_points.broadcast.average_tild_n_samples = gp.run_lambda_points.output.n_samples[-1]
+
+        # run_lambda_points - clock
+        g.run_lambda_points.direct.n_sub_steps = ip.convergence_check_steps
+
+        # clock
+        g.clock.input.add_counts = ip.convergence_check_steps
+
+        # post_processing
+        g.post.input.lambda_pairs = gp.build_lambdas.output.lambda_pairs[-1]
+        g.post.input.tild_mean = gp.run_lambda_points.output.mean_diff[-1]
+        g.post.input.tild_std = gp.run_lambda_points.output.std_diff[-1]
+        g.post.input.temperature = ip.temperature
+        g.post.input.n_samples = gp.run_lambda_points.output.n_samples[-1][-1]
+
+        # exit
+        g.exit.input.vertices = [
+            gp.check_steps,
+            gp.check_convergence
+        ]
+        g.exit.input.print_strings = [
+            'Maximum steps reached',
+            'Convergence reached'
+        ]
+
+        self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
+
+    def get_output(self):
+        gp = Pointer(self.graph)
+        o = Pointer(self.graph.run_lambda_points.output)
+        return {
+            'total_steps': ~o.total_steps[-1],
+            'temperature_mean': ~o.temperature_mean[-1],
+            'temperature_std': ~o.temperature_std[-1],
+            'integrands': ~o.mean_diff[-1],
+            'integrands_std': ~o.std_diff[-1],
+            'integrands_n_samples': ~o.n_samples[-1],
+            'tild_free_energy_mean': ~gp.post.output.tild_free_energy_mean[-1],
+            'tild_free_energy_std': ~gp.post.output.tild_free_energy_std[-1],
+            'tild_free_energy_se': ~gp.post.output.tild_free_energy_se[-1]
+        }
+
+    def get_tild_integrands(self):
+        o = Pointer(self.graph.run_lambda_points.output)
+        return np.array(~o.mean_diff[-1]), ~o.std_diff[-1] / np.sqrt(~o.n_samples[-1])
+
+
+class ProtoTILDPar(Protocol, TILDParallel):
     pass

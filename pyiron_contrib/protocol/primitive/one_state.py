@@ -15,6 +15,7 @@ from ase.geometry import get_distances
 from pyiron_atomistics import Project
 from pyiron_atomistics.atomistics.job.interactive import GenericInteractive
 from pyiron_atomistics.lammps.lammps import LammpsInteractive
+from pyiron_atomistics.thermodynamics.hessian import HessianJob
 from pyiron_contrib.protocol.generic import PrimitiveVertex
 from pyiron_contrib.protocol.utils import Pointer
 from pyiron_contrib.protocol.utils import ensure_iterable
@@ -227,8 +228,13 @@ class ExternalHamiltonian(PrimitiveVertex):
                 self._job.structure.positions = positions
             if cell is not None:
                 self._job.structure.cell = cell
-            self._job.calc_static()
-            self._job.run()
+            if isinstance(self._job, HessianJob):
+                self._job.interactive_initialize_interface()
+                self._job.calculate_forces()
+                self._job.interactive_collect()
+            else:
+                self._job.calc_static()
+                self._job.run()
         else:
             raise TypeError('Job of class {} is not compatible.'.format(self._job.__class__))
 
@@ -260,7 +266,12 @@ class ExternalHamiltonian(PrimitiveVertex):
                 # and could then be removed here
                 job.interactive_flush_frequency = 10 ** 10
                 job.interactive_write_frequency = 10 ** 10
-            job.save()
+            if job.check_if_job_exists():
+                if not isinstance(job, HessianJob):
+                    job.calc_static()
+                job.run(delete_existing_job=True)
+            else:
+                job.save()
         else:
             raise TypeError('Job of class {} is not compatible.'.format(ref_job.__class__))
 
@@ -325,7 +336,7 @@ class CreateJob(ExternalHamiltonian):
         self._job_names = None
         id_ = self.input.default
         id_.ref_job_full_path = None
-        id_.n_images = 5
+        id_.n_images = 1
         id_.structure = None
 
     def command(self, ref_job_full_path, n_images, structure, *args, **kwargs):
@@ -998,25 +1009,36 @@ class SphereReflectionPerAtom(PrimitiveVertex):
     def __init__(self, name=None):
         super(SphereReflectionPerAtom, self).__init__(name=name)
         id_ = self.input.default
-        id_.use_reflection = True
+        id_.use_reflection = False
         id_.total_steps = 0
+        id_.cutoff_factor = 0.48
+        id_.cutoff_distance = None
 
-    def command(self, reference_positions, cutoff_distance, positions, velocities, previous_positions,
+    def command(self, reference_positions, cutoff_factor, cutoff_distance, positions, velocities, previous_positions,
                 previous_velocities, structure, use_reflection, total_steps):
+
+        if (total_steps == 0) and use_reflection:
+            try:
+                nn_list = structure.get_neighbors(num_neighbors=1)
+            except ValueError:
+                nn_list = structure.get_neighbors(num_neighbors=1)
+            cutoff_distance = nn_list.distances[0] * cutoff_factor
+
         total_steps += 1
         if use_reflection:
             distance = np.linalg.norm(structure.find_mic(reference_positions - positions), axis=-1)
             is_at_home = (distance < cutoff_distance)[:, np.newaxis]
             is_away = 1 - is_at_home
         else:
-            is_at_home = np.ones(len(reference_positions))
+            is_at_home = np.ones(len(reference_positions))[:, np.newaxis]
             is_away = 1 - is_at_home
 
         return {
             'positions': is_at_home * positions + is_away * previous_positions,
             'velocities': is_at_home * velocities + is_away * -previous_velocities,
             'reflected': is_away.astype(bool).flatten(),
-            'total_steps': total_steps
+            'total_steps': total_steps,
+            'cutoff_distance': cutoff_distance
         }
 
 
@@ -1026,13 +1048,13 @@ class CutoffDistance(PrimitiveVertex):
     Input attributes:
         structure (Atoms): The reference structure.
         cutoff_factor (float): The cutoff is obtained by taking the first nearest neighbor distance and multiplying
-            it by the cutoff factor. A default value of 0.4 is chosen, because taking a cutoff factor of ~0.5
+            it by the cutoff factor. A default value of 0.48 is chosen, because taking a cutoff factor of ~0.5
             sometimes let certain reflections off the hook, and we do not want that to happen.
     Output attributes:
         cutoff_distance (float): The cutoff distance.
     """
 
-    def command(self, structure, cutoff_factor=0.5):
+    def command(self, structure, cutoff_factor=0.48):
         try:
             nn_list = structure.get_neighbors(num_neighbors=1)
         except ValueError:
@@ -1390,19 +1412,20 @@ class TILDPostProcess(PrimitiveVertex):
         fep_free_energy_se (float): The standard error calculated via free energy perturbation.
     """
 
-    def command(self, lambda_pairs, tild_mean, tild_std, fep_exp_mean, fep_exp_std, temperature, n_samples):
+    # def command(self, lambda_pairs, tild_mean, tild_std, fep_exp_mean, fep_exp_std, temperature, n_samples):
+    def command(self, lambda_pairs, tild_mean, tild_std, temperature, n_samples):
 
         tild_fe_mean, tild_fe_std, tild_fe_se = self.get_tild_free_energy(lambda_pairs, tild_mean, tild_std,
                                                                           n_samples)
-        fep_fe_mean, fep_fe_std, fep_fe_se = self.get_fep_free_energy(fep_exp_mean, fep_exp_std, n_samples,
-                                                                      temperature)
+        # fep_fe_mean, fep_fe_std, fep_fe_se = self.get_fep_free_energy(fep_exp_mean, fep_exp_std, n_samples,
+        #                                                               temperature)
         return {
             'tild_free_energy_mean': tild_fe_mean,
             'tild_free_energy_std': tild_fe_std,
             'tild_free_energy_se': tild_fe_se,
-            'fep_free_energy_mean': fep_fe_mean,
-            'fep_free_energy_std': fep_fe_std,
-            'fep_free_energy_se': fep_fe_se
+            # 'fep_free_energy_mean': fep_fe_mean,
+            # 'fep_free_energy_std': fep_fe_std,
+            # 'fep_free_energy_se': fep_fe_se
 
         }
 
@@ -1419,21 +1442,21 @@ class TILDPostProcess(PrimitiveVertex):
 
         return float(mean), float(std), float(se)
 
-    @staticmethod
-    def get_fep_free_energy(fep_exp_mean, fep_exp_std, n_samples, temperature):
-        fep_exp_se = fep_exp_std / np.sqrt(n_samples)
-        y = unumpy.uarray(fep_exp_mean, fep_exp_std)
-        y_se = unumpy.uarray(fep_exp_mean, fep_exp_se)
-        free_energy = 0
-        free_energy_se = 0
-        for (val, val_se) in zip(y, y_se):
-            free_energy += -KB * temperature * unumpy.log(val)
-            free_energy_se += -KB * temperature * unumpy.log(val_se)
-        mean = unumpy.nominal_values(free_energy)
-        std = unumpy.std_devs(free_energy)
-        se = unumpy.std_devs(free_energy_se)
-
-        return float(mean), float(std), float(se)
+    # @staticmethod
+    # def get_fep_free_energy(fep_exp_mean, fep_exp_std, n_samples, temperature):
+    #     fep_exp_se = fep_exp_std / np.sqrt(n_samples)
+    #     y = unumpy.uarray(fep_exp_mean, fep_exp_std)
+    #     y_se = unumpy.uarray(fep_exp_mean, fep_exp_se)
+    #     free_energy = 0
+    #     free_energy_se = 0
+    #     for (val, val_se) in zip(y, y_se):
+    #         free_energy += -KB * temperature * unumpy.log(val)
+    #         free_energy_se += -KB * temperature * unumpy.log(val_se)
+    #     mean = unumpy.nominal_values(free_energy)
+    #     std = unumpy.std_devs(free_energy)
+    #     se = unumpy.std_devs(free_energy_se)
+    #
+    #     return float(mean), float(std), float(se)
 
 
 class BerendsenBarostat(PrimitiveVertex):

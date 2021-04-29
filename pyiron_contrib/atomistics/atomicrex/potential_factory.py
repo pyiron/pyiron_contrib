@@ -43,8 +43,8 @@ class ARPotFactory(PyironFactory):
         return TersoffPotential(elements=elements, param_file=param_file)
 
     @staticmethod
-    def abop_potential():
-        pass
+    def abop_potential(elements, param_file=None):
+        return ABOPPotential(elements=elements, param_file=param_file)
 
 
 class AbstractPotential(DataContainer):
@@ -84,28 +84,35 @@ class AbstractPotential(DataContainer):
         raise NotImplementedError("Should be implemented in the subclass")
 
 
-class TersoffPotential(AbstractPotential):
-    def __init__(self, init=None, elements=None, param_file=None, identifier="tersoff"):
+class BOPAbstract(AbstractPotential):
+    def __init__(self, init=None, elements=None, param_file=None, identifier=None):
         super().__init__(init=init)
         if init is None:
+            self.identifier = identifier
             if elements is not None:
                 if param_file is None:
                     self.param_file = f"{''.join(elem for elem in elements)}.tersoff"
                 else:
                     self.param_file = param_file
-
+                
+                self._tag_dict = _get_tag_dict(elements)
                 self.elements = elements
-                self.tag_dict = _get_tag_dict(elements)
-                self.parameters = TersoffParameters(self.tag_dict)
-            self.identifier = identifier
+                if self.identifier == "tersoff":
+                    self.parameters = TersoffParameters(self._tag_dict)
+                elif self.identifier == "abop":
+                    self.parameters = ABOPParameters(self._tag_dict)
+            
 
     def write_xml_file(self, directory):
         self.parameters._write_tersoff_file(directory)
 
-        tersoff = ET.Element("tersoff")
+        tersoff = ET.Element(f"{self.identifier}")
         tersoff.set("id", f"{self.identifier}")
         tersoff.set("species-a", "*")
         tersoff.set("species-b", "*")
+
+        output = ET.SubElement(tersoff, "export-potential")
+        output.text = f"{self.param_file}"
 
         params = ET.SubElement(tersoff, "param-file")
         params.text = "input.tersoff"
@@ -122,6 +129,17 @@ class TersoffPotential(AbstractPotential):
             self.parameters[tag][param].final_value = value
 
 
+class TersoffPotential(BOPAbstract):
+    def __init__(self, init=None, elements=None, param_file=None):
+        super().__init__(init=init, elements=elements, param_file=param_file, identifier="tersoff")
+
+
+class ABOPPotential(BOPAbstract):
+    def __init__(self, init=None, elements=None, param_file=None):
+        super().__init__(init=init, elements=elements, param_file=param_file, identifier="abop")
+
+# tag regular expression
+tag_re = re.compile("[A-Z][a-z]?")
 # Parameters in the order of tersoff file format
 tersoff_file_params = [
     "e1",
@@ -143,21 +161,53 @@ tersoff_file_params = [
     "A"
 ]
 
-class TersoffParameters(DataContainer):
+# Transform tersoff to abop parameters
+def get_r0(lam1, lam2, A, B): return 1/(lam1-lam2)*np.log(lam1*A/(lam2*B))
+def get_D0(lam1, lam2, A, B): return A*(lam1/lam2 - 1)*np.exp(-lam1/(lam1-lam2)*np.log(lam1*A/lam2*B))
+def get_beta(lam1, lam2): return lam1 / np.sqrt(2*lam1/lam2) 
+def get_S(lam1, lam2): return lam1/lam2
+# abop to tersoff parameters
+def get_lam1(beta, S): return beta*np.sqrt(2*S)
+def get_lam2(beta, S): return beta*np.sqrt(2/S)
+def get_A(beta, S, D0, r0): return D0/(S-1)*np.exp(beta*np.sqrt(2*S)*r0)
+def get_B(beta, S, D0, r0): return D0*S/(S-1)*np.exp(beta*np.sqrt(2/S)*r0)
+
+class BOPParameters(DataContainer):
     def __init__(self, tag_dict=None):
         super().__init__()
         if tag_dict is not None:
             self._setup_parameters(tag_dict)
-        
-    def _setup_parameters(self, tags):
-        for tag, v in tags.items():
+
+    def _setup_parameters(self, tag_dict):
+        raise NotImplementedError("Implement in subclass")
+
+    @staticmethod
+    def tags_from_elements(elements):
+        """
+        Helper function that returns a list of tags
+        from a list of elements, f.e. for the start_vals_from_file function
+
+        Args:
+            elements (list[str]): list of elements .f.e ["Si", "C"]
+
+        Returns:
+            list[str]: list of tags f.e. ["SiSiSi", "SiSiC", ...]
+        """        
+        return _tag_list(elements)
+
+class TersoffParameters(BOPParameters):
+    def __init__(self, tag_dict=None):
+        super().__init__(tag_dict)
+
+    def _setup_parameters(self, tag_dict):
+        for tag, v in tag_dict.items():
             self[tag] = FunctionParameterList()
 
             # Parameters are added in the same order as they appear in lammps/tersoff format
             # If this order is kept always? this allows to iterate through it in a for loop
             # in some sitauations, instead of looking up the keys
             # 3 body params m(not fittable), gamma, lambda3, c, d, theta0
-            self[tag].add_parameter("m", start_val=None, fitable=False)
+            self[tag].add_parameter("m", start_val=3, fitable=False) # 3 or 1
 
             self[tag].add_parameter("gamma", start_val=None, tag=tag)
             self[tag].add_parameter("lambda3", start_val=None, tag=tag)
@@ -208,8 +258,7 @@ class TersoffParameters(DataContainer):
         with open(filepath, "w") as f:
             f.write("# Tersoff parameter file in lammps/tersoff format written via pyiron atomicrex interface.\n")
             f.write("# Necessary to fit tersoff and abop potentials.\n#\n")
-            f.write(f"# {' '.join(tersoff_file_params)}\n#\n")
-            tag_re = re.compile("[A-Z][a-z]?") 
+            f.write(f"# {' '.join(tersoff_file_params)}\n#\n") 
             for tag in self.keys():
                 for el in tag_re.findall(tag):
                     f.write(f"{el} ")
@@ -218,20 +267,84 @@ class TersoffParameters(DataContainer):
                     f.write(f"{self[tag][param].start_val} ")
                 f.write("\n")
     
-    @staticmethod
-    def tags_from_elements(elements):
-        """
-        Helper function that returns a list of tags
-        from a list of elements, f.e. for the start_vals_from_file function
+    def _to_xml_element(self):
+        fit_dof = ET.Element("fit-dof")
+        for tag, parameters in self.items():
+            for param in parameters.values():
+                if param.fitable:
+                    fit_dof.append(param._to_xml_element())
+        return fit_dof
 
-        Args:
-            elements (list[str]): list of elements .f.e ["Si", "C"]
 
-        Returns:
-            list[str]: list of tags f.e. ["SiSiSi", "SiSiC", ...]
-        """        
-        return _tag_list(elements)
+class ABOPParameters(BOPParameters):
+    def __init__(self, tag_dict=None):
+        super().__init__(tag_dict)
 
+    def _setup_parameters(self, tag_dict):
+        for tag, v in tag_dict.items():
+            self[tag] = FunctionParameterList()
+
+            #2 Body parameters, fitable only if v (see https://lammps.sandia.gov/doc/pair_tersoff.html)
+            self[tag].add_parameter("D0", start_val=None, fitable=v, tag=tag)
+            self[tag].add_parameter("S", start_val=None, fitable=v, tag=tag)
+            self[tag].add_parameter("r0", start_val=None, fitable=v, tag=tag)
+            self[tag].add_parameter("beta", start_val=None, fitable=v, tag=tag)
+            self[tag].add_parameter("beta2", start_val=None, fitable=v, tag=tag)
+            # default enable False for n in 1/2n term and standard value 1
+            self[tag].add_parameter("powern", start_val=1, fitable=v, enabled=False, tag=tag)
+            # 3 Body parameters
+            self[tag].add_parameter("gamma", start_val=None, tag=tag)
+            self[tag].add_parameter("c", start_val=None, tag=tag)
+            self[tag].add_parameter("d", start_val=None, tag=tag)
+            self[tag].add_parameter("h", start_val=None, tag=tag)
+            #twomu = lambda3?
+            self[tag].add_parameter("twomu", start_val=None, tag=tag)           
+            # m is not fittable
+            self[tag].add_parameter("m", start_val=1.0, fitable=False, tag=tag) # 3 or 1
+            # 2 and 3 body
+            # default enable False for cutoff parameters
+            self[tag].add_parameter("bigd", start_val=None, enabled=False, tag=tag)
+            self[tag].add_parameter("bigr", start_val=None, enabled=False, tag=tag)
+                    
+    def start_vals_from_file(self, file, tag_list=None):
+        if tag_list is None:
+            tag_list = self.list_groups()
+        tag_dict = _tagdict_from_taglist(tag_list)
+        t_params = TersoffParameters(tag_dict)
+        t_params.start_vals_from_file(file, tag_list=tag_list)
+        for tag, params in t_params.items():
+                lam1 = params["lambda1"].start_val
+                lam2 = params["lambda2"].start_val
+                A = params["A"].start_val
+                B = params["B"].start_val
+                
+                self[tag]["h"].start_val = -params["theta0"].start_val
+
+                if tag_dict[tag]:
+                    self[tag]["r0"].start_val = get_r0(lam1, lam2, A, B)
+                    self[tag]["D0"].start_val = get_D0(lam1, lam2, A, B)
+                    self[tag]["S"].start_val = get_S(lam1, lam2)
+                    self[tag]["beta"].start_val = get_beta(lam1, lam2)
+                else: # pair only parameters are not read for these tags and are set to 0 to prevent 0 division errors
+                    self[tag]["r0"].start_val = 0.0
+                    self[tag]["D0"].start_val = 0.0
+                    self[tag]["S"].start_val = 0.0
+                    self[tag]["beta"].start_val = 0.0
+
+                # Other parameters
+                self[tag]["m"].start_val = params["m"].start_val
+                self[tag]["powern"].start_val = params["n"].start_val
+                self[tag]["c"].start_val = params["c"].start_val
+                self[tag]["d"].start_val = params["d"].start_val
+                self[tag]["bigd"].start_val = params["D"].start_val
+                self[tag]["bigr"].start_val = params["R"].start_val
+                self[tag]["gamma"].start_val = params["gamma"].start_val
+                self[tag]["twomu"].start_val = params["lambda3"].start_val
+                self[tag]["beta2"].start_val = params["beta"].start_val
+
+    def _write_tersoff_file(self, directory, filename="input.tersoff"):
+        tersoff = abop_to_tersoff_params(self)
+        tersoff._write_tersoff_file(directory, filename=filename)
 
     def _to_xml_element(self):
         fit_dof = ET.Element("fit-dof")
@@ -242,23 +355,50 @@ class TersoffParameters(DataContainer):
         return fit_dof
 
 
-
-    #TODO: Probably a good idea to flatten this data and write to_hdf and from_hdf correspondingly
-#    def _flatten(self):
-#        pass
-#
-#    def to_hdf():
-#        pass
-#
-#    def from_hdf():
-#        pass
-
-
-def tersoff_to_abop_params(tersoff_parameters):
-    pass
-
 def abop_to_tersoff_params(abop_parameters):
-    pass
+    """
+    Transforms a ABOPParameters instance to TersoffParameters
+    Does not take care of min or max vals, only initial values!
+    Necessary to write the tersoff file as input.
+    Not tested for anything else.
+    Args:
+        tersoff_parameters ([type]): [description]
+    """
+
+    tag_dict = _tagdict_from_taglist(abop_parameters.groups())
+    tersoff = TersoffParameters(tag_dict)
+     
+    for tag, params in tersoff.items():
+        if tag_dict[tag]:
+            beta = abop_parameters[tag]["beta"].start_val
+            S = abop_parameters[tag]["S"].start_val
+            D0 = abop_parameters[tag]["D0"].start_val
+            r0 = abop_parameters[tag]["r0"].start_val
+
+            # parameters that need calculations
+            params["A"].start_val = get_A(beta, S, D0, r0)
+            params["B"].start_val = get_B(beta, S, D0, r0)
+            params["lambda1"].start_val = get_lam1(beta, S)
+            params["lambda2"].start_val = get_lam2(beta, S)
+        else: # pair only parameters are not read for these tags and are set to 0 to prevent 0 division errors
+            params["A"].start_val = 0.0
+            params["B"].start_val = 0.0
+            params["lambda1"].start_val = 0.0
+            params["lambda2"].start_val = 0.0
+
+        params["theta0"].start_val = -abop_parameters[tag]["h"].start_val
+
+        # Other parameters
+        params["m"].start_val = abop_parameters[tag]["m"].start_val
+        params["n"].start_val = abop_parameters[tag]["powern"].start_val
+        params["c"].start_val = abop_parameters[tag]["c"].start_val
+        params["d"].start_val = abop_parameters[tag]["d"].start_val
+        params["D"].start_val = abop_parameters[tag]["bigd"].start_val
+        params["R"].start_val = abop_parameters[tag]["bigr"].start_val
+        params["gamma"].start_val = abop_parameters[tag]["gamma"].start_val
+        params["lambda3"].start_val = abop_parameters[tag]["twomu"].start_val
+        params["beta"].start_val = abop_parameters[tag]["beta2"].start_val
+    return tersoff
 
 
 class LJPotential(AbstractPotential):
@@ -722,3 +862,13 @@ def _parse_tersoff_line(line):
     param = info[0]
     tag = info[1].rstrip("]:")
     return tag, param, value
+
+def _tagdict_from_taglist(taglist):
+    tagdict = {}
+    for tag in taglist:
+        elems = tag_re.findall(tag)
+        if elems[1] == elems[2]:
+            tagdict[tag] = True
+        else:
+            tagdict[tag] = False
+    return tagdict

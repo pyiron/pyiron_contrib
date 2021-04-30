@@ -640,11 +640,26 @@ def write_modified_poscar(identifier, forces, directory, structure=None, positio
     filename = posixpath.join(directory, f"POSCAR_{identifier}")
     with open(filename, 'w') as f:
         # Elements as system name
+        # Also check if the symbols are disordered
+        # to prevent errors resulting from poscar format
+        # not having indices or element for each atom.
         elements = []
+        counter = 0
+        last_elem = "XX"
         if symbols is None:
             symbols = np.array(structure.symbols)
         for elem in symbols:
-            if not elem in elements: elements.append(elem)
+            if not elem in elements:
+                elements.append(elem)
+            if not last_elem == elem:
+                counter += 1
+                last_elem = elem
+        if counter != len(elements):
+            raise ValueError(
+                "Structures with disordered elements are not supported right now\n"
+                "They can be sorted together with target forces using numpy.argsort"
+            )
+            ## maybe this can be fixed returning an argsort array to sort the forces.
         f.write(f"{elements}\n")
 
         # Cell metric

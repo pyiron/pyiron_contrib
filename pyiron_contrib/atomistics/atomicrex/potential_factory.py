@@ -101,7 +101,7 @@ class BOPAbstract(AbstractPotential):
                     self.parameters = TersoffParameters(self._tag_dict)
                 elif self.identifier == "abop":
                     self.parameters = ABOPParameters(self._tag_dict)
-            
+       
 
     def write_xml_file(self, directory):
         self.parameters._write_tersoff_file(directory)
@@ -127,6 +127,31 @@ class BOPAbstract(AbstractPotential):
         for l in lines:
             tag, param, value = _parse_tersoff_line(l)
             self.parameters[tag][param].final_value = value
+    
+    def _potential_as_pd_df(self, job):
+        """
+        Makes the tabulated eam potential written by atomicrex usable
+        for pyiron lammps jobs.
+        """
+        if self.param_file is None:
+            raise ValueError("export_file must be set to use the potential with lammps")
+
+        species = [el for el in job.input.atom_types.keys()]
+        species_str = ""
+        for s in species:
+            species_str += f"{s} "
+
+        pot = pd.DataFrame({
+            "Name": f"{self.identifier}",
+            "Filename": [[f"{job.working_directory}/{self.param_file}"]],
+            'Model': ['Custom'],
+            "Species": [species],
+            "Config": [[
+                "pair_style tersoff\n",
+                f"pair_coeff * * {job.working_directory}/{self.param_file} {species_str}\n",
+                ]]
+        })    
+        return pot
 
 
 class TersoffPotential(BOPAbstract):

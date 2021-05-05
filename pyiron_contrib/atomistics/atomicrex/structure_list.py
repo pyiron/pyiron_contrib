@@ -29,7 +29,7 @@ class FlattenedStructureContainer:
     more (or larger) structures are added than initially anticipated.
     """
 
-    def __init__(self, num_structures=0, num_atoms=0):
+    def __init__(self, num_structures=1, num_atoms=1):
         """
         Create new structure container.
 
@@ -72,20 +72,19 @@ class FlattenedStructureContainer:
         self.identifiers.resize(new)
 
     def add_structure(self, structure, identifier):
-
-        new_atoms = self.current_atom_index + len(structure)
-        if new_atoms >= self._num_atoms_alloc:
+        n = len(structure)
+        new_atoms = self.current_atom_index + n
+        if new_atoms > self._num_atoms_alloc:
             self._resize_atoms(max(new_atoms, self._num_atoms_alloc * 2))
-        if self.current_structure_index + 1 >= self._num_structures_alloc:
+        if self.current_structure_index + 1 > self._num_structures_alloc:
             self._resize_structures(self._num_structures_alloc * 2)
 
-        if new_atoms >= self.num_atoms:
+        if new_atoms > self.num_atoms:
             self.num_atoms = new_atoms
-        if self.current_structure_index + 1 >= self.num_structures:
+        if self.current_structure_index + 1 > self.num_structures:
             self.num_structures += 1
 
         # len of structure to index into the initialized arrays
-        n = len(structure)
         i = self.current_atom_index + n
 
         self.symbols[self.current_atom_index:i] = np.array(structure.symbols)
@@ -159,7 +158,7 @@ class FlattenedStructureContainer:
         if not (0 <= index < self.num_structures):
             raise IndexError(f"Index {index} not in in range [-{self.num_structures}, {self.num_structures})")
         I = self.start_indices[index]
-        E = I + self.len_current_struct[I]
+        E = I + self.len_current_struct[index]
         return Atoms(symbols=self.symbols[I:E], cell=self.cells[index], positions=self.positions[I:E])
 
 

@@ -61,15 +61,15 @@ class FlattenedStructureContainer:
 
     def _resize_atoms(self, new):
         self._num_atoms_alloc = new
-        self.symbols = np.resize(self.symbols, new)
-        self.positions = np.resize(self.positions, (new, 3) )
+        self.symbols.resize(new)
+        self.positions.resize( (new, 3) )
 
     def _resize_structures(self, new):
         self._num_structures_alloc = new
-        self.cells = np.resize(self.cells, (new, 3, 3) )
-        self.start_indices = np.resize(self.start_indices, new)
-        self.len_current_struct = np.resize(self.len_current_struct, new)
-        self.identifiers = np.resize(self.identifiers, new)
+        self.cells.resize( (new, 3, 3) )
+        self.start_indices.resize(new)
+        self.len_current_struct.resize(new)
+        self.identifiers.resize(new)
 
     def add_structure(self, structure, identifier):
         n = len(structure)

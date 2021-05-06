@@ -162,63 +162,50 @@ class DeleteAtom(PrimitiveVertex):
 
 class ExternalHamiltonian(PrimitiveVertex):
     """
-    Manages calls to an external interpreter (e.g. Lammps, Vasp, Sphinx...) to produce energies, forces,
+    Manages calls to an external interpreter (ex. Lammps, Vasp, Sphinx...) to produce energies, forces,
         and possibly other properties. The collected output can be expanded beyond forces and energies
         (e.g. to magnetic properties or whatever else the interpreting code produces) by modifying the
         `interesting_keys` in the input. The property must have a corresponding interactive getter for
         this property.
+    Note: The jobs for the external interpreters MUST be initialized and saved outside of this vertex, using the
+        'CreateSubJobs' vertex. This vertex ONLY runs the job to produce properties, given positions and cell.
     Input attributes:
-        ref_job_full_path (string): The full path to the hdf5 file of the job to use as a reference template.
-            (Default is None.)
-        project_path (string): The path of the project. To be specified ONLY when the jobs are already
-            initialized outside of this vertex. If `project_path` is specified, `ref_job_full_path` must
-            be set to None. (Default is None.)
+        job_project_path (string): The project path of the job. (Default is None.)
         job_name (string): The name of the job. This is specified only when the jobs are already
             initialized outside of this vertex. (Default is None.)
-        structure (Atoms): The structure for initializing the external Hamiltonian. Overwrites the reference
-            job structure when provided. (Default is None, the reference job needs to have its structure set.)
-        positions (numpy.ndarray): New positions to evaluate. Shape must match the shape of the structure.
-            (Default is None, only necessary if positions are being updated.)
-        cell (numpy.ndarray): The cell, if not same as that in the specified structure. (Default is None,
-            same cell as in the structure.)
+        positions (numpy.ndarray): New positions at which to evaluate properties. Shape must match the shape of the
+            job's structure. (Default is None, only necessary if positions are being updated.)
+        cell (numpy.ndarray): The cell, if not same as that in the specified job's structure. (Default is None,
+            same cell as in the job's structure.)
         interesting_keys (list[str]): String codes for output properties of the underlying job to collect.
-            (Default is ['positions', 'forces', 'energy_pot', 'pressures', 'volume', 'cell'].)
+            (Default is ['forces', 'energy_pot'].)
     Output attributes:
         keys (list/numpy.ndarray): The output corresponding to the interesting keys.
     """
 
     def __init__(self, name=None):
         super(ExternalHamiltonian, self).__init__(name=name)
-        self._fast_lammps_mode = True  # Set to false only to intentionally be slow for comparison purposes
+        self._fast_lammps_mode = True
         self._job_project_path = None
-        self._job = None
         self._job_name = None
+        self._job = None
         id_ = self.input.default
-        id_.ref_job_full_path = None
-        id_.project_path = None
+        id_.ref_job = None
+        id_.job_project_path = None
         id_.job_name = None
-        id_.structure = None
         id_.positions = None
         id_.cell = None
-        id_.interesting_keys = ['positions', 'forces', 'energy_pot', 'pressures', 'volume', 'cell']
+        id_.interesting_keys = ['forces', 'energy_pot']
 
-    def command(self, ref_job_full_path, project_path, job_name, structure, positions, cell, interesting_keys):
+    def command(self, ref_job, job_project_path, job_name, positions, cell, interesting_keys):
 
-        if self._job_project_path is None:
-            if project_path is None and ref_job_full_path is not None:
-                self._job_project_path, self._job_name = self._initialize(self.get_graph_location(),
-                                                                          ref_job_full_path,
-                                                                          structure,
-                                                                          self._fast_lammps_mode
-                                                                          )
-            elif project_path is not None and ref_job_full_path is None:
-                self._job_project_path = project_path
-                self._job_name = job_name
-            else:
-                raise AttributeError('Please specify valid project path OR ref_job_full_path, but not both!')
+        self._job_project_path = job_project_path
+        self._job_name = job_name
 
+        # reload happens only if a CompoundVertex with this Vertex is run in a loop. Within the CompoundVertex
+        # itself, there is no need for a reload, once self._job is assigned a job.
         if self._job is None:
-            self._reload()
+            self._job_reload()
 
         if isinstance(self._job, LammpsInteractive) and self._fast_lammps_mode:
             if positions is not None:
@@ -227,8 +214,8 @@ class ExternalHamiltonian(PrimitiveVertex):
                 self._job.interactive_cells_setter(cell)
             self._job._interactive_lib_command(self._job._interactive_run_command)
         elif isinstance(self._job, GenericInteractive):
-            # DFT codes are slow enough that we can run them the regular way and not care
-            # Also we might intentionally run Lammps slowly for comparison purposes
+            # DFT codes are slow enough that we can run them the regular way and not care.
+            # Also we might intentionally run Lammps slowly for comparison purposes.
             if positions is not None:
                 self._job.structure.positions = positions
             if cell is not None:
@@ -245,46 +232,9 @@ class ExternalHamiltonian(PrimitiveVertex):
 
         return {key: self._get_interactive_value(key) for key in interesting_keys}
 
-    @staticmethod
-    def _initialize(graph_location, ref_job_full_path, structure, fast_lammps_mode, name=None):
+    def _job_reload(self):
         """
-        Initialize / create the interactive job and save it.
-        """
-        if name is None:
-            name = graph_location + '_job'
-        project_path, ref_job_path = split(ref_job_full_path)
-        pr = Project(path=project_path)
-        ref_job = pr.load(ref_job_path)
-        job = ref_job.copy_to(
-            project=pr,
-            new_job_name=name,
-            input_only=True,
-            new_database_entry=True
-        )
-        if structure is not None:
-            job.structure = structure
-        if isinstance(job, GenericInteractive):
-            job.interactive_open()
-            job.run_if_interactive()
-            if isinstance(job, LammpsInteractive) and fast_lammps_mode:
-                # Note: This might be done by default at some point in LammpsInteractive,
-                # and could then be removed here
-                job.interactive_flush_frequency = 10 ** 10
-                job.interactive_write_frequency = 10 ** 10
-            if job.check_if_job_exists():
-                if not isinstance(job, HessianJob):
-                    job.calc_static()
-                job.run(delete_existing_job=True)
-            else:
-                job.save()
-        else:
-            raise TypeError('Job of class {} is not compatible.'.format(ref_job.__class__))
-
-        return job.project.path, job.job_name
-
-    def _reload(self):
-        """
-        Reload a saved job from its `project_path` and `job_name`.
+        Reload a saved job from its `job_project_path` and `job_name`.
         """
         pr = Project(path=self._job_project_path)
         self._job = pr.load(self._job_name)
@@ -310,66 +260,85 @@ class ExternalHamiltonian(PrimitiveVertex):
             raise NotImplementedError
         return val
 
-    def finish(self):
-        """
-        Close the interactive job.
-        """
-        super(ExternalHamiltonian, self).finish()
-        if self._job is not None:
-            self._job.interactive_close()
 
-
-class CreateJob(ExternalHamiltonian):
+class CreateSubJobs(PrimitiveVertex):
     """
-    Creates a job of an external interpreter (e.g. Lammps, Vasp, Sphinx...) outside of the `ExternalHamiltonian`.
-        This vertex does not run the interpreter, but only creates the job and saves it.
+    Create sub jobs of an external interpreter (e.g. Lammps, Vasp, Sphinx...).
+        This vertex does not run the interpreter to give properties, but only creates the sub jobs and saves them.
     Input attributes:
-        ref_job_full_path (string): The full path to the hdf5 file of the job to use as a reference template.
-            (Default is None.)
-        n_images (int): Number of jobs to create. (Default is 5.)
-        structure (Atoms): The structure for initializing the external Hamiltonian. Overwrites the reference
-            job structure when provided. (Default is None, the reference job needs to have its structure set.)
+        ref_job (GenricInteractive/LammpsInteractive/VaspInteractive/SphinxInteractive/HessianJob): The reference
+            job, from which to create the sub jobs. The reference job should have all the necessary inputs
+            ex. structure, potential etc. (Default is None, no reference job)
+        n_images (int): Number of sub jobs to create. (Default is 1.)
     Output attributes:
-        project_path (list/string): The path of the project.
-        job_names (list/string): The name of the job.
+        jobs_project_path (list of strings): The project path of the sub jobs.
+        jobs_names (list of strings): The names of the jobs.
     """
 
     def __init__(self, name=None):
-        super(CreateJob, self).__init__(name=name)
+        super(CreateSubJobs, self).__init__(name=name)
         self._fast_lammps_mode = True
-        self._project_path = None
-        self._job_names = None
+        self._jobs_project_path = None
+        self._jobs_names = None
         id_ = self.input.default
-        id_.ref_job_full_path = None
+        id_.ref_job = None
         id_.n_images = 1
-        id_.structure = None
 
-    def command(self, ref_job_full_path, n_images, structure, *args, **kwargs):
-        graph_location = self.get_graph_location()
-        job_names = []
-        project_path = []
+    def command(self, ref_job, n_images, *args, **kwargs):
+        project_path = ref_job.project.path
+        pr = Project(path=project_path)
+        pr_sub = pr.create_group(self.vertex_name + '_children')
+        self._jobs_project_path = []
+        self._jobs_names = []
         for i in np.arange(n_images):
-            name = graph_location + '_' + str(i)
-            output = self._initialize(graph_location, ref_job_full_path, structure,
-                                      self._fast_lammps_mode, name)
-            project_path.append(output[0])
-            job_names.append(output[1])
-        self._project_path = project_path
-        self._job_names = job_names
+            name = self.vertex_name + '_' + str(i)
+            p_path, j_name = self._initialize(pr_sub, ref_job, self._fast_lammps_mode, name)
+            self._jobs_project_path.append(p_path)
+            self._jobs_names.append(j_name)
 
         return {
-            'project_path': project_path,
-            'job_names': job_names
+            'jobs_project_path': self._jobs_project_path,
+            'jobs_names': self._jobs_names
         }
+
+    @staticmethod
+    def _initialize(pr, ref_job, fast_lammps_mode, name):
+        """
+        Initialize/create the interactive job and save it.
+        """
+        job = ref_job.copy_to(
+            project=pr,
+            new_job_name=name,
+            input_only=True,
+            new_database_entry=True
+        )
+        if isinstance(job, GenericInteractive):
+            job.interactive_open()
+            job.run_if_interactive()
+            if isinstance(job, LammpsInteractive) and fast_lammps_mode:
+                # Note: This might be done by default at some point in LammpsInteractive,
+                # and could then be removed here
+                job.interactive_flush_frequency = 10 ** 10
+                job.interactive_write_frequency = 10 ** 10
+            if job.check_if_job_exists():
+                if not isinstance(job, HessianJob):
+                    job.calc_static()
+                job.run(delete_existing_job=True)
+            else:
+                job.save()
+        else:
+            raise TypeError('Job of class {} is not compatible.'.format(ref_job.__class__))
+
+        return job.project.path, job.job_name
 
     def finish(self):
         """
-        Close the interactive job.
+        Close all the interactive sub jobs.
         """
-        super(CreateJob, self).finish()
-        if all(v is not None for v in [self._project_path, self._job_names]):
-            pr = Project(path=self._project_path[-1])
-            for name in self._job_names:
+        super(CreateSubJobs, self).finish()
+        if all(v is not None for v in [self._jobs_project_path, self._jobs_names]):
+            pr = Project(path=self._jobs_project_path[-1])
+            for name in self._jobs_names:
                 job = pr.load(name)
                 if isinstance(job, GenericInteractive):
                     job.interactive_close()
@@ -1467,7 +1436,7 @@ class BerendsenBarostat(PrimitiveVertex):
     """
     The Berendsen barostat which can be used for pressure control as elaborated in
     https://doi.org/10.1063/1.448118
-    NOTE: Always use in conjunction with a thermostat, otherwise time integration will not be performed.
+    Note: Always use in conjunction with a thermostat, otherwise time integration will not be performed.
     The barostat only modifies the cell of the input structure, and scales the positions. Positions
     and velocities will only be updated by the thermostat.
     Input attributes:

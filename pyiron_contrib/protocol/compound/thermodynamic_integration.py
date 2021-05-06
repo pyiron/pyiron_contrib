@@ -12,8 +12,8 @@ from scipy.constants import physical_constants
 from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
 from pyiron_contrib.protocol.list import SerialList, ParallelList
 from pyiron_contrib.protocol.utils import Pointer
-from pyiron_contrib.protocol.primitive.one_state import BuildMixingPairs, ComputeFormationEnergy, Counter, CreateJob,\
-    CutoffDistance, DeleteAtom, ExternalHamiltonian, FEPExponential, HarmonicHamiltonian, \
+from pyiron_contrib.protocol.primitive.one_state import BuildMixingPairs, ComputeFormationEnergy, Counter, \
+    CreateSubJobs, CutoffDistance, DeleteAtom, ExternalHamiltonian, FEPExponential, HarmonicHamiltonian, \
     Overwrite, RemoveJob, RandomVelocity, Slice, SphereReflection, SphereReflectionPerAtom, TILDPostProcess, \
     Transpose, VerletPositionUpdate, VerletVelocityUpdate, WeightedSum, WelfordOnline, Zeros
 from pyiron_contrib.protocol.primitive.two_state import AnyVertex, IsGEq, IsLEq, ModIsZero
@@ -2235,14 +2235,12 @@ class _TILDLambdaEvolution(CompoundVertex):
         g.reflect.input.cutoff_distance = gp.reflect.output.cutoff_distance[-1]
 
         # calc_static_a
-        g.calc_static_a.input.structure = ip.structure
-        g.calc_static_a.input.project_path = ip.project_path_a
+        g.calc_static_a.input.job_project_path = ip.job_project_path_a
         g.calc_static_a.input.job_name = ip.job_name_a
         g.calc_static_a.input.positions = gp.reflect.output.positions[-1]
 
         # calc_static_b
-        g.calc_static_b.input.structure = ip.structure
-        g.calc_static_b.input.project_path = ip.project_path_b
+        g.calc_static_b.input.job_project_path = ip.job_project_path_b
         g.calc_static_b.input.job_name = ip.job_name_b
         g.calc_static_b.input.positions = gp.reflect.output.positions[-1]
 
@@ -2373,8 +2371,8 @@ class TILDParallel(HarmonicTILD):
         g.build_lambdas = BuildMixingPairs()
         g.initial_forces = Zeros()
         g.initial_velocities = SerialList(RandomVelocity)
-        g.create_jobs_a = CreateJob()
-        g.create_jobs_b = CreateJob()
+        g.create_jobs_a = CreateSubJobs()
+        g.create_jobs_b = CreateSubJobs()
         g.check_steps = IsGEq()
         g.check_convergence = IsLEq()
         g.run_lambda_points = ParallelList(_TILDLambdaEvolution, sleep_time=ip.sleep_time)
@@ -2415,23 +2413,23 @@ class TILDParallel(HarmonicTILD):
         g.build_lambdas.input.custom_lambdas = ip.custom_lambdas
 
         # initial_forces
-        g.initial_forces.input.shape = ip.structure.positions.shape
+        g.initial_forces.input.shape = ip.ref_job_a.structure.positions.shape
 
         # initial_velocities
         g.initial_velocities.input.n_children = ip.n_lambdas
         g.initial_velocities.direct.temperature = ip.temperature
-        g.initial_velocities.direct.masses = ip.structure.get_masses
+        g.initial_velocities.direct.masses = ip.ref_job_a.structure.get_masses
         g.initial_velocities.direct.overheat_fraction = ip.overheat_fraction
 
         # create_jobs_a
         g.create_jobs_a.input.n_images = ip.n_lambdas
-        g.create_jobs_a.input.ref_job_full_path = ip.ref_job_a_full_path
-        g.create_jobs_a.input.structure = ip.structure
+        g.create_jobs_a.input.ref_job = ip.ref_job_a
+        # g.create_jobs_a.input.structure = ip.structure
 
         # create_jobs_b
         g.create_jobs_b.input.n_images = ip.n_lambdas
-        g.create_jobs_b.input.ref_job_full_path = ip.ref_job_b_full_path
-        g.create_jobs_b.input.structure = ip.structure
+        g.create_jobs_b.input.ref_job = ip.ref_job_b
+        # g.create_jobs_b.input.structure = ip.structure
 
         # check_steps
         g.check_steps.input.target = gp.clock.output.n_counts[-1]
@@ -2449,7 +2447,7 @@ class TILDParallel(HarmonicTILD):
         g.run_lambda_points.direct.time_step = ip.time_step
         g.run_lambda_points.direct.temperature = ip.temperature
         g.run_lambda_points.direct.temperature_damping_timescale = ip.temperature_damping_timescale
-        g.run_lambda_points.direct.structure = ip.structure
+        g.run_lambda_points.direct.structure = ip.ref_job_a.structure
 
         g.run_lambda_points.direct.default.positions = ip.structure.positions
         g.run_lambda_points.broadcast.default.velocities = gp.initial_velocities.output.velocities[-1]
@@ -2468,12 +2466,12 @@ class TILDParallel(HarmonicTILD):
         g.run_lambda_points.direct.use_reflection = ip.use_reflection
 
         # run_lambda_points - calc_static_a
-        g.run_lambda_points.broadcast.project_path_a = gp.create_jobs_a.output.project_path[-1]
-        g.run_lambda_points.broadcast.job_name_a = gp.create_jobs_a.output.job_names[-1]
+        g.run_lambda_points.broadcast.job_project_path_a = gp.create_jobs_a.output.jobs_project_path[-1]
+        g.run_lambda_points.broadcast.job_name_a = gp.create_jobs_a.output.jobs_names[-1]
 
         # run_lambda_points - calc_static_b
-        g.run_lambda_points.broadcast.project_path_b = gp.create_jobs_b.output.project_path[-1]
-        g.run_lambda_points.broadcast.job_name_b = gp.create_jobs_b.output.job_names[-1]
+        g.run_lambda_points.broadcast.job_project_path_b = gp.create_jobs_b.output.jobs_project_path[-1]
+        g.run_lambda_points.broadcast.job_name_b = gp.create_jobs_b.output.jobs_names[-1]
 
         # run_lambda_points - mix
         g.run_lambda_points.broadcast.coupling_weights = gp.build_lambdas.output.lambda_pairs[-1]

@@ -2212,7 +2212,7 @@ class _TILDLambdaEvolution(CompoundVertex):
         g.verlet_positions.input.positions = gp.reflect.output.positions[-1]
         g.verlet_positions.input.velocities = gp.verlet_velocities.output.velocities[-1]
         g.verlet_positions.input.forces = gp.mix.output.weighted_sum[-1]
-        g.verlet_positions.input.masses = ip.structure.get_masses
+        g.verlet_positions.input.masses = ip.masses
         g.verlet_positions.input.time_step = ip.time_step
         g.verlet_positions.input.temperature = ip.temperature
         g.verlet_positions.input.temperature_damping_timescale = ip.temperature_damping_timescale
@@ -2224,12 +2224,12 @@ class _TILDLambdaEvolution(CompoundVertex):
         g.reflect.input.default.total_steps = ip.total_steps
         g.reflect.input.default.cutoff_distance = ip.cutoff_distance
 
-        g.reflect.input.reference_positions = ip.structure.positions
+        g.reflect.input.reference_positions = ip.structure_a.positions
         g.reflect.input.positions = gp.verlet_positions.output.positions[-1]
         g.reflect.input.velocities = gp.verlet_positions.output.velocities[-1]
         g.reflect.input.previous_positions = gp.reflect.output.positions[-1]
         g.reflect.input.previous_velocities = gp.verlet_velocities.output.velocities[-1]
-        g.reflect.input.structure = ip.structure
+        g.reflect.input.structure = ip.structure_a
         g.reflect.input.cutoff_factor = ip.cutoff_factor
         g.reflect.input.total_steps = gp.reflect.output.total_steps[-1]
         g.reflect.input.cutoff_distance = gp.reflect.output.cutoff_distance[-1]
@@ -2238,11 +2238,13 @@ class _TILDLambdaEvolution(CompoundVertex):
         g.calc_static_a.input.job_project_path = ip.job_project_path_a
         g.calc_static_a.input.job_name = ip.job_name_a
         g.calc_static_a.input.positions = gp.reflect.output.positions[-1]
+        g.calc_static_a.input.cell = ip.structure_a.cell.array
 
         # calc_static_b
         g.calc_static_b.input.job_project_path = ip.job_project_path_b
         g.calc_static_b.input.job_name = ip.job_name_b
         g.calc_static_b.input.positions = gp.reflect.output.positions[-1]
+        g.calc_static_a.input.cell = ip.structure_b.cell.array
 
         # mix
         g.mix.input.vectors = [
@@ -2254,7 +2256,7 @@ class _TILDLambdaEvolution(CompoundVertex):
         # verlet_velocities
         g.verlet_velocities.input.velocities = gp.reflect.output.velocities[-1]
         g.verlet_velocities.input.forces = gp.mix.output.weighted_sum[-1]
-        g.verlet_velocities.input.masses = ip.structure.get_masses
+        g.verlet_velocities.input.masses = ip.masses
         g.verlet_velocities.input.time_step = ip.time_step
         g.verlet_velocities.input.temperature = ip.temperature
         g.verlet_velocities.input.temperature_damping_timescale = ip.temperature_damping_timescale
@@ -2369,6 +2371,7 @@ class TILDParallel(HarmonicTILD):
         ip = Pointer(self.input)
         g.build_lambdas = BuildMixingPairs()
         g.initial_forces = Zeros()
+        g.mass_mixer = WeightedSum()
         g.initial_velocities = SerialList(RandomVelocity)
         g.create_jobs_a = CreateSubJobs()
         g.create_jobs_b = CreateSubJobs()
@@ -2385,6 +2388,7 @@ class TILDParallel(HarmonicTILD):
         g.make_pipeline(
             g.build_lambdas,
             g.initial_forces,
+            g.mass_mixer,
             g.initial_velocities,
             g.create_jobs_a,
             g.create_jobs_b,
@@ -2414,10 +2418,17 @@ class TILDParallel(HarmonicTILD):
         # initial_forces
         g.initial_forces.input.shape = ip.ref_job_a.structure.positions.shape
 
+        # mass_mixer
+        g.mass_mixer.input.vectors = [
+            ip.ref_job_a.structure.get_masses,
+            ip.ref_job_b.structure.get_masses
+        ]
+        g.mass_mixer.input.weights = [0.5, 0.5]
+
         # initial_velocities
         g.initial_velocities.input.n_children = ip.n_lambdas
         g.initial_velocities.direct.temperature = ip.temperature
-        g.initial_velocities.direct.masses = ip.ref_job_a.structure.get_masses
+        g.initial_velocities.direct.masses = gp.mass_mixer.output.weighted_sum[-1]
         g.initial_velocities.direct.overheat_fraction = ip.overheat_fraction
 
         # create_jobs_a
@@ -2445,10 +2456,12 @@ class TILDParallel(HarmonicTILD):
         # run_lambda_points - verlet_positions
         g.run_lambda_points.direct.time_step = ip.time_step
         g.run_lambda_points.direct.temperature = ip.temperature
+        g.run_lambda_points.direct.masses = gp.mass_mixer.output.weighted_sum[-1]
         g.run_lambda_points.direct.temperature_damping_timescale = ip.temperature_damping_timescale
-        g.run_lambda_points.direct.structure = ip.ref_job_a.structure
+        g.run_lambda_points.direct.structure_a = ip.ref_job_a.structure
+        g.run_lambda_points.direct.structure_b = ip.ref_job_b.structure
 
-        g.run_lambda_points.direct.default.positions = ip.structure.positions
+        g.run_lambda_points.direct.default.positions = ip.ref_job_a.structure.positions
         g.run_lambda_points.broadcast.default.velocities = gp.initial_velocities.output.velocities[-1]
         g.run_lambda_points.direct.default.forces = gp.initial_forces.output.zeros[-1]
 

@@ -4,7 +4,7 @@ from __future__ import print_function
 # Distributed under the terms of "New BSD License", see the LICENSE file.
 
 from logging import getLogger
-from inspect import getargspec
+from inspect import getfullargspec
 from pydoc import locate
 from itertools import islice
 import re
@@ -79,7 +79,7 @@ def requires_arguments(func):
     Returns: (bool) wether arguments (except "self" for methods) are needed
 
     """
-    args, varargs, varkw, defaults = getargspec(func)
+    args, varargs, varkw, defaults, _, _, _ = getfullargspec(func)
     if defaults:
         args = args[:-len(defaults)]
     # It could be a bound method too

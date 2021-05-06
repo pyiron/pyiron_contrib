@@ -21,6 +21,8 @@ from pyiron_contrib.protocol.utils import Pointer
 from pyiron_contrib.protocol.utils import ensure_iterable
 from pyiron_contrib.protocol.math import welford_online
 
+import warnings
+
 KB = physical_constants['Boltzmann constant in eV/K'][0]
 EV_TO_U_ANGSQ_PER_FSSQ = 0.00964853322
 # https://www.wolframalpha.com/input/?i=1+eV+in+u+*+%28angstrom%2Ffs%29%5E2
@@ -1351,6 +1353,9 @@ class WelfordOnline(PrimitiveVertex):
 class FEPExponential(PrimitiveVertex):
     """
     Compute the free energy perturbation exponential difference.
+    Note: If the calculation of exponential difference gives a RuntimeWarning, it means that the 2 systems
+        between which the free energy is to be computed are very dissimilar, and the value of exponential_difference
+        is set to 0.
     Input attributes:
         u_diff (float): The energy difference between system B and system A.
         delta_lambda (float): The delta for the lambdas for the two systems A and B.
@@ -1360,15 +1365,24 @@ class FEPExponential(PrimitiveVertex):
     """
 
     def command(self, u_diff, delta_lambda, temperature):
+        warnings.filterwarnings('error')
+        try:
+            exponential_difference = np.exp(-u_diff * delta_lambda / (KB * temperature))
+        except RuntimeWarning:
+            exponential_difference = 0
+        warnings.filterwarnings('default')
+
         return {
-            'exponential_difference': np.exp(-u_diff * delta_lambda / (KB * temperature))
+            'exponential_difference': exponential_difference
         }
 
 
 class TILDPostProcess(PrimitiveVertex):
     """
-    Post processing for the Harmonic and Vacancy TILD protocols, to remove the necessity to load interactive
-        jobs after they have been closed, once the protocol has been executed.
+    Post processing for the TILD protocols, to compute the free energy between the input systems.
+        Also calculates the free energy using free energy perturbation (fep). For fep, if the systems are dissimilar,
+        meaning the potential energies of the reference and the final systems are not similar, then returns None
+        as the fep outputs.
     Input attributes:
         lambda_pairs (numpy.ndarray): The (`n_lambdas`, 2)-shaped array of mixing pairs.
         tild_mean (list): The mean of the computed integration points.
@@ -1406,14 +1420,14 @@ class TILDPostProcess(PrimitiveVertex):
     def get_tild_free_energy(lambda_pairs, tild_mean, tild_std, n_samples):
         y = unumpy.uarray(tild_mean, tild_std)
         integral = simps(x=lambda_pairs[:, 0], y=y)
-        mean = unumpy.nominal_values(integral)
-        std = unumpy.std_devs(integral)
+        mean = float(unumpy.nominal_values(integral))
+        std = float(unumpy.std_devs(integral))
         tild_se = tild_std / np.sqrt(n_samples)
         y_se = unumpy.uarray(tild_mean, tild_se)
         integral_se = simps(x=lambda_pairs[:, 0], y=y_se)
-        se = unumpy.std_devs(integral_se)
+        se = float(unumpy.std_devs(integral_se))
 
-        return float(mean), float(std), float(se)
+        return mean, std, se
 
     @staticmethod
     def get_fep_free_energy(fep_exp_mean, fep_exp_std, n_samples, temperature):
@@ -1423,13 +1437,22 @@ class TILDPostProcess(PrimitiveVertex):
         free_energy = 0
         free_energy_se = 0
         for (val, val_se) in zip(y, y_se):
-            free_energy += -KB * temperature * unumpy.log(val)
-            free_energy_se += -KB * temperature * unumpy.log(val_se)
-        mean = unumpy.nominal_values(free_energy)
-        std = unumpy.std_devs(free_energy)
-        se = unumpy.std_devs(free_energy_se)
+            try:
+                free_energy += -KB * temperature * unumpy.log(val)
+                free_energy_se += -KB * temperature * unumpy.log(val_se)
+            except ValueError:
+                free_energy = None
+                free_energy_se = None
+        if free_energy is None:
+            mean = None
+            std = None
+            se = None
+        else:
+            mean = float(unumpy.nominal_values(free_energy))
+            std = float(unumpy.std_devs(free_energy))
+            se = float(unumpy.std_devs(free_energy_se))
 
-        return float(mean), float(std), float(se)
+        return mean, std, se
 
 
 class BerendsenBarostat(PrimitiveVertex):

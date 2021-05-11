@@ -27,7 +27,7 @@ __status__ = "development"
 __date__ = "06 May, 2021"
 
 
-class DecoupledOscillators(GenericInteractive, FlexibleMaster, ABC):
+class DecoupledOscillators(GenericInteractive, FlexibleMaster):
     def __init__(self, project, job_name):
         super(DecoupledOscillators, self).__init__(project, job_name)
         self.__version__ = "0.0.1"
@@ -112,7 +112,7 @@ class DecoupledOscillators(GenericInteractive, FlexibleMaster, ABC):
         """
 
         # remove atoms that are oscillators from the base structure
-        for i, atom_id in enumerate(self.input.oscillators_id_list):
+        for i, atom_id in enumerate(np.sort(self.input.oscillators_id_list)):
             new_atom_id = atom_id - i
             self._base_structure.pop(new_atom_id)
 

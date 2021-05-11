@@ -114,7 +114,7 @@ class DecoupledOscillators(GenericInteractive, FlexibleMaster):
         # remove atoms that are oscillators from the base structure
         for i, atom_id in enumerate(np.sort(self.input.oscillators_id_list)):
             new_atom_id = atom_id - i
-            self._base_structure.pop(new_atom_id)
+            self._base_structure.pop(int(new_atom_id))
 
         # collect indices of atoms that are NOT harmonic oscillators
         self._base_atom_ids = np.delete(np.arange(len(self.input.ref_job.structure)).astype(int),

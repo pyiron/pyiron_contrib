@@ -170,8 +170,8 @@ class Spline(DataContainer):
         super().__init__(table_name=f"Spline_{identifier}")
         self.identifier = identifier
         self.cutoff = cutoff
-        self.derivative_left = derivative_left
-        self.derivative_right = derivative_right
+        self.derivative_left = FunctionParameter(param="derivative-left", start_val=derivative_left)
+        self.derivative_right = FunctionParameter(param="derivative-right", start_val=derivative_right, enabled=False)
         self.species = species
         self.parameters = NodeList()
 
@@ -182,16 +182,26 @@ class Spline(DataContainer):
             cutoff = ET.SubElement(spline, "cutoff")
             cutoff.text = f"{self.cutoff}"
         der_l = ET.SubElement(spline, "derivative-left")
-        der_l.text = f"{self.derivative_left}"
+        der_l.text = f"{self.derivative_left.start_val}"
         der_r = ET.SubElement(spline, "derivative-right")
-        der_r.text = f"{self.derivative_right}"
+        der_r.text = f"{self.derivative_right.start_val}"
+
+        fit_dof = ET.SubElement(spline, "fit-dof")
+        fit_dof.append(self.derivative_left._to_xml_element())
+        fit_dof.append(self.derivative_right._to_xml_element())
+
         spline.append(self.parameters._to_xml_element())
         return spline
 
     def _parse_final_parameter(self, leftover, value):
-        param = float(leftover[0].split("[")[1])
-        param = f"node_{param}"
-        self.parameters[param].final_value = value
+        if "derivative-right" in leftover[-1]:
+            self.derivative_right.final_value = value
+        elif "derivative-left" in leftover[-1]:
+            self.derivative_left.final_value = value
+        else:
+            param = float(leftover[0].split("[")[1])
+            param = f"node_{param}"
+            self.parameters[param].final_value = value
 
 class ExpA(SpecialFunction):
     def __init__(self, identifier=None, cutoff=None, species=["*", "*"], is_screening_function=True):

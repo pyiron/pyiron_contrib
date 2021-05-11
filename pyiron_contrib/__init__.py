@@ -13,6 +13,7 @@ from pyiron_base import JOB_CLASS_DICT
 
 # Make classes available for new pyiron version
 JOB_CLASS_DICT['ProtoTILDPar'] = 'pyiron_contrib.protocol.compound.thermodynamic_integration'
+JOB_CLASS_DICT['DecoupledOscillators'] = 'pyiron_contrib.protocol.jobs.decoupled_oscillators'
 JOB_CLASS_DICT['ProtoMinimGradDes'] = 'pyiron_contrib.protocol.compound.minimize'
 JOB_CLASS_DICT['ProtoMD'] = 'pyiron_contrib.protocol.compound.molecular_dynamics'
 JOB_CLASS_DICT['ProtoConfinedMD'] = 'pyiron_contrib.protocol.compound.molecular_dynamics'

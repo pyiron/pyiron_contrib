@@ -13,8 +13,8 @@ from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
 from pyiron_contrib.protocol.list import SerialList, ParallelList
 from pyiron_contrib.protocol.utils import Pointer
 from pyiron_contrib.protocol.primitive.one_state import BuildMixingPairs, ComputeFormationEnergy, Counter, \
-    CreateSubJobs, CutoffDistance, DeleteAtom, ExternalHamiltonian, FEPExponential, HarmonicHamiltonian, \
-    Overwrite, RemoveJob, RandomVelocity, Slice, SphereReflection, SphereReflectionPerAtom, TILDPostProcess, \
+    CreateSubJobs, CutoffDistance, DeleteAtoms, ExternalHamiltonian, FEPExponential, HarmonicHamiltonian, \
+    Overwrite, RandomVelocity, Slice, SphereReflection, SphereReflectionPerAtom, TILDPostProcess, \
     Transpose, VerletPositionUpdate, VerletVelocityUpdate, WeightedSum, WelfordOnline, Zeros
 from pyiron_contrib.protocol.primitive.two_state import AnyVertex, IsGEq, IsLEq, ModIsZero
 
@@ -2434,12 +2434,14 @@ class TILDParallel(HarmonicTILD):
         # create_jobs_a
         g.create_jobs_a.input.n_images = ip.n_lambdas
         g.create_jobs_a.input.ref_job = ip.ref_job_a
-        # g.create_jobs_a.input.structure = ip.structure
+        g.create_jobs_a.input.default.structure = ip.structure_a
+        g.create_jobs_a.input.structure = ip.ref_job_a.structure
 
         # create_jobs_b
         g.create_jobs_b.input.n_images = ip.n_lambdas
         g.create_jobs_b.input.ref_job = ip.ref_job_b
-        # g.create_jobs_b.input.structure = ip.structure
+        g.create_jobs_b.input.default.structure = ip.structure_b
+        g.create_jobs_b.input.structure = ip.ref_job_b.structure
 
         # check_steps
         g.check_steps.input.target = gp.clock.output.n_counts[-1]

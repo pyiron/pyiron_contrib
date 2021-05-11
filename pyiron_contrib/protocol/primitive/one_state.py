@@ -16,6 +16,7 @@ from pyiron_atomistics import Project
 from pyiron_atomistics.atomistics.job.interactive import GenericInteractive
 from pyiron_atomistics.lammps.lammps import LammpsInteractive
 from pyiron_atomistics.thermodynamics.hessian import HessianJob
+from pyiron_contrib.protocol.jobs.decoupled_oscillators import DecoupledOscillators
 from pyiron_contrib.protocol.generic import PrimitiveVertex
 from pyiron_contrib.protocol.utils import Pointer
 from pyiron_contrib.protocol.utils import ensure_iterable
@@ -136,25 +137,27 @@ class Zeros(PrimitiveVertex):
         }
 
 
-class DeleteAtom(PrimitiveVertex):
+class DeleteAtoms(PrimitiveVertex):
     """
-    Given a structure, deletes one of the atoms.
+    Given a structure, deletes atoms whose indices are in the atom_id list.
     Input attributes:
-        structure (Atoms): The structure to delete an atom of.
-        atom_id (int): Which atom to delete. (Default is 0, the 0th atom.)
+        structure (Atoms): The structure to delete atoms of.
+        atom_id (int): Which atoms to delete. (Default is 0, the 0th atom.)
     Output attributes:
         structure (Atoms): The new, modified structure.
         mask (numpy.ndarray): The integer ids shared by both the old and new structure.
     """
 
     def __init__(self, name=None):
-        super(DeleteAtom, self).__init__(name=name)
-        self.input.default.atom_id = 0
+        super(DeleteAtoms, self).__init__(name=name)
+        self.input.default.atoms_id_list = [0]
 
-    def command(self, structure, atom_id):
+    def command(self, structure, atoms_id_list):
         vacancy_structure = structure.copy()
-        vacancy_structure.pop(atom_id)
-        mask = np.delete(np.arange(len(structure)).astype(int), atom_id)
+        for i, atom_id in enumerate(atoms_id_list):
+            new_atom_id = atom_id - i
+            del vacancy_structure[new_atom_id]
+        mask = np.delete(np.arange(len(structure)).astype(int), atoms_id_list)
 
         return {
             'structure': vacancy_structure,
@@ -285,8 +288,9 @@ class CreateSubJobs(PrimitiveVertex):
         id_ = self.input.default
         id_.ref_job = None
         id_.n_images = 1
+        id_.structure = None
 
-    def command(self, ref_job, n_images, *args, **kwargs):
+    def command(self, ref_job, n_images, structure, *args, **kwargs):
         project_path = ref_job.project.path
         pr = Project(path=project_path)
         pr_sub = pr.create_group(self.vertex_name + '_children')
@@ -294,7 +298,7 @@ class CreateSubJobs(PrimitiveVertex):
         self._jobs_names = []
         for i in np.arange(n_images):
             name = self.vertex_name + '_' + str(i)
-            p_path, j_name = self._initialize(pr_sub, ref_job, self._fast_lammps_mode, name)
+            _, p_path, j_name = self._initialize(pr_sub, ref_job, self._fast_lammps_mode, name, structure)
             self._jobs_project_path.append(p_path)
             self._jobs_names.append(j_name)
 
@@ -304,7 +308,7 @@ class CreateSubJobs(PrimitiveVertex):
         }
 
     @staticmethod
-    def _initialize(pr, ref_job, fast_lammps_mode, name):
+    def _initialize(pr, ref_job, fast_lammps_mode, name, structure):
         """
         Initialize/create the interactive job and save it.
         """
@@ -314,16 +318,22 @@ class CreateSubJobs(PrimitiveVertex):
             input_only=True,
             new_database_entry=True
         )
+        if structure is not None:
+            job.structure = structure
         if isinstance(job, GenericInteractive):
             job.interactive_open()
-            job.run_if_interactive()
+            if isinstance(job, DecoupledOscillators):
+                job.input = ref_job.input
+                job.validate_ready_to_run()
+            else:
+                job.run_if_interactive()
             if isinstance(job, LammpsInteractive) and fast_lammps_mode:
                 # Note: This might be done by default at some point in LammpsInteractive,
                 # and could then be removed here
-                job.interactive_flush_frequency = 10 ** 10
-                job.interactive_write_frequency = 10 ** 10
+                job.interactive_flush_frequency = 100
+                job.interactive_write_frequency = 100
             if job.check_if_job_exists():
-                if not isinstance(job, HessianJob):
+                if not isinstance(job, (HessianJob, DecoupledOscillators)):
                     job.calc_static()
                 job.run(delete_existing_job=True)
             else:
@@ -331,7 +341,7 @@ class CreateSubJobs(PrimitiveVertex):
         else:
             raise TypeError('Job of class {} is not compatible.'.format(ref_job.__class__))
 
-        return job.project.path, job.job_name
+        return job, job.project.path, job.job_name
 
     def finish(self):
         """
@@ -345,67 +355,6 @@ class CreateSubJobs(PrimitiveVertex):
                 if isinstance(job, GenericInteractive):
                     job.interactive_close()
                     job.status.finished = True
-
-
-class MinimizeReferenceJob(ExternalHamiltonian):
-    """
-    Minimizes a job using an external interpreter (e.g. Lammps, Vasp, Sphinx...) outside of the `ExternalHamiltonian`.
-        This vertex minimizes the job at constant volume or constant pressure.
-    Input attributes:
-        ref_job_full_path (string): The full path to the hdf5 file of the job to use as a reference template.
-            (Default is None.)
-        pressure (float): Pressure of the system. (Default is None.)
-        structure (Atoms): The structure for initializing the external Hamiltonian. Overwrites the reference
-            job structure when provided. (Default is None, the reference job needs to have its structure set.)
-    Output attributes:
-        energy_pot (float): The evaluated potential energy.
-        forces (numpy.ndarray): The evaluated forces.
-    """
-
-    def __init__(self, name=None):
-        super(MinimizeReferenceJob, self).__init__(name=name)
-        self._fast_lammps_mode = True
-        id_ = self.input.default
-        id_.ref_job_full_path = None
-        id_.pressure = None
-        id_.structure = None
-
-    def command(self, ref_job_full_path, structure, pressure=None, *args, **kwargs):
-        graph_location = self.get_graph_location()
-        name = 'minimize_ref_job'
-        project_path, job_name = self._initialize(graph_location, ref_job_full_path, structure,
-                                                  self._fast_lammps_mode, name)
-        pr = Project(path=project_path)
-        job = pr.load(job_name)
-        job.structure = structure
-        job.calc_minimize(pressure=pressure)
-        job.run(delete_existing_job=True)
-        if isinstance(job, GenericInteractive):
-            job.interactive_close()
-
-        return {
-            'energy_pot': job.output.energy_pot[-1],
-            'forces': job.output.forces[-1]
-        }
-
-
-class RemoveJob(PrimitiveVertex):
-    """
-    Remove an existing job/s from a project path.
-    Input attributes:
-        project_path (string): The path of the project. (Default is None.)
-        job_names (string): The names of the jobs to be removed. (Default is None.)
-    """
-    def __init__(self, name=None):
-        super(RemoveJob, self).__init__(name=name)
-        self.input.default.project_path = None
-        self.input.default.job_names = None
-
-    def command(self, project_path, job_names):
-        if all(v is not None for v in [project_path, job_names]):
-            pr = Project(path=project_path)
-            for name in job_names:
-                pr.remove_job(name)
 
 
 class GradientDescent(PrimitiveVertex):
@@ -548,22 +497,24 @@ class HarmonicHamiltonian(PrimitiveVertex):
     def __init__(self, name=None):
         super(HarmonicHamiltonian, self).__init__(name=name)
         id_ = self.input.default
-        id_.spring_constant = None
+        id_.spring_constants_list = None
         id_.force_constants = None
 
-    def command(self, positions, reference_positions, structure, spring_constant=None, force_constants=None,
-                mask=None, eq_energy=None):
+    def command(self, positions, structure, spring_constants_list=None, force_constants=None, mask=None):
 
+        reference_positions = structure.positions
         dr = structure.find_mic(positions - reference_positions)
-        if spring_constant is not None and force_constants is None:
+        if spring_constants_list is not None and force_constants is None:
             if mask is not None:
-                forces = -spring_constant * dr[mask]
-                energy = -0.5 * np.dot(dr[mask], forces)
+                spring_constants_list = np.expand_dims(spring_constants_list, axis=-1)
+                forces = -np.array(spring_constants_list) * dr[mask]
+                energy = 0
+                for i, m in enumerate(mask):
+                    energy += -0.5 * np.dot(dr[m], forces[i].T)
             else:
-                forces = -spring_constant * dr
+                forces = -np.array(spring_constants_list) * dr
                 energy = -0.5 * np.tensordot(dr, forces)
-
-        elif force_constants is not None and spring_constant is None:
+        elif force_constants is not None and spring_constants_list is None:
             transformed_force_constants = self.transform_force_constants(force_constants, len(structure.positions))
             transformed_displacements = self.transform_displacements(dr)
             transformed_forces = -np.dot(transformed_force_constants, transformed_displacements)
@@ -577,9 +528,6 @@ class HarmonicHamiltonian(PrimitiveVertex):
 
         else:
             raise TypeError('Please specify either a spring constant or the force constant matrix')
-
-        if eq_energy is not None:
-            energy += eq_energy
 
         return {
             'forces': forces,

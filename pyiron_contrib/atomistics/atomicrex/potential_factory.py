@@ -587,13 +587,13 @@ class EAMPotential(AbstractPotential):
             KeyError: Raises if a parsed parameter can't be matched to a function.
         """        
         for l in lines:
-            identifier, param, value = _parse_parameter_line(l)
+            identifier, leftover, value = _parse_parameter_line(l)
             if identifier in self.pair_interactions:
-                self.pair_interactions[identifier].parameters[param].final_value = value
+                self.pair_interactions[identifier]._parse_final_parameter(leftover, value)
             elif identifier in self.electron_densities:
-                self.electron_densities[identifier].parameters[param].final_value = value
+                self.electron_densities[identifier]._parse_final_parameter(leftover, value)
             elif identifier in self.embedding_energies:
-                self.embedding_energies[identifier].parameters[param].final_value = value
+                self.embedding_energies[identifier]._parse_final_parameter(leftover, value)
             else:
 
                 raise KeyError(
@@ -784,15 +784,15 @@ class MEAMPotential(AbstractPotential):
         for l in lines:
             identifier, param, value = _parse_parameter_line(l)
             if identifier in self.pair_interactions:
-                self.pair_interactions[identifier].parameters[param].final_value = value
+                self.pair_interactions[identifier]._parse_final_parameter(leftover, value)
             elif identifier in self.electron_densities:
-                self.electron_densities[identifier].parameters[param].final_value = value
+                self.electron_densities[identifier]._parse_final_parameter(leftover, value)
             elif identifier in self.f_functions:
-                self.f_functions[identifier].parameters[param].final_value = value
+                self.f_functions[identifier]._parse_final_parameter(leftover, value)
             elif identifier in self.g_functions:
-                self.g_functions[identifier].parameters[param].final_value = value
+                self.g_functions[identifier]._parse_final_parameter(leftover, value)
             elif identifier in self.embedding_energies:
-                self.embedding_energies[identifier].parameters[param].final_value = value
+                self.embedding_energies[identifier]._parse_final_parameter(leftover, value)
             else:
                 raise KeyError(
                     f"Can't find {identifier} in potential, probably something went wrong during parsing.\n"
@@ -803,27 +803,32 @@ class MEAMPotential(AbstractPotential):
 def _parse_parameter_line(line):
     """
     Internal Function.
-    Parses the function identifier, name and final value of a function parameter
+    Parses the function identifier, leftover and final value of a function parameter
     from an atomicrex output line looking like:
     EAM[EAM].V_CuCu[morse-B].delta: 0.0306585 [-0.5:0.5]
     EAM[EAM].CuCu_rho[spline].node[1].y: 2.10988 [1:3]
-
+    EAM[EAM].V_CuCu[functionSum].V_rep[user-function].A: 0.680291
+    EAM[EAM].CuCu_rho[spline].derivative-left: -1000.19
+    Returns tuples like these:
+    ("V_CuCu", ["delta:"] ,0.0306585)
+    ("CuCu_rho", ["node[1", "y:"] ,2.10988)
+    ("V_CuCu", ["V_rep[user-function", "A:"],0.680291)
+    ("CuCu_rho", ["derivative-left:"] ,-1000.19)
+    This allows to flexibly parse the lines for the different types
+    of functional forms by passing leftover to a function defined
+    in the corresponding function class.
+    
     TODO: Add parsing of polynomial parameters.
     Returns:
-        [(str, str, float): [description]
+        (str, [str], float): identifier, leftover, value
     """        
-
     line = line.strip().split()
     value = float(line[1])
     info = line[0].split("].")
     identifier = info[1].split("[")[0]
-    param = info[2]
-    if param.startswith("node"):
-        x = float(param.split("[")[1])
-        param = f"node_{x}"
-    else:
-        param = param.rstrip(":")
-    return identifier, param, value
+    leftover = info[2:]
+    return identifier, leftover, value
+
 
 def _tag_list(elements):
     """

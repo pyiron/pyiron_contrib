@@ -54,6 +54,33 @@ class FunctionFactory(PyironFactory):
     def gaussian(identifier, prefactor, eta, mu, species=["*", "*"]):
         return GaussianFunc(identifier, prefactor, eta, mu, species)
 
+    @staticmethod
+    def sum(identifier, species=["*", "*"]):
+        return Sum(identifier=identifier, species=species)
+
+
+class Sum(DataContainer):
+    def __init__(self, identifier=None, species=None):
+        super().__init__()
+        self.identifier = identifier
+        self.functions = DataContainer(table_name="sum_functions")
+        self.species = species
+
+    def _to_xml_element(self):
+        root = ET.Element("sum")
+        root.set("id", self.identifier)
+        for k, v in self.functions.items():
+            root.append(v._to_xml_element())
+        return root
+    
+    def _parse_final_parameter(self, leftover, value):
+        identifier = leftover[0].split("[")[0]
+        leftover = leftover[1:]
+        try:
+            self.functions[identifier]._parse_final_parameter(leftover, value)
+        except KeyError:
+            raise KeyError(f"Function {identifier} not found in sum {self.identifier}")
+
 
 class SpecialFunction(DataContainer):
     """
@@ -105,6 +132,9 @@ class SpecialFunction(DataContainer):
         else:
             return plot(self.func)
 
+    def _parse_final_parameter(self, leftover, value):
+        param = leftover[0].rstrip(":")
+        self.parameters[param].final_value = value
 
 class Poly(DataContainer):
     """
@@ -158,9 +188,12 @@ class Spline(DataContainer):
         spline.append(self.parameters._to_xml_element())
         return spline
 
+    def _parse_final_parameter(self, leftover, value):
+        param = float(leftover[0].split("[")[1])
+        param = f"node_{param}"
+        self.parameters[param].final_value = value
 
 class ExpA(SpecialFunction):
-
     def __init__(self, identifier=None, cutoff=None, species=["*", "*"], is_screening_function=True):
         super().__init__(identifier, species=species, is_screening_function=is_screening_function)
         self.parameters.add_parameter(
@@ -471,6 +504,10 @@ class UserFunction(DataContainer):
             return root
         else:
             return screening
+
+    def _parse_final_parameter(self, leftover, value):
+        param = leftover[0].rstrip(":")
+        self.parameters[param].final_value = value
 
 
 class FunctionParameter(DataContainer):

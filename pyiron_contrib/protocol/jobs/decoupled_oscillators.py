@@ -7,6 +7,7 @@ from __future__ import print_function
 import numpy as np
 from abc import ABC
 
+from pyiron_atomistics import Project
 from pyiron_atomistics.atomistics.job.interactive import GenericInteractive
 from pyiron_base.master.flexible import FlexibleMaster
 from pyiron_base.generic.datacontainer import DataContainer
@@ -34,7 +35,6 @@ class DecoupledOscillators(GenericInteractive, FlexibleMaster, ABC):
         self.input = DataContainer(table_name="decoupled_input")
         self.output = DataContainer(table_name="decoupled_output")
         self.input.structure = None
-        self.input.ref_job_id = None
         self.input.save_components = False
         self.interactive_cache = {
             "forces": [],
@@ -49,7 +49,6 @@ class DecoupledOscillators(GenericInteractive, FlexibleMaster, ABC):
         self._base_structure = None
         self._base_atom_ids = None
         self._forces = None
-        self._ref_job = None
 
     @property
     def structure(self):
@@ -72,10 +71,6 @@ class DecoupledOscillators(GenericInteractive, FlexibleMaster, ABC):
     def positions(self, value):
         self.input.positions = value
 
-    def _collect_ref_job_id(self):
-        self.input.ref_job_id = self.input.ref_job.job_id
-        self._ref_job = self.input.ref_job
-
     def _check_inputs(self):
         """
         Check if all necessary inputs are provided.
@@ -87,8 +82,8 @@ class DecoupledOscillators(GenericInteractive, FlexibleMaster, ABC):
             self._base_structure = self.input.structure.copy()
         # otherwise revert to the structure of the reference job
         elif self.input.structure is None:
-            self.input.structure = self._ref_job.structure.copy()
-            self._base_structure = self._ref_job.structure.copy()
+            self.input.structure = self.input.ref_job.structure.copy()
+            self._base_structure = self.input.ref_job.structure.copy()
 
         # check if input positions are provided
         assert self.input.positions is not None, '<job>.input.positions need to be provided'
@@ -122,20 +117,27 @@ class DecoupledOscillators(GenericInteractive, FlexibleMaster, ABC):
             self._base_structure.pop(new_atom_id)
 
         # collect indices of atoms that are NOT harmonic oscillators
-        self._base_atom_ids = np.delete(np.arange(len(self._ref_job.structure)).astype(int),
+        self._base_atom_ids = np.delete(np.arange(len(self.input.ref_job.structure)).astype(int),
                                         self.input.oscillators_id_list)
 
-    def _create_base_job(self):
+    def _create_base_job(self, pr=None, name=None):
         """
         Create the base interpreter (Lammps/Vasp/Sphinx) job with the vacancy structure and save it.
         """
 
         # check if ref_job is an instance of Lammps/Vasp/Sphinx interactive
-        assert isinstance(self._ref_job, (LammpsInteractive, VaspInteractive, SphinxInteractive)), \
+        assert isinstance(self.input.ref_job, (LammpsInteractive, VaspInteractive, SphinxInteractive)), \
             'ref_job should be one of Lammps/Vasp/SphinxInteractive'
 
+        if pr is None:
+            pr = self.project
+        if name is None:
+            job_name = 'base_job'
+        else:
+            job_name = name + '_base_job'
+
         # copy the reference job to create the base job
-        self.append(self._ref_job.copy_to(project=self.project, new_job_name='base_job', input_only=True))
+        self.append(self.input.ref_job.copy_to(project=pr, new_job_name=job_name, input_only=True))
         self[0].structure = self._base_structure
 
         # set interactive open
@@ -178,16 +180,15 @@ class DecoupledOscillators(GenericInteractive, FlexibleMaster, ABC):
             harmonic_energy_pot += -0.5 * np.dot(dr[m], harmonic_forces[i].T)
         return harmonic_forces, harmonic_energy_pot
 
-    def validate_ready_to_run(self):
+    def validate_ready_to_run(self, pr=None, name=None):
         """
         A pre check before running the main job. Also initializes the base job.
         """
-        self._collect_ref_job_id()
         self._check_inputs()
         self.interactive_open()
         self.status.running = True
         self._set_base_structure()
-        self._create_base_job()
+        self._create_base_job(pr=pr, name=name)
         self._forces = np.zeros(self.input.positions.shape)
 
     def run_if_interactive(self):
@@ -230,7 +231,10 @@ class DecoupledOscillators(GenericInteractive, FlexibleMaster, ABC):
         super(DecoupledOscillators, self).to_hdf(hdf=hdf, group_name=group_name)
         # ref job probably still needs explicit care? It seems to work for now... -R
         with self.project_hdf5.open("decoupled_input") as hdf5_input:
-            self.input.to_hdf(hdf5_input)
+            try:
+                self.input.to_hdf(hdf5_input)
+            except AttributeError:
+                pass
 
     def from_hdf(self, hdf=None, group_name=None):
         """

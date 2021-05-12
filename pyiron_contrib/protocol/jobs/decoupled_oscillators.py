@@ -45,6 +45,7 @@ class DecoupledOscillators(GenericInteractive, FlexibleMaster):
             "harmonic_energy_pot": []
         }
         self._fast_mode = True
+        self._initialized = False
         self._python_only_job = True
         self._base_structure = None
         self._base_atom_ids = None
@@ -75,6 +76,9 @@ class DecoupledOscillators(GenericInteractive, FlexibleMaster):
         """
         Check if all necessary inputs are provided.
         """
+        # check if the job is interactive
+        if self.server.run_mode != 'interactive':
+            raise TypeError('<job>.server.run_mode should be set to interactive')
         # check if input structure is of the Atoms class, and set the base structure
         if self.input.structure is not None:
             assert isinstance(self.input.structure, Atoms), \
@@ -142,20 +146,20 @@ class DecoupledOscillators(GenericInteractive, FlexibleMaster):
         # copy the reference job to create the base job
         self.append(self.input.ref_job.copy_to(project=pr, new_job_name=self.input.job_name,
                                                input_only=True))
-        self[1].structure = self._base_structure
+        self[0].structure = self._base_structure
 
         # set interactive open
-        self[1].interactive_open()
-        self[1].interactive_initialize_interface()
+        self[0].interactive_open()
+        self[0].interactive_initialize_interface()
 
         # change the flush and write frequencies, if fast_mode is enabled
         if self._fast_mode:
-            self[1].interactive_flush_frequency = 10**10
-            self[1].interactive_write_frequency = 10**10
+            self[0].interactive_flush_frequency = 10**10
+            self[0].interactive_write_frequency = 10**10
 
         # save the job and set status to running
-        self[1].save()
-        self[1].status.running = True
+        self[0].save()
+        self[0].status.running = True
 
     def _calc_static_base_job(self):
         """
@@ -164,9 +168,9 @@ class DecoupledOscillators(GenericInteractive, FlexibleMaster):
             forces
             energy_pot
         """
-        self._base_job.interactive_positions_setter(self.input.positions[self._base_atom_ids])
-        self._base_job.run()
-        return self._base_job.interactive_forces_getter(), self._base_job.interactive_energy_pot_getter()
+        self[0].interactive_positions_setter(self.input.positions[self._base_atom_ids])
+        self[0].run()
+        return self[0].interactive_forces_getter(), self[0].interactive_energy_pot_getter()
 
     def _calc_harmonic(self):
         """
@@ -184,14 +188,12 @@ class DecoupledOscillators(GenericInteractive, FlexibleMaster):
             harmonic_energy_pot += -0.5 * np.dot(dr[m], harmonic_forces[i].T)
         return harmonic_forces, harmonic_energy_pot
 
-    # def validate_ready_to_run(self, pr=None, name=None):
-    #     """
-    #     A pre check before running the main job. Also initializes the base job.
-    #     """
-    #     self._check_inputs()
-    #     self.interactive_open()
-    #     self._set_base_structure()
-    #
+    def validate_ready_to_run(self, pr=None, name=None):
+        """
+        A pre check before running the main job. Also initializes the base job.
+        """
+        self._check_inputs()
+
     # def _base_job_reload(self):
     #     pr = Project(self.project)
     #     self._base_job = pr.load(self.input.job_name)
@@ -200,13 +202,14 @@ class DecoupledOscillators(GenericInteractive, FlexibleMaster):
         """
         The main run function.
         """
-        if self._base_job is None:
+        if not self._initialized:
             self._check_inputs()
             self.interactive_open()
             self.status.running = True
             self._set_base_structure()
             self._create_base_job(pr=pr, name=name)
             self._forces = np.zeros(self.input.positions.shape)
+            self._initialized = True
         self.status.running = True
         self._forces[self._base_atom_ids], base_energy_pot = self._calc_static_base_job()
         self._forces[self.input.oscillators_id_list], harmonic_energy_pot = self._calc_harmonic()
@@ -218,13 +221,6 @@ class DecoupledOscillators(GenericInteractive, FlexibleMaster):
             self.interactive_cache["base_energy_pot"].append(base_energy_pot)
             self.interactive_cache["harmonic_forces"].append(self._forces[self.input.oscillators_id_list])
             self.interactive_cache["harmonic_energy_pot"].append(harmonic_energy_pot)
-
-    def run_static(self):
-        """
-        In case run_static is called.
-        """
-        self.run_if_interactive()
-        self.interactive_close()
 
     def interactive_forces_getter(self):
         return self.output.forces
@@ -250,7 +246,7 @@ class DecoupledOscillators(GenericInteractive, FlexibleMaster):
 
     def from_hdf(self, hdf=None, group_name=None):
         """
-        Restore the DecoupledOscillator object in the HDF5 File
+        Restore the DecoupledOscillator object from the HDF5 File
 
         Args:
             hdf (ProjectHDFio): HDF5 group object - optional
@@ -266,7 +262,7 @@ class DecoupledOscillators(GenericInteractive, FlexibleMaster):
         self.output.from_hdf(self.project_hdf5)
 
     def interactive_close(self):
-        self._base_job.interactive_close()  # close the base job
+        self[0].interactive_close()  # close the base job
         self.to_hdf()   # run to_hdf to re-save input
         self.output.to_hdf(self.project_hdf5)  # save output
         # assign forces and energy_pot to output list

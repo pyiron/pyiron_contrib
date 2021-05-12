@@ -230,7 +230,6 @@ class ExternalHamiltonian(PrimitiveVertex):
                 self._job.calculate_forces()
                 self._job.interactive_collect()
             elif isinstance(self._job, DecoupledOscillators):
-                self._job.interactive_open()
                 self._job.run_if_interactive()
             else:
                 self._job.calc_static()

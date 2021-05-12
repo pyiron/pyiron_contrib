@@ -200,7 +200,7 @@ class Spline(DataContainer):
             self.derivative_left.final_value = value
         else:
             param = float(leftover[0].split("[")[1])
-            param = f"node_{param}"
+            param = f"node_{param:.6g}"
             self.parameters[param].final_value = value
 
 class ExpA(SpecialFunction):

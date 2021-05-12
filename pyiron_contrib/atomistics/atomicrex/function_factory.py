@@ -720,8 +720,7 @@ class NodeList(DataContainer):
         """        
         x = float(x)
         # atomicrex rounds output to 6 digits, so this is done here to prevent issues when reading the output.
-        x = round(x, 6)
-        key = f"node_{x}"
+        key = f"node_{x:.6g}"
         self[key] = Node(
             x=x,
             start_val=start_val,

@@ -56,6 +56,9 @@ class DecoupledOscilattorsInput(DataContainer):
             raise TypeError(f"Got type {type(job)}, which is not a recognized interactive job.")
         self._ref_job = job
 
+    def pop_ref(self):
+        return self.pop('_ref_job')
+
 
 class DecoupledOscillators(GenericInteractive, GenericMaster):
     def __init__(self, project, job_name):
@@ -261,7 +264,7 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
             group_name (str): HDF5 subgroup name - optional
         """
         super(DecoupledOscillators, self).to_hdf()
-        ref_job = self.input.pop('ref_job')
+        ref_job = self.input.pop_ref()
         if len(self) == 0 or self[-1].job_name != ref_job:
             self.append(ref_job)
         self.input.to_hdf(self.project_hdf5)

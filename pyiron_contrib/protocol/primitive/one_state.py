@@ -340,7 +340,6 @@ class CreateSubJobs(PrimitiveVertex):
                 job.save()
             if isinstance(job, DecoupledOscillators):
                 job.input = ref_job.input
-                # job.validate_ready_to_run(pr=pr, name=name)
         else:
             raise TypeError('Job of class {} is not compatible.'.format(ref_job.__class__))
 

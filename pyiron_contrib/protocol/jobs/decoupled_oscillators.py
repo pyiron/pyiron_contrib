@@ -247,10 +247,10 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
             self.interactive_cache["harmonic_energy_pot"].append(harmonic_energy_pot)
 
     def interactive_forces_getter(self):
-        return self.output.forces
+        return self.interactive_cache["forces"][-1]
 
     def interactive_energy_pot_getter(self):
-        return self.output.energy_pot
+        return self.interactive_cache["energy_pot"][-1]
 
     def to_hdf(self, hdf=None, group_name=None):
         """

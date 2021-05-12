@@ -35,6 +35,7 @@ class DecoupledOscilattorsInput(DataContainer):
         self.spring_constants_list = None
         self.save_debug_data = False
         self._ref_job = None
+        self._ref_job_name = None
 
     @property
     def structure(self) -> Atoms:
@@ -54,10 +55,15 @@ class DecoupledOscilattorsInput(DataContainer):
     def ref_job(self, job: (LammpsInteractive, VaspInteractive, SphinxInteractive)):
         if not isinstance(job, (LammpsInteractive, VaspInteractive, SphinxInteractive)):
             raise TypeError(f"Got type {type(job)}, which is not a recognized interactive job.")
+        self._ref_job_name = job.job_name
         self._ref_job = job
 
     def pop_ref(self):
         return self.pop('_ref_job')
+
+    @property
+    def ref_job_name(self):
+        return self._ref_job_name
 
 
 class DecoupledOscillators(GenericInteractive, GenericMaster):
@@ -211,14 +217,9 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
             harmonic_energy_pot += -0.5 * np.dot(dr[m], harmonic_forces[i].T)
         return harmonic_forces, harmonic_energy_pot
 
-    def validate_ready_to_run(self):
-        """
-        A pre check before running the main job. Also initializes the base job.
-        """
-        self._check_inputs()
+    def _setup_base(self):
         self._set_base_structure()
         self._create_base_job()
-        self._forces = np.zeros(self.input.positions.shape)
 
     # def _base_job_reload(self):
     #     pr = Project(self.project)
@@ -228,6 +229,11 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
         """
         The main run function.
         """
+        if not self._initialized:
+            self._check_inputs()
+            self._forces = np.zeros(self.input.positions.shape)
+            self._setup_base()
+            self._initialized = True
         self.status.running = True
         self._forces[self._base_atom_ids], base_energy_pot = self._calc_static_base_job()
         self._forces[self.input.oscillators_id_list], harmonic_energy_pot = self._calc_harmonic()
@@ -254,13 +260,18 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
             hdf (ProjectHDFio): HDF5 group object - optional
             group_name (str): HDF5 subgroup name - optional
         """
-        super(DecoupledOscillators, self).to_hdf()
+        # Make sure the ref job *isn't* on the input and *is* on self
         ref_job = self.input.pop_ref()
-        if len(self) == 0 or self[-1].job_name != ref_job:
+        if ref_job is not None and ref_job.job_name not in self._job_name_lst:
             self.append(ref_job)
+
+        # Save everything
+        super(DecoupledOscillators, self).to_hdf()
         self.input.to_hdf(self.project_hdf5)
-        self.input.ref_job = ref_job
         self.output.to_hdf(self.project_hdf5)
+
+        # Ok, now put the ref job back into the input
+        self.input.ref_job = ref_job
 
     def from_hdf(self, hdf=None, group_name=None):
         """
@@ -271,12 +282,8 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
             group_name (str): HDF5 subgroup name - optional
         """
         super(DecoupledOscillators, self).from_hdf()
-        try:
-            self.input.ref_job
-        except AttributeError:
-            ref_job = self.pop()
-            self.input.from_hdf(self.project_hdf5)
-            self.input.ref_job = ref_job
+        self.input.from_hdf(self.project_hdf5)
+        self.input.ref_job = self[self.input.ref_job_name]
         self.output.from_hdf(self.project_hdf5)
 
     def interactive_close(self):

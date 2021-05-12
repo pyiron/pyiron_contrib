@@ -9,7 +9,7 @@ from abc import ABC
 
 from pyiron_atomistics import Project
 from pyiron_atomistics.atomistics.job.interactive import GenericInteractive
-from pyiron_base.master.flexible import FlexibleMaster
+from pyiron_base.master.generic import GenericMaster
 from pyiron_base.generic.datacontainer import DataContainer
 from pyiron_base.generic.hdfio import ProjectHDFio
 from pyiron_atomistics.lammps.lammps import LammpsInteractive
@@ -27,7 +27,7 @@ __status__ = "development"
 __date__ = "06 May, 2021"
 
 
-class DecoupledOscillators(GenericInteractive, FlexibleMaster):
+class DecoupledOscillators(GenericInteractive, GenericMaster):
     def __init__(self, project, job_name):
         super(DecoupledOscillators, self).__init__(project, job_name)
         self.__version__ = "0.0.1"

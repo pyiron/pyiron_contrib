@@ -2377,8 +2377,7 @@ class TILDParallel(HarmonicTILD):
         g.create_jobs_b = CreateSubJobs()
         g.check_steps = IsGEq()
         g.check_convergence = IsLEq()
-        # g.run_lambda_points = ParallelList(_TILDLambdaEvolution, sleep_time=ip.sleep_time)
-        g.run_lambda_points = SerialList(_TILDLambdaEvolution, sleep_time=ip.sleep_time)
+        g.run_lambda_points = ParallelList(_TILDLambdaEvolution, sleep_time=ip.sleep_time)
         g.clock = Counter()
         g.post = TILDPostProcess()
         g.exit = AnyVertex()
@@ -2583,3 +2582,28 @@ class TILDParallel(HarmonicTILD):
 
 class ProtoTILDPar(Protocol, TILDParallel):
     pass
+
+
+class TILDSerial(TILDParallel):
+    def define_vertices(self):
+        # Graph components
+        g = self.graph
+        ip = Pointer(self.input)
+        g.build_lambdas = BuildMixingPairs()
+        g.initial_forces = Zeros()
+        g.mass_mixer = WeightedSum()
+        g.initial_velocities = SerialList(RandomVelocity)
+        g.create_jobs_a = CreateSubJobs()
+        g.create_jobs_b = CreateSubJobs()
+        g.check_steps = IsGEq()
+        g.check_convergence = IsLEq()
+        # g.run_lambda_points = ParallelList(_TILDLambdaEvolution, sleep_time=ip.sleep_time)
+        g.run_lambda_points = SerialList(_TILDLambdaEvolution, sleep_time=ip.sleep_time)  # !!! only difference
+        g.clock = Counter()
+        g.post = TILDPostProcess()
+        g.exit = AnyVertex()
+
+
+class ProtoTILDSer(Protocol, TILDSerial):
+    pass
+

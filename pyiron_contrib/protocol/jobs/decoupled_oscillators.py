@@ -27,15 +27,44 @@ __status__ = "development"
 __date__ = "06 May, 2021"
 
 
+class DecoupledOscilattorsInput(DataContainer):
+    def __init__(self, init=None, table_name="decoupled_input"):
+        super().__init__(init=init, table_name=table_name)
+        self._structure = None
+        self.oscillators_id_list = None
+        self.spring_constants_list = None
+        self.save_debug_data = False
+        self._ref_job = None
+
+    @property
+    def structure(self) -> Atoms:
+        return self._structure
+
+    @structure.setter
+    def structure(self, atoms: Atoms):
+        if not isinstance(atoms, Atoms):
+            raise TypeError(f'Structures must be of type Atoms but got {type(atoms)}')
+        self._structure = atoms
+
+    @property
+    def ref_job(self) -> (LammpsInteractive, VaspInteractive, SphinxInteractive):
+        return self._ref_job
+
+    @ref_job.setter
+    def ref_job(self, job: (LammpsInteractive, VaspInteractive, SphinxInteractive)):
+        if not isinstance(job, (LammpsInteractive, VaspInteractive, SphinxInteractive)):
+            raise TypeError(f"Got type {type(job)}, which is not a recognized interactive job.")
+        self._ref_job = job
+
+
 class DecoupledOscillators(GenericInteractive, GenericMaster):
     def __init__(self, project, job_name):
         super(DecoupledOscillators, self).__init__(project, job_name)
         self.__version__ = "0.0.1"
         self.__name__ = "DecoupledOscillators"
-        self.input = DataContainer(table_name="decoupled_input")
+        self.input = DecoupledOscilattorsInput()
         self.output = DataContainer(table_name="decoupled_output")
-        self.input.structure = None
-        self.input.save_debug_data = False
+
         self.interactive_cache = {
             "forces": [],
             "energy_pot": [],
@@ -81,8 +110,6 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
             raise TypeError('<job>.server.run_mode should be set to interactive')
         # check if input structure is of the Atoms class, and set the base structure
         if self.input.structure is not None:
-            assert isinstance(self.input.structure, Atoms), \
-                '<job>.input.structure should be an instance of the Atoms class'
             self._base_structure = self.input.structure.copy()
         # otherwise revert to the structure of the reference job
         elif self.input.structure is None:
@@ -129,10 +156,6 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
         Create the base interpreter (Lammps/Vasp/Sphinx) job with the vacancy structure and save it.
         """
 
-        # check if ref_job is an instance of Lammps/Vasp/Sphinx interactive
-        assert isinstance(self.input.ref_job, (LammpsInteractive, VaspInteractive, SphinxInteractive)), \
-            'ref_job should be one of Lammps/Vasp/SphinxInteractive'
-
         if pr is None:
             pr = self.project
         else:
@@ -168,6 +191,7 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
             forces
             energy_pot
         """
+        print(f"Calc static on {self[0].job_name}")
         self[0].interactive_positions_setter(self.input.positions[self._base_atom_ids])
         self[0].run()
         return self[0].interactive_forces_getter(), self[0].interactive_energy_pot_getter()

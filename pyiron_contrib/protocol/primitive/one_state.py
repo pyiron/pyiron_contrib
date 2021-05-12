@@ -229,6 +229,8 @@ class ExternalHamiltonian(PrimitiveVertex):
                 self._job.interactive_initialize_interface()
                 self._job.calculate_forces()
                 self._job.interactive_collect()
+            elif isinstance(self._job, DecoupledOscillators):
+                self._job.run_if_interactive(pr=self._job_project_path, name=self._job_name)
             else:
                 self._job.calc_static()
                 self._job.run()
@@ -243,7 +245,8 @@ class ExternalHamiltonian(PrimitiveVertex):
         """
         pr = Project(path=self._job_project_path)
         self._job = pr.load(self._job_name)
-        self._job.run_if_interactive()
+        if not isinstance(self._job, DecoupledOscillators):
+            self._job.run_if_interactive()
 
     def _get_interactive_value(self, key):
         """
@@ -327,8 +330,8 @@ class CreateSubJobs(PrimitiveVertex):
             if isinstance(job, LammpsInteractive) and fast_lammps_mode:
                 # Note: This might be done by default at some point in LammpsInteractive,
                 # and could then be removed here
-                job.interactive_flush_frequency = 100
-                job.interactive_write_frequency = 100
+                job.interactive_flush_frequency = 10**10
+                job.interactive_write_frequency = 10**10
             if job.check_if_job_exists():
                 if not isinstance(job, (HessianJob, DecoupledOscillators)):
                     job.calc_static()
@@ -337,8 +340,7 @@ class CreateSubJobs(PrimitiveVertex):
                 job.save()
             if isinstance(job, DecoupledOscillators):
                 job.input = ref_job.input
-                print(job.input.ref_job)
-                job.validate_ready_to_run(pr=pr, name=name)
+                # job.validate_ready_to_run(pr=pr, name=name)
         else:
             raise TypeError('Job of class {} is not compatible.'.format(ref_job.__class__))
 

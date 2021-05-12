@@ -216,6 +216,9 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
         A pre check before running the main job. Also initializes the base job.
         """
         self._check_inputs()
+        self._set_base_structure()
+        self._create_base_job()
+        self._forces = np.zeros(self.input.positions.shape)
 
     # def _base_job_reload(self):
     #     pr = Project(self.project)
@@ -225,14 +228,6 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
         """
         The main run function.
         """
-        if not self._initialized:
-            self._check_inputs()
-            self.interactive_open()
-            self.status.running = True
-            self._set_base_structure()
-            self._create_base_job()
-            self._forces = np.zeros(self.input.positions.shape)
-            self._initialized = True
         self.status.running = True
         self._forces[self._base_atom_ids], base_energy_pot = self._calc_static_base_job()
         self._forces[self.input.oscillators_id_list], harmonic_energy_pot = self._calc_harmonic()

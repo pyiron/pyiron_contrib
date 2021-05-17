@@ -268,7 +268,7 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
             ref_job.status.initialized = True
             self.append(ref_job)
         # Save everything
-        super(DecoupledOscillators, self).to_hdf()
+        super(DecoupledOscillators, self).to_hdf(hdf=hdf, group_name=group_name)
         self.input.to_hdf(self.project_hdf5)
         self.output.to_hdf(self.project_hdf5)
 
@@ -282,7 +282,7 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
             hdf (ProjectHDFio): HDF5 group object - optional
             group_name (str): HDF5 subgroup name - optional
         """
-        super(DecoupledOscillators, self).from_hdf()
+        super(DecoupledOscillators, self).from_hdf(hdf=hdf, group_name=group_name)
         self.input.from_hdf(self.project_hdf5)
         self.input.ref_job = self[self.input.ref_job_name]
         self.output.from_hdf(self.project_hdf5)

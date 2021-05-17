@@ -257,10 +257,8 @@ class IODictionary(dict, LoggerMixin):
         # if the group_name is a reference job saved as an hdf object, load the reference job
         elif hdf[group_name]['TYPE'] in [str(Lammps), str(Vasp), str(Sphinx), str(HessianJob),
                                          str(DecoupledOscillators)]:
-            job_name = hdf[group_name].name
             pr = Project(path=hdf['__project'])
-            job = pr.load(job_name)
-            return job
+            return pr.load(hdf[group_name].name)
 
         else:
             raise TypeError('I do not know how to deserialize type(%s)' % hdf[group_name])

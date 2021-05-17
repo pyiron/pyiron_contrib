@@ -289,9 +289,10 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
 
     def interactive_close(self):
         # a bit of a workaround to close the base_job
-        self._create_base_job(initialize_only=True)
-        self[self._base_name].status.finished = True
-        self[self._base_name].interactive_close()
+        if self._base_name is None:
+            self._create_base_job(initialize_only=True)
+            self[self._base_name].status.finished = True
+            self[self._base_name].interactive_close()
 
         # assign forces and energy_pot to output list
         self.output.forces = np.array(self.interactive_cache["forces"])
@@ -301,7 +302,7 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
             self.output.base_energy_pot = np.array(self.interactive_cache["base_energy_pot"])
             self.output.harmonic_forces = np.array(self.interactive_cache["harmonic_forces"])
             self.output.harmonic_energy_pot = np.array(self.interactive_cache["harmonic_energy_pot"])
-        self.to_hdf()   # run to_hdf to re-save input
+        self.to_hdf(self.project_hdf5)   # run to_hdf to re-save input
         self.output.to_hdf(self.project_hdf5)  # save output
         self.project.db.item_update(self._runtime(), self._job_id)  # update
         self.status.finished = True  # set job status to finish

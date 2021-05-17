@@ -666,6 +666,7 @@ class Protocol(CompoundVertex, GenericJob):
         """
         if hdf is None:
             hdf = self.project_hdf5
+        self.input['__project'] = self.project.path
         super(CompoundVertex, self).to_hdf(hdf=hdf, group_name=group_name)
 
     def from_hdf(self, hdf=None, group_name=None):

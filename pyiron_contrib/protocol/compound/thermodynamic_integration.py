@@ -2281,9 +2281,10 @@ class _TILDLambdaEvolution(CompoundVertex):
         # addition
         g.addition.input.vectors = [
             gp.calc_static_b.output.energy_pot[-1],
-            gp.calc_static_a.output.energy_pot[-1]
+            gp.calc_static_a.output.energy_pot[-1],
+            ip.zero_k_energy
         ]
-        g.addition.input.weights = [1, -1]
+        g.addition.input.weights = [1, -1, -1]
 
         # average_tild
         g.average_tild.input.default.mean = ip.average_tild_mean

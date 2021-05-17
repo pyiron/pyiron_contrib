@@ -4,6 +4,7 @@
 
 from __future__ import print_function
 import numpy as np
+import warnings
 
 """
 Simetimes numpy and scipy are missing things, or I can't find them.
@@ -35,6 +36,15 @@ def welford_online(x, mean, std, k):
     Returns:
         float/numpy.ndarray, float/numpy.ndarray: The new mean and standard deviation for `k+1` values.
     """
-    new_mean = (x + k * mean) / (k + 1)
-    new_std = np.sqrt((k * std ** 2 + (x - mean) * (x - new_mean)) / (k + 1))
+    warnings.filterwarnings('ignore')
+    if np.nan in [x, mean, std, k]:
+        new_mean = np.nan
+        new_std = np.nan
+    else:
+        # NOTE: RuntimeWarning is suppressed here!
+        warnings.filterwarnings('ignore', category=RuntimeWarning)
+        new_mean = (x + k * mean) / (k + 1)
+        new_std = np.sqrt((k * std ** 2 + (x - mean) * (x - new_mean)) / (k + 1))
+        # and set to default here:
+        warnings.filterwarnings('default')
     return new_mean, new_std

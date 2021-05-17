@@ -7,7 +7,7 @@ from __future__ import print_function
 import numpy as np
 from os.path import split
 from abc import ABC, abstractmethod
-from uncertainties import unumpy
+from uncertainties import unumpy, core
 from scipy.constants import physical_constants
 from scipy.integrate import simps
 from ase.geometry import get_distances
@@ -1319,7 +1319,7 @@ class FEPExponential(PrimitiveVertex):
         try:
             exponential_difference = np.exp(-u_diff * delta_lambda / (KB * temperature))
         except RuntimeWarning:
-            exponential_difference = 0
+            exponential_difference = np.nan
         warnings.filterwarnings('default')
 
         return {
@@ -1368,39 +1368,39 @@ class TILDPostProcess(PrimitiveVertex):
 
     @staticmethod
     def get_tild_free_energy(lambda_pairs, tild_mean, tild_std, n_samples):
-        y = unumpy.uarray(tild_mean, tild_std)
-        integral = simps(x=lambda_pairs[:, 0], y=y)
-        mean = float(unumpy.nominal_values(integral))
-        std = float(unumpy.std_devs(integral))
-        tild_se = tild_std / np.sqrt(n_samples)
-        y_se = unumpy.uarray(tild_mean, tild_se)
-        integral_se = simps(x=lambda_pairs[:, 0], y=y_se)
-        se = float(unumpy.std_devs(integral_se))
-
+        if np.nan not in [tild_mean, tild_std]:
+            y = unumpy.uarray(tild_mean, tild_std)
+            integral = simps(x=lambda_pairs[:, 0], y=y)
+            mean = float(unumpy.nominal_values(integral))
+            std = float(unumpy.std_devs(integral))
+            tild_se = tild_std / np.sqrt(n_samples)
+            y_se = unumpy.uarray(tild_mean, tild_se)
+            integral_se = simps(x=lambda_pairs[:, 0], y=y_se)
+            se = float(unumpy.std_devs(integral_se))
+        else:
+            mean = np.nan
+            std = np.nan
+            se = np.nan
         return mean, std, se
 
     @staticmethod
     def get_fep_free_energy(fep_exp_mean, fep_exp_std, n_samples, temperature):
-        fep_exp_se = fep_exp_std / np.sqrt(n_samples)
-        y = unumpy.uarray(fep_exp_mean, fep_exp_std)
-        y_se = unumpy.uarray(fep_exp_mean, fep_exp_se)
-        free_energy = 0
-        free_energy_se = 0
-        for (val, val_se) in zip(y, y_se):
-            try:
+        if np.nan not in [fep_exp_mean, fep_exp_std]:
+            fep_exp_se = fep_exp_std / np.sqrt(n_samples)
+            y = unumpy.uarray(fep_exp_mean, fep_exp_std)
+            y_se = unumpy.uarray(fep_exp_mean, fep_exp_se)
+            free_energy = 0
+            free_energy_se = 0
+            for (val, val_se) in zip(y, y_se):
                 free_energy += -KB * temperature * unumpy.log(val)
                 free_energy_se += -KB * temperature * unumpy.log(val_se)
-            except ValueError:
-                free_energy = None
-                free_energy_se = None
-        if free_energy is None:
-            mean = None
-            std = None
-            se = None
-        else:
             mean = float(unumpy.nominal_values(free_energy))
             std = float(unumpy.std_devs(free_energy))
             se = float(unumpy.std_devs(free_energy_se))
+        else:
+            mean = np.nan
+            std = np.nan
+            se = np.nan
 
         return mean, std, se
 

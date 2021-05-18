@@ -635,7 +635,7 @@ class Protocol(CompoundVertex, GenericJob):
 
     def run_static(self):
         """If this CompoundVertex is the highest level, it can be run as a regular pyiron job."""
-        self.from_hdf()  # If I do not include this, the job doesn't run. -R
+        self.from_hdf()  # If I do not include this, the DC job doesn't run with Protocols. -R
         self.status.running = True
         self.execute()
         self.status.collect = True  # Assume modal for now

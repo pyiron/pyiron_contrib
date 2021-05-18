@@ -201,7 +201,7 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
             forces
             energy_pot
         """
-        self[self._base_name].interactive_positions_setter(self.input.positions[self._base_atom_ids])
+        self[self._base_name].structure.positions = self.input.positions[self._base_atom_ids]
         self[self._base_name].run()
         return self[self._base_name].interactive_forces_getter(), self[self._base_name].interactive_energy_pot_getter()
 
@@ -215,11 +215,11 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
         reference_positions = self.input.structure.positions
         dr = self.input.structure.find_mic(self.input.positions - reference_positions)
         spring_constants = np.expand_dims(self.input.spring_constants_list, axis=-1)
-        harmonic_forces = -np.array(spring_constants) * dr[self.input.oscillators_id_list]
+        harmonic_forces = -np.array(spring_constants) * dr
         harmonic_energy_pot = 0
-        for i, m in enumerate(self.input.oscillators_id_list):
-            harmonic_energy_pot += -0.5 * np.dot(dr[m], harmonic_forces[i].T)
-        return harmonic_forces, harmonic_energy_pot
+        for m in self.input.oscillators_id_list:
+            harmonic_energy_pot += -0.5 * np.dot(dr[m], harmonic_forces[m])
+        return harmonic_forces[self.input.oscillators_id_list], harmonic_energy_pot
 
     def _setup_base(self):
         """
@@ -233,11 +233,11 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
         The main run function.
         """
         if not self._initialized:
+            self.status.running = True
             self._check_inputs()
             self._forces = np.zeros(self.input.positions.shape)
             self._setup_base()
             self._initialized = True
-        self.status.running = True
         self._forces[self._base_atom_ids], base_energy_pot = self._calc_static_base_job()
         self._forces[self.input.oscillators_id_list], harmonic_energy_pot = self._calc_harmonic()
         energy_pot = base_energy_pot + harmonic_energy_pot
@@ -289,10 +289,10 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
 
     def interactive_close(self):
         # a bit of a workaround to close the base_job
-        if self._base_name is None:
+        if isinstance(self[self._base_name], ProjectHDFio):
             self._create_base_job(initialize_only=True)
-            self[self._base_name].status.finished = True
-            self[self._base_name].interactive_close()
+        self[self._base_name].interactive_close()
+        self[self._base_name].status.finished = True
 
         # assign forces and energy_pot to output list
         self.output.forces = np.array(self.interactive_cache["forces"])

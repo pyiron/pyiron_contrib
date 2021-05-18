@@ -221,19 +221,21 @@ class ExternalHamiltonian(PrimitiveVertex):
         elif isinstance(self._job, GenericInteractive):
             # DFT codes are slow enough that we can run them the regular way and not care.
             # Also we might intentionally run Lammps slowly for comparison purposes.
-            if positions is not None:
-                self._job.structure.positions = positions
-            if cell is not None:
-                self._job.structure.cell = cell
-            if isinstance(self._job, HessianJob):
-                self._job.interactive_initialize_interface()
-                self._job.calculate_forces()
-                self._job.interactive_collect()
-            elif isinstance(self._job, DecoupledOscillators):
+            if isinstance(self._job, DecoupledOscillators):
+                self._job.input.positions = positions
                 self._job.run_if_interactive()
             else:
-                self._job.calc_static()
-                self._job.run()
+                if positions is not None:
+                    self._job.structure.positions = positions
+                if cell is not None:
+                    self._job.structure.cell = cell
+                if isinstance(self._job, HessianJob):
+                    self._job.interactive_initialize_interface()
+                    self._job.calculate_forces()
+                    self._job.interactive_collect()
+                else:
+                    self._job.calc_static()
+                    self._job.run()
         else:
             raise TypeError('Job of class {} is not compatible.'.format(self._job.__class__))
 

@@ -143,8 +143,11 @@ class StructureContainer(HasStructure):
         raise KeyError(f"No structure named {frame} in StructureContainer.")
 
     def _get_structure(self, frame=-1):
-        E = I + self.len_current_struct[frame]
-        return Atoms(symbols=self.symbols[I:E], cell=self.cells[frame], positions=self.positions[I:E])
+        I = self._per_structure_arrays["start_indices"][frame]
+        E = I + self._per_structure_arrays["len_current_struct"][frame]
+        return Atoms(symbols=self._per_atom_arrays["symbols"][I:E],
+                     cell=self._per_structure_arrays["cells"][frame],
+                     positions=self._per_atom_arrays["positions"][I:E])
 
     def _number_of_structures(self):
         return self.num_structures

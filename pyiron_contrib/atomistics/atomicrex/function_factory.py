@@ -54,6 +54,33 @@ class FunctionFactory(PyironFactory):
     def gaussian(identifier, prefactor, eta, mu, species=["*", "*"]):
         return GaussianFunc(identifier, prefactor, eta, mu, species)
 
+    @staticmethod
+    def sum(identifier, species=["*", "*"]):
+        return Sum(identifier=identifier, species=species)
+
+
+class Sum(DataContainer):
+    def __init__(self, identifier=None, species=None):
+        super().__init__()
+        self.identifier = identifier
+        self.functions = DataContainer(table_name="sum_functions")
+        self.species = species
+
+    def _to_xml_element(self):
+        root = ET.Element("sum")
+        root.set("id", self.identifier)
+        for k, v in self.functions.items():
+            root.append(v._to_xml_element())
+        return root
+    
+    def _parse_final_parameter(self, leftover, value):
+        identifier = leftover[0].split("[")[0]
+        leftover = leftover[1:]
+        try:
+            self.functions[identifier]._parse_final_parameter(leftover, value)
+        except KeyError:
+            raise KeyError(f"Function {identifier} not found in sum {self.identifier}")
+
 
 class SpecialFunction(DataContainer):
     """
@@ -105,6 +132,9 @@ class SpecialFunction(DataContainer):
         else:
             return plot(self.func)
 
+    def _parse_final_parameter(self, leftover, value):
+        param = leftover[0].rstrip(":")
+        self.parameters[param].final_value = value
 
 class Poly(DataContainer):
     """
@@ -140,8 +170,8 @@ class Spline(DataContainer):
         super().__init__(table_name=f"Spline_{identifier}")
         self.identifier = identifier
         self.cutoff = cutoff
-        self.derivative_left = derivative_left
-        self.derivative_right = derivative_right
+        self.derivative_left = FunctionParameter(param="derivative-left", start_val=derivative_left)
+        self.derivative_right = FunctionParameter(param="derivative-right", start_val=derivative_right, enabled=False)
         self.species = species
         self.parameters = NodeList()
 
@@ -152,15 +182,28 @@ class Spline(DataContainer):
             cutoff = ET.SubElement(spline, "cutoff")
             cutoff.text = f"{self.cutoff}"
         der_l = ET.SubElement(spline, "derivative-left")
-        der_l.text = f"{self.derivative_left}"
+        der_l.text = f"{self.derivative_left.start_val}"
         der_r = ET.SubElement(spline, "derivative-right")
-        der_r.text = f"{self.derivative_right}"
+        der_r.text = f"{self.derivative_right.start_val}"
+
+        fit_dof = ET.SubElement(spline, "fit-dof")
+        fit_dof.append(self.derivative_left._to_xml_element())
+        fit_dof.append(self.derivative_right._to_xml_element())
+
         spline.append(self.parameters._to_xml_element())
         return spline
 
+    def _parse_final_parameter(self, leftover, value):
+        if "derivative-right" in leftover[-1]:
+            self.derivative_right.final_value = value
+        elif "derivative-left" in leftover[-1]:
+            self.derivative_left.final_value = value
+        else:
+            param = float(leftover[0].split("[")[1])
+            param = f"node_{param:.6g}"
+            self.parameters[param].final_value = value
 
 class ExpA(SpecialFunction):
-
     def __init__(self, identifier=None, cutoff=None, species=["*", "*"], is_screening_function=True):
         super().__init__(identifier, species=species, is_screening_function=is_screening_function)
         self.parameters.add_parameter(
@@ -461,7 +504,7 @@ class UserFunction(DataContainer):
         for param in self.parameters.values():
             p = ET.SubElement(root, "param")
             p.set("name", f"{param.param}")
-            p.text = f"{param.start_val:.6g}"
+            p.text = f"{param.start_val:.6g}"#6g formatting because atomicrex output is limited to 6 significant digits, prevents some errors
         
         root.append(self.parameters.fit_dofs_to_xml_element())
 
@@ -471,6 +514,10 @@ class UserFunction(DataContainer):
             return root
         else:
             return screening
+
+    def _parse_final_parameter(self, leftover, value):
+        param = leftover[0].rstrip(":")
+        self.parameters[param].final_value = value
 
 
 class FunctionParameter(DataContainer):
@@ -502,8 +549,16 @@ class FunctionParameter(DataContainer):
 
     def _to_xml_element(self):
         root = ET.Element(f"{self.param}")
-        root.set("enabled", f"{self.enabled}".lower())
-        root.set("reset", f"{self.reset}".lower())
+        if self.enabled:
+            root.set("enabled", "true")
+        else:
+            root.set("enabled", "false")
+
+        if self.reset:
+            root.set("reset", "true")
+        else:
+            root.set("reset", "false")
+
         if self.min_val is not None:
             root.set("min", f"{self.min_val:.6g}")
         if self.max_val is not None:
@@ -665,8 +720,7 @@ class NodeList(DataContainer):
         """        
         x = float(x)
         # atomicrex rounds output to 6 digits, so this is done here to prevent issues when reading the output.
-        x = round(x, 6)
-        key = f"node_{x}"
+        key = f"node_{x:.6g}"
         self[key] = Node(
             x=x,
             start_val=start_val,

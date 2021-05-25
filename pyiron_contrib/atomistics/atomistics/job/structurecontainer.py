@@ -43,34 +43,64 @@ class StructureContainer(HasStructure):
         self._init_arrays()
 
     def _init_arrays(self):
-        self.symbols = np.full(self._num_atoms_alloc, "XX", dtype=np.dtype("U2"))# 2 character unicode array for chemical symbols
-        self.positions = np.empty((self._num_atoms_alloc, 3))
-        self.cells = np.empty((self._num_structures_alloc, 3, 3))
-        self.start_indices = np.empty(self._num_structures_alloc, dtype=np.int32)
-        self.len_current_struct = np.empty(self._num_structures_alloc, dtype=np.int32)
-        self.identifiers = np.empty(self._num_structures_alloc, dtype=np.dtype("U20"))
+        self._per_atom_arrays = {
+                # 2 character unicode array for chemical symbols
+                "symbols": np.full(self._num_atoms_alloc, "XX", dtype=np.dtype("U2")),
+                "positions": np.empty((self._num_atoms_alloc, 3))
+        }
+
+        self._per_structure_arrays = {
+                "start_indices": np.empty(self._num_structures_alloc, dtype=np.int32),
+                "len_current_struct": np.empty(self._num_structures_alloc, dtype=np.int32),
+                "identifiers": np.empty(self._num_structures_alloc, dtype=np.dtype("U20")),
+                "cells": np.empty((self._num_structures_alloc, 3, 3))
+        }
+
+    @property
+    def symbols(self):
+        return self._per_atom_arrays["symbols"]
+
+    @property
+    def positions(self):
+        return self._per_atom_arrays["positions"]
+
+    @property
+    def start_indices(self):
+        return self._per_structure_arrays["start_indices"]
+
+    @property
+    def len_current_struct(self):
+        return self._per_structure_arrays["len_current_struct"]
+
+    @property
+    def identifiers(self):
+        return self._per_structure_arrays["identifiers"]
+
+    @property
+    def cells(self):
+        return self._per_structure_arrays["cells"]
 
     def _resize_atoms(self, new):
         self._num_atoms_alloc = new
         try:
-            self.symbols.resize(new)
-            self.positions.resize( (new, 3) )
+            self._per_atom_arrays["symbols"].resize(new)
+            self._per_atom_arrays["positions"].resize( (new, 3) )
         except ValueError:
-            self.symbols = np.resize(self.symbols, new)
-            self.positions = np.resize(self.positions, (new, 3) )
+            self._per_atom_arrays["symbols"] = np.resize(self._per_atom_arrays["symbols"], new)
+            self._per_atom_arrays["positions"] = np.resize(self._per_atom_arrays["positions"], (new, 3) )
 
     def _resize_structures(self, new):
         self._num_structures_alloc = new
         try:
-            self.cells.resize( (new, 3, 3) )
-            self.start_indices.resize(new)
-            self.len_current_struct.resize(new)
-            self.identifiers.resize(new)
+            self._per_structure_arrays["cells"].resize( (new, 3, 3) )
+            self._per_structure_arrays["start_indices"].resize(new)
+            self._per_structure_arrays["len_current_struct"].resize(new)
+            self._per_structure_arrays["identifiers"].resize(new)
         except ValueError:
-            self.cells = np.resize(self.cells, (new, 3, 3) )
-            self.start_indices = np.resize(self.start_indices, new)
-            self.len_current_struct = np.resize(self.len_current_struct, new)
-            self.identifiers = np.resize(self.identifiers, new)
+            self._per_structure_arrays["cells"] = np.resize(self._per_structure_arrays["cells"], (new, 3, 3) )
+            self._per_structure_arrays["start_indices"] = np.resize(self._per_structure_arrays["start_indices"], new)
+            self._per_structure_arrays["len_current_struct"] = np.resize(self._per_structure_arrays["len_current_struct"], new)
+            self._per_structure_arrays["identifiers"] = np.resize(self._per_structure_arrays["identifiers"], new)
 
     def add_structure(self, structure, identifier):
         n = len(structure)
@@ -88,13 +118,13 @@ class StructureContainer(HasStructure):
         # len of structure to index into the initialized arrays
         i = self.current_atom_index + n
 
-        self.symbols[self.current_atom_index:i] = np.array(structure.symbols)
-        self.positions[self.current_atom_index:i] = structure.positions
+        self._per_atom_arrays["symbols"][self.current_atom_index:i] = np.array(structure.symbols)
+        self._per_atom_arrays["positions"][self.current_atom_index:i] = structure.positions
 
-        self.len_current_struct[self.current_structure_index] = n
-        self.cells[self.current_structure_index] = structure.cell.array
-        self.start_indices[self.current_structure_index] = self.current_atom_index
-        self.identifiers[self.current_structure_index] = identifier
+        self._per_structure_arrays["len_current_struct"][self.current_structure_index] = n
+        self._per_structure_arrays["cells"][self.current_structure_index] = structure.cell.array
+        self._per_structure_arrays["start_indices"][self.current_structure_index] = self.current_atom_index
+        self._per_structure_arrays["identifiers"][self.current_structure_index] = identifier
 
         self.prev_structure_index = self.current_structure_index
         self.prev_atom_index = self.current_atom_index
@@ -111,14 +141,14 @@ class StructureContainer(HasStructure):
         self._resize_structures(self.num_structures)
 
         with hdf.open(group_name) as hdf_s_lst:
-            hdf_s_lst["symbols"] = self.symbols.astype(np.dtype("S2"))
-            hdf_s_lst["positions"] = self.positions
-            hdf_s_lst["cells"] = self.cells
-            hdf_s_lst["start_indices"] = self.start_indices
-            hdf_s_lst["identifiers"] = self.identifiers.astype(np.dtype("S20"))
+            hdf_s_lst["symbols"] = self._per_atom_arrays["symbols"].astype(np.dtype("S2"))
+            hdf_s_lst["positions"] = self._per_atom_arrays["positions"]
+            hdf_s_lst["cells"] = self._per_structure_arrays["cells"]
+            hdf_s_lst["start_indices"] = self._per_structure_arrays["start_indices"]
+            hdf_s_lst["identifiers"] = self._per_structure_arrays["identifiers"].astype(np.dtype("S20"))
             hdf_s_lst["num_atoms"] =  self._num_atoms_alloc
             hdf_s_lst["num_structures"] = self._num_structures_alloc
-            hdf_s_lst["len_current_struct"] = self.len_current_struct
+            hdf_s_lst["len_current_struct"] = self._per_structure_arrays["len_current_struct"]
 
 
     def from_hdf(self, hdf, group_name="structures"):
@@ -128,16 +158,16 @@ class StructureContainer(HasStructure):
 
             self._init_arrays()
 
-            self.symbols = hdf_s_lst["symbols"].astype(np.dtype("U2"))
-            self.positions = hdf_s_lst["positions"]
-            self.cells = hdf_s_lst["cells"]
-            self.start_indices = hdf_s_lst["start_indices"]
-            self.identifiers = hdf_s_lst["identifiers"].astype(np.dtype("U20"))
-            self.len_current_struct = hdf_s_lst["len_current_struct"]
+            self._per_atom_arrays["symbols"] = hdf_s_lst["symbols"].astype(np.dtype("U2"))
+            self._per_atom_arrays["positions"] = hdf_s_lst["positions"]
+            self._per_structure_arrays["start_indices"] = hdf_s_lst["start_indices"]
+            self._per_structure_arrays["len_current_struct"] = hdf_s_lst["len_current_struct"]
+            self._per_structure_arrays["identifiers"] = hdf_s_lst["identifiers"].astype(np.dtype("U20"))
+            self._per_structure_arrays["cells"] = hdf_s_lst["cells"]
 
 
     def _translate_frame(self, frame):
-        for i, name in enumerate(self.identifiers):
+        for i, name in enumerate(self._per_structure_arrays["identifiers"]):
             if name == frame:
                 return i
         raise KeyError(f"No structure named {frame} in StructureContainer.")

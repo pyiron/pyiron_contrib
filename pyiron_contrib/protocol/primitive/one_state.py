@@ -5,9 +5,9 @@
 from __future__ import print_function
 
 import numpy as np
-from os.path import split
+
 from abc import ABC, abstractmethod
-from uncertainties import unumpy, core
+from uncertainties import unumpy
 from scipy.constants import physical_constants
 from scipy.integrate import simps
 from ase.geometry import get_distances
@@ -65,7 +65,6 @@ class BuildMixingPairs(PrimitiveVertex):
         self.input.default.custom_lambdas = None
 
     def command(self, n_lambdas, custom_lambdas):
-
         if custom_lambdas is not None:
             lambdas = np.array(custom_lambdas)
         else:
@@ -74,7 +73,6 @@ class BuildMixingPairs(PrimitiveVertex):
         delta_lambdas = np.gradient(lambdas)
         delta_lambdas[0] = delta_lambdas[0] / 2
         delta_lambdas[-1] = delta_lambdas[-1] / 2
-
         return {
                 'lambda_pairs': np.array([lambdas, 1 - lambdas]).T,
                 'delta_lambdas': delta_lambdas
@@ -154,11 +152,10 @@ class DeleteAtoms(PrimitiveVertex):
 
     def command(self, structure, atoms_id_list):
         vacancy_structure = structure.copy()
-        for i, atom_id in enumerate(atoms_id_list):
+        for i, atom_id in enumerate(np.sort(atoms_id_list)):
             new_atom_id = atom_id - i
-            del vacancy_structure[new_atom_id]
+            vacancy_structure.pop(int(new_atom_id))
         mask = np.delete(np.arange(len(structure)).astype(int), atoms_id_list)
-
         return {
             'structure': vacancy_structure,
             'mask': mask
@@ -195,14 +192,13 @@ class ExternalHamiltonian(PrimitiveVertex):
         self._job_name = None
         self._job = None
         id_ = self.input.default
-        id_.ref_job = None
         id_.job_project_path = None
         id_.job_name = None
         id_.positions = None
         id_.cell = None
         id_.interesting_keys = ['forces', 'energy_pot']
 
-    def command(self, ref_job, job_project_path, job_name, positions, cell, interesting_keys):
+    def command(self, job_project_path, job_name, positions, cell, interesting_keys):
 
         self._job_project_path = job_project_path
         self._job_name = job_name
@@ -212,23 +208,27 @@ class ExternalHamiltonian(PrimitiveVertex):
         if self._job is None:
             self._job_reload()
 
+        # if the job is of Lammps type, use the interactive functionality
         if isinstance(self._job, LammpsInteractive) and self._fast_lammps_mode:
             if positions is not None:
                 self._job.interactive_positions_setter(positions)
             if cell is not None:
                 self._job.interactive_cells_setter(cell)
             self._job._interactive_lib_command(self._job._interactive_run_command)
+        # otherwise,
         elif isinstance(self._job, GenericInteractive):
-            # DFT codes are slow enough that we can run them the regular way and not care.
-            # Also we might intentionally run Lammps slowly for comparison purposes.
+            # if the job is of type DecoupledOscillators,
             if isinstance(self._job, DecoupledOscillators):
-                self._job.input.positions = positions
+                self._job.positions = positions
                 self._job.run_if_interactive()
             else:
+                # DFT codes are slow enough that we can run them the regular way and not care
+                # also we might intentionally run Lammps slowly for comparison purposes
                 if positions is not None:
                     self._job.structure.positions = positions
                 if cell is not None:
                     self._job.structure.cell = cell
+                # if the job is of type HessianJob,
                 if isinstance(self._job, HessianJob):
                     self._job.interactive_initialize_interface()
                     self._job.calculate_forces()
@@ -238,7 +238,6 @@ class ExternalHamiltonian(PrimitiveVertex):
                     self._job.run()
         else:
             raise TypeError('Job of class {} is not compatible.'.format(self._job.__class__))
-
         return {key: self._get_interactive_value(key) for key in interesting_keys}
 
     def _job_reload(self):
@@ -247,6 +246,8 @@ class ExternalHamiltonian(PrimitiveVertex):
         """
         pr = Project(path=self._job_project_path)
         self._job = pr.load(self._job_name)
+        # The run_if_interactive method of DecoupledOscillators calls the main run function so, don't call it
+        # while reloading!
         if not isinstance(self._job, DecoupledOscillators):
             self._job.run_if_interactive()
 
@@ -276,10 +277,11 @@ class CreateSubJobs(PrimitiveVertex):
     Create sub jobs of an external interpreter (e.g. Lammps, Vasp, Sphinx...).
         This vertex does not run the interpreter to give properties, but only creates the sub jobs and saves them.
     Input attributes:
-        ref_job (GenricInteractive/LammpsInteractive/VaspInteractive/SphinxInteractive/HessianJob): The reference
-            job, from which to create the sub jobs. The reference job should have all the necessary inputs
-            ex. structure, potential etc. (Default is None, no reference job)
+        ref_job (GenricInteractive/LammpsInteractive/VaspInteractive/SphinxInteractive/HessianJob/
+        DecoupledOscillators): The reference job, from which to create the sub jobs. The reference job should
+        have all the necessary inputs, ex. structure, potential etc. (Default is None, no reference job)
         n_images (int): Number of sub jobs to create. (Default is 1.)
+        structure (Atoms): The structure to assign to the sub-job
     Output attributes:
         jobs_project_path (list of strings): The project path of the sub jobs.
         jobs_names (list of strings): The names of the jobs.
@@ -306,7 +308,6 @@ class CreateSubJobs(PrimitiveVertex):
             _, p_path, j_name = self._initialize(pr_sub, ref_job, self._fast_lammps_mode, name, structure)
             self._jobs_project_path.append(p_path)
             self._jobs_names.append(j_name)
-
         return {
             'jobs_project_path': self._jobs_project_path,
             'jobs_names': self._jobs_names
@@ -344,7 +345,6 @@ class CreateSubJobs(PrimitiveVertex):
                 job.input = ref_job.input
         else:
             raise TypeError('Job of class {} is not compatible.'.format(ref_job.__class__))
-
         return job, job.project.path, job.job_name
 
     def finish(self):
@@ -462,15 +462,12 @@ class InitialPositions(PrimitiveVertex):
             pos_i = structure_initial.positions
             pos_f = structure_final.positions
             displacement = structure_initial.find_mic(pos_f - pos_i)
-
             initial_positions = []
             for n, mix in enumerate(np.linspace(0, 1, n_images)):
                 initial_positions.append(pos_i + (mix * displacement))
-
         else:
             if len(initial_positions) != n_images:
                 raise TypeError("Length of positions is not the same as n_images!")
-
         return {
             'initial_positions': initial_positions
         }
@@ -505,7 +502,6 @@ class HarmonicHamiltonian(PrimitiveVertex):
         id_.force_constants = None
 
     def command(self, positions, structure, spring_constants_list=None, force_constants=None, mask=None):
-
         reference_positions = structure.positions
         dr = structure.find_mic(positions - reference_positions)
         if spring_constants_list is not None and force_constants is None:
@@ -529,10 +525,8 @@ class HarmonicHamiltonian(PrimitiveVertex):
             else:
                 forces = retransformed_forces
                 energy = -0.5 * np.tensordot(forces, dr)
-
         else:
             raise TypeError('Please specify either a spring constant or the force constant matrix')
-
         return {
             'forces': forces,
             'energy_pot': energy
@@ -549,7 +543,6 @@ class HarmonicHamiltonian(PrimitiveVertex):
             ).reshape((force_reshape, force_reshape))
         elif force_shape[1] == 3 and force_shape[3] == 3:
             transformed_force_constants = np.array(force_constants).reshape(3 * n_atoms, 3 * n_atoms)
-
         return transformed_force_constants
 
     @staticmethod
@@ -588,14 +581,12 @@ class LangevinThermostat(PrimitiveVertex):
         # Ensure that masses are a commensurate shape
         masses = np.array(masses)[:, np.newaxis]
         gamma = masses / damping_timescale
-        np.random.seed()
         noise = np.sqrt(2 * (gamma / time_step) * KB * temperature) * np.random.randn(*velocities.shape)
         drag = -gamma * velocities
         thermostat_forces = noise + drag
 
         if fix_com:  # Apply zero net force
             thermostat_forces -= np.mean(noise, axis=0)
-
         return {
             'forces': thermostat_forces
         }
@@ -733,7 +724,6 @@ class NEBForces(PrimitiveVertex):
                 dr_mag = np.linalg.norm(dr_right) - np.linalg.norm(dr_left)
                 force_spring = spring_constant * dr_mag * tau
                 neb_forces.append(input_force_perpendicular + force_spring + force_smoothing)
-
         return {
             'forces': neb_forces
         }
@@ -960,7 +950,6 @@ class SphereReflectionPerAtom(PrimitiveVertex):
         else:
             is_at_home = np.ones(len(reference_positions))[:, np.newaxis]
             is_away = 1 - is_at_home
-
         return {
             'positions': is_at_home * positions + is_away * previous_positions,
             'velocities': is_at_home * velocities + is_away * -previous_velocities,
@@ -982,14 +971,13 @@ class CutoffDistance(PrimitiveVertex):
         cutoff_distance (float): The cutoff distance.
     """
 
-    def command(self, structure, cutoff_factor=0.48):
+    def command(self, structure, cutoff_factor=0.5):
         try:
             nn_list = structure.get_neighbors(num_neighbors=1)
         except ValueError:
             nn_list = structure.get_neighbors(num_neighbors=1)
 
         cutoff_distance = nn_list.distances[0] * cutoff_factor
-
         return {
             'cutoff_distance': cutoff_distance[-1]
         }
@@ -1044,7 +1032,7 @@ class VerletParent(PrimitiveVertex, ABC):
         damping_timescale (float): Damping timescale in fs. (Default is None, no thermostat is used.)
     TODO: VerletVelocityUpdate should *always* have its velocity input wired to the velocity outupt of
           VerletPositionUpdate. This implies to me that we need some structure *other* than two fully independent
-          nodes. It would also be nice to syncronize, e.g. the thermostat and timestep input which is also the same
+          nodes. It would also be nice to synchronize, e.g. the thermostat and timestep input which is also the same
           for both. However, I haven't figured out how to do that in the confines of the current graph traversal
           and hdf5 setup.
     """
@@ -1084,7 +1072,6 @@ class VerletParent(PrimitiveVertex, ABC):
             (numpy.ndarray): Per atom accelerations to use for changing velocities.
         """
         drag = -0.5 * time_step * velocities / damping_timescale
-        np.random.seed()
         noise = np.sqrt(EV_TO_U_ANGSQ_PER_FSSQ * KB * temperature * time_step / (masses * damping_timescale)) \
                 * np.random.randn(*velocities.shape)
         noise -= np.mean(noise, axis=0)
@@ -1120,7 +1107,6 @@ class VerletPositionUpdate(VerletParent):
                 velocities
             )
         pos_step = positions + vel_half * time_step
-
         return {
             'positions': pos_step,
             'velocities': vel_half
@@ -1161,7 +1147,6 @@ class VerletVelocityUpdate(VerletParent):
             )
         kinetic_energy = 0.5 * np.sum(masses * vel_step * vel_step) / EV_TO_U_ANGSQ_PER_FSSQ
         instant_temperature = (kinetic_energy * 2) / (3 * KB * len(velocities))
-
         return {
             'velocities': vel_step,
             'energy_kin': kinetic_energy,
@@ -1254,7 +1239,6 @@ class WeightedSum(PrimitiveVertex):
         # If dot reduces to a single value, recast
         if len(weighted_sum.shape) == 0:
             weighted_sum = float(weighted_sum)
-
         return {
             'weighted_sum': weighted_sum
         }
@@ -1323,7 +1307,6 @@ class FEPExponential(PrimitiveVertex):
         except RuntimeWarning:
             exponential_difference = np.nan
         warnings.filterwarnings('default')
-
         return {
             'exponential_difference': exponential_difference
         }
@@ -1365,7 +1348,6 @@ class TILDPostProcess(PrimitiveVertex):
             'fep_free_energy_mean': fep_fe_mean,
             'fep_free_energy_std': fep_fe_std,
             'fep_free_energy_se': fep_fe_se
-
         }
 
     @staticmethod
@@ -1403,7 +1385,6 @@ class TILDPostProcess(PrimitiveVertex):
             mean = np.nan
             std = np.nan
             se = np.nan
-
         return mean, std, se
 
 
@@ -1493,31 +1474,8 @@ class BerendsenBarostat(PrimitiveVertex):
             total_pressure = np.mean([total_pressure_x, total_pressure_y, total_pressure_z])
         else:
             raise TypeError('Invalid value for pressure')
-
         return {
             'pressure': total_pressure,
             'structure': new_structure,
             'positions': new_structure.positions
-        }
-
-
-class ComputeFormationEnergy(PrimitiveVertex):
-    """
-    """
-
-    def command(self, n_atoms, eq_energy, harm_to_inter_mean, harm_to_inter_std, harm_to_inter_se, inter_to_vac_mean,
-                inter_to_vac_std, inter_to_vac_se):
-
-        harm_to_inter_fe = unumpy.uarray(harm_to_inter_mean, harm_to_inter_std)
-        harm_to_inter_fe_se = unumpy.uarray(harm_to_inter_mean, harm_to_inter_se)
-        inter_to_vac_fe = unumpy.uarray(inter_to_vac_mean, inter_to_vac_std)
-        inter_to_vac_fe_se = unumpy.uarray(inter_to_vac_mean, inter_to_vac_se)
-
-        fe = ((eq_energy + harm_to_inter_fe) / n_atoms) + inter_to_vac_fe
-        fe_se = ((eq_energy + harm_to_inter_fe_se) / n_atoms) + inter_to_vac_fe_se
-
-        return {
-            'formation_energy_mean': float(unumpy.nominal_values(fe)),
-            'formation_energy_std': float(unumpy.std_devs(fe)),
-            'formation_energy_se': float(unumpy.std_devs(fe_se))
         }

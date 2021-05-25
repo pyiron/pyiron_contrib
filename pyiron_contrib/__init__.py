@@ -12,20 +12,15 @@ except:
 from pyiron_base import JOB_CLASS_DICT
 
 # Make classes available for new pyiron version
-JOB_CLASS_DICT['ProtoTILDPar'] = 'pyiron_contrib.protocol.compound.thermodynamic_integration'
-JOB_CLASS_DICT['ProtoTILDSer'] = 'pyiron_contrib.protocol.compound.thermodynamic_integration'
-JOB_CLASS_DICT['DecoupledOscillators'] = 'pyiron_contrib.protocol.jobs.decoupled_oscillators'
 JOB_CLASS_DICT['ProtoMinimGradDes'] = 'pyiron_contrib.protocol.compound.minimize'
 JOB_CLASS_DICT['ProtoMD'] = 'pyiron_contrib.protocol.compound.molecular_dynamics'
 JOB_CLASS_DICT['ProtoConfinedMD'] = 'pyiron_contrib.protocol.compound.molecular_dynamics'
 JOB_CLASS_DICT['ProtoHarmMD'] = 'pyiron_contrib.protocol.compound.molecular_dynamics'
 JOB_CLASS_DICT['ProtoNEBSer'] = 'pyiron_contrib.protocol.compound.nudged_elastic_band'
 JOB_CLASS_DICT['ProtocolQMMM'] = 'pyiron_contrib.protocol.compound.qmmm'
-JOB_CLASS_DICT['ProtoHarmTILDSer'] = 'pyiron_contrib.protocol.compound.thermodynamic_integration'
-JOB_CLASS_DICT['ProtoHarmTILDPar'] = 'pyiron_contrib.protocol.compound.thermodynamic_integration'
-JOB_CLASS_DICT['ProtoVacTILDSer'] = 'pyiron_contrib.protocol.compound.thermodynamic_integration'
-JOB_CLASS_DICT['ProtoVacTILDPar'] = 'pyiron_contrib.protocol.compound.thermodynamic_integration'
-JOB_CLASS_DICT['ProtoVacForm'] = 'pyiron_contrib.protocol.compound.thermodynamic_integration'
+JOB_CLASS_DICT['ProtoTILDPar'] = 'pyiron_contrib.protocol.compound.thermodynamic_integration'
+JOB_CLASS_DICT['ProtoTILDSer'] = 'pyiron_contrib.protocol.compound.thermodynamic_integration'
+JOB_CLASS_DICT['DecoupledOscillators'] = 'pyiron_contrib.protocol.jobs.decoupled_oscillators'
 JOB_CLASS_DICT['ProtoFTSEvoSer'] = 'pyiron_contrib.protocol.compound.finite_temperature_string'
 JOB_CLASS_DICT['ProtoFTSEvoPar'] = 'pyiron_contrib.protocol.compound.finite_temperature_string'
 JOB_CLASS_DICT['ImageJob'] = 'pyiron_contrib.image.job'

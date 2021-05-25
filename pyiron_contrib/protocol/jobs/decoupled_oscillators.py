@@ -22,7 +22,7 @@ __version__ = "0.0"
 __maintainer__ = "Raynol Dsouza"
 __email__ = "dsouza@mpie.de"
 __status__ = "development"
-__date__ = "06 May, 2021"
+__date__ = "25 May, 2021"
 
 
 class _DecoupledOscillatorsInput(DataContainer):
@@ -42,7 +42,7 @@ class _DecoupledOscillatorsInput(DataContainer):
     @structure.setter
     def structure(self, atoms: Atoms):
         if not isinstance(atoms, Atoms):
-            raise TypeError(f'Structures must be of type Atoms but got {type(atoms)}')
+            raise TypeError(f'<job>.input.structure must be of type Atoms but got {type(atoms)}')
         self._structure = atoms
 
     @property
@@ -52,7 +52,7 @@ class _DecoupledOscillatorsInput(DataContainer):
     @ref_job.setter
     def ref_job(self, job: (LammpsInteractive, VaspInteractive, SphinxInteractive)):
         if not isinstance(job, (LammpsInteractive, VaspInteractive, SphinxInteractive)):
-            raise TypeError(f"Got type {type(job)}, which is not a recognized interactive job.")
+            raise TypeError(f"Got type {type(job)}, which is not a recognized interactive job")
         self._ref_job_name = job.job_name
         self._ref_job = job
 
@@ -288,11 +288,18 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
         self.output.from_hdf(self.project_hdf5)
 
     def interactive_close(self):
-        # a bit of a workaround to close the base_job
-        if isinstance(self[self._base_name], ProjectHDFio):
-            self._create_base_job(initialize_only=True)
-        self[self._base_name].interactive_close()
-        self[self._base_name].status.finished = True
+        # close the base_job
+        # if it is already loaded and not am hdf object
+        if not isinstance(self[self._base_name], ProjectHDFio):
+            self[self._base_name].interactive_close()
+            self[self._base_name].status.finished = True
+        else:
+            # if it is an hdf object, check its job status
+            for job in self.project.iter_jobs(status='running'):
+                if '__base' in job.job_name:
+                    base_job = self.project.load(job.job_name)  # load and close
+                    base_job.interactive_close()
+                    base_job.status.finished = True
 
         # assign forces and energy_pot to output list
         self.output.forces = np.array(self.interactive_cache["forces"])

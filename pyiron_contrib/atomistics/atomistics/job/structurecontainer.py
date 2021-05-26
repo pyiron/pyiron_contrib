@@ -82,25 +82,21 @@ class StructureContainer(HasStructure):
 
     def _resize_atoms(self, new):
         self._num_atoms_alloc = new
-        try:
-            self._per_atom_arrays["symbols"].resize(new)
-            self._per_atom_arrays["positions"].resize( (new, 3) )
-        except ValueError:
-            self._per_atom_arrays["symbols"] = np.resize(self._per_atom_arrays["symbols"], new)
-            self._per_atom_arrays["positions"] = np.resize(self._per_atom_arrays["positions"], (new, 3) )
+        for k, a in self._per_atom_arrays.items():
+            new_shape = (new,) + a.shape[1:]
+            try:
+                a.resize(new_shape)
+            except ValueError:
+                self._per_atom_arrays[k] = np.resize(a, new_shape)
 
     def _resize_structures(self, new):
         self._num_structures_alloc = new
-        try:
-            self._per_structure_arrays["cells"].resize( (new, 3, 3) )
-            self._per_structure_arrays["start_indices"].resize(new)
-            self._per_structure_arrays["len_current_struct"].resize(new)
-            self._per_structure_arrays["identifiers"].resize(new)
-        except ValueError:
-            self._per_structure_arrays["cells"] = np.resize(self._per_structure_arrays["cells"], (new, 3, 3) )
-            self._per_structure_arrays["start_indices"] = np.resize(self._per_structure_arrays["start_indices"], new)
-            self._per_structure_arrays["len_current_struct"] = np.resize(self._per_structure_arrays["len_current_struct"], new)
-            self._per_structure_arrays["identifiers"] = np.resize(self._per_structure_arrays["identifiers"], new)
+        for k, a in self._per_structure_arrays.items():
+            new_shape = (new,) + a.shape[1:]
+            try:
+                a.resize(new_shape)
+            except ValueError:
+                self._per_structure_arrays[k] = np.resize(a, new_shape)
 
     def add_structure(self, structure, identifier):
         n = len(structure)

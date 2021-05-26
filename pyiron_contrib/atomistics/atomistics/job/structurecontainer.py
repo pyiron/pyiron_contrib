@@ -6,7 +6,10 @@
 Alternative structure container that stores them in flattened arrays.
 """
 
+from itertools import chain
+
 import numpy as np
+import h5py
 
 from pyiron_atomistics.atomistics.structure.atoms import Atoms
 from pyiron_atomistics.atomistics.structure.has_structure import HasStructure
@@ -137,14 +140,24 @@ class StructureContainer(HasStructure):
         self._resize_structures(self.num_structures)
 
         with hdf.open(group_name) as hdf_s_lst:
-            hdf_s_lst["symbols"] = self._per_atom_arrays["symbols"].astype(np.dtype("S2"))
-            hdf_s_lst["positions"] = self._per_atom_arrays["positions"]
-            hdf_s_lst["cells"] = self._per_structure_arrays["cells"]
-            hdf_s_lst["start_indices"] = self._per_structure_arrays["start_indices"]
-            hdf_s_lst["identifiers"] = self._per_structure_arrays["identifiers"].astype(np.dtype("S20"))
             hdf_s_lst["num_atoms"] =  self._num_atoms_alloc
             hdf_s_lst["num_structures"] = self._num_structures_alloc
             hdf_s_lst["len_current_struct"] = self._per_structure_arrays["len_current_struct"]
+
+            hdf_arrays = hdf_s_lst.open("arrays")
+            for k, a in chain(self._per_atom_arrays.items(), self._per_structure_arrays.items()):
+                if a.dtype.char == "U":
+                    # numpy stores unicode data in UTF-32/UCS-4, but h5py wants UTF-8, so we manually encode them here
+                    # TODO: string arrays with shape != () not handled
+                    hdf_arrays[k] = np.array([s.encode("utf8") for s in a],
+                                             # each character in a utf8 string might be encoded in up to 4 bytes, so to
+                                             # make sure we can store any string of length n we tell h5py that the
+                                             # string will be 4 * n bytes; numpy's dtype does this calculation already
+                                             # in itemsize, so we don't need to repeat it here
+                                             # see also https://docs.h5py.org/en/stable/strings.html
+                                             dtype=h5py.string_dtype('utf8', a.dtype.itemsize))
+                else:
+                    hdf_arrays[k] = a
 
 
     def from_hdf(self, hdf, group_name="structures"):
@@ -152,15 +165,21 @@ class StructureContainer(HasStructure):
             self._num_structures_alloc = hdf_s_lst["num_structures"]
             self._num_atoms_alloc = hdf_s_lst["num_atoms"]
 
-            self._init_arrays()
-
-            self._per_atom_arrays["symbols"] = hdf_s_lst["symbols"].astype(np.dtype("U2"))
-            self._per_atom_arrays["positions"] = hdf_s_lst["positions"]
-            self._per_structure_arrays["start_indices"] = hdf_s_lst["start_indices"]
-            self._per_structure_arrays["len_current_struct"] = hdf_s_lst["len_current_struct"]
-            self._per_structure_arrays["identifiers"] = hdf_s_lst["identifiers"].astype(np.dtype("U20"))
-            self._per_structure_arrays["cells"] = hdf_s_lst["cells"]
-
+            with hdf_s_lst.open("arrays") as hdf_arrays:
+                for k in hdf_arrays.list_nodes():
+                    a = np.array(hdf_arrays[k])
+                    if a.dtype.char == "S":
+                        # if saved as bytes, we wrote this as an encoded unicode string, so manually decode here
+                        # TODO: string arrays with shape != () not handled
+                        a = np.array([s.decode("utf8") for s in a],
+                                     # itemsize of original a is four bytes per character, so divide by four to get
+                                     # length of the orignal stored unicode string; np.dtype('U1').itemsize is just a
+                                     # platform agnostic way of knowing how wide a unicode charater is for numpy
+                                     dtype=f"U{a.dtype.itemsize//np.dtype('U1').itemsize}")
+                    if a.shape[0] == self._num_atoms_alloc:
+                        self._per_atom_arrays[k] = a
+                    elif a.shape[0] == self._num_structures_alloc:
+                        self._per_structure_arrays[k] = a
 
     def _translate_frame(self, frame):
         for i, name in enumerate(self._per_structure_arrays["identifiers"]):

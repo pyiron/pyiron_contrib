@@ -1,6 +1,6 @@
 from unittest import TestCase
 from pyiron_atomistics import Project
-from pyiron_contrib.atomistics.atomicrex.structure_list import FlattenedStructureContainer
+from pyiron_contrib.atomistics.atomistics.job.structurecontainer import StructureContainer
 import os.path
 import numpy as np
 
@@ -11,11 +11,11 @@ class TestContainer(TestCase):
 
         project = Project(os.path.dirname(__file__))
         structures = [project.create.structure.bulk(el).repeat(3) for el in ("Fe", "Mg", "Al", "Cu", "Ti")]
-        cont_static = FlattenedStructureContainer(
+        cont_static = StructureContainer(
                     num_structures=len(structures),
                     num_atoms=sum(len(s) for s in structures)
         )
-        cont_dynamic = FlattenedStructureContainer(num_structures=2, num_atoms=10)
+        cont_dynamic = StructureContainer(num_structures=2, num_atoms=10)
 
         for s in structures:
             cont_static.add_structure(s, s.get_chemical_formula())

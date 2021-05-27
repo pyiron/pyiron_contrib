@@ -110,7 +110,7 @@ class TrainingContainer(GenericJob):
         for name, atoms, energy, forces, *_ in dataset.itertuples(index=False):
             self._container.add_structure(atoms, name, energy=energy, forces=forces)
 
-    def get_structure(self, iteration_step=-1):
+    def get_structure(self, frame=-1):
         """
         Returns a structure from the training set.
 
@@ -120,7 +120,7 @@ class TrainingContainer(GenericJob):
         Returns:
             :class:`.Atoms`: pyiron structure
         """
-        return ase_to_pyiron(self._table.atoms[iteration_step])
+        return self._container.get_structure(frame=frame)
 
     def get_elements(self):
         """

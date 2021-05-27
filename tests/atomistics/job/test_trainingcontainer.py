@@ -55,9 +55,9 @@ class TestTrainingContainer(unittest.TestCase):
         self.assertEqual(self.container.get_elements(), ["Al"])
 
     def test_get_structure(self):
-        self.assertEqual(len(self.container.get_structure(iteration_step=0)), 1,
+        self.assertEqual(len(self.container.get_structure(frame=0)), 1,
                          "get_structure() returned wrong structure.")
-        self.assertEqual(len(self.container.get_structure(iteration_step=1)), 2,
+        self.assertEqual(len(self.container.get_structure(frame=1)), 2,
                          "get_structure() returned wrong structure.")
 
     def test_hdf(self):

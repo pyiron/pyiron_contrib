@@ -204,8 +204,8 @@ class StructureContainer(HasStructure):
 
     def from_hdf(self, hdf, group_name="structures"):
         with hdf.open(group_name) as hdf_s_lst:
-            self._num_structures_alloc = hdf_s_lst["num_structures"]
-            self._num_atoms_alloc = hdf_s_lst["num_atoms"]
+            self._num_structures_alloc = self.current_structure_index = hdf_s_lst["num_structures"]
+            self._num_atoms_alloc = self.current_atom_index = hdf_s_lst["num_atoms"]
 
             with hdf_s_lst.open("arrays") as hdf_arrays:
                 for k in hdf_arrays.list_nodes():

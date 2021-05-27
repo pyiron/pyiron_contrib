@@ -101,13 +101,24 @@ class StructureContainer(HasStructure):
         return list(set(self._per_atom_arrays["symbols"]))
 
 
-    def get_array(self, name, index):
+    def get_array(self, name, frame):
+        """
+        Fetch array for given structure.
+
+        Args:
+            name (str): name of the array to fetch
+            frame (int, str): selects structure to fetch, as in :method:`.get_structure()`
+
+        Returns:
+            :class:`numpy.ndarray`: requested array
+        """
+
         if name in self._per_atom_arrays:
-            I = self._per_structure_arrays["start_indices"][index]
-            E = I + self._per_structure_arrays["len_current_struct"][index]
+            I = self._per_structure_arrays["start_indices"][frame]
+            E = I + self._per_structure_arrays["len_current_struct"][frame]
             return self._per_atom_arrays[name][I:E]
         elif name in self._per_structure_arrays:
-            return self._per_structure_arrays[name][index]
+            return self._per_structure_arrays[name][frame]
         else:
             raise KeyError(f"no array named {name} defined on StructureContainer")
 
@@ -130,6 +141,20 @@ class StructureContainer(HasStructure):
                 self._per_structure_arrays[k] = np.resize(a, new_shape)
 
     def add_array(self, name, shape=(), dtype=np.float64, fill=None, per="atom"):
+        """
+        Add a custom array to the container.
+
+        Args:
+            name (str): name of the new array
+            shape (tuple of int): shape of the new array per atom or structure
+            dtype (type): data type of the new array
+            fill (object): populate the new array with this value for existing structure, if given; default `None`
+            per (str): either "atom" or "structure"; denotes whether the new array should exist for every atom in a
+                       structure or only once for every structure
+
+        Raises:
+            ValueError: if wrong value for `per` is given
+        """
         if per == "atom":
             shape = (self._num_atoms_alloc,) + shape
             store = self._per_atom_arrays
@@ -145,6 +170,29 @@ class StructureContainer(HasStructure):
             store[name] = np.full(shape=shape, fill_value=fill, dtype=dtype)
 
     def add_structure(self, structure, identifier, **arrays):
+        """
+        Add a new structure to the container.
+
+        Additional keyword arguments given specify additional arrays to store for the structure.  If an array with the
+        given keyword name does not exist yet, it will be added to the container.  If the first axis of the extra array
+        matches the length of the given structure, it will be added as an per atom array, otherwise as an per structure
+        array.  Reshaping the array to have the first axis be length 1 forces the array to be set as per structure
+        array.
+
+        >>> container.add_structure(Atoms(...), identifier="A", energy=3.14)
+        >>> container.get_array("energy", "A")
+        3.14
+        >>> structure = Atoms(...)
+        >>> container.add_structure(structure, identifier="B", forces=len(structure) * [[0,0,0]])
+        >>> len(container.get_array("forces", "B")) == len(structure)
+        True
+
+        Args:
+            structure (:class:`.Atoms`): structure to add
+            identifier (str): human-readable name for the structure
+            **kwargs: additional arrays to store for structure
+        """
+
         n = len(structure)
         new_atoms = self.current_atom_index + n
 

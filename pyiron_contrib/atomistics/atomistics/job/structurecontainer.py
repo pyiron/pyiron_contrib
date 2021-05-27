@@ -83,6 +83,16 @@ class StructureContainer(HasStructure):
     def cells(self):
         return self._per_structure_arrays["cells"]
 
+    def get_array(self, name, index):
+        if name in self._per_atom_arrays:
+            I = self._per_structure_arrays["start_indices"][index]
+            E = I + self._per_structure_arrays["len_current_struct"][index]
+            return self._per_atom_arrays[name][I:E]
+        elif name in self._per_structure_arrays:
+            return self._per_structure_arrays[name][index]
+        else:
+            raise KeyError(f"no array named {name} defined on StructureContainer")
+
     def _resize_atoms(self, new):
         self._num_atoms_alloc = new
         for k, a in self._per_atom_arrays.items():
@@ -101,9 +111,25 @@ class StructureContainer(HasStructure):
             except ValueError:
                 self._per_structure_arrays[k] = np.resize(a, new_shape)
 
-    def add_structure(self, structure, identifier):
+    def add_array(self, name, shape=(), dtype=np.float64, fill=None, per="atom"):
+        if per == "atom":
+            shape = (self._num_atoms_alloc,) + shape
+            store = self._per_atom_arrays
+        elif per == "structure":
+            shape = (self._num_structures_alloc,) + shape
+            store = self._per_structure_arrays
+        else:
+            raise ValueError(f"per must \"atom\" or \"structure\", not {per}")
+
+        if fill is None:
+            store[name] = np.empty(shape=shape, dtype=dtype)
+        else:
+            store[name] = np.full(shape=shape, fill_value=fill, dtype=dtype)
+
+    def add_structure(self, structure, identifier, **arrays):
         n = len(structure)
         new_atoms = self.current_atom_index + n
+
         if new_atoms > self._num_atoms_alloc:
             self._resize_atoms(max(new_atoms, self._num_atoms_alloc * 2))
         if self.current_structure_index + 1 > self._num_structures_alloc:
@@ -124,6 +150,19 @@ class StructureContainer(HasStructure):
         self._per_structure_arrays["cells"][self.current_structure_index] = structure.cell.array
         self._per_structure_arrays["start_indices"][self.current_structure_index] = self.current_atom_index
         self._per_structure_arrays["identifiers"][self.current_structure_index] = identifier
+
+        for k, a in arrays.items():
+            a = np.asarray(a)
+            if len(a.shape) > 0 and a.shape[0] == n:
+                if k not in self._per_atom_arrays:
+                    self.add_array(k, shape=a.shape[1:], dtype=a.dtype, per="atom")
+                self._per_atom_arrays[k][self.current_atom_index:i] = a
+            else:
+                if len(a.shape) > 0 and a.shape[0] == 1:
+                    a = a[0]
+                if k not in self._per_structure_arrays:
+                    self.add_array(k, shape=a.shape, dtype=a.dtype, per="structure")
+                self._per_structure_arrays[k][self.current_structure_index] = a
 
         self.prev_structure_index = self.current_structure_index
         self.prev_atom_index = self.current_atom_index

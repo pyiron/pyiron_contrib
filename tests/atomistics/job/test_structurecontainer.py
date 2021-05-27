@@ -22,6 +22,10 @@ class TestContainer(TestCase):
     def tearDown(self):
         del self.cont
 
+    def test_len(self):
+        """Length of container should be equal to number of calls to add_structure."""
+        self.assertEqual(len(self.cont), len(self.structures))
+
     def test_add_array(self):
         """Custom arrays added with add_array should be properly allocated with matching shape, dtype and fill"""
 

@@ -45,6 +45,9 @@ class StructureContainer(HasStructure):
 
         self._init_arrays()
 
+    def __len__(self):
+        return self.current_structure_index
+
     def _init_arrays(self):
         self._per_atom_arrays = {
                 # 2 character unicode array for chemical symbols
@@ -234,4 +237,4 @@ class StructureContainer(HasStructure):
                      positions=self._per_atom_arrays["positions"][I:E])
 
     def _number_of_structures(self):
-        return self.num_structures
+        return len(self)

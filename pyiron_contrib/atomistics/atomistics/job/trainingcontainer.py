@@ -35,10 +35,11 @@ import pandas as pd
 from pyiron_contrib.atomistics.atomistics.job.structurecontainer import StructureContainer
 from pyiron_atomistics import pyiron_to_ase, ase_to_pyiron
 from pyiron_atomistics.atomistics.structure.atoms import Atoms
+from pyiron_atomistics.atomistics.structure.has_structure import HasStructure
 from pyiron_base import GenericJob
 
 
-class TrainingContainer(GenericJob):
+class TrainingContainer(GenericJob, HasStructure):
     """
     Stores ASE structures with energies and forces.
     """
@@ -110,17 +111,11 @@ class TrainingContainer(GenericJob):
         for name, atoms, energy, forces, *_ in dataset.itertuples(index=False):
             self._container.add_structure(atoms, name, energy=energy, forces=forces)
 
-    def get_structure(self, frame=-1):
-        """
-        Returns a structure from the training set.
+    def _get_structure(self, frame=-1, wrap_atoms=True):
+        return self._container.get_structure(frame=frame, wrap_atoms=wrap_atoms)
 
-        Args:
-            iteration_step (int, optional): index of the structure in training set
-
-        Returns:
-            :class:`.Atoms`: pyiron structure
-        """
-        return self._container.get_structure(frame=frame)
+    def _number_of_structures(self):
+        return self._container.number_of_structures
 
     def get_elements(self):
         """

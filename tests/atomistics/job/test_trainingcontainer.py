@@ -59,3 +59,18 @@ class TestTrainingContainer(unittest.TestCase):
                          "get_structure() returned wrong structure.")
         self.assertEqual(len(self.container.get_structure(iteration_step=1)), 2,
                          "get_structure() returned wrong structure.")
+
+    def test_hdf(self):
+        """Container read from HDF should match container written to HDF."""
+
+        container_from_hdf = self.project.load("test")
+
+        self.assertEqual(len(self.container._table), len(container_from_hdf._table),
+                         "Container has different number of structures after reading/writing.")
+
+        for i in range(len(self.container._table)):
+            self.assertEqual(self.container.get_structure(i), container_from_hdf.get_structure(i),
+                             f"{i}th structure not the same after reading/writing.")
+
+        self.assertTrue(self.container.to_pandas().equals(container_from_hdf.to_pandas()),
+                        "Conversion to pandas not the same after reading/writing.")

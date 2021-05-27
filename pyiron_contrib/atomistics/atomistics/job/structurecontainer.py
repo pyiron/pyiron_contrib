@@ -91,6 +91,16 @@ class StructureContainer(HasStructure):
     def pbc(self):
         return self._per_structure_arrays["pbc"]
 
+    def get_elements(self):
+        """
+        Return a list of chemical elements in the training set.
+
+        Returns:
+            :class:`list`: list of unique elements in the training set as strings of their standard abbreviations
+        """
+        return list(set(self._per_atom_arrays["symbols"]))
+
+
     def get_array(self, name, index):
         if name in self._per_atom_arrays:
             I = self._per_structure_arrays["start_indices"][index]

@@ -121,10 +121,7 @@ class TrainingContainer(GenericJob, HasStructure):
         Returns:
             :class:`list`: list of unique elements in the training set as strings of their standard abbreviations
         """
-        elements = set()
-        for s in self._table.atoms:
-            elements.update(s.get_chemical_symbols())
-        return list(elements)
+        return self._container.get_elements()
 
     def to_pandas(self):
         """

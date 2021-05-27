@@ -33,7 +33,6 @@ from warnings import catch_warnings
 import numpy as np
 import pandas as pd
 from pyiron_contrib.atomistics.atomistics.job.structurecontainer import StructureContainer
-from pyiron_atomistics import pyiron_to_ase, ase_to_pyiron
 from pyiron_atomistics.atomistics.structure.atoms import Atoms
 from pyiron_atomistics.atomistics.structure.has_structure import HasStructure
 from pyiron_base import GenericJob
@@ -80,13 +79,11 @@ class TrainingContainer(GenericJob, HasStructure):
         is performed.
 
         Args:
-            structure_or_job (:class:`~.Atoms`, :class:`ase.Atoms`): if :class:`~.Atoms` convert to :class:`ase.Atoms`
+            structure_or_job (:class:`~.Atoms`): structure to add
             energy (float): energy of the whole structure
             forces (Nx3 array of float, optional): per atom forces, where N is the number of atoms in the structure
             name (str, optional): name describing the structure
         """
-        if isinstance(structure, Atoms):
-            structure = pyiron_to_ase(structure)
         if forces is not None:
             self._container.add_structure(structure, name, energy=energy, forces=forces)
         else:
@@ -159,7 +156,7 @@ class TrainingContainer(GenericJob, HasStructure):
             data_table = self._table
         else:
             data_table = filter_function(self._table)
-        structure_list = data_table.atoms.apply(ase_to_pyiron).to_list()
+        structure_list = data_table.atoms.to_list()
         energy_list = data_table.energy.to_list()
         force_list = data_table.forces.to_list()
         num_atoms_list = data_table.number_of_atoms.to_list()

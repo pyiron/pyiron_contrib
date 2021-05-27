@@ -48,6 +48,12 @@ class TestContainer(TestCase):
         self.assertTrue((self.cont._per_atom_arrays["fnorble"] == 0).all(),
                          "'fnorble' array not initialized with given fill value.")
 
+    def test_get_structure(self):
+        """Structure from get_structure should match thoes add with add_structure exactly."""
+
+        for i, s in enumerate(self.structures):
+            self.assertEqual(s, self.cont.get_structure(i),
+                             "Added structure not equal to returned structure.")
 
     def test_add_structure_kwargs(self):
         """Additional kwargs given to add_structure should create appropriate custom arrays."""

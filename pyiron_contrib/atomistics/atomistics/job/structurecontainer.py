@@ -59,7 +59,8 @@ class StructureContainer(HasStructure):
                 "start_indices": np.empty(self._num_structures_alloc, dtype=np.int32),
                 "len_current_struct": np.empty(self._num_structures_alloc, dtype=np.int32),
                 "identifiers": np.empty(self._num_structures_alloc, dtype=np.dtype("U20")),
-                "cells": np.empty((self._num_structures_alloc, 3, 3))
+                "cells": np.empty((self._num_structures_alloc, 3, 3)),
+                "pbc": np.empty((self._num_atoms_alloc, 3), dtype=bool)
         }
 
     @property
@@ -85,6 +86,10 @@ class StructureContainer(HasStructure):
     @property
     def cells(self):
         return self._per_structure_arrays["cells"]
+
+    @property
+    def pbc(self):
+        return self._per_structure_arrays["pbc"]
 
     def get_array(self, name, index):
         if name in self._per_atom_arrays:
@@ -149,10 +154,11 @@ class StructureContainer(HasStructure):
         self._per_atom_arrays["symbols"][self.current_atom_index:i] = np.array(structure.symbols)
         self._per_atom_arrays["positions"][self.current_atom_index:i] = structure.positions
 
-        self._per_structure_arrays["len_current_struct"][self.current_structure_index] = n
-        self._per_structure_arrays["cells"][self.current_structure_index] = structure.cell.array
         self._per_structure_arrays["start_indices"][self.current_structure_index] = self.current_atom_index
+        self._per_structure_arrays["len_current_struct"][self.current_structure_index] = n
         self._per_structure_arrays["identifiers"][self.current_structure_index] = identifier
+        self._per_structure_arrays["cells"][self.current_structure_index] = structure.cell.array
+        self._per_structure_arrays["pbc"][self.current_structure_index] = structure.pbc
 
         for k, a in arrays.items():
             a = np.asarray(a)
@@ -233,8 +239,9 @@ class StructureContainer(HasStructure):
         I = self._per_structure_arrays["start_indices"][frame]
         E = I + self._per_structure_arrays["len_current_struct"][frame]
         return Atoms(symbols=self._per_atom_arrays["symbols"][I:E],
+                     positions=self._per_atom_arrays["positions"][I:E],
                      cell=self._per_structure_arrays["cells"][frame],
-                     positions=self._per_atom_arrays["positions"][I:E])
+                     pbc=self._per_structure_arrays["pbc"][frame])
 
     def _number_of_structures(self):
         return len(self)

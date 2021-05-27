@@ -30,7 +30,9 @@ Fe_bcc  ...
 
 from warnings import catch_warnings
 
+import numpy as np
 import pandas as pd
+from pyiron_contrib.atomistics.atomistics.job.structurecontainer import StructureContainer
 from pyiron_atomistics import pyiron_to_ase, ase_to_pyiron
 from pyiron_atomistics.atomistics.structure.atoms import Atoms
 from pyiron_base import GenericJob
@@ -44,6 +46,9 @@ class TrainingContainer(GenericJob):
     def __init__(self, project, job_name):
         super().__init__(project=project, job_name=job_name)
         self.__name__ = "TrainingContainer"
+        self._container = StructureContainer()
+        self._container.add_array("energy", dtype=np.float64, per="structure")
+        self._container.add_array("forces", shape=(3,), dtype=np.float64, per="atom")
         self._table = pd.DataFrame({
             "name": [],
             "atoms": [],
@@ -80,6 +85,10 @@ class TrainingContainer(GenericJob):
         """
         if isinstance(structure, Atoms):
             structure = pyiron_to_ase(structure)
+        if forces is not None:
+            self._container.add_structure(structure, name, energy=energy, forces=forces)
+        else:
+            self._container.add_structure(structure, name, energy=energy)
         self._table = self._table.append(
                 {"name": name, "atoms": structure, "energy": energy, "forces": forces,
                  "number_of_atoms": len(structure)},
@@ -96,6 +105,9 @@ class TrainingContainer(GenericJob):
             - forces (Nx3 array of float): per atom forces, where N is the number of atoms in the structure
         """
         self._table = self._table.append(dataset, ignore_index=True)
+        # in case given dataset has more columns than the necessary ones, swallow/ignore them in *_
+        for name, atoms, energy, forces, *_ in dataset.itertuples(index=False):
+            self._container.add_structure(atoms, name, energy=energy, forces=forces)
 
     def get_structure(self, iteration_step=-1):
         """

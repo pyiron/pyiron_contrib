@@ -46,6 +46,7 @@ class TrainingContainer(GenericJob):
     def __init__(self, project, job_name):
         super().__init__(project=project, job_name=job_name)
         self.__name__ = "TrainingContainer"
+        self.__hdf_version__ = "0.2.0"
         self._container = StructureContainer()
         self._container.add_array("energy", dtype=np.float64, per="structure")
         self._container.add_array("forces", shape=(3,), dtype=np.float64, per="atom")
@@ -184,9 +185,26 @@ class TrainingContainer(GenericJob):
 
     def to_hdf(self, hdf=None, group_name=None):
         super().to_hdf(hdf=hdf, group_name=group_name)
-        with catch_warnings():
-            self._table.to_hdf(self.project_hdf5.file_name, self.name + "/output/structure_table")
+        self._container.to_hdf(self.project_hdf5, "structures")
 
     def from_hdf(self, hdf=None, group_name=None):
         super().from_hdf(hdf=hdf, group_name=group_name)
-        self._table = pd.read_hdf(self.project_hdf5.file_name, self.name + "/output/structure_table")
+        hdf_version = self.project_hdf5.get("HDF_VERSION", "0.1.0")
+        if hdf_version == "0.1.0":
+            table = pd.read_hdf(self.project_hdf5.file_name, self.name + "/output/structure_table")
+            self.include_dataset(table)
+        else:
+            self._container = StructureContainer()
+            self._container.from_hdf(self.project_hdf5, "structures")
+            self._table = pd.DataFrame({
+                "name":             [self._container.get_array("identifiers", i)
+                                        for i in range(len(self._container))],
+                "atoms":            [self._container.get_structure(i)
+                                        for i in range(len(self._container))],
+                "energy":           [self._container.get_array("energy", i)
+                                        for i in range(len(self._container))],
+                "forces":           [self._container.get_array("forces", i)
+                                        for i in range(len(self._container))],
+                "number_of_atoms":  [self._container.get_array("len_current_struct", i)
+                                        for i in range(len(self._container))],
+            })

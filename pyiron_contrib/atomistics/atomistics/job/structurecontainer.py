@@ -229,7 +229,7 @@ class StructureContainer(HasStructure):
                 return i
         raise KeyError(f"No structure named {frame} in StructureContainer.")
 
-    def _get_structure(self, frame=-1):
+    def _get_structure(self, frame=-1, wrap_atoms=True):
         I = self._per_structure_arrays["start_indices"][frame]
         E = I + self._per_structure_arrays["len_current_struct"][frame]
         return Atoms(symbols=self._per_atom_arrays["symbols"][I:E],

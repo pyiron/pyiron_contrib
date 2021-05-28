@@ -164,7 +164,8 @@ class StructureContainer(HasStructure):
             :class:`numpy.ndarray`: requested array
         """
 
-        frame = self._translate_frame(frame)
+        if isinstance(frame, str):
+            frame = self._translate_frame(frame)
         if name in self._per_atom_arrays:
             I = self._per_structure_arrays["start_indices"][frame]
             E = I + self._per_structure_arrays["len_current_struct"][frame]

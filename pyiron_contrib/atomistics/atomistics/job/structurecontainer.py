@@ -51,13 +51,17 @@ class StructureContainer(HasStructure):
     >>> container.get_array("energy", 0)
     -1
 
+    It is also possible to use the same names in :method:`.get_array()` as in :method:`.get_structure()`.
+
+    >>> container.get_array("energy", 0) == container.get_array("energy", "fcc")
+    True
+
     By default the following arrays are defined for each structure:
-        - identifiers   shape=(),   dtype=str,          per structure; human readable name of the structure
-        - cells         shape=(3,3),dtype=np.float64,   per structure; cell shape
-        - pbc           shape=(3,), dtype=bool          per structure; periodic boundary conditions
-        - symbols:      shape=(),   dtype=str,          per atom; chemical symbol
-        - positions:    shape=(3,), dtype=np.float64,   per atom: atomic positions
-        - 
+        - identifiers   shape=(),    dtype=str,          per structure; human readable name of the structure
+        - cells         shape=(3,3), dtype=np.float64,   per structure; cell shape
+        - pbc           shape=(3,),  dtype=bool          per structure; periodic boundary conditions
+        - symbols:      shape=(),    dtype=str,          per atom; chemical symbol
+        - positions:    shape=(3,),  dtype=np.float64,   per atom: atomic positions
     """
 
     def __init__(self, num_structures=1, num_atoms=1):
@@ -155,6 +159,7 @@ class StructureContainer(HasStructure):
             :class:`numpy.ndarray`: requested array
         """
 
+        frame = self._translate_frame(frame)
         if name in self._per_atom_arrays:
             I = self._per_structure_arrays["start_indices"][frame]
             E = I + self._per_structure_arrays["len_current_struct"][frame]

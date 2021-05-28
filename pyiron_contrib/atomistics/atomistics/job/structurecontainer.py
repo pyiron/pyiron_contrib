@@ -56,6 +56,11 @@ class StructureContainer(HasStructure):
     >>> container.get_array("energy", 0) == container.get_array("energy", "fcc")
     True
 
+    The length of the container is the number of structures inside it.
+
+    >>> len(container)
+    4
+
     By default the following arrays are defined for each structure:
         - identifiers   shape=(),    dtype=str,          per structure; human readable name of the structure
         - cells         shape=(3,3), dtype=np.float64,   per structure; cell shape

@@ -22,6 +22,42 @@ class StructureContainer(HasStructure):
     group.  Structures are stored together with an identifier that should be unique.  The class can be initialized with
     the number of structures and the total number of atoms in all structures, but re-allocates memory as necessary when
     more (or larger) structures are added than initially anticipated.
+
+    You can add structures and a human-readable name with :method:`.add_structure()`.
+
+    >>> container = StructureContainer()
+    >>> container.add_structure(Atoms(...), "fcc")
+    >>> container.add_structure(Atoms(...), "hcp")
+    >>> container.add_structure(Atoms(...), "bcc")
+
+    Accessing stored structures works with :method:`.get_strucure()`.  You can either pass the identifier you passed
+    when adding the structure or the numeric index
+
+    >>> container.get_structure(frame=0) == container.get_structure(frame="fcc")
+    True
+
+    Custom arrays may also be defined on the container
+
+    >>> container.add_array("energy", shape=(), dtype=np.float64, fill=-1, per="structure")
+
+    You can then pass arrays of the corresponding shape to :method:`add_structure()`
+
+    >>> container.add_structure(Atoms(...), "grain_boundary", energy=3.14)
+
+    Saved arrays are accessed with :method:`.get_array()`
+
+    >>> container.get_array("energy", 3)
+    3.14
+    >>> container.get_array("energy", 0)
+    -1
+
+    By default the following arrays are defined for each structure:
+        - identifiers   shape=(),   dtype=str,          per structure; human readable name of the structure
+        - cells         shape=(3,3),dtype=np.float64,   per structure; cell shape
+        - pbc           shape=(3,), dtype=bool          per structure; periodic boundary conditions
+        - symbols:      shape=(),   dtype=str,          per atom; chemical symbol
+        - positions:    shape=(3,), dtype=np.float64,   per atom: atomic positions
+        - 
     """
 
     def __init__(self, num_structures=1, num_atoms=1):
@@ -65,30 +101,37 @@ class StructureContainer(HasStructure):
 
     @property
     def symbols(self):
+        """:meta private:"""
         return self._per_atom_arrays["symbols"]
 
     @property
     def positions(self):
+        """:meta private:"""
         return self._per_atom_arrays["positions"]
 
     @property
     def start_indices(self):
+        """:meta private:"""
         return self._per_structure_arrays["start_indices"]
 
     @property
     def len_current_struct(self):
+        """:meta private:"""
         return self._per_structure_arrays["len_current_struct"]
 
     @property
     def identifiers(self):
+        """:meta private:"""
         return self._per_structure_arrays["identifiers"]
 
     @property
     def cells(self):
+        """:meta private:"""
         return self._per_structure_arrays["cells"]
 
     @property
     def pbc(self):
+        """:meta private:"""
         return self._per_structure_arrays["pbc"]
 
     def get_elements(self):
@@ -99,7 +142,6 @@ class StructureContainer(HasStructure):
             :class:`list`: list of unique elements in the training set as strings of their standard abbreviations
         """
         return list(set(self._per_atom_arrays["symbols"]))
-
 
     def get_array(self, name, frame):
         """
@@ -144,10 +186,19 @@ class StructureContainer(HasStructure):
         """
         Add a custom array to the container.
 
+        When adding an array after some structures have been added, specifying `fill` will be used as a default value
+        for the value of the array for those structures.
+
+        >>> container = StructureContainer()
+        >>> container.add_structure(Atoms(...), "foo")
+        >>> container.add_array("energy", shape=(), dtype=np.float64, fill=42, per="structure")
+        >>> container.get_array("energy", 0)
+        42
+
         Args:
             name (str): name of the new array
-            shape (tuple of int): shape of the new array per atom or structure
-            dtype (type): data type of the new array
+            shape (tuple of int): shape of the new array per atom or structure; scalars can pass ()
+            dtype (type): data type of the new array, string arrays can pass 'U$n' where $n is the length of the string
             fill (object): populate the new array with this value for existing structure, if given; default `None`
             per (str): either "atom" or "structure"; denotes whether the new array should exist for every atom in a
                        structure or only once for every structure
@@ -174,18 +225,27 @@ class StructureContainer(HasStructure):
         Add a new structure to the container.
 
         Additional keyword arguments given specify additional arrays to store for the structure.  If an array with the
-        given keyword name does not exist yet, it will be added to the container.  If the first axis of the extra array
-        matches the length of the given structure, it will be added as an per atom array, otherwise as an per structure
-        array.  Reshaping the array to have the first axis be length 1 forces the array to be set as per structure
-        array.
+        given keyword name does not exist yet, it will be added to the container.
 
+        >>> container = StructureContainer()
         >>> container.add_structure(Atoms(...), identifier="A", energy=3.14)
-        >>> container.get_array("energy", "A")
+        >>> container.get_array("energy", 0)
         3.14
+
+        If the first axis of the extra array matches the length of the given structure, it will be added as an per atom
+        array, otherwise as an per structure array.
+
         >>> structure = Atoms(...)
         >>> container.add_structure(structure, identifier="B", forces=len(structure) * [[0,0,0]])
-        >>> len(container.get_array("forces", "B")) == len(structure)
+        >>> len(container.get_array("forces", 1)) == len(structure)
         True
+
+        Reshaping the array to have the first axis be length 1 forces the array to be set as per structure array.  That
+        axis will then be stripped.
+
+        >>> container.add_structure(Atoms(...), identifier="C", pressure=np.eye(3)[np.newaxis, :, :])
+        >>> container.get_array("pressure", 2).shape
+        (3, 3)
 
         Args:
             structure (:class:`.Atoms`): structure to add

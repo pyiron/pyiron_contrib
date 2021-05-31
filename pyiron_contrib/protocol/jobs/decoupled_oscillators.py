@@ -168,7 +168,7 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
     def _base_name(self):
         return self.job_name + '__base'
 
-    def _create_base_job(self, initialize_only=False):
+    def _create_base_job(self):
         """
         Create the base interpreter (Lammps/Vasp/Sphinx) job with the vacancy structure and save it.
         Args:
@@ -182,17 +182,15 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
             input_only=True,
             delete_existing_job=True
         ))
-        if initialize_only:
-            self[self._base_name].save()
-        else:  # if not, set all the parameters
-            self[self._base_name].structure = self._base_structure
-            self[self._base_name].interactive_open()
-            self[self._base_name].interactive_initialize_interface()
-            if self._fast_mode:
-                self[self._base_name].interactive_flush_frequency = 10**10
-                self[self._base_name].interactive_write_frequency = 10**10
-            self[self._base_name].save()
-            self[self._base_name].status.running = True
+        # if not, set all the parameters
+        self[self._base_name].structure = self._base_structure
+        self[self._base_name].interactive_open()
+        self[self._base_name].interactive_initialize_interface()
+        if self._fast_mode:
+            self[self._base_name].interactive_flush_frequency = 10**10
+            self[self._base_name].interactive_write_frequency = 10**10
+        self[self._base_name].save()
+        self[self._base_name].status.running = True
 
     def _calc_static_base_job(self):
         """
@@ -289,7 +287,7 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
 
     def interactive_close(self):
         # close the base_job
-        # if it is already loaded and not am hdf object
+        # if it is already loaded and not an hdf object
         if not isinstance(self[self._base_name], ProjectHDFio):
             self[self._base_name].interactive_close()
             self[self._base_name].status.finished = True

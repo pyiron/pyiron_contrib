@@ -15,6 +15,7 @@ from ase.geometry import get_distances
 from pyiron_atomistics import Project
 from pyiron_atomistics.atomistics.job.interactive import GenericInteractive
 from pyiron_atomistics.lammps.lammps import LammpsInteractive
+from pyiron_atomistics.vasp.vasp import VaspInteractive
 from pyiron_atomistics.thermodynamics.hessian import HessianJob
 from pyiron_contrib.protocol.jobs.decoupled_oscillators import DecoupledOscillators
 from pyiron_contrib.protocol.generic import PrimitiveVertex
@@ -328,9 +329,9 @@ class CreateSubJobs(PrimitiveVertex):
             job.structure = structure
         if isinstance(job, GenericInteractive):
             job.interactive_open()
-            if not isinstance(job, DecoupledOscillators):
+            if not isinstance(job, (DecoupledOscillators, VaspInteractive)):
                 job.run_if_interactive()
-            elif isinstance(job, DecoupledOscillators):
+            if isinstance(job, DecoupledOscillators):
                 job.input = ref_job.input
             if isinstance(job, LammpsInteractive) and fast_lammps_mode:
                 # Note: This might be done by default at some point in LammpsInteractive,

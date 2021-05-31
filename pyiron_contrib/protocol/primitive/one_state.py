@@ -234,6 +234,9 @@ class ExternalHamiltonian(PrimitiveVertex):
                     self._job.interactive_initialize_interface()
                     self._job.calculate_forces()
                     self._job.interactive_collect()
+                elif isinstance(self._job, VaspInteractive):
+                    self._job.calc_static()
+                    self._job.run(delete_existing_job=True)
                 else:
                     self._job.calc_static()
                     self._job.run()
@@ -247,9 +250,7 @@ class ExternalHamiltonian(PrimitiveVertex):
         """
         pr = Project(path=self._job_project_path)
         self._job = pr.load(self._job_name)
-        # The run_if_interactive method of DecoupledOscillators calls the main run function so, don't call it
-        # while reloading!
-        if not isinstance(self._job, DecoupledOscillators):
+        if isinstance(self._job, LammpsInteractive):
             self._job.run_if_interactive()
 
     def _get_interactive_value(self, key):
@@ -329,13 +330,12 @@ class CreateSubJobs(PrimitiveVertex):
             job.structure = structure
         if isinstance(job, GenericInteractive):
             job.interactive_open()
-            if not isinstance(job, (DecoupledOscillators, VaspInteractive)):
-                job.run_if_interactive()
             if isinstance(job, DecoupledOscillators):
                 job.input = ref_job.input
             if isinstance(job, LammpsInteractive) and fast_lammps_mode:
                 # Note: This might be done by default at some point in LammpsInteractive,
                 # and could then be removed here
+                job.run_if_interactive()
                 job.interactive_flush_frequency = 10**10
                 job.interactive_write_frequency = 10**10
             if job.check_if_job_exists():

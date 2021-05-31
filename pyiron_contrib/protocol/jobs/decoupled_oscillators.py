@@ -189,7 +189,7 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
         if self._fast_mode:
             self[self._base_name].interactive_flush_frequency = 10**10
             self[self._base_name].interactive_write_frequency = 10**10
-        self[self._base_name].save()
+        self[self._base_name].run()
         self[self._base_name].status.running = True
 
     def _calc_static_base_job(self):
@@ -232,7 +232,6 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
         The main run function.
         """
         if not self._initialized:
-            print('yes')
             self.status.running = True
             self._check_inputs()
             self._setup_base()

@@ -234,9 +234,6 @@ class ExternalHamiltonian(PrimitiveVertex):
                     self._job.interactive_initialize_interface()
                     self._job.calculate_forces()
                     self._job.interactive_collect()
-                elif isinstance(self._job, VaspInteractive):
-                    self._job.calc_static()
-                    self._job.run(delete_existing_job=True)
                 else:
                     self._job.calc_static()
                     self._job.run()

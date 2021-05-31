@@ -220,7 +220,7 @@ class ExternalHamiltonian(PrimitiveVertex):
             # if the job is of type DecoupledOscillators,
             if isinstance(self._job, DecoupledOscillators):
                 self._job.positions = positions
-                self._job.run_if_interactive()
+                self._job.run()
             else:
                 # DFT codes are slow enough that we can run them the regular way and not care
                 # also we might intentionally run Lammps slowly for comparison purposes
@@ -330,6 +330,8 @@ class CreateSubJobs(PrimitiveVertex):
             job.interactive_open()
             if not isinstance(job, DecoupledOscillators):
                 job.run_if_interactive()
+            elif isinstance(job, DecoupledOscillators):
+                job.input = ref_job.input
             if isinstance(job, LammpsInteractive) and fast_lammps_mode:
                 # Note: This might be done by default at some point in LammpsInteractive,
                 # and could then be removed here
@@ -341,9 +343,6 @@ class CreateSubJobs(PrimitiveVertex):
                 job.run(delete_existing_job=True)
             else:
                 job.save()
-            if isinstance(job, DecoupledOscillators):
-                job.input = ref_job.input
-                job.validate_ready_to_run()
         else:
             raise TypeError('Job of class {} is not compatible.'.format(ref_job.__class__))
         return job, job.project.path, job.job_name

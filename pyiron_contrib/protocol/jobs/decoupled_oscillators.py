@@ -112,7 +112,7 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
         """
         pass
 
-    def _check_inputs(self):
+    def validate_ready_to_run(self):
         """
         Check if all necessary inputs are provided.
         """
@@ -122,7 +122,7 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
 
         # check if input structure is of the Atoms class, and set the base structure
         if self.input.structure is not None:
-            self._base_structure = self.input.structure.copy()
+            self.input.structure = self.input.ref_job.structure.copy()
 
         # otherwise revert to the structure of the reference job
         elif self.input.structure is None:
@@ -151,10 +151,14 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
         assert len(self.input.oscillators_id_list) == len(self.input.spring_constants_list), \
             '<job>.input.oscillators_id_list and <job>.input.spring_constants_list should have the same length'
 
+        self.status.running = True
+        self._setup_base()
+
     def _set_base_structure(self):
         """
         Create a base structure with vacancies at the oscillator atom ids.
         """
+        self._base_structure = self.input.ref_job.structure.copy()
         # remove atoms that are oscillators from the base structure
         for i, atom_id in enumerate(np.sort(self.input.oscillators_id_list)):
             new_atom_id = atom_id - i
@@ -171,9 +175,6 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
     def _create_base_job(self):
         """
         Create the base interpreter (Lammps/Vasp/Sphinx) job with the vacancy structure and save it.
-        Args:
-            initialize_only: If set to True, only initializes the base_job by copying the ref_job. This is presently a
-                workaround to make sure that the base_job is closed when interactive_close() is called
         """
         # copy the reference job to create the base job
         self.append(self.input.ref_job.copy_to(
@@ -182,7 +183,7 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
             input_only=True,
             delete_existing_job=True
         ))
-        # if not, set all the parameters
+        # set all the parameters
         self[self._base_name].structure = self._base_structure
         self[self._base_name].interactive_open()
         self[self._base_name].interactive_initialize_interface()
@@ -225,17 +226,14 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
         """
         self._set_base_structure()
         self._create_base_job()
+        self._forces = np.zeros(self.input.positions.shape)
 
     def run_if_interactive(self):
         """
         The main run function.
         """
-        if not self._initialized:
-            self.status.running = True
-            self._check_inputs()
-            self._forces = np.zeros(self.input.positions.shape)
+        if isinstance(self[self._base_name], ProjectHDFio):
             self._setup_base()
-            self._initialized = True
         self._forces[self._base_atom_ids], base_energy_pot = self._calc_static_base_job()
         self._forces[self.input.oscillators_id_list], harmonic_energy_pot = self._calc_harmonic()
         energy_pot = base_energy_pot + harmonic_energy_pot

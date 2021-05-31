@@ -33,7 +33,7 @@ setup(
     install_requires=[        
         'matplotlib==3.4.2',
         'numpy==1.20.3',
-        'pyiron_base==0.2.12',
+        'pyiron_base==0.2.13',
         'scipy==1.6.3',
         'seaborn==0.11.1'
     ],

@@ -6,7 +6,7 @@ from ase import Atoms as ASEAtoms
 from pyiron_base import DataContainer
 from pyiron_atomistics import pyiron_to_ase, ase_to_pyiron, Atoms
 
-from pyiron_contrib.atomistics.job.structurecontainer import StructureContainer
+from pyiron_contrib.atomistics.atomistics.job.structurecontainer import StructureContainer
 from pyiron_contrib.atomistics.atomicrex.fit_properties import ARFitPropertyList, ARFitProperty
 from pyiron_contrib.atomistics.atomicrex.utility_functions import write_pretty_xml
 from pyiron_contrib.atomistics.atomicrex.fit_properties import FlattenedARProperty, FlattenedARVectorProperty

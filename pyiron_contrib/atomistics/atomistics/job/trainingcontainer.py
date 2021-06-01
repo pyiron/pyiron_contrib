@@ -50,13 +50,24 @@ class TrainingContainer(GenericJob, HasStructure):
         self._container = StructureContainer()
         self._container.add_array("energy", dtype=np.float64, per="structure")
         self._container.add_array("forces", shape=(3,), dtype=np.float64, per="atom")
-        self._table = pd.DataFrame({
-            "name": [],
-            "atoms": [],
-            "energy": [],
-            "forces": [],
-            "number_of_atoms": []
-        })
+        self._table_cache = None
+
+    @property
+    def _table(self):
+        if self._table_cache is None:
+            self._table_cache = pd.DataFrame({
+                "name":             [self._container.get_array("identifiers", i)
+                                        for i in range(len(self._container))],
+                "atoms":            [self._container.get_structure(i)
+                                        for i in range(len(self._container))],
+                "energy":           [self._container.get_array("energy", i)
+                                        for i in range(len(self._container))],
+                "forces":           [self._container.get_array("forces", i)
+                                        for i in range(len(self._container))],
+                "number_of_atoms":  [self._container.get_array("len_current_struct", i)
+                                        for i in range(len(self._container))],
+            })
+        return self._table_cache
 
     def include_job(self, job, iteration_step=-1):
         """
@@ -88,10 +99,11 @@ class TrainingContainer(GenericJob, HasStructure):
             self._container.add_structure(structure, name, energy=energy, forces=forces)
         else:
             self._container.add_structure(structure, name, energy=energy)
-        self._table = self._table.append(
-                {"name": name, "atoms": structure, "energy": energy, "forces": forces,
-                 "number_of_atoms": len(structure)},
-                ignore_index=True)
+        if self._table_cache:
+            self._table = self._table.append(
+                    {"name": name, "atoms": structure, "energy": energy, "forces": forces,
+                     "number_of_atoms": len(structure)},
+                    ignore_index=True)
 
     def include_dataset(self, dataset):
         """
@@ -185,15 +197,3 @@ class TrainingContainer(GenericJob, HasStructure):
         else:
             self._container = StructureContainer()
             self._container.from_hdf(self.project_hdf5, "structures")
-            self._table = pd.DataFrame({
-                "name":             [self._container.get_array("identifiers", i)
-                                        for i in range(len(self._container))],
-                "atoms":            [self._container.get_structure(i)
-                                        for i in range(len(self._container))],
-                "energy":           [self._container.get_array("energy", i)
-                                        for i in range(len(self._container))],
-                "forces":           [self._container.get_array("forces", i)
-                                        for i in range(len(self._container))],
-                "number_of_atoms":  [self._container.get_array("len_current_struct", i)
-                                        for i in range(len(self._container))],
-            })

@@ -180,17 +180,16 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
             project=self.project,
             new_job_name=self._base_name,
             input_only=True,
+            new_database_entry=False,
             delete_existing_job=True
         ))
         # set all the parameters
         self[self._base_name].structure = self._base_structure
-        self[self._base_name].interactive_open()
-        self[self._base_name].interactive_initialize_interface()
         if self._fast_mode:
             self[self._base_name].interactive_flush_frequency = 10**10
             self[self._base_name].interactive_write_frequency = 10**10
+        self[self._base_name].interactive_open()
         self[self._base_name].save()
-        self[self._base_name].status.running = True
 
     def _calc_static_base_job(self):
         """
@@ -264,8 +263,9 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
         # Make sure the ref job *isn't* on the input and *is* on self
         ref_job = self.input.pop_ref()
         if ref_job is not None and ref_job.job_name not in self._job_name_lst:
-            ref_job.status.initialized = True
+            ref_job.status.initialized = True  # throws an error if this is not done!
             self.append(ref_job)
+            ref_job.status.created = True
         # Save everything
         super(DecoupledOscillators, self).to_hdf(hdf=hdf, group_name=group_name)
         self.input.to_hdf(self.project_hdf5)

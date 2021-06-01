@@ -321,26 +321,20 @@ class CreateSubJobs(PrimitiveVertex):
             project=pr,
             new_job_name=name,
             input_only=True,
-            new_database_entry=True
+            new_database_entry=False,
+            delete_existing_job=True
         )
         if structure is not None:
             job.structure = structure
         if isinstance(job, GenericInteractive):
             job.interactive_open()
-            if isinstance(job, DecoupledOscillators):
-                job.input = ref_job.input
             if isinstance(job, LammpsInteractive) and fast_lammps_mode:
                 # Note: This might be done by default at some point in LammpsInteractive,
                 # and could then be removed here
                 job.run_if_interactive()
                 job.interactive_flush_frequency = 10**10
                 job.interactive_write_frequency = 10**10
-            if job.check_if_job_exists():
-                if not isinstance(job, (HessianJob, DecoupledOscillators)):
-                    job.calc_static()
-                job.run(delete_existing_job=True)
-            else:
-                job.save()
+            job.save()
         else:
             raise TypeError('Job of class {} is not compatible.'.format(ref_job.__class__))
         return job, job.project.path, job.job_name

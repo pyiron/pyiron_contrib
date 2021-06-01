@@ -334,6 +334,7 @@ class CreateSubJobs(PrimitiveVertex):
                 job.run_if_interactive()
                 job.interactive_flush_frequency = 10**10
                 job.interactive_write_frequency = 10**10
+            job.validate_ready_to_run()
             job.save()
         else:
             raise TypeError('Job of class {} is not compatible.'.format(ref_job.__class__))

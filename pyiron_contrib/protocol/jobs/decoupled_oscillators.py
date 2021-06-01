@@ -5,6 +5,7 @@
 from __future__ import print_function
 
 import numpy as np
+import os
 
 from pyiron_atomistics.atomistics.job.interactive import GenericInteractive
 from pyiron_base.master.generic import GenericMaster
@@ -34,6 +35,7 @@ class _DecoupledOscillatorsInput(DataContainer):
         self.save_debug_data = False
         self._ref_job = None
         self._ref_job_name = None
+        self._base_atom_ids = None
 
     @property
     def structure(self) -> Atoms:
@@ -82,7 +84,6 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
         self._fast_mode = True
         self._initialized = False
         self._base_structure = None
-        self._base_atom_ids = None
         self._forces = None
 
     @property
@@ -112,7 +113,7 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
         """
         pass
 
-    def _check_inputs(self):
+    def validate_ready_to_run(self):
         """
         Check if all necessary inputs are provided.
         """
@@ -151,6 +152,9 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
         assert len(self.input.oscillators_id_list) == len(self.input.spring_constants_list), \
             '<job>.input.oscillators_id_list and <job>.input.spring_constants_list should have the same length'
 
+        # run initializer
+        self._setup_base()
+
     def _set_base_structure(self):
         """
         Create a base structure with vacancies at the oscillator atom ids.
@@ -161,8 +165,8 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
             self._base_structure.pop(int(new_atom_id))
 
         # collect indices of atoms that are NOT harmonic oscillators
-        self._base_atom_ids = np.delete(np.arange(len(self.input.structure)).astype(int),
-                                        self.input.oscillators_id_list)
+        self.input._base_atom_ids = np.delete(np.arange(len(self.input.structure)).astype(int),
+                                             self.input.oscillators_id_list)
 
     @property
     def _base_name(self):
@@ -171,9 +175,6 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
     def _create_base_job(self):
         """
         Create the base interpreter (Lammps/Vasp/Sphinx) job with the vacancy structure and save it.
-        Args:
-            initialize_only: If set to True, only initializes the base_job by copying the ref_job. This is presently a
-                workaround to make sure that the base_job is closed when interactive_close() is called
         """
         # copy the reference job to create the base job
         self.append(self.input.ref_job.copy_to(
@@ -189,7 +190,7 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
             self[self._base_name].interactive_flush_frequency = 10**10
             self[self._base_name].interactive_write_frequency = 10**10
         self[self._base_name].interactive_open()
-        self[self._base_name].save()
+        self[self._base_name].run()
 
     def _calc_static_base_job(self):
         """
@@ -198,7 +199,7 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
             forces
             energy_pot
         """
-        self[self._base_name].structure.positions = self.input.positions[self._base_atom_ids]
+        self[self._base_name].structure.positions = self.input.positions[self.input._base_atom_ids]
         self[self._base_name].interactive_initialize_interface()
         self[self._base_name].run_if_interactive()
         return self[self._base_name].interactive_forces_getter(), self[self._base_name].interactive_energy_pot_getter()
@@ -225,26 +226,21 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
         """
         self._set_base_structure()
         self._create_base_job()
-        self._forces = np.zeros(self.input.positions.shape)
+        self.input.forces = np.zeros(self.input.positions.shape)
 
     def run_if_interactive(self):
         """
         The main run function.
         """
-        if not self._initialized:
-            self.status.running = True
-            self._check_inputs()
-            self._setup_base()
-            self._initialized = True
-        self._forces[self._base_atom_ids], base_energy_pot = self._calc_static_base_job()
-        self._forces[self.input.oscillators_id_list], harmonic_energy_pot = self._calc_harmonic()
+        self.input.forces[self.input._base_atom_ids], base_energy_pot = self._calc_static_base_job()
+        self.input.forces[self.input.oscillators_id_list], harmonic_energy_pot = self._calc_harmonic()
         energy_pot = base_energy_pot + harmonic_energy_pot
-        self.interactive_cache["forces"].append(self._forces)
+        self.interactive_cache["forces"].append(self.input.forces)
         self.interactive_cache["energy_pot"].append(energy_pot)
         if self.input.save_debug_data:
-            self.interactive_cache["base_forces"].append(self._forces[self._base_atom_ids])
+            self.interactive_cache["base_forces"].append(self.input.forces[self.input._base_atom_ids])
             self.interactive_cache["base_energy_pot"].append(base_energy_pot)
-            self.interactive_cache["harmonic_forces"].append(self._forces[self.input.oscillators_id_list])
+            self.interactive_cache["harmonic_forces"].append(self.input.forces[self.input.oscillators_id_list])
             self.interactive_cache["harmonic_energy_pot"].append(harmonic_energy_pot)
 
     def interactive_forces_getter(self):

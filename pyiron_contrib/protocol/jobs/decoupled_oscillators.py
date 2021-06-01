@@ -189,7 +189,7 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
         if self._fast_mode:
             self[self._base_name].interactive_flush_frequency = 10**10
             self[self._base_name].interactive_write_frequency = 10**10
-        self[self._base_name].run()
+        self[self._base_name].save()
         self[self._base_name].status.running = True
 
     def _calc_static_base_job(self):
@@ -200,7 +200,8 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
             energy_pot
         """
         self[self._base_name].structure.positions = self.input.positions[self._base_atom_ids]
-        self[self._base_name].run()
+        self[self._base_name].interactive_initialize_interface()
+        self[self._base_name].run_if_interactive()
         return self[self._base_name].interactive_forces_getter(), self[self._base_name].interactive_energy_pot_getter()
 
     def _calc_harmonic(self):

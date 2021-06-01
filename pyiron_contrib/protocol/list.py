@@ -8,7 +8,7 @@ from pyiron_contrib.protocol.utils import InputDictionary, Pointer
 import numpy as np
 import time
 from abc import abstractmethod
-from multiprocessing import Process, Manager
+from multiprocessing import Process, Manager, cpu_count
 from pyiron_atomistics.vasp.interactive import VaspInteractive
 from pyiron_atomistics.sphinx.interactive import SphinxInteractive
 
@@ -174,6 +174,8 @@ class ParallelList(ListVertex):
         sleep_time = ~self.sleep_time
 
         all_child_output = Manager().dict()
+
+        print(cpu_count())
 
         jobs = []
         for i, child in enumerate(self.children):

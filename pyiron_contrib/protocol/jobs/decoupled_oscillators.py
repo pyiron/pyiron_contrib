@@ -166,7 +166,7 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
 
         # collect indices of atoms that are NOT harmonic oscillators
         self.input._base_atom_ids = np.delete(np.arange(len(self.input.structure)).astype(int),
-                                             self.input.oscillators_id_list)
+                                              self.input.oscillators_id_list)
 
     @property
     def _base_name(self):
@@ -190,7 +190,7 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
             self[self._base_name].interactive_flush_frequency = 10**10
             self[self._base_name].interactive_write_frequency = 10**10
         self[self._base_name].interactive_open()
-        self[self._base_name].run()
+        self[self._base_name].save()
 
     def _calc_static_base_job(self):
         """
@@ -295,7 +295,6 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
                     base_job = self.project.load(job.job_name)  # load and close
                     base_job.interactive_close()
                     base_job.status.finished = True
-
         # assign forces and energy_pot to output list
         self.output.forces = np.array(self.interactive_cache["forces"])
         self.output.energy_pot = np.array(self.interactive_cache["energy_pot"])

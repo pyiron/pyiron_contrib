@@ -44,7 +44,7 @@ class ARStructureContainer:
         self.structure_file_path = structure_file_path
 
     def _init_structure_container(self, num_structures, num_atoms):
-        self.flattened_structures = FlattenedStructureContainer(num_structures=num_structures, num_atoms=num_atoms)
+        self.flattened_structures = StructureContainer(num_structures=num_structures, num_atoms=num_atoms)
         self.fit = np.empty(num_structures, dtype=bool)
         self.clamp = np.empty(num_structures, dtype=bool)
         self.relative_weight = np.empty(num_structures)
@@ -115,8 +115,14 @@ class ARStructureContainer:
 
     def from_hdf(self, hdf, group_name="structures"):
         with hdf.open(group_name) as h:
-            num_structures = h["flattened_structures/num_structures"]
-            num_atoms = h["flattened_structures/num_atoms"]
+            # Compatibility Old and new StructureContainer
+            try:
+                num_structures = h["flattened_structures/num_structures"]
+                num_atoms = h["flattened_structures/num_atoms"]
+            except ValueError:
+                num_structures = h["structures/num_structures"]
+                num_atoms = h["structures/num_atoms"]
+
             self._init_structure_container(num_structures, num_atoms)
             self.flattened_structures.from_hdf(hdf=h)
 

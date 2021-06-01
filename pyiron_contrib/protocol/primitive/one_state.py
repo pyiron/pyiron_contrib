@@ -833,7 +833,6 @@ class RandomVelocity(PrimitiveVertex):
     def command(self, temperature, masses, overheat_fraction):
         masses = np.array(masses)[:, np.newaxis]
         vel_scale = np.sqrt(EV_TO_U_ANGSQ_PER_FSSQ * KB * temperature / masses) * np.sqrt(overheat_fraction)
-        np.random.seed(0)
         vel_dir = np.random.randn(len(masses), 3)
         vel = vel_scale * vel_dir
         vel -= np.mean(vel, axis=0)

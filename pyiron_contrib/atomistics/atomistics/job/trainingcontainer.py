@@ -115,7 +115,7 @@ class TrainingContainer(GenericJob, HasStructure):
             - energy(float): energy of the whole structure
             - forces (Nx3 array of float): per atom forces, where N is the number of atoms in the structure
         """
-        self._table = self._table.append(dataset, ignore_index=True)
+        self._table_cache = self._table.append(dataset, ignore_index=True)
         # in case given dataset has more columns than the necessary ones, swallow/ignore them in *_
         for name, atoms, energy, forces, *_ in dataset.itertuples(index=False):
             self._container.add_structure(atoms, name, energy=energy, forces=forces)

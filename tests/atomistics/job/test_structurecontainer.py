@@ -1,14 +1,13 @@
-from unittest import TestCase
-from pyiron_atomistics import Project
+from pyiron_atomistics._tests import TestWithProject
 from pyiron_contrib.atomistics.atomistics.job.structurecontainer import StructureContainer
 import os.path
 import numpy as np
 
-class TestContainer(TestCase):
+class TestContainer(TestWithProject):
 
     @classmethod
     def setUpClass(cls):
-        cls.project = Project(os.path.dirname(__file__))
+        super().setUpClass()
         cls.elements = ("Fe", "Mg", "Al", "Cu", "Ti")
         cls.structures = [cls.project.create.structure.bulk(el).repeat(3) for el in cls.elements]
 

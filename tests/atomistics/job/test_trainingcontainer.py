@@ -4,24 +4,11 @@
 
 import os
 import unittest
-from pyiron_atomistics import Project
+from pyiron_atomistics._tests import TestWithCleanProject
 import pyiron_contrib
-print(pyiron_contrib.__file__)
 
 
-class TestTrainingContainer(unittest.TestCase):
-
-    @classmethod
-    def setUpClass(cls):
-        cls.execution_path = os.path.dirname(os.path.abspath(__file__))
-        cls.project = Project(os.path.join(cls.execution_path, "test_training"))
-
-    @classmethod
-    def tearDownClass(cls):
-        cls.execution_path = os.path.dirname(os.path.abspath(__file__))
-        project = Project(os.path.join(cls.execution_path, "test_training"))
-        project.remove_jobs_silently(recursive=True)
-        project.remove(enable=True)
+class TestTrainingContainer(TestWithCleanProject):
 
     def setUp(self):
         self.container = self.project.create.job.TrainingContainer("test")

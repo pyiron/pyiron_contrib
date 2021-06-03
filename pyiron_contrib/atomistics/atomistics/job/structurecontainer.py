@@ -152,9 +152,16 @@ class StructureContainer(HasStructure):
         """
         return list(set(self._per_atom_arrays["symbols"]))
 
+    def _get_per_atom_slice(self, frame):
+        start = self._per_structure_arrays["start_indices"][frame]
+        end = start + self._per_structure_arrays["len_current_struct"][frame]
+        return slice(start, end, 1)
+
     def get_array(self, name, frame):
         """
         Fetch array for given structure.
+
+        Works for per atom and per arrays.
 
         Args:
             name (str): name of the array to fetch
@@ -162,16 +169,40 @@ class StructureContainer(HasStructure):
 
         Returns:
             :class:`numpy.ndarray`: requested array
+
+        Raises:
+            `KeyError`: if array with name does not exists
         """
 
         if isinstance(frame, str):
             frame = self._translate_frame(frame)
         if name in self._per_atom_arrays:
-            I = self._per_structure_arrays["start_indices"][frame]
-            E = I + self._per_structure_arrays["len_current_struct"][frame]
-            return self._per_atom_arrays[name][I:E]
+            return self._per_atom_arrays[name][self._get_per_atom_slice(frame)]
         elif name in self._per_structure_arrays:
             return self._per_structure_arrays[name][frame]
+        else:
+            raise KeyError(f"no array named {name} defined on StructureContainer")
+
+    def set_array(self, name, frame, value):
+        """
+        Add array for given structure.
+
+        Works for per atom and per arrays.
+
+        Args:
+            name (str): name of array to set
+            frame (int, str): selects structure to set, as in :method:`.get_strucure()`
+
+        Raises:
+            `KeyError`: if array with name does not exists
+        """
+
+        if isinstance(frame, str):
+            frame = self._translate_frame(frame)
+        if name in self._per_atom_arrays:
+            self._per_atom_arrays[name][self._get_per_atom_slice(frame)] = value
+        elif name in self._per_structure_arrays:
+            self._per_structure_arrays[name][frame] = value
         else:
             raise KeyError(f"no array named {name} defined on StructureContainer")
 

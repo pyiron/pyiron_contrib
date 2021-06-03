@@ -54,6 +54,37 @@ class TestContainer(TestCase):
         self.assertTrue((self.cont._per_atom_arrays["fnorble"] == 0).all(),
                          "'fnorble' array not initialized with given fill value.")
 
+    def test_get_array(self):
+        """get_array should return the arrays for the correct structures."""
+
+        for i, structure in enumerate(self.structures):
+            self.assertTrue(np.allclose(self.cont.get_array("positions", i), structure.positions),
+                            f"get_array returns wrong positions for structure {i}")
+            self.assertTrue(np.allclose(self.cont.get_array("cells", i), structure.cell.array),
+                            f"get_array returns wrong positions for structure {i}")
+
+    def test_set_array(self):
+        """set_array should set the arrays for the correct structures and only those."""
+
+        new_pbc = [True, False, True]
+        self.cont.set_array("pbc", 0, new_pbc)
+        self.assertTrue((self.cont.get_array("pbc", 0,) == new_pbc).all(),
+                        f"Value from get_array {self.cont.get_array('pbc', 0)} does not match set value {new_pbc}")
+
+        symbols = self.cont.get_array("symbols", 2)
+        symbols[5:10] = 'Cu'
+        self.cont.set_array("symbols", 2, symbols)
+        self.assertTrue((self.cont.get_array("symbols", 2) == symbols).all(),
+                        f"Value from get_array {self.cont.get_array('symbols', 0)} does not match set value {symbols}")
+
+        self.cont.set_array("positions", 0, np.ones( (len(self.structures[0]), 3) ))
+        for i, structure in enumerate(self.structures):
+            if i == 0: continue
+
+            self.assertTrue(np.allclose(self.cont.get_array("positions", i), structure.positions),
+                            f"set_array modified arrray for different structure than instructured.")
+
+
     def test_get_structure(self):
         """Structure from get_structure should match thoes add with add_structure exactly."""
 

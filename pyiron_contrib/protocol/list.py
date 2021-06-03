@@ -175,8 +175,6 @@ class ParallelList(ListVertex):
 
         all_child_output = Manager().dict()
 
-        print(cpu_count())
-
         jobs = []
         for i, child in enumerate(self.children):
             job = Process(target=child.execute_parallel, args=(i, all_child_output))

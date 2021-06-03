@@ -232,6 +232,8 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
         """
         The main run function.
         """
+        if not self.status.running:
+            self.status.running = True
         self.input.forces[self.input._base_atom_ids], base_energy_pot = self._calc_static_base_job()
         self.input.forces[self.input.oscillators_id_list], harmonic_energy_pot = self._calc_harmonic()
         energy_pot = base_energy_pot + harmonic_energy_pot

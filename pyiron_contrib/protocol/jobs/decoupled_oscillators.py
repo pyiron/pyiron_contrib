@@ -5,9 +5,10 @@
 from __future__ import print_function
 
 import numpy as np
-import os
+from os.path import split
 
 from pyiron_atomistics.atomistics.job.interactive import GenericInteractive
+from pyiron_atomistics import Project
 from pyiron_base.master.generic import GenericMaster
 from pyiron_base.generic.datacontainer import DataContainer
 from pyiron_base.generic.hdfio import ProjectHDFio
@@ -30,11 +31,12 @@ class _DecoupledOscillatorsInput(DataContainer):
     def __init__(self, init=None, table_name="decoupled_input"):
         super().__init__(init=init, table_name=table_name)
         self._structure = None
+        self._positions = None
         self.oscillators_id_list = None
         self.spring_constants_list = None
         self.save_debug_data = False
-        self._ref_job = None
-        self._ref_job_name = None
+        self._ref_job_full_path = None
+        self._base_job_name = None
         self._base_atom_ids = None
 
     @property
@@ -48,22 +50,12 @@ class _DecoupledOscillatorsInput(DataContainer):
         self._structure = atoms
 
     @property
-    def ref_job(self) -> (LammpsInteractive, VaspInteractive, SphinxInteractive):
-        return self._ref_job
+    def ref_job_full_path(self):
+        return self._ref_job_full_path
 
-    @ref_job.setter
-    def ref_job(self, job: (LammpsInteractive, VaspInteractive, SphinxInteractive)):
-        if not isinstance(job, (LammpsInteractive, VaspInteractive, SphinxInteractive)):
-            raise TypeError(f"Got type {type(job)}, which is not a recognized interactive job")
-        self._ref_job_name = job.job_name
-        self._ref_job = job
-
-    def pop_ref(self):
-        return self.pop('_ref_job')
-
-    @property
-    def ref_job_name(self):
-        return self._ref_job_name
+    @ref_job_full_path.setter
+    def ref_job_full_path(self, path):
+        self._ref_job_full_path = path
 
 
 class DecoupledOscillators(GenericInteractive, GenericMaster):
@@ -81,10 +73,11 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
             "harmonic_forces": [],
             "harmonic_energy_pot": []
         }
+        self._base_job = None
+        self._forces = None
         self._fast_mode = True
         self._initialized = False
-        self._base_structure = None
-        self._forces = None
+        self.input.positions = None
 
     @property
     def structure(self):
@@ -121,6 +114,15 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
         if self.server.run_mode != 'interactive':
             raise TypeError('<job>.server.run_mode should be set to interactive')
 
+        if self.input.ref_job_full_path is None:
+            raise ValueError('<job>.input.ref_job_full_path is a necessary input')
+        else:
+            ref_job_path, ref_job_name = split(self.input.ref_job_full_path)
+            pr = Project(ref_job_path)
+            self.input.ref_job = pr.load(ref_job_name)
+            if not isinstance(self.input.ref_job, (LammpsInteractive, VaspInteractive, SphinxInteractive)):
+                raise TypeError(f"Got type {type(self.input.ref_job)}, which is not a recognized interactive job")
+
         # check if input structure is of the Atoms class, and set the base structure
         if self.input.structure is not None:
             self._base_structure = self.input.structure.copy()
@@ -130,8 +132,9 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
             self.input.structure = self.input.ref_job.structure.copy()
             self._base_structure = self.input.ref_job.structure.copy()
 
-        # check if input positions are provided
-        assert self.input.positions is not None, '<job>.input.positions need to be provided'
+        # check if input positions are provided, otherwise set the positions as structure positions
+        if self.input.positions is None:
+            self.input.positions = self.input.ref_job.structure.positions
 
         # check if oscillator_id_list is a list of integers
         if isinstance(self.input.oscillators_id_list, list):
@@ -152,7 +155,6 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
         assert len(self.input.oscillators_id_list) == len(self.input.spring_constants_list), \
             '<job>.input.oscillators_id_list and <job>.input.spring_constants_list should have the same length'
 
-        # run initializer
         self._setup_base()
 
     def _set_base_structure(self):
@@ -177,20 +179,22 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
         Create the base interpreter (Lammps/Vasp/Sphinx) job with the vacancy structure and save it.
         """
         # copy the reference job to create the base job
-        self.append(self.input.ref_job.copy_to(
+        self._base_job = self.input.ref_job.copy_to(
             project=self.project,
             new_job_name=self._base_name,
             input_only=True,
             new_database_entry=False,
             delete_existing_job=True
-        ))
+        )
         # set all the parameters
-        self[self._base_name].structure = self._base_structure
+        self._base_job.structure = self._base_structure
         if self._fast_mode:
-            self[self._base_name].interactive_flush_frequency = 10**10
-            self[self._base_name].interactive_write_frequency = 10**10
-        self[self._base_name].interactive_open()
-        self[self._base_name].save()
+            self._base_job.interactive_flush_frequency = 10**10
+            self._base_job.interactive_write_frequency = 10**10
+        self._base_job.interactive_open()
+        self._base_job.save()
+        self._base_job.status.running = True
+        self.input._base_job_name = self._base_job.name
 
     def _calc_static_base_job(self):
         """
@@ -199,10 +203,10 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
             forces
             energy_pot
         """
-        self[self._base_name].structure.positions = self.input.positions[self.input._base_atom_ids]
-        self[self._base_name].interactive_initialize_interface()
-        self[self._base_name].run_if_interactive()
-        return self[self._base_name].interactive_forces_getter(), self[self._base_name].interactive_energy_pot_getter()
+        self._base_job.structure.positions = self.input.positions[self.input._base_atom_ids]
+        self._base_job.interactive_initialize_interface()
+        self._base_job.run_if_interactive()
+        return self._base_job.interactive_forces_getter(), self._base_job.interactive_energy_pot_getter()
 
     def _calc_harmonic(self):
         """
@@ -226,7 +230,7 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
         """
         self._set_base_structure()
         self._create_base_job()
-        self.input.forces = np.zeros(self.input.positions.shape)
+        self.input._forces = np.zeros(self.input.positions.shape)
 
     def run_if_interactive(self):
         """
@@ -234,15 +238,15 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
         """
         if not self.status.running:
             self.status.running = True
-        self.input.forces[self.input._base_atom_ids], base_energy_pot = self._calc_static_base_job()
-        self.input.forces[self.input.oscillators_id_list], harmonic_energy_pot = self._calc_harmonic()
+        self.input._forces[self.input._base_atom_ids], base_energy_pot = self._calc_static_base_job()
+        self.input._forces[self.input.oscillators_id_list], harmonic_energy_pot = self._calc_harmonic()
         energy_pot = base_energy_pot + harmonic_energy_pot
-        self.interactive_cache["forces"].append(self.input.forces)
+        self.interactive_cache["forces"].append(self.input._forces)
         self.interactive_cache["energy_pot"].append(energy_pot)
         if self.input.save_debug_data:
-            self.interactive_cache["base_forces"].append(self.input.forces[self.input._base_atom_ids])
+            self.interactive_cache["base_forces"].append(self.input._forces[self.input._base_atom_ids])
             self.interactive_cache["base_energy_pot"].append(base_energy_pot)
-            self.interactive_cache["harmonic_forces"].append(self.input.forces[self.input.oscillators_id_list])
+            self.interactive_cache["harmonic_forces"].append(self.input._forces[self.input.oscillators_id_list])
             self.interactive_cache["harmonic_energy_pot"].append(harmonic_energy_pot)
 
     def interactive_forces_getter(self):
@@ -258,19 +262,11 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
             hdf (ProjectHDFio): HDF5 group object - optional
             group_name (str): HDF5 subgroup name - optional
         """
-        # Make sure the ref job *isn't* on the input and *is* on self
-        ref_job = self.input.pop_ref()
-        if ref_job is not None and ref_job.job_name not in self._job_name_lst:
-            ref_job.status.initialized = True  # throws an error if this is not done!
-            self.append(ref_job)
-            ref_job.status.created = True
-        # Save everything
         super(DecoupledOscillators, self).to_hdf(hdf=hdf, group_name=group_name)
+        if self.input.ref_job is not None:
+            self.input.ref_job = None
         self.input.to_hdf(self.project_hdf5)
         self.output.to_hdf(self.project_hdf5)
-
-        # Ok, now put the ref job back into the input
-        self.input.ref_job = ref_job
 
     def from_hdf(self, hdf=None, group_name=None):
         """
@@ -281,15 +277,16 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
         """
         super(DecoupledOscillators, self).from_hdf(hdf=hdf, group_name=group_name)
         self.input.from_hdf(self.project_hdf5)
-        self.input.ref_job = self[self.input.ref_job_name]
         self.output.from_hdf(self.project_hdf5)
+        if self.input._base_job_name is not None:
+            self._base_job = self.project.load(self.input._base_job_name)
 
     def interactive_close(self):
         # close the base_job
         # if it is already loaded and not an hdf object
-        if not isinstance(self[self._base_name], ProjectHDFio):
-            self[self._base_name].interactive_close()
-            self[self._base_name].status.finished = True
+        if not isinstance(self._base_job, ProjectHDFio):
+            self._base_job.interactive_close()
+            self._base_job.status.finished = True
         else:
             # if it is an hdf object, check its job status
             for job in self.project.iter_jobs(status='running'):

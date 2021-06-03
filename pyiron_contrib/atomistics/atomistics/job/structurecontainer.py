@@ -69,6 +69,9 @@ class StructureContainer(HasStructure):
         - positions:    shape=(3,),  dtype=np.float64,   per atom: atomic positions
     """
 
+    __version__ = "0.1.0"
+    __hdf_version__ = "0.1.0"
+
     def __init__(self, num_structures=1, num_atoms=1):
         """
         Create new structure container.
@@ -365,12 +368,26 @@ class StructureContainer(HasStructure):
         #return last_structure_index, last_atom_index
 
 
+    def _type_to_hdf(self, hdf):
+        """
+        Internal helper function to save type and version in hdf root
+
+        Args:
+            hdf (ProjectHDFio): HDF5 group object
+        """
+        hdf["NAME"] = self.__class__.__name__
+        hdf["TYPE"] = str(type(self))
+        hdf["VERSION"] = self.__version__
+        hdf["HDF_VERSION"] = self.__hdf_version__
+        hdf["OBJECT"] = "StructureContainer"
+
     def to_hdf(self, hdf, group_name="structures"):
         # truncate arrays to necessary size before writing
         self._resize_atoms(self.num_atoms)
         self._resize_structures(self.num_structures)
 
         with hdf.open(group_name) as hdf_s_lst:
+            self._type_to_hdf(hdf_s_lst)
             hdf_s_lst["num_atoms"] =  self._num_atoms_alloc
             hdf_s_lst["num_structures"] = self._num_structures_alloc
             hdf_s_lst["len_current_struct"] = self._per_structure_arrays["len_current_struct"]

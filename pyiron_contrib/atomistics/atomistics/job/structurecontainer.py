@@ -231,6 +231,8 @@ class StructureContainer(HasStructure):
         When adding an array after some structures have been added, specifying `fill` will be used as a default value
         for the value of the array for those structures.
 
+        Adding an array with the same name twice is ignored, if dtype and shape match, otherwise raises an exception.
+
         >>> container = StructureContainer()
         >>> container.add_structure(Atoms(...), "foo")
         >>> container.add_array("energy", shape=(), dtype=np.float64, fill=42, per="structure")
@@ -247,7 +249,23 @@ class StructureContainer(HasStructure):
 
         Raises:
             ValueError: if wrong value for `per` is given
+            ValueError: if array with same name but different parameters exists already
         """
+
+        if name in self._per_atom_arrays:
+            a = self._per_atom_arrays[name]
+            if a.shape[1:] != shape or a.dtype != dtype or per != "atom":
+                raise ValueError(f"Array with name '{name}' exists with shape {a.shape[1:]} and dtype {a.dtype}.")
+            else:
+                return
+
+        if name in self._per_structure_arrays:
+            a = self._per_structure_arrays[name]
+            if a.shape[1:] != shape or a.dtype != dtype or per != "structure":
+                raise ValueError(f"Array with name '{name}' exists with shape {a.shape[1:]} and dtype {a.dtype}.")
+            else:
+                return
+
         if per == "atom":
             shape = (self._num_atoms_alloc,) + shape
             store = self._per_atom_arrays

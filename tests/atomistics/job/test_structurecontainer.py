@@ -52,7 +52,15 @@ class TestContainer(TestCase):
         self.assertEqual(self.cont._per_atom_arrays["fnorble"].dtype, np.int64,
                          "'fnorble' array has wrong dtype after adding it with add_array()")
         self.assertTrue((self.cont._per_atom_arrays["fnorble"] == 0).all(),
-                         "'fnorble' array not initialized with given fill value.")
+                         "'fnorble' array not initialized with given fill value")
+
+        self.cont.add_array("fnorble", shape=(), dtype=np.int64, fill=42, per="atom")
+        self.assertTrue(not (self.cont._per_atom_arrays["fnorble"] == 42).all(),
+                         "Duplicate add_array call was not ignored")
+
+        self.cont.add_array("energy", fill=42, per="structure")
+        self.assertTrue(not (self.cont._per_structure_arrays["energy"] == 42).all(),
+                         "Duplicate add_array call was not ignored")
 
     def test_get_array(self):
         """get_array should return the arrays for the correct structures."""

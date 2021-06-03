@@ -118,16 +118,19 @@ class TestContainer(TestWithProject):
                                 energy=E, forces=F, pressure=P, fnord=R[None, :])
         self.assertEqual(self.cont.get_array("energy", self.cont.num_structures - 1), E,
                          "Energy returned from get_array() does not match energy passed to add_structure")
-        self.assertTrue(np.allclose(self.cont.get_array("forces", self.cont.num_structures - 1), F),
-                        "Forces returned from get_array() does not match forces passed to add_structure")
-        self.assertTrue(np.allclose(self.cont.get_array("pressure", self.cont.num_structures - 1), P),
-                        "Pressure returned from get_array() does not match pressure passed to add_structure")
+        got_F = self.cont.get_array("forces", self.cont.num_structures - 1)
+        self.assertTrue(np.allclose(got_F, F),
+                        f"Forces returned from get_array() {got_F} do not match forces passed to add_structure {F}")
+        got_P = self.cont.get_array("pressure", self.cont.num_structures - 1)
+        self.assertTrue(np.allclose(got_P, P),
+                        f"Pressure returned from get_array() {got_P} does not match pressure passed to add_structure {P}")
         self.assertTrue("fnord" in self.cont._per_structure_arrays,
                         "array 'fnord' not in per structure array, even though shape[0]==1")
-        self.assertEqual(self.cont.get_array("fnord", self.cont.num_structures - 1).shape, R.shape,
-                        "array 'fnord' added with wrong shape, even though shape[0]==1")
-        self.assertTrue((self.cont.get_array("fnord", self.cont.num_structures - 1) == R).all(),
-                        "Fnord returned from get_array() does not match fnord passed to add_structure")
+        got_R = self.cont.get_array("fnord", self.cont.num_structures - 1)
+        self.assertEqual(got_R.shape, R.shape,
+                        f"array 'fnord' added with wrong shape {got_R.shape}, even though shape[0]==1 ({R.shape})")
+        self.assertTrue((got_R == R).all(),
+                        f"Fnord returned from get_array() {got_R} does not match fnord passed to add_structure {R}")
 
     def test_resize(self):
         """A dynamically resized container should behave exactly as a pre-allocated container."""

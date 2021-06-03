@@ -221,7 +221,7 @@ class ExternalHamiltonian(PrimitiveVertex):
             # if the job is of type DecoupledOscillators,
             if isinstance(self._job, DecoupledOscillators):
                 self._job.positions = positions
-                self._job.run_if_interactive()
+                self._job.run()
             else:
                 # DFT codes are slow enough that we can run them the regular way and not care
                 # also we might intentionally run Lammps slowly for comparison purposes

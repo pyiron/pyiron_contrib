@@ -84,13 +84,21 @@ class TestContainer(TestCase):
             self.assertTrue(np.allclose(self.cont.get_array("positions", i), structure.positions),
                             f"set_array modified arrray for different structure than instructured.")
 
-
     def test_get_structure(self):
         """Structure from get_structure should match thoes add with add_structure exactly."""
 
         for i, s in enumerate(self.structures):
             self.assertEqual(s, self.cont.get_structure(i),
                              "Added structure not equal to returned structure.")
+
+    def test_add_structure(self):
+        """add_structure(identifier=None) should set the current structure index as identifier"""
+
+        for i, structure in enumerate(self.structures):
+            self.cont.add_structure(structure)
+            self.assertEqual(self.cont.get_array("identifiers", len(self.structures) + i),
+                             str(len(self.structures) + i),
+                             "Default identifier is incorrect.")
 
     def test_add_structure_kwargs(self):
         """Additional kwargs given to add_structure should create appropriate custom arrays."""

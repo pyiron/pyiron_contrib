@@ -262,7 +262,7 @@ class StructureContainer(HasStructure):
         else:
             store[name] = np.full(shape=shape, fill_value=fill, dtype=dtype)
 
-    def add_structure(self, structure, identifier, **arrays):
+    def add_structure(self, structure, identifier=None, **arrays):
         """
         Add a new structure to the container.
 
@@ -291,9 +291,13 @@ class StructureContainer(HasStructure):
 
         Args:
             structure (:class:`.Atoms`): structure to add
-            identifier (str): human-readable name for the structure
+            identifier (str, optional): human-readable name for the structure, if None use current structre index as
+                                        string
             **kwargs: additional arrays to store for structure
         """
+
+        if identifier is None:
+            identifier = str(self.num_structures)
 
         n = len(structure)
         new_atoms = self.current_atom_index + n

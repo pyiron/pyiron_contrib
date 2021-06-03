@@ -245,7 +245,7 @@ class StructureContainer(HasStructure):
             dtype (type): data type of the new array, string arrays can pass 'U$n' where $n is the length of the string
             fill (object): populate the new array with this value for existing structure, if given; default `None`
             per (str): either "atom" or "structure"; denotes whether the new array should exist for every atom in a
-                       structure or only once for every structure
+                       structure or only once for every structure; case-insensitive
 
         Raises:
             ValueError: if wrong value for `per` is given
@@ -266,6 +266,7 @@ class StructureContainer(HasStructure):
             else:
                 return
 
+        per = per.lower()
         if per == "atom":
             shape = (self._num_atoms_alloc,) + shape
             store = self._per_atom_arrays

@@ -15,7 +15,6 @@ from ase.geometry import get_distances
 from pyiron_atomistics import Project
 from pyiron_atomistics.atomistics.job.interactive import GenericInteractive
 from pyiron_atomistics.lammps.lammps import LammpsInteractive
-from pyiron_atomistics.vasp.vasp import VaspInteractive
 from pyiron_atomistics.thermodynamics.hessian import HessianJob
 from pyiron_contrib.protocol.jobs.decoupled_oscillators import DecoupledOscillators
 from pyiron_contrib.protocol.generic import PrimitiveVertex
@@ -94,16 +93,13 @@ class Counter(PrimitiveVertex):
     def __init__(self, name=None):
         super(Counter, self).__init__(name=name)
         self.input.default.add_counts = 0
-        self.input.default.max_counts = 1e10
         self.output.n_counts = [0]
 
-    def command(self, add_counts, max_counts):
+    def command(self, add_counts):
         if add_counts > 0:  # increment from a value
             count = self.output.n_counts[-1] + add_counts
         else:  # regular increment
             count = self.output.n_counts[-1] + 1
-        if count > max_counts:  # counter reset
-            count = 1
         return {
             'n_counts': count
         }

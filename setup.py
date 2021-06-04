@@ -33,14 +33,14 @@ setup(
     install_requires=[        
         'matplotlib==3.4.2',
         'numpy==1.20.3',
-        'pyiron_base==0.2.13',
+        'pyiron_base==0.2.15',
         'scipy==1.6.3',
         'seaborn==0.11.1'
     ],
     extras_require={
         'atomistic': [
             'ase==3.21.1',
-            'pyiron_atomistics==0.2.12',
+            'pyiron_atomistics==0.2.14',
         ],
         'fenics': [
             'fenics==2019.1.0',

@@ -14,7 +14,7 @@ from pyiron_contrib.protocol.list import SerialList, ParallelList
 from pyiron_contrib.protocol.utils import Pointer
 from pyiron_contrib.protocol.primitive.one_state import BuildMixingPairs, Counter, \
     CreateSubJobs, ExternalHamiltonian, FEPExponential, RandomVelocity, SphereReflectionPerAtom, TILDPostProcess, \
-    VerletPositionUpdate, VerletVelocityUpdate, WeightedSum, WelfordOnline, Zeros
+    TILDValidate, VerletPositionUpdate, VerletVelocityUpdate, WeightedSum, WelfordOnline, Zeros
 from pyiron_contrib.protocol.primitive.two_state import AnyVertex, IsGEq, IsLEq, ModIsZero
 
 # Define physical constants that will be used in this script
@@ -250,7 +250,13 @@ class TILDParallel(CompoundVertex):
         structure_b (Atoms): The structure of ref_job_b. (Default is None, use the structure of ref_job_b.)
         temperature (float): Temperature to run at in K. (Default is 300.)
         n_lambdas (int): How many 'lambda'/integration points to create. (Default is 3.)
-        custom_lambdas (list): Specify the set of lambda values as input. (Default is None.)
+        lambda_bias (float): A function to generate N points between 0 and 1, with a left, equidistant and right bias.
+            bias = 0 makes the points fully left biased. The amount of left bias can be controlled by varying it
+            between 0 and 0.49.
+            bias = 0.5 keeps the points equidistant.
+            bias = 1 makes the points fully right biased. The amount of right bias can be controlled by varying it
+            between 0.51 and 1.
+            (Default is 0.5, keep the points equidistant.)
         n_steps (int): How many MD steps to run for. (Default is 100.)
         thermalization_steps (int): Number of steps the system is thermalized for to reach equilibrium. (Default is
             10 steps.)
@@ -264,7 +270,7 @@ class TILDParallel(CompoundVertex):
             desired value. (Default is 2.0, assuming energy equipartition is a good idea.)
         cutoff_factor (float): The cutoff is obtained by taking the first nearest neighbor distance and multiplying
             it by the cutoff factor. (Default is 0.5.)
-        use_reflection (boolean): Turn on or off 'SphereReflection' (Default is False.)
+        use_reflection (boolean): Turn on or off 'SphereReflectionPerAtom' (Default is False.)
         zero_k_energy (float): The minimized potential energy of the static (expanded) structure. (Default is 0.)
         sleep_time (float): A delay in seconds for database access of results. For sqlite, a non-zero delay maybe
             required. (Default is 0 seconds, no delay.)
@@ -292,9 +298,11 @@ class TILDParallel(CompoundVertex):
 
         id_ = self.input.default
         # Default values
+        id_.structure_a = None
+        id_.structure_b = None
         id_.temperature = 300.
         id_.n_lambdas = 3
-        id_.custom_lambdas = None
+        id_.lambda_bias = 0.5
         id_.n_steps = 100
         id_.thermalization_steps = 10
         id_.sampling_period = 1
@@ -320,6 +328,7 @@ class TILDParallel(CompoundVertex):
         # Graph components
         g = self.graph
         ip = Pointer(self.input)
+        g.validate = TILDValidate()
         g.build_lambdas = BuildMixingPairs()
         g.initial_forces = Zeros()
         g.mass_mixer = WeightedSum()
@@ -337,6 +346,7 @@ class TILDParallel(CompoundVertex):
         # Execution flow
         g = self.graph
         g.make_pipeline(
+            g.validate,
             g.build_lambdas,
             g.initial_forces,
             g.mass_mixer,
@@ -353,7 +363,7 @@ class TILDParallel(CompoundVertex):
         g.make_edge(g.check_steps, g.exit, "true")
         g.make_edge(g.check_convergence, g.exit, "true")
         g.make_edge(g.exit, g.check_steps, "false")
-        g.starting_vertex = g.build_lambdas
+        g.starting_vertex = g.validate
         g.restarting_vertex = g.create_jobs_a
 
     def define_information_flow(self):
@@ -362,9 +372,17 @@ class TILDParallel(CompoundVertex):
         gp = Pointer(self.graph)
         ip = Pointer(self.input)
 
+        # validate
+        g.validate.input.ref_job_a = ip.ref_job_a
+        g.validate.input.ref_job_b = ip.ref_job_b
+        g.validate.input.n_steps = ip.n_steps
+        g.validate.input.thermalization_steps = ip.thermalization_steps
+        g.validate.input.sampling_period = ip.sampling_period
+        g.validate.input.convergence_check_steps = ip.convergence_check_steps
+
         # build_lambdas
         g.build_lambdas.input.n_lambdas = ip.n_lambdas
-        g.build_lambdas.input.custom_lambdas = ip.custom_lambdas
+        g.build_lambdas.input.lambda_bias = ip.lambda_bias
 
         # initial_forces
         g.initial_forces.input.shape = ip.ref_job_a.structure.positions.shape
@@ -501,9 +519,12 @@ class TILDParallel(CompoundVertex):
             gp.check_convergence
         ]
         g.exit.input.print_strings = [
-            "Maximum steps reached",
-            "Convergence reached"
+            "Maximum steps ({}) exceeded. Stopping run.",
+            "Convergence reached in {} steps. Stopping run.",
+            "Convergence not reached in {} steps. Continuing run..."  # 1 extra, if convergence is not reached!
         ]
+        g.exit.input.step = gp.clock.output.n_counts[-1]
+        g.exit.input.n_steps = ip.n_steps
 
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
 

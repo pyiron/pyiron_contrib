@@ -61,22 +61,36 @@ class BuildMixingPairs(PrimitiveVertex):
 
     def __init__(self, name=None):
         super(BuildMixingPairs, self).__init__(name=name)
-        self.input.default.n_lambdas = 5
-        self.input.default.custom_lambdas = None
+        self.input.default.n_lambdas = 3
+        self.input.default.lambda_bias = 0.5
 
-    def command(self, n_lambdas, custom_lambdas):
-        if custom_lambdas is not None:
-            lambdas = np.array(custom_lambdas)
-        else:
-            lambdas = np.linspace(0, 1, num=n_lambdas)
-
+    def command(self, n_lambdas, lambda_bias):
+        lambdas = self._generate_lambdas(n_lambdas=n_lambdas, bias=lambda_bias)
         delta_lambdas = np.gradient(lambdas)
         delta_lambdas[0] = delta_lambdas[0] / 2
         delta_lambdas[-1] = delta_lambdas[-1] / 2
         return {
-                'lambda_pairs': np.array([lambdas, 1 - lambdas]).T,
-                'delta_lambdas': delta_lambdas
-            }
+            'lambda_pairs': np.array([lambdas, 1 - lambdas]).T,
+            'delta_lambdas': delta_lambdas
+        }
+
+    @staticmethod
+    def _generate_lambdas(n_lambdas, bias):
+        """
+        A function to generate N points between 0 and 1, with a left, equidistant and right bias.
+        bias = 0 makes the points fully left biased. The amount of left bias can be controlled by varying it between 0 and
+            0.49.
+        bias = 0.5 keeps the points equidistant.
+        bias = 1 makes the points fully right biased. The amount of right bias can be controlled by varying it between 0.51
+            and 1.
+        """
+        factor = bias + 0.5
+        lambdas = [0, 1]
+        for _ in np.arange(n_lambdas - 2):
+            lambdas.append(lambdas[-1] + (lambdas[-1] - lambdas[-2]) / factor)
+        lambdas = np.asarray(lambdas)
+        lambdas /= lambdas[-1]
+        return lambdas
 
 
 class Counter(PrimitiveVertex):
@@ -335,8 +349,8 @@ class CreateSubJobs(PrimitiveVertex):
             if isinstance(job, LammpsInteractive) and fast_lammps_mode:
                 # Note: This might be done by default at some point in LammpsInteractive,
                 # and could then be removed here
-                job.interactive_flush_frequency = 10**10
-                job.interactive_write_frequency = 10**10
+                job.interactive_flush_frequency = 10 ** 10
+                job.interactive_write_frequency = 10 ** 10
             job.validate_ready_to_run()
             job.save()
         else:
@@ -1308,6 +1322,45 @@ class FEPExponential(PrimitiveVertex):
         }
 
 
+class TILDValidate(PrimitiveVertex):
+    """
+    Check if all the inputs fir the TILD protocol are in order.
+    Input attributes:
+        ref_job_a (job): Initial state of the system, given by a job of type LammpsInteractive/VaspInteractive/
+            SphinxInteractive/HessianJob/DecoupledOscillators.
+        ref_job_b (job): Final state of the system, given by a job of type LammpsInteractive/VaspInteractive/
+            SphinxInteractive/HessianJob/DecoupledOscillators.
+        n_steps (int): How many MD steps to run for. (Default is 100.)
+        thermalization_steps (int): Number of steps the system is thermalized for to reach equilibrium. (Default is
+            10 steps.)
+        sampling_period (int): Collect a 'sample' every 'sampling_period' steps. (Default is 1, collect sample
+            for every MD step.
+    """
+
+    def command(self, ref_job_a, ref_job_b, n_steps, thermalization_steps, sampling_period, convergence_check_steps):
+        # check if the ref jobs are of valid job types
+        self._check_job(ref_job_a)
+        self._check_job(ref_job_b)
+
+        # check if the n_steps is divisible by (x) steps
+        message = "n_steps must be divisible by thermalization steps"
+        self._check_modulo(target=n_steps, mod=thermalization_steps, message=message)
+        message = "n_steps must be divisible by sampling_period"
+        self._check_modulo(target=n_steps, mod=sampling_period, message=message)
+        message = "n_steps must be divisible by convergence_check_steps"
+        self._check_modulo(target=n_steps, mod=convergence_check_steps, message=message)
+
+    @staticmethod
+    def _check_job(job):
+        if not isinstance(job, GenericInteractive):
+            raise TypeError(f"Got reference type {type(job)}, which is not a recognized interactive job")
+
+    @staticmethod
+    def _check_modulo(target, mod, message):
+        if target % mod != 0:
+            raise ValueError(message)
+
+
 class TILDPostProcess(PrimitiveVertex):
     """
     Post processing for the TILD protocols, to compute the free energy between the input systems.
@@ -1331,8 +1384,11 @@ class TILDPostProcess(PrimitiveVertex):
         fep_free_energy_se (float): The standard error calculated via free energy perturbation.
     """
 
-    def command(self, lambda_pairs, tild_mean, tild_std, fep_exp_mean, fep_exp_std, temperature, n_samples):
+    def __init__(self, name=None):
+        super(TILDPostProcess, self).__init__(name=name)
+        self.output.tild_free_energy_se = [np.nan]
 
+    def command(self, lambda_pairs, tild_mean, tild_std, fep_exp_mean, fep_exp_std, temperature, n_samples):
         tild_fe_mean, tild_fe_std, tild_fe_se = self.get_tild_free_energy(lambda_pairs, tild_mean, tild_std,
                                                                           n_samples)
         fep_fe_mean, fep_fe_std, fep_fe_se = self.get_fep_free_energy(fep_exp_mean, fep_exp_std, n_samples,

@@ -88,9 +88,11 @@ class AnyVertex(BoolVertex):
     Input attributes:
         vertices (list): The list of vertices.
         print_strings (list): The list of strings to print should the associated vertex be true.
+        step (int): The step at which this vertex is called.
+        n_steps (int): The maximum number of steps.
     """
 
-    def command(self, vertices, print_strings):
+    def command(self, vertices, print_strings, step=None, n_steps=None):
         bool_list = []
         for i in vertices:
             if isinstance(i, PrimitiveVertex):
@@ -101,15 +103,13 @@ class AnyVertex(BoolVertex):
             else:
                 raise TypeError(str(i) + " is not an instance of PrimitiveVertex")
 
-        print_condition = (len(print_strings) == len(vertices))
-
         if np.any(bool_list):
-            if bool_list[0]:
-                if print_condition:
-                    print(print_strings[0])
-            elif bool_list[1]:
-                if print_condition:
-                    print(print_strings[1])
+            for i, val in enumerate(bool_list):
+                if val:
+                    print(print_strings[i].format(step))  # this should still run if step is None
             self.vertex_state = "true"
         else:
+            if (step is not None) and (n_steps is not None):
+                if step < n_steps:
+                    print(print_strings[-1].format(step))
             self.vertex_state = "false"

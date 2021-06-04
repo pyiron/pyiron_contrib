@@ -28,7 +28,7 @@ __date__ = "25 May, 2021"
 
 
 class _DecoupledOscillatorsInput(DataContainer):
-    def __init__(self, init=None, table_name="decoupled_input"):
+    def __init__(self, init=None, table_name='decoupled_input'):
         super().__init__(init=init, table_name=table_name)
         self.oscillators_id_list = None
         self.spring_constants_list = None
@@ -47,7 +47,7 @@ class _DecoupledOscillatorsInput(DataContainer):
     @structure.setter
     def structure(self, atoms: Atoms):
         if not isinstance(atoms, Atoms):
-            raise TypeError(f'<job>.input.structure must be of type Atoms but got {type(atoms)}')
+            raise TypeError(f"<job>.input.structure must be of type Atoms but got {type(atoms)}")
         self._structure = atoms
 
     @property
@@ -73,14 +73,14 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
         self.__version__ = "0.0.1"
         self.__name__ = "DecoupledOscillators"
         self.input = _DecoupledOscillatorsInput()
-        self.output = DataContainer(table_name="decoupled_output")
+        self.output = DataContainer(table_name='decoupled_output')
         self.interactive_cache = {
-            "forces": [],
-            "energy_pot": [],
-            "base_forces": [],
-            "base_energy_pot": [],
-            "harmonic_forces": [],
-            "harmonic_energy_pot": []
+            'forces': [],
+            'energy_pot': [],
+            'base_forces': [],
+            'base_energy_pot': [],
+            'harmonic_forces': [],
+            'harmonic_energy_pot': []
         }
         self._base_job = None
         self._forces = None
@@ -114,37 +114,37 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
         """
         # check if the job is interactive
         if self.server.run_mode != 'interactive':
-            raise TypeError('<job>.server.run_mode should be set to interactive')
+            raise TypeError("<job>.server.run_mode should be set to interactive")
 
         # check if input structure is of the Atoms class, and set the base structure
         if self.input.structure is None:
-            raise ValueError('<job>.input.structure is a necessary input')
+            raise ValueError("<job>.input.structure is a necessary input")
 
         # check if oscillator_id_list is a list of integers
         if isinstance(self.input.oscillators_id_list, list):
             if not all(isinstance(element, int) for element in self.input.oscillators_id_list):
-                raise ValueError('oscillator ids should be integers')
+                raise ValueError("oscillator ids should be integers")
         else:
-            raise ValueError('<job>.input.oscillators_id_list should be a list of integers')
+            raise ValueError("<job>.input.oscillators_id_list should be a list of integers")
 
         # check if spring_constants_list is a list of integers/floats
         if isinstance(self.input.spring_constants_list, list):
             if not all(isinstance(element, (int, float)) for element in self.input.spring_constants_list):
-                raise ValueError('spring constants should be integers or floats, and not array '
-                                 'data types like int64, float64 etc.')
+                raise ValueError("spring constants should be integers or floats, and not array "
+                                 "data types like int64, float64 etc.")
         else:
-            raise ValueError('<job>.input.spring_constants_list should be a list of integers or floats')
+            raise ValueError("<job>.input.spring_constants_list should be a list of integers or floats")
 
         # check if the length of oscillators_id_list and spring_constants_list is the same
         assert len(self.input.oscillators_id_list) == len(self.input.spring_constants_list), \
-            '<job>.input.oscillators_id_list and <job>.input.spring_constants_list should have the same length'
+            "<job>.input.oscillators_id_list and <job>.input.spring_constants_list should have the same length"
 
     def _load_ref_job(self):
         """
         Load the reference job from its path.
         """
         if self.input.ref_job_full_path is None:
-            raise ValueError('<job>.input.ref_job_full_path is a necessary input')
+            raise ValueError("<job>.input.ref_job_full_path is a necessary input")
         else:
             ref_job_path, ref_job_name = split(self.input.ref_job_full_path)
             pr = Project(ref_job_path)
@@ -180,7 +180,7 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
         """
         Returns the name of the child job of this class based off of the name of the job.
         """
-        return self.job_name + '__base'
+        return self.job_name + "__base"
 
     def _create_base_job(self):
         """
@@ -212,6 +212,7 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
             energy_pot
         """
         if isinstance(self._base_job, LammpsInteractive) and self._fast_lammps_mode:
+            # this is the code that runs lammps super fast
             self._base_job.interactive_initialize_interface()
             self._base_job.interactive_positions_setter(self.input.positions[self.input._base_atom_ids])
             self._base_job._interactive_lib_command(self._base_job._interactive_run_command)
@@ -239,7 +240,7 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
 
     def validate_ready_to_run(self):
         """
-        Perfrom these before running the job.
+        Perform these before running the job.
         """
         self._preliminary_check()
         self._load_ref_job()
@@ -257,19 +258,19 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
         forces[self.input._base_atom_ids], base_energy_pot = self._calc_static_base_job()  # get base forces and ens
         forces[self.input.oscillators_id_list], harmonic_energy_pot = self._calc_harmonic()  # get harm forces and ens
         energy_pot = base_energy_pot + harmonic_energy_pot
-        self.interactive_cache["forces"].append(forces)
-        self.interactive_cache["energy_pot"].append(energy_pot)
+        self.interactive_cache['forces'].append(forces)
+        self.interactive_cache['energy_pot'].append(energy_pot)
         if self.input.save_debug_data:
-            self.interactive_cache["base_forces"].append(forces[self.input._base_atom_ids])
-            self.interactive_cache["base_energy_pot"].append(base_energy_pot)
-            self.interactive_cache["harmonic_forces"].append(forces[self.input.oscillators_id_list])
-            self.interactive_cache["harmonic_energy_pot"].append(harmonic_energy_pot)
+            self.interactive_cache['base_forces'].append(forces[self.input._base_atom_ids])
+            self.interactive_cache['base_energy_pot'].append(base_energy_pot)
+            self.interactive_cache['harmonic_forces'].append(forces[self.input.oscillators_id_list])
+            self.interactive_cache['harmonic_energy_pot'].append(harmonic_energy_pot)
 
     def interactive_forces_getter(self):
-        return self.interactive_cache["forces"][-1]
+        return self.interactive_cache['forces'][-1]
 
     def interactive_energy_pot_getter(self):
-        return self.interactive_cache["energy_pot"][-1]
+        return self.interactive_cache['energy_pot'][-1]
 
     def to_hdf(self, hdf=None, group_name=None):
         """
@@ -307,19 +308,19 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
             self._base_job.status.finished = True
         else:
             # if it is an hdf object, check its job status
-            for job in self.project.iter_jobs(status='running'):
-                if '__base' in job.job_name:
+            for job in self.project.iter_jobs(status="running"):
+                if "__base" in job.job_name:
                     base_job = self.project.load(job.job_name)  # load and close
                     base_job.interactive_close()
                     base_job.status.finished = True
         # assign forces and energy_pot to output list
-        self.output.forces = np.array(self.interactive_cache["forces"])
-        self.output.energy_pot = np.array(self.interactive_cache["energy_pot"])
+        self.output.forces = np.array(self.interactive_cache['forces'])
+        self.output.energy_pot = np.array(self.interactive_cache['energy_pot'])
         if self.input.save_debug_data:
-            self.output.base_forces = np.array(self.interactive_cache["base_forces"])
-            self.output.base_energy_pot = np.array(self.interactive_cache["base_energy_pot"])
-            self.output.harmonic_forces = np.array(self.interactive_cache["harmonic_forces"])
-            self.output.harmonic_energy_pot = np.array(self.interactive_cache["harmonic_energy_pot"])
+            self.output.base_forces = np.array(self.interactive_cache['base_forces'])
+            self.output.base_energy_pot = np.array(self.interactive_cache['base_energy_pot'])
+            self.output.harmonic_forces = np.array(self.interactive_cache['harmonic_forces'])
+            self.output.harmonic_energy_pot = np.array(self.interactive_cache['harmonic_energy_pot'])
         self.to_hdf(self.project_hdf5)   # run to_hdf to re-save input
         self.output.to_hdf(self.project_hdf5)  # save output
         self.project.db.item_update(self._runtime(), self._job_id)  # update

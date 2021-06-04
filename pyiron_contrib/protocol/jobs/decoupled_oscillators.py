@@ -84,7 +84,7 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
         }
         self._base_job = None
         self._forces = None
-        self._fast_mode = True
+        self._fast_lammps_mode = True
 
     @property
     def structure(self):
@@ -196,7 +196,7 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
         )
         # set all the parameters
         self._base_job.structure = self._base_structure
-        if self._fast_mode:
+        if self._fast_lammps_mode:
             self._base_job.interactive_flush_frequency = 10**10
             self._base_job.interactive_write_frequency = 10**10
         self._base_job.interactive_open()
@@ -211,9 +211,14 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
             forces
             energy_pot
         """
-        self._base_job.structure.positions = self.input.positions[self.input._base_atom_ids]
-        self._base_job.calc_static()
-        self._base_job.run()
+        if isinstance(self._base_job, LammpsInteractive) and self._fast_lammps_mode:
+            self._base_job.interactive_initialize_interface()
+            self._base_job.interactive_positions_setter(self.input.positions[self.input._base_atom_ids])
+            self._base_job._interactive_lib_command(self._base_job._interactive_run_command)
+        else:
+            self._base_job.structure.positions = self.input.positions[self.input._base_atom_ids]
+            self._base_job.calc_static()
+            self._base_job.run()
         return self._base_job.interactive_forces_getter(), self._base_job.interactive_energy_pot_getter()
 
     def _calc_harmonic(self):

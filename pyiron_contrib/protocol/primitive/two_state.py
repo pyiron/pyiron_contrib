@@ -13,9 +13,7 @@ Primitive protocols which have two outbound execution edges.
 
 class BoolVertex(PrimitiveVertex):
     """
-    This is a class of commands designed to branch the graph based on a binary check. They do not have
-
-    Attributes
+    This is a class of commands designed to branch the graph based on a binary check. They do not have attributes.
     """
     def __init__(self, name=None):
         super(BoolVertex, self).__init__(name=name)
@@ -28,8 +26,8 @@ class BoolVertex(PrimitiveVertex):
 
 class IsGEq(BoolVertex):
     """
-    Checks if an input value is greater than or equal to a target threshold. Vertex state switches from 'false' to
-    'true' when the target exceeds the threshold.
+    Checks if an input value is greater than or equal to a target threshold. Vertex state switches from "false" to
+    "true" when the target exceeds the threshold.
     Input attributes:
         target (float/int): The value being checked. (Default is numpy infinity.)
         threshold (float/int): What it's being checked against. (Default is zero.)
@@ -48,8 +46,8 @@ class IsGEq(BoolVertex):
 
 class IsLEq(BoolVertex):
     """
-    Checks if an input value is less than or equal to a target threshold. Vertex state switches from 'false' to
-    'true' when the target exceeds the threshold.
+    Checks if an input value is less than or equal to a target threshold. Vertex state switches from "false" to
+    "true" when the target exceeds the threshold.
 
     Input attributes:
         target (float/int): The value being checked. (Default is zero.)
@@ -101,7 +99,7 @@ class AnyVertex(BoolVertex):
                 else:
                     bool_list.append(False)
             else:
-                raise TypeError(str(i) + ' is not an instance of PrimitiveVertex.')
+                raise TypeError(str(i) + " is not an instance of PrimitiveVertex")
 
         print_condition = (len(print_strings) == len(vertices))
 

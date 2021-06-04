@@ -1,0 +1,4 @@
+# .coveragerc to control coverage.py
+[run]
+source = pyiron_contrib
+omit = pyiron_contrib/_version.py

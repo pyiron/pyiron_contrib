@@ -519,7 +519,7 @@ class TILDParallel(CompoundVertex):
             gp.check_convergence
         ]
         g.exit.input.print_strings = [
-            "Maximum steps ({}) exceeded. Stopping run.",
+            "Maximum steps ({}) reached. Stopping run.",
             "Convergence reached in {} steps. Stopping run.",
             "Convergence not reached in {} steps. Continuing run..."  # 1 extra, if convergence is not reached!
         ]

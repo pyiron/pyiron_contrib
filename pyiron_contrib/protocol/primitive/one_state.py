@@ -1333,11 +1333,11 @@ class TILDValidate(PrimitiveVertex):
         n_steps (int): How many MD steps to run for. (Default is 100.)
         thermalization_steps (int): Number of steps the system is thermalized for to reach equilibrium. (Default is
             10 steps.)
-        sampling_period (int): Collect a 'sample' every 'sampling_period' steps. (Default is 1, collect sample
+        sampling_steps (int): Collect a 'sample' every 'sampling_steps' steps. (Default is 1, collect sample
             for every MD step.
     """
 
-    def command(self, ref_job_a, ref_job_b, n_steps, thermalization_steps, sampling_period, convergence_check_steps):
+    def command(self, ref_job_a, ref_job_b, n_steps, thermalization_steps, sampling_steps, convergence_check_steps):
         # check if the ref jobs are of valid job types
         self._check_job(ref_job_a)
         self._check_job(ref_job_b)
@@ -1345,8 +1345,8 @@ class TILDValidate(PrimitiveVertex):
         # check if the n_steps is divisible by (x) steps
         message = "n_steps must be divisible by thermalization steps"
         self._check_modulo(target=n_steps, mod=thermalization_steps, message=message)
-        message = "n_steps must be divisible by sampling_period"
-        self._check_modulo(target=n_steps, mod=sampling_period, message=message)
+        message = "n_steps must be divisible by sampling_steps"
+        self._check_modulo(target=n_steps, mod=sampling_steps, message=message)
         message = "n_steps must be divisible by convergence_check_steps"
         self._check_modulo(target=n_steps, mod=convergence_check_steps, message=message)
 

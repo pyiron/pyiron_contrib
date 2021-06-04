@@ -55,7 +55,7 @@ class _TILDLambdaEvolution(CompoundVertex):
         g.verlet_velocities = VerletVelocityUpdate()
         g.check_thermalized = IsGEq()
         g.average_temp = WelfordOnline()
-        g.check_sampling_period = ModIsZero()
+        g.check_sampling_steps = ModIsZero()
         g.addition = WeightedSum()
         g.average_tild = WelfordOnline()
         g.fep_exp = FEPExponential()
@@ -76,7 +76,7 @@ class _TILDLambdaEvolution(CompoundVertex):
             g.verlet_velocities,
             g.check_thermalized, "true",
             g.average_temp,
-            g.check_sampling_period, "true",
+            g.check_sampling_steps, "true",
             g.addition,
             g.average_tild,
             g.fep_exp,
@@ -84,7 +84,7 @@ class _TILDLambdaEvolution(CompoundVertex):
             g.check_steps
         )
         g.make_edge(g.check_thermalized, g.check_steps, "false")
-        g.make_edge(g.check_sampling_period, g.check_steps, "false")
+        g.make_edge(g.check_sampling_steps, g.check_steps, "false")
         g.starting_vertex = g.check_steps
         g.restarting_vertex = g.clock
 
@@ -168,9 +168,9 @@ class _TILDLambdaEvolution(CompoundVertex):
         g.average_temp.input.n_samples = gp.average_temp.output.n_samples[-1]
         g.average_temp.input.sample = gp.verlet_velocities.output.instant_temperature[-1]
 
-        # check_sampling_period
-        g.check_sampling_period.input.target = gp.reflect.output.total_steps[-1]
-        g.check_sampling_period.input.default.mod = ip.sampling_period
+        # check_sampling_steps
+        g.check_sampling_steps.input.target = gp.reflect.output.total_steps[-1]
+        g.check_sampling_steps.input.default.mod = ip.sampling_steps
 
         # addition
         g.addition.input.vectors = [
@@ -260,7 +260,7 @@ class TILDParallel(CompoundVertex):
         n_steps (int): How many MD steps to run for. (Default is 100.)
         thermalization_steps (int): Number of steps the system is thermalized for to reach equilibrium. (Default is
             10 steps.)
-        sampling_period (int): Collect a 'sample' every 'sampling_period' steps. (Default is 1, collect sample
+        sampling_steps (int): Collect a 'sample' every 'sampling_steps' steps. (Default is 1, collect sample
             for every MD step.
         time_step (float): MD time step in fs. (Default is 1.)
         temperature_damping_timescale (float): Langevin thermostat timescale in fs. (Default is None, which runs NVE.)
@@ -305,7 +305,7 @@ class TILDParallel(CompoundVertex):
         id_.lambda_bias = 0.5
         id_.n_steps = 100
         id_.thermalization_steps = 10
-        id_.sampling_period = 1
+        id_.sampling_steps = 1
         id_.time_step = 1.
         id_.temperature_damping_timescale = 100.
         id_.overheat_fraction = 2.
@@ -377,7 +377,7 @@ class TILDParallel(CompoundVertex):
         g.validate.input.ref_job_b = ip.ref_job_b
         g.validate.input.n_steps = ip.n_steps
         g.validate.input.thermalization_steps = ip.thermalization_steps
-        g.validate.input.sampling_period = ip.sampling_period
+        g.validate.input.sampling_steps = ip.sampling_steps
         g.validate.input.convergence_check_steps = ip.convergence_check_steps
 
         # build_lambdas
@@ -465,8 +465,8 @@ class TILDParallel(CompoundVertex):
         # run_lambda_points - check_thermalized
         g.run_lambda_points.direct.thermalization_steps = ip.thermalization_steps
 
-        # run_lambda_points - check_sampling_period
-        g.run_lambda_points.direct.sampling_period = ip.sampling_period
+        # run_lambda_points - check_sampling_steps
+        g.run_lambda_points.direct.sampling_steps = ip.sampling_steps
 
         # run_lambda_points - average_temp
         g.run_lambda_points.direct.default.average_temp_mean = ip._mean

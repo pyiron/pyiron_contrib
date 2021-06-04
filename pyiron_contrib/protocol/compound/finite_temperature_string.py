@@ -54,7 +54,7 @@ class FTSEvolution(CompoundVertex):
             case equipartition of energy tells us that the kinetic energy should be initialized to double the
             desired value. (Default is 2.0, assume energy equipartition is a good idea.)
         time_step (float): MD time step in fs. (Default is 1.)
-        sampling_period (int): Account output every `sampling_period' for the TI operations. (Default is 1, account
+        sampling_steps (int): Account output every `sampling_steps' for the TI operations. (Default is 1, account
             for every MD step.
         thermalization_steps (int): Number of steps the system is thermalized for to reach equilibrium. (Default is
             10 steps.)
@@ -93,7 +93,7 @@ class FTSEvolution(CompoundVertex):
         id_.temperature_damping_timescale = 100.
         id_.overheat_fraction = 2.
         id_.time_step = 1.
-        id_.sampling_period = 1
+        id_.sampling_steps = 1
         id_.thermalization_steps = 10
         id_.n_images = 5
         id_.initial_positions = None
@@ -124,7 +124,7 @@ class FTSEvolution(CompoundVertex):
         g.calc_static_images = SerialList(ExternalHamiltonian)
         g.verlet_velocities = SerialList(VerletVelocityUpdate)
         g.running_average_pos = SerialList(PositionsRunningAverage)
-        g.check_sampling_period = ModIsZero()
+        g.check_sampling_steps = ModIsZero()
         g.mix = CentroidsRunningAverageMix()
         g.smooth = CentroidsSmoothing()
         g.reparameterize = CentroidsReparameterization()
@@ -149,7 +149,7 @@ class FTSEvolution(CompoundVertex):
             g.calc_static_images,
             g.verlet_velocities,
             g.running_average_pos,
-            g.check_sampling_period, 'true',
+            g.check_sampling_steps, 'true',
             g.mix,
             g.smooth,
             g.reparameterize,
@@ -158,7 +158,7 @@ class FTSEvolution(CompoundVertex):
             g.clock,
             g.check_steps
         )
-        g.make_edge(g.check_sampling_period, g.recenter, 'false')
+        g.make_edge(g.check_sampling_steps, g.recenter, 'false')
         g.starting_vertex = g.initialize_images
         g.restarting_vertex = g.check_steps
 
@@ -283,9 +283,9 @@ class FTSEvolution(CompoundVertex):
         g.running_average_pos.broadcast.positions = gp.reflect_atoms.output.positions[-1]
         g.running_average_pos.direct.structure = ip.structure_initial
 
-        # check_sampling_period
-        g.check_sampling_period.input.target = gp.clock.output.n_counts[-1]
-        g.check_sampling_period.input.default.mod = ip.sampling_period
+        # check_sampling_steps
+        g.check_sampling_steps.input.target = gp.clock.output.n_counts[-1]
+        g.check_sampling_steps.input.default.mod = ip.sampling_steps
 
         # mix
         g.mix.input.default.centroids_pos_list = gp.initial_positions.output.initial_positions[-1]
@@ -712,10 +712,10 @@ class FTSEvolutionParallel(FTSEvolution):
             gp.constrained_evo.output.running_average_positions[-1]
 
         # constrained_evolution - clock
-        g.constrained_evo.direct.n_steps = ip.sampling_period
+        g.constrained_evo.direct.n_steps = ip.sampling_steps
 
         # clock
-        g.clock.input.add_counts = ip.sampling_period
+        g.clock.input.add_counts = ip.sampling_steps
 
         # check_thermalized
         g.check_thermalized.input.target = gp.constrained_evo.output.total_steps[-1][-1]

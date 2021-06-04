@@ -170,7 +170,6 @@ class ParallelList(ListVertex):
         for child in self.children:
             child.parallel_setup()
 
-        start_time = time.time()
         sleep_time = ~self.sleep_time
 
         all_child_output = Manager().dict()
@@ -186,8 +185,6 @@ class ParallelList(ListVertex):
             job.join()
             time.sleep(sleep_time)
 
-        print(all_child_output.keys())
-
         ordered_child_output = dict.fromkeys(range(len(all_child_output)))
         for i in range(len(all_child_output)):
             ordered_child_output[i] = all_child_output[i]
@@ -202,9 +199,6 @@ class ParallelList(ListVertex):
                 output_data[key] = values
         else:
             output_data = None
-
-        stop_time = time.time()
-        print('Time elapsed :', stop_time - start_time)
 
         return output_data
 

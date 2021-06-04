@@ -66,7 +66,7 @@ class _TILDLambdaEvolution(CompoundVertex):
         # Execution flow
         g = self.graph
         g.make_pipeline(
-            g.check_steps, 'false',
+            g.check_steps, "false",
             g.clock,
             g.verlet_positions,
             g.reflect,
@@ -74,17 +74,17 @@ class _TILDLambdaEvolution(CompoundVertex):
             g.calc_static_b,
             g.mix,
             g.verlet_velocities,
-            g.check_thermalized, 'true',
+            g.check_thermalized, "true",
             g.average_temp,
-            g.check_sampling_period, 'true',
+            g.check_sampling_period, "true",
             g.addition,
             g.average_tild,
             g.fep_exp,
             g.average_fep_exp,
             g.check_steps
         )
-        g.make_edge(g.check_thermalized, g.check_steps, 'false')
-        g.make_edge(g.check_sampling_period, g.check_steps, 'false')
+        g.make_edge(g.check_thermalized, g.check_steps, "false")
+        g.make_edge(g.check_sampling_period, g.check_steps, "false")
         g.starting_vertex = g.check_steps
         g.restarting_vertex = g.clock
 
@@ -97,9 +97,6 @@ class _TILDLambdaEvolution(CompoundVertex):
         # check_steps
         g.check_steps.input.target = gp.clock.output.n_counts[-1]
         g.check_steps.input.threshold = ip.n_sub_steps
-
-        # clock
-        g.clock.input.max_counts = ip.n_sub_steps
 
         # verlet_positions
         g.verlet_positions.input.default.positions = ip.positions
@@ -346,16 +343,16 @@ class TILDParallel(CompoundVertex):
             g.initial_velocities,
             g.create_jobs_a,
             g.create_jobs_b,
-            g.check_steps, 'false',
-            g.check_convergence, 'false',
+            g.check_steps, "false",
+            g.check_convergence, "false",
             g.run_lambda_points,
             g.clock,
             g.post,
             g.exit
         )
-        g.make_edge(g.check_steps, g.exit, 'true')
-        g.make_edge(g.check_convergence, g.exit, 'true')
-        g.make_edge(g.exit, g.check_steps, 'false')
+        g.make_edge(g.check_steps, g.exit, "true")
+        g.make_edge(g.check_convergence, g.exit, "true")
+        g.make_edge(g.exit, g.check_steps, "false")
         g.starting_vertex = g.build_lambdas
         g.restarting_vertex = g.create_jobs_a
 
@@ -488,7 +485,6 @@ class TILDParallel(CompoundVertex):
 
         # clock
         g.clock.input.add_counts = ip.convergence_check_steps
-        g.clock.input.max_counts = ip.n_steps
 
         # post_processing
         g.post.input.lambda_pairs = gp.build_lambdas.output.lambda_pairs[-1]
@@ -505,8 +501,8 @@ class TILDParallel(CompoundVertex):
             gp.check_convergence
         ]
         g.exit.input.print_strings = [
-            'Maximum steps reached',
-            'Convergence reached'
+            "Maximum steps reached",
+            "Convergence reached"
         ]
 
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])

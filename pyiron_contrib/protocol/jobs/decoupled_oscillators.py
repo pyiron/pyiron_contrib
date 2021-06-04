@@ -112,10 +112,6 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
         """
         Check if the necessary inputs are provided.
         """
-        # check if the job is interactive
-        if self.server.run_mode != 'interactive':
-            raise TypeError("<job>.server.run_mode should be set to interactive")
-
         # check if input structure is of the Atoms class, and set the base structure
         if self.input.structure is None:
             raise ValueError("<job>.input.structure is a necessary input")
@@ -265,6 +261,16 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
             self.interactive_cache['base_energy_pot'].append(base_energy_pot)
             self.interactive_cache['harmonic_forces'].append(forces[self.input.oscillators_id_list])
             self.interactive_cache['harmonic_energy_pot'].append(harmonic_energy_pot)
+
+    def run_static(self):
+        """
+        If the job is not run interactively, then run it for one step (interactively) and close.
+        """
+        run_mode = self.server.run_mode.mode  # save the existing run mode
+        self.interactive_open()  # change the run mode to interactive
+        self.run_if_interactive()  # run interactively
+        self.interactive_close()  # close interactive
+        self.server.run_mode = run_mode  # set the current run mode to the initial run mode
 
     def interactive_forces_getter(self):
         return self.interactive_cache['forces'][-1]

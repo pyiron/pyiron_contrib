@@ -84,8 +84,6 @@ class Counter(PrimitiveVertex):
     Increments by one at each execution. Can be made to increment from a specific value.
     Input attributes:
         add_counts (int): A specific value from which to increment. (Default is 0.)
-        max_counts (int): Reset the counter to 1, if the this value is crossed. 1, because the step at which the
-            counter is called also counts! (Default is 1e10.)
     Output attributes:
         n_counts (int): How many executions have passed. (Default is 0.)
     """
@@ -137,7 +135,7 @@ class DeleteAtoms(PrimitiveVertex):
     Given a structure, deletes atoms whose indices are in the atom_id list.
     Input attributes:
         structure (Atoms): The structure to delete atoms of.
-        atom_id (int): Which atoms to delete. (Default is 0, the 0th atom.)
+        atom_id_list (list(int)): Which atoms to delete. (Default is 0, the 0th atom.)
     Output attributes:
         structure (Atoms): The new, modified structure.
         mask (numpy.ndarray): The integer ids shared by both the old and new structure.
@@ -148,6 +146,13 @@ class DeleteAtoms(PrimitiveVertex):
         self.input.default.atoms_id_list = [0]
 
     def command(self, structure, atoms_id_list):
+        # check if atoms_id_list is a list of integers
+        if isinstance(atoms_id_list, list):
+            if not all(isinstance(atom_id, int) for atom_id in atoms_id_list):
+                raise ValueError("Atom ids should be integers")
+        else:
+            raise ValueError("atoms_id_list should be a list of integers")
+
         vacancy_structure = structure.copy()
         for i, atom_id in enumerate(np.sort(atoms_id_list)):
             new_atom_id = atom_id - i
@@ -234,7 +239,10 @@ class ExternalHamiltonian(PrimitiveVertex):
                     self._job.calc_static()
                     self._job.run()
         else:
-            raise TypeError('Job of class {} is not compatible.'.format(self._job.__class__))
+            if self._job is not None:
+                raise TypeError("Job of class {} is not compatible".format(self._job.__class__))
+            else:
+                raise ValueError("Please make sure that the child jobs are created")
         return {key: self._get_interactive_value(key) for key in interesting_keys}
 
     def _job_reload(self):
@@ -295,7 +303,7 @@ class CreateSubJobs(PrimitiveVertex):
     def command(self, ref_job, n_images, structure, *args, **kwargs):
         project_path = ref_job.project.path
         pr = Project(path=project_path)
-        pr_sub = pr.create_group(self.vertex_name + '_children')
+        pr_sub = pr.create_group(self.vertex_name + "_children")
         self._jobs_project_path = []
         self._jobs_names = []
         for i in np.arange(n_images):
@@ -332,7 +340,7 @@ class CreateSubJobs(PrimitiveVertex):
             job.validate_ready_to_run()
             job.save()
         else:
-            raise TypeError('Job of class {} is not compatible.'.format(ref_job.__class__))
+            raise TypeError("Job of class {} is not compatible".format(ref_job.__class__))
         return job, job.project.path, job.job_name
 
     def finish(self):
@@ -455,7 +463,7 @@ class InitialPositions(PrimitiveVertex):
                 initial_positions.append(pos_i + (mix * displacement))
         else:
             if len(initial_positions) != n_images:
-                raise TypeError("Length of positions is not the same as n_images!")
+                raise TypeError("Length of positions is not the same as n_images")
         return {
             'initial_positions': initial_positions
         }
@@ -514,7 +522,7 @@ class HarmonicHamiltonian(PrimitiveVertex):
                 forces = retransformed_forces
                 energy = -0.5 * np.tensordot(forces, dr)
         else:
-            raise TypeError('Please specify either a spring constant or the force constant matrix')
+            raise TypeError("Please specify either a spring constant or the force constant matrix")
         return {
             'forces': forces,
             'energy_pot': energy
@@ -523,6 +531,7 @@ class HarmonicHamiltonian(PrimitiveVertex):
     @staticmethod
     def transform_force_constants(force_constants, n_atoms):
         force_shape = np.shape(force_constants)
+        transformed_force_constants = None
         if force_shape[2] == 3 and force_shape[3] == 3:
             force_reshape = force_shape[0] * force_shape[2]
             transformed_force_constants = np.transpose(
@@ -648,7 +657,7 @@ class NEBForces(PrimitiveVertex):
         super(NEBForces, self).__init__(name=name)
         id_ = self.input.default
         id_.spring_constant = 1.
-        id_.tangent_style = 'upwinding'
+        id_.tangent_style = "upwinding"
         id_.use_climbing_image = True
         id_.smoothing = None
 
@@ -680,11 +689,11 @@ class NEBForces(PrimitiveVertex):
             tau_right = dr_right / np.linalg.norm(dr_right)
 
             # Calculate the NEB tangent vector
-            if tangent_style == 'plain':
+            if tangent_style == "plain":
                 tau = self.normalize(dr_right + dr_left)
-            elif tangent_style == 'improved':
+            elif tangent_style == "improved":
                 tau = self.normalize(tau_left + tau_right)
-            elif tangent_style == 'upwinding':
+            elif tangent_style == "upwinding":
                 en_left = energies[i - 1]
                 en = energies[i]
                 en_right = energies[i + 1]
@@ -1204,7 +1213,7 @@ class WeightedSum(PrimitiveVertex):
             n = len(vectors)
             weights = np.ones() / n
         elif len(weights) != len(vectors):
-            raise ValueError('The length of the weights and vectors must be comensurate, but were {} and {}'.format(
+            raise ValueError("The length of the weights and vectors must be comensurate, but were {} and {}".format(
                 len(weights), len(vectors)))
 
         # Mask vectors
@@ -1288,12 +1297,12 @@ class FEPExponential(PrimitiveVertex):
     """
 
     def command(self, u_diff, delta_lambda, temperature):
-        warnings.filterwarnings('error')
+        warnings.filterwarnings("error")
         try:
             exponential_difference = np.exp(-u_diff * delta_lambda / (KB * temperature))
         except RuntimeWarning:
             exponential_difference = np.nan
-        warnings.filterwarnings('default')
+        warnings.filterwarnings("default")
         return {
             'exponential_difference': exponential_difference
         }
@@ -1410,13 +1419,13 @@ class BerendsenBarostat(PrimitiveVertex):
         id_.pressure_damping_timescale = 1000.
         id_.time_step = 1.
         id_.compressibility = 4.57e-5  # compressibility of water in bar^-1
-        id_.pressure_style = 'isotropic'
+        id_.pressure_style = "isotropic"
 
     def command(self, pressure, temperature, box_pressure, energy_kin, time_step, positions,
                 pressure_damping_timescale, compressibility, structure, previous_volume, pressure_style):
 
-        if pressure_style != 'isotropic' and pressure_style != 'anisotropic':
-            raise TypeError('style can only be \'isotropic\' or \'anisotropic\'')
+        if pressure_style != "isotropic" and pressure_style != "anisotropic":
+            raise TypeError("style can only be \'isotropic\' or \'anisotropic\'")
 
         n_atoms = len(structure.positions)
 
@@ -1431,7 +1440,7 @@ class BerendsenBarostat(PrimitiveVertex):
         if pressure is None:
             new_structure = structure.copy()
             total_pressure = isotropic_pressure
-        elif pressure is not None and pressure_style == 'isotropic':
+        elif pressure is not None and pressure_style == "isotropic":
             new_structure = structure.copy()
             new_structure.positions = positions
             first_term = ((2 * energy_kin) / (3 * previous_volume)) * EV_PER_ANGCUB_TO_GPA
@@ -1440,7 +1449,7 @@ class BerendsenBarostat(PrimitiveVertex):
             eta = 1 - (tau * (pressure - total_pressure) * GPA_TO_BAR)
             new_cell = new_structure.cell * eta
             new_structure.set_cell(new_cell, scale_atoms=True)
-        elif pressure is not None and pressure_style == 'anisotropic':
+        elif pressure is not None and pressure_style == "anisotropic":
             new_structure = structure.copy()
             new_structure.positions = positions
             first_term = ((2 * energy_kin) / (3 * previous_volume)) * EV_PER_ANGCUB_TO_GPA
@@ -1460,7 +1469,7 @@ class BerendsenBarostat(PrimitiveVertex):
             new_structure.set_cell(new_cell, scale_atoms=True)
             total_pressure = np.mean([total_pressure_x, total_pressure_y, total_pressure_z])
         else:
-            raise TypeError('Invalid value for pressure')
+            raise TypeError("Invalid value for pressure")
         return {
             'pressure': total_pressure,
             'structure': new_structure,

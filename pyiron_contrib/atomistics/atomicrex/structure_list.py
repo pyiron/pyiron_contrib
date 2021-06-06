@@ -27,6 +27,8 @@ class ARStructureContainer:
         # This allows to preallocate arrays and speed everything up massively
         # when writing and reading hdf5 files
 
+    __version__ = "0.2.0"
+    __hdf_version__ = "0.2.0"
 
     def init_structure_container(
         self,
@@ -99,9 +101,21 @@ class ARStructureContainer:
         self.fit_properties[prop].output[self.flattened_structures.prev_structure_index] = output
         self.fit_properties[prop].tolerance[self.flattened_structures.prev_structure_index] = tolerance
 
+    def _type_to_hdf(self, hdf):
+        """
+        Internal helper function to save type and version in hdf root
+
+        Args:
+            hdf (ProjectHDFio): HDF5 group object
+        """
+        hdf["NAME"] = self.__class__.__name__
+        hdf["TYPE"] = str(type(self))
+        hdf["VERSION"] = self.__version__
+        hdf["HDF_VERSION"] = self.__hdf_version__
 
     def to_hdf(self, hdf, group_name="structures"):
         with hdf.open(group_name) as h:
+            self._type_to_hdf(h)
             self.flattened_structures.to_hdf(hdf=h)
 
             h_fit = h.create_group("fit_properties")
@@ -115,11 +129,12 @@ class ARStructureContainer:
 
     def from_hdf(self, hdf, group_name="structures"):
         with hdf.open(group_name) as h:
+            version = h.get("HDF_VERSION", "0.1.0")
             # Compatibility Old and new StructureContainer
-            try:
+            if version == "0.1.0":
                 num_structures = h["flattened_structures/num_structures"]
                 num_atoms = h["flattened_structures/num_atoms"]
-            except ValueError:
+            else:
                 num_structures = h["structures/num_structures"]
                 num_atoms = h["structures/num_atoms"]
 

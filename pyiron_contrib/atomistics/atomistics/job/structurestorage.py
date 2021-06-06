@@ -14,7 +14,7 @@ import h5py
 from pyiron_atomistics.atomistics.structure.atoms import Atoms
 from pyiron_atomistics.atomistics.structure.has_structure import HasStructure
 
-class StructureContainer(HasStructure):
+class StructureStorage(HasStructure):
     """
     Class that can write and read lots of structures from and to hdf quickly.
 
@@ -25,7 +25,7 @@ class StructureContainer(HasStructure):
 
     You can add structures and a human-readable name with :method:`.add_structure()`.
 
-    >>> container = StructureContainer()
+    >>> container = StructureStorage()
     >>> container.add_structure(Atoms(...), "fcc")
     >>> container.add_structure(Atoms(...), "hcp")
     >>> container.add_structure(Atoms(...), "bcc")
@@ -184,7 +184,7 @@ class StructureContainer(HasStructure):
         elif name in self._per_structure_arrays:
             return self._per_structure_arrays[name][frame]
         else:
-            raise KeyError(f"no array named {name} defined on StructureContainer")
+            raise KeyError(f"no array named {name} defined on StructureStorage")
 
     def set_array(self, name, frame, value):
         """
@@ -207,7 +207,7 @@ class StructureContainer(HasStructure):
         elif name in self._per_structure_arrays:
             self._per_structure_arrays[name][frame] = value
         else:
-            raise KeyError(f"no array named {name} defined on StructureContainer")
+            raise KeyError(f"no array named {name} defined on StructureStorage")
 
     def _resize_atoms(self, new):
         self._num_atoms_alloc = new
@@ -236,7 +236,7 @@ class StructureContainer(HasStructure):
 
         Adding an array with the same name twice is ignored, if dtype and shape match, otherwise raises an exception.
 
-        >>> container = StructureContainer()
+        >>> container = StructureStorage()
         >>> container.add_structure(Atoms(...), "foo")
         >>> container.add_array("energy", shape=(), dtype=np.float64, fill=42, per="structure")
         >>> container.get_array("energy", 0)
@@ -291,7 +291,7 @@ class StructureContainer(HasStructure):
         Additional keyword arguments given specify additional arrays to store for the structure.  If an array with the
         given keyword name does not exist yet, it will be added to the container.
 
-        >>> container = StructureContainer()
+        >>> container = StructureStorage()
         >>> container.add_structure(Atoms(...), identifier="A", energy=3.14)
         >>> container.get_array("energy", 0)
         3.14
@@ -379,7 +379,7 @@ class StructureContainer(HasStructure):
         hdf["TYPE"] = str(type(self))
         hdf["VERSION"] = self.__version__
         hdf["HDF_VERSION"] = self.__hdf_version__
-        hdf["OBJECT"] = "StructureContainer"
+        hdf["OBJECT"] = "StructureStorage"
 
     def to_hdf(self, hdf, group_name="structures"):
         # truncate arrays to necessary size before writing
@@ -433,7 +433,7 @@ class StructureContainer(HasStructure):
         for i, name in enumerate(self._per_structure_arrays["identifiers"]):
             if name == frame:
                 return i
-        raise KeyError(f"No structure named {frame} in StructureContainer.")
+        raise KeyError(f"No structure named {frame} in StructureStorage.")
 
     def _get_structure(self, frame=-1, wrap_atoms=True):
         I = self._per_structure_arrays["start_indices"][frame]

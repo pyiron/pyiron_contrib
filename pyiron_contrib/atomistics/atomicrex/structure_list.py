@@ -6,7 +6,7 @@ from ase import Atoms as ASEAtoms
 from pyiron_base import DataContainer
 from pyiron_atomistics import pyiron_to_ase, ase_to_pyiron, Atoms
 
-from pyiron_contrib.atomistics.atomistics.job.structurecontainer import StructureContainer
+from pyiron_contrib.atomistics.atomistics.job.structurestorage import StructureStorage
 from pyiron_contrib.atomistics.atomicrex.fit_properties import ARFitPropertyList, ARFitProperty
 from pyiron_contrib.atomistics.atomicrex.utility_functions import write_pretty_xml
 from pyiron_contrib.atomistics.atomicrex.fit_properties import FlattenedARProperty, FlattenedARVectorProperty
@@ -46,7 +46,7 @@ class ARStructureContainer:
         self.structure_file_path = structure_file_path
 
     def _init_structure_container(self, num_structures, num_atoms):
-        self.flattened_structures = StructureContainer(num_structures=num_structures, num_atoms=num_atoms)
+        self.flattened_structures = StructureStorage(num_structures=num_structures, num_atoms=num_atoms)
         self.fit = np.empty(num_structures, dtype=bool)
         self.clamp = np.empty(num_structures, dtype=bool)
         self.relative_weight = np.empty(num_structures)
@@ -130,7 +130,7 @@ class ARStructureContainer:
     def from_hdf(self, hdf, group_name="structures"):
         with hdf.open(group_name) as h:
             version = h.get("HDF_VERSION", "0.1.0")
-            # Compatibility Old and new StructureContainer
+            # Compatibility Old and new StructureStorage
             if version == "0.1.0":
                 num_structures = h["flattened_structures/num_structures"]
                 num_atoms = h["flattened_structures/num_atoms"]

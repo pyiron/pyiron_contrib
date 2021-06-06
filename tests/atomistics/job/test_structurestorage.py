@@ -1,5 +1,5 @@
 from pyiron_atomistics._tests import TestWithProject
-from pyiron_contrib.atomistics.atomistics.job.structurecontainer import StructureContainer
+from pyiron_contrib.atomistics.atomistics.job.structurestorage import StructureStorage
 import os.path
 import numpy as np
 
@@ -12,7 +12,7 @@ class TestContainer(TestWithProject):
         cls.structures = [cls.project.create.structure.bulk(el).repeat(3) for el in cls.elements]
 
     def setUp(self):
-        self.cont = StructureContainer(
+        self.cont = StructureStorage(
                     num_structures=len(self.structures),
                     num_atoms=sum(len(s) for s in self.structures)
         )
@@ -136,7 +136,7 @@ class TestContainer(TestWithProject):
         """A dynamically resized container should behave exactly as a pre-allocated container."""
 
         cont_static = self.cont
-        cont_dynamic = StructureContainer(num_structures=2, num_atoms=10)
+        cont_dynamic = StructureStorage(num_structures=2, num_atoms=10)
 
         for s in self.structures:
             cont_dynamic.add_structure(s, s.get_chemical_formula())

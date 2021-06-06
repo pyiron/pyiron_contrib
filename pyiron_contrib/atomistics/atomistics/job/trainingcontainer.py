@@ -32,7 +32,7 @@ from warnings import catch_warnings
 
 import numpy as np
 import pandas as pd
-from pyiron_contrib.atomistics.atomistics.job.structurecontainer import StructureContainer
+from pyiron_contrib.atomistics.atomistics.job.structurestorage import StructureStorage
 from pyiron_atomistics.atomistics.structure.atoms import Atoms
 from pyiron_atomistics.atomistics.structure.has_structure import HasStructure
 from pyiron_base import GenericJob
@@ -47,7 +47,7 @@ class TrainingContainer(GenericJob, HasStructure):
         super().__init__(project=project, job_name=job_name)
         self.__name__ = "TrainingContainer"
         self.__hdf_version__ = "0.2.0"
-        self._container = StructureContainer()
+        self._container = StructureStorage()
         self._container.add_array("energy", dtype=np.float64, per="structure")
         self._container.add_array("forces", shape=(3,), dtype=np.float64, per="atom")
         self._table_cache = None
@@ -195,5 +195,5 @@ class TrainingContainer(GenericJob, HasStructure):
             table = pd.read_hdf(self.project_hdf5.file_name, self.name + "/output/structure_table")
             self.include_dataset(table)
         else:
-            self._container = StructureContainer()
+            self._container = StructureStorage()
             self._container.from_hdf(self.project_hdf5, "structures")

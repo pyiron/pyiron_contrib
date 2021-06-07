@@ -15,6 +15,7 @@ from ase.geometry import get_distances
 from pyiron_atomistics import Project
 from pyiron_atomistics.atomistics.job.interactive import GenericInteractive
 from pyiron_atomistics.lammps.lammps import LammpsInteractive
+from pyiron_atomistics.vasp.vasp import VaspInteractive
 from pyiron_atomistics.thermodynamics.hessian import HessianJob
 from pyiron_contrib.protocol.jobs.decoupled_oscillators import DecoupledOscillators
 from pyiron_contrib.protocol.generic import PrimitiveVertex
@@ -249,6 +250,8 @@ class ExternalHamiltonian(PrimitiveVertex):
                     self._job.interactive_initialize_interface()
                     self._job.calculate_forces()
                     self._job.interactive_collect()
+                elif isinstance(self._job, VaspInteractive):
+                    self._job.run()
                 else:
                     self._job.calc_static()
                     self._job.run()

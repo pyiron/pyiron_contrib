@@ -533,6 +533,7 @@ class TILDParallel(CompoundVertex):
         o = Pointer(self.graph.run_lambda_points.output)
         return {
             'total_steps': ~o.total_steps[-1],
+            'lambdas': ~gp.build_lambdas.output.lambda_pairs[-1][:, 0],
             'temperature_mean': ~o.temperature_mean[-1],
             'temperature_std': ~o.temperature_std[-1],
             'integrands': ~o.mean_diff[-1],

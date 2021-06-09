@@ -62,13 +62,16 @@ class StructureStorage(HasStructure):
     4
 
     By default the following arrays are defined for each structure:
-        - identifiers   shape=(),    dtype=str,          per structure; human readable name of the structure
-        - cells         shape=(3,3), dtype=np.float64,   per structure; cell shape
+        - identifier    shape=(),    dtype=str,          per structure; human readable name of the structure
+        - cell          shape=(3,3), dtype=np.float64,   per structure; cell shape
         - pbc           shape=(3,),  dtype=bool          per structure; periodic boundary conditions
         - symbols:      shape=(),    dtype=str,          per atom; chemical symbol
         - positions:    shape=(3,),  dtype=np.float64,   per atom: atomic positions
     If a structure has spins/magnetic moments defined on its atoms these will be saved in a per atom array as well.  In
     that case, however all structures in the container must either have all collinear spins or all non-collinear spins.
+
+    When adding new array follow the convention that per-structure arrays should be named in singular and per-atom
+    arrays should be named in plural.
     """
 
     __version__ = "0.1.0"
@@ -106,10 +109,10 @@ class StructureStorage(HasStructure):
         }
 
         self._per_structure_arrays = {
-                "start_indices": np.empty(self._num_structures_alloc, dtype=np.int32),
-                "len_current_struct": np.empty(self._num_structures_alloc, dtype=np.int32),
-                "identifiers": np.empty(self._num_structures_alloc, dtype=np.dtype("U20")),
-                "cells": np.empty((self._num_structures_alloc, 3, 3)),
+                "start_index": np.empty(self._num_structures_alloc, dtype=np.int32),
+                "length": np.empty(self._num_structures_alloc, dtype=np.int32),
+                "identifier": np.empty(self._num_structures_alloc, dtype=np.dtype("U20")),
+                "cell": np.empty((self._num_structures_alloc, 3, 3)),
                 "pbc": np.empty((self._num_atoms_alloc, 3), dtype=bool)
         }
 
@@ -124,24 +127,24 @@ class StructureStorage(HasStructure):
         return self._per_atom_arrays["positions"]
 
     @property
-    def start_indices(self):
+    def start_index(self):
         """:meta private:"""
-        return self._per_structure_arrays["start_indices"]
+        return self._per_structure_arrays["start_index"]
 
     @property
-    def len_current_struct(self):
+    def length(self):
         """:meta private:"""
-        return self._per_structure_arrays["len_current_struct"]
+        return self._per_structure_arrays["length"]
 
     @property
-    def identifiers(self):
+    def identifier(self):
         """:meta private:"""
-        return self._per_structure_arrays["identifiers"]
+        return self._per_structure_arrays["identifier"]
 
     @property
-    def cells(self):
+    def cell(self):
         """:meta private:"""
-        return self._per_structure_arrays["cells"]
+        return self._per_structure_arrays["cell"]
 
     @property
     def pbc(self):
@@ -158,8 +161,8 @@ class StructureStorage(HasStructure):
         return list(set(self._per_atom_arrays["symbols"]))
 
     def _get_per_atom_slice(self, frame):
-        start = self._per_structure_arrays["start_indices"][frame]
-        end = start + self._per_structure_arrays["len_current_struct"][frame]
+        start = self._per_structure_arrays["start_index"][frame]
+        end = start + self._per_structure_arrays["length"][frame]
         return slice(start, end, 1)
 
     def get_array(self, name, frame):
@@ -342,10 +345,10 @@ class StructureStorage(HasStructure):
         self._per_atom_arrays["symbols"][self.current_atom_index:i] = np.array(structure.symbols)
         self._per_atom_arrays["positions"][self.current_atom_index:i] = structure.positions
 
-        self._per_structure_arrays["start_indices"][self.current_structure_index] = self.current_atom_index
-        self._per_structure_arrays["len_current_struct"][self.current_structure_index] = n
-        self._per_structure_arrays["identifiers"][self.current_structure_index] = identifier
-        self._per_structure_arrays["cells"][self.current_structure_index] = structure.cell.array
+        self._per_structure_arrays["start_index"][self.current_structure_index] = self.current_atom_index
+        self._per_structure_arrays["length"][self.current_structure_index] = n
+        self._per_structure_arrays["identifier"][self.current_structure_index] = identifier
+        self._per_structure_arrays["cell"][self.current_structure_index] = structure.cell.array
         self._per_structure_arrays["pbc"][self.current_structure_index] = structure.pbc
 
         if structure.spins is not None:
@@ -395,7 +398,6 @@ class StructureStorage(HasStructure):
             self._type_to_hdf(hdf_s_lst)
             hdf_s_lst["num_atoms"] =  self._num_atoms_alloc
             hdf_s_lst["num_structures"] = self._num_structures_alloc
-            hdf_s_lst["len_current_struct"] = self._per_structure_arrays["len_current_struct"]
 
             hdf_arrays = hdf_s_lst.open("arrays")
             for k, a in chain(self._per_atom_arrays.items(), self._per_structure_arrays.items()):
@@ -435,7 +437,7 @@ class StructureStorage(HasStructure):
                         self._per_structure_arrays[k] = a
 
     def _translate_frame(self, frame):
-        for i, name in enumerate(self._per_structure_arrays["identifiers"]):
+        for i, name in enumerate(self._per_structure_arrays["identifier"]):
             if name == frame:
                 return i
         raise KeyError(f"No structure named {frame} in StructureStorage.")
@@ -449,7 +451,7 @@ class StructureStorage(HasStructure):
             magmoms = None
         return Atoms(symbols=self._per_atom_arrays["symbols"][slc],
                      positions=self._per_atom_arrays["positions"][slc],
-                     cell=self._per_structure_arrays["cells"][frame],
+                     cell=self._per_structure_arrays["cell"][frame],
                      pbc=self._per_structure_arrays["pbc"][frame],
                      magmoms=magmoms)
 

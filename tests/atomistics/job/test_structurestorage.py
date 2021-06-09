@@ -67,7 +67,7 @@ class TestContainer(TestWithProject):
         for i, structure in enumerate(self.structures):
             self.assertTrue(np.allclose(self.cont.get_array("positions", i), structure.positions),
                             f"get_array returns wrong positions for structure {i}")
-            self.assertTrue(np.allclose(self.cont.get_array("cells", i), structure.cell.array),
+            self.assertTrue(np.allclose(self.cont.get_array("cell", i), structure.cell.array),
                             f"get_array returns wrong positions for structure {i}")
 
     def test_set_array(self):
@@ -109,7 +109,7 @@ class TestContainer(TestWithProject):
 
         for i, structure in enumerate(self.structures):
             self.cont.add_structure(structure)
-            self.assertEqual(self.cont.get_array("identifiers", len(self.structures) + i),
+            self.assertEqual(self.cont.get_array("identifier", len(self.structures) + i),
                              str(len(self.structures) + i),
                              "Default identifier is incorrect.")
 
@@ -183,9 +183,9 @@ class TestContainer(TestWithProject):
         self.assertTrue(np.isclose(cont_static.positions[:cont_static.current_atom_index],
                                    cont_static.positions[:cont_dynamic.current_atom_index]).all(),
                         "Array of chemical symbols not equal after adding structures.")
-        self.assertTrue(np.isclose(cont_static.cells[:cont_static.current_structure_index],
-                                   cont_dynamic.cells[:cont_dynamic.current_structure_index]).all(),
+        self.assertTrue(np.isclose(cont_static.cell[:cont_static.current_structure_index],
+                                   cont_dynamic.cell[:cont_dynamic.current_structure_index]).all(),
                         "Array of chemical symbols not equal after adding structures.")
-        self.assertTrue( (cont_static.identifiers[:cont_static.current_structure_index] \
-                            == cont_dynamic.identifiers[:cont_dynamic.current_structure_index]).all(),
+        self.assertTrue( (cont_static.identifier[:cont_static.current_structure_index] \
+                            == cont_dynamic.identifier[:cont_dynamic.current_structure_index]).all(),
                         "Array of chemical symbols not equal after adding structures.")

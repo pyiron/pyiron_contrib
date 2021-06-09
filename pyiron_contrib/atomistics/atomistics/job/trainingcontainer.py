@@ -56,7 +56,7 @@ class TrainingContainer(GenericJob, HasStructure):
     def _table(self):
         if self._table_cache is None:
             self._table_cache = pd.DataFrame({
-                "name":             [self._container.get_array("identifiers", i)
+                "name":             [self._container.get_array("identifier", i)
                                         for i in range(len(self._container))],
                 "atoms":            [self._container.get_structure(i)
                                         for i in range(len(self._container))],
@@ -64,9 +64,8 @@ class TrainingContainer(GenericJob, HasStructure):
                                         for i in range(len(self._container))],
                 "forces":           [self._container.get_array("forces", i)
                                         for i in range(len(self._container))],
-                "number_of_atoms":  [self._container.get_array("len_current_struct", i)
-                                        for i in range(len(self._container))],
             })
+            self._table_cache["number_of_atoms"] = [len(s) for s in self._table_cache.atoms]
         return self._table_cache
 
     def include_job(self, job, iteration_step=-1):

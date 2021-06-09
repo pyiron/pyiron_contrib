@@ -189,3 +189,31 @@ class TestContainer(TestWithProject):
         self.assertTrue( (cont_static.identifier[:cont_static.current_structure_index] \
                             == cont_dynamic.identifier[:cont_dynamic.current_structure_index]).all(),
                         "Array of chemical symbols not equal after adding structures.")
+
+    def test_hdf(self):
+        """Containers written to, then read from HDF should match."""
+        hdf = self.project.create_hdf(self.project.path, "test_hdf")
+        self.cont.to_hdf(hdf)
+        cont_read = StructureStorage()
+        cont_read.from_hdf(hdf)
+
+        self.assertEqual(len(self.cont), len(cont_read), "Container size not matching after reading from HDF.")
+        self.assertEqual(self.cont.num_structures, cont_read.num_structures,
+                         "num_structures does not match after reading from HDF.")
+        self.assertEqual(self.cont.num_atoms, cont_read.num_atoms,
+                         "num_atoms does not match after reading from HDF.")
+        for s1, s2 in zip(self.cont.iter_structures(), cont_read.iter_structures()):
+            self.assertEqual(s1, s2, "Structure from get_structure not matching after reading from HDF.")
+
+        cont_read.to_hdf(hdf, "other_structures")
+        cont_read.from_hdf(hdf, "other_structures")
+
+        # bug regression: if you mess up reading some variables it might work fine when you use but it could write
+        # itself wrongly to the HDF, thus double check here.
+        self.assertEqual(len(self.cont), len(cont_read), "Container size not matching after reading from HDF twice.")
+        self.assertEqual(self.cont.num_structures, cont_read.num_structures,
+                         "num_structures does not match after reading from HDF twice.")
+        self.assertEqual(self.cont.num_atoms, cont_read.num_atoms,
+                         "num_atoms does not match after reading from HDF twice.")
+        for s1, s2 in zip(self.cont.iter_structures(), cont_read.iter_structures()):
+            self.assertEqual(s1, s2, "Structure from get_structure not matching after reading from HDF twice.")

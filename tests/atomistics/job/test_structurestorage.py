@@ -98,6 +98,12 @@ class TestContainer(TestWithProject):
             self.assertEqual(s, self.cont.get_structure(i),
                              "Added structure not equal to returned structure.")
 
+    def test_translate_frame(self):
+        """Using get_structure with the given identifiers should return the respective structure."""
+        for s in self.structures:
+            self.assertEqual(s, self.cont.get_structure(s.get_chemical_formula()),
+                             "get_structure returned wrong structure for given identifier.")
+
     def test_add_structure(self):
         """add_structure(identifier=None) should set the current structure index as identifier"""
 

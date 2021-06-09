@@ -30,13 +30,15 @@ Fe_bcc  ...
 
 from warnings import catch_warnings
 
+import numpy as np
 import pandas as pd
-from pyiron_atomistics import pyiron_to_ase, ase_to_pyiron
+from pyiron_contrib.atomistics.atomistics.job.structurestorage import StructureStorage
 from pyiron_atomistics.atomistics.structure.atoms import Atoms
+from pyiron_atomistics.atomistics.structure.has_structure import HasStructure
 from pyiron_base import GenericJob
 
 
-class TrainingContainer(GenericJob):
+class TrainingContainer(GenericJob, HasStructure):
     """
     Stores ASE structures with energies and forces.
     """
@@ -44,13 +46,27 @@ class TrainingContainer(GenericJob):
     def __init__(self, project, job_name):
         super().__init__(project=project, job_name=job_name)
         self.__name__ = "TrainingContainer"
-        self._table = pd.DataFrame({
-            "name": [],
-            "atoms": [],
-            "energy": [],
-            "forces": [],
-            "number_of_atoms": []
-        })
+        self.__hdf_version__ = "0.2.0"
+        self._container = StructureStorage()
+        self._container.add_array("energy", dtype=np.float64, per="structure")
+        self._container.add_array("forces", shape=(3,), dtype=np.float64, per="atom")
+        self._table_cache = None
+
+    @property
+    def _table(self):
+        if self._table_cache is None:
+            self._table_cache = pd.DataFrame({
+                "name":             [self._container.get_array("identifier", i)
+                                        for i in range(len(self._container))],
+                "atoms":            [self._container.get_structure(i)
+                                        for i in range(len(self._container))],
+                "energy":           [self._container.get_array("energy", i)
+                                        for i in range(len(self._container))],
+                "forces":           [self._container.get_array("forces", i)
+                                        for i in range(len(self._container))],
+            })
+            self._table_cache["number_of_atoms"] = [len(s) for s in self._table_cache.atoms]
+        return self._table_cache
 
     def include_job(self, job, iteration_step=-1):
         """
@@ -73,17 +89,20 @@ class TrainingContainer(GenericJob):
         is performed.
 
         Args:
-            structure_or_job (:class:`~.Atoms`, :class:`ase.Atoms`): if :class:`~.Atoms` convert to :class:`ase.Atoms`
+            structure_or_job (:class:`~.Atoms`): structure to add
             energy (float): energy of the whole structure
             forces (Nx3 array of float, optional): per atom forces, where N is the number of atoms in the structure
             name (str, optional): name describing the structure
         """
-        if isinstance(structure, Atoms):
-            structure = pyiron_to_ase(structure)
-        self._table = self._table.append(
-                {"name": name, "atoms": structure, "energy": energy, "forces": forces,
-                 "number_of_atoms": len(structure)},
-                ignore_index=True)
+        if forces is not None:
+            self._container.add_structure(structure, name, energy=energy, forces=forces)
+        else:
+            self._container.add_structure(structure, name, energy=energy)
+        if self._table_cache:
+            self._table = self._table.append(
+                    {"name": name, "atoms": structure, "energy": energy, "forces": forces,
+                     "number_of_atoms": len(structure)},
+                    ignore_index=True)
 
     def include_dataset(self, dataset):
         """
@@ -95,19 +114,16 @@ class TrainingContainer(GenericJob):
             - energy(float): energy of the whole structure
             - forces (Nx3 array of float): per atom forces, where N is the number of atoms in the structure
         """
-        self._table = self._table.append(dataset, ignore_index=True)
+        self._table_cache = self._table.append(dataset, ignore_index=True)
+        # in case given dataset has more columns than the necessary ones, swallow/ignore them in *_
+        for name, atoms, energy, forces, *_ in dataset.itertuples(index=False):
+            self._container.add_structure(atoms, name, energy=energy, forces=forces)
 
-    def get_structure(self, iteration_step=-1):
-        """
-        Returns a structure from the training set.
+    def _get_structure(self, frame=-1, wrap_atoms=True):
+        return self._container.get_structure(frame=frame, wrap_atoms=wrap_atoms)
 
-        Args:
-            iteration_step (int, optional): index of the structure in training set
-
-        Returns:
-            :class:`.Atoms`: pyiron structure
-        """
-        return ase_to_pyiron(self._table.atoms[iteration_step])
+    def _number_of_structures(self):
+        return self._container.number_of_structures
 
     def get_elements(self):
         """
@@ -116,10 +132,7 @@ class TrainingContainer(GenericJob):
         Returns:
             :class:`list`: list of unique elements in the training set as strings of their standard abbreviations
         """
-        elements = set()
-        for s in self._table.atoms:
-            elements.update(s.get_chemical_symbols())
-        return list(elements)
+        return self._container.get_elements()
 
     def to_pandas(self):
         """
@@ -151,7 +164,7 @@ class TrainingContainer(GenericJob):
             data_table = self._table
         else:
             data_table = filter_function(self._table)
-        structure_list = data_table.atoms.apply(ase_to_pyiron).to_list()
+        structure_list = data_table.atoms.to_list()
         energy_list = data_table.energy.to_list()
         force_list = data_table.forces.to_list()
         num_atoms_list = data_table.number_of_atoms.to_list()
@@ -172,9 +185,14 @@ class TrainingContainer(GenericJob):
 
     def to_hdf(self, hdf=None, group_name=None):
         super().to_hdf(hdf=hdf, group_name=group_name)
-        with catch_warnings():
-            self._table.to_hdf(self.project_hdf5.file_name, self.name + "/output/structure_table")
+        self._container.to_hdf(self.project_hdf5, "structures")
 
     def from_hdf(self, hdf=None, group_name=None):
         super().from_hdf(hdf=hdf, group_name=group_name)
-        self._table = pd.read_hdf(self.project_hdf5.file_name, self.name + "/output/structure_table")
+        hdf_version = self.project_hdf5.get("HDF_VERSION", "0.1.0")
+        if hdf_version == "0.1.0":
+            table = pd.read_hdf(self.project_hdf5.file_name, self.name + "/output/structure_table")
+            self.include_dataset(table)
+        else:
+            self._container = StructureStorage()
+            self._container.from_hdf(self.project_hdf5, "structures")

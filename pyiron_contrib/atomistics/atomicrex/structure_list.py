@@ -6,6 +6,7 @@ from ase import Atoms as ASEAtoms
 from pyiron_base import DataContainer
 from pyiron_atomistics import pyiron_to_ase, ase_to_pyiron, Atoms
 
+from pyiron_contrib.atomistics.atomistics.job.structurestorage import StructureStorage
 from pyiron_contrib.atomistics.atomicrex.fit_properties import ARFitPropertyList, ARFitProperty
 from pyiron_contrib.atomistics.atomicrex.utility_functions import write_pretty_xml
 from pyiron_contrib.atomistics.atomicrex.fit_properties import FlattenedARProperty, FlattenedARVectorProperty
@@ -19,160 +20,6 @@ from pyiron_contrib.atomistics.atomicrex.fit_properties import FlattenedARProper
 #        self.positions = positions
 
 
-class FlattenedStructureContainer:
-    """
-    Class that can write and read lots of structures from and to hdf quickly.
-
-    This is done by storing positions, cells, etc. into large arrays instead of writing every structure into a new
-    group.  Structures are stored together with an identifier that should be unique.  The class can be initialized with
-    the number of structures and the total number of atoms in all structures, but re-allocates memory as necessary when
-    more (or larger) structures are added than initially anticipated.
-    """
-
-    def __init__(self, num_structures=1, num_atoms=1):
-        """
-        Create new structure container.
-
-        Args:
-            num_structures (int): pre-allocation for per structure arrays
-            num_atoms (int): pre-allocation for per atoms arrays
-        """
-        # tracks allocated versed as yet used number of structures/atoms
-        self._num_structures_alloc = self.num_structures = num_structures
-        self._num_atoms_alloc = self.num_atoms = num_atoms
-        # store the starting index for properties with unknown length
-        self.current_atom_index = 0
-        # store the index for properties of known size, stored at the same index as the structure
-        self.current_structure_index = 0
-        # Also store indices of structure recently added
-        self.prev_structure_index = 0
-        self.prev_atom_index = 0
-
-        self._init_arrays()
-
-
-    def _init_arrays(self):
-        self.symbols = np.full(self._num_atoms_alloc, "XX", dtype=np.dtype("U2"))# 2 character unicode array for chemical symbols
-        self.positions = np.empty((self._num_atoms_alloc, 3))
-        self.cells = np.empty((self._num_structures_alloc, 3, 3))
-        self.start_indices = np.empty(self._num_structures_alloc, dtype=np.int32)
-        self.len_current_struct = np.empty(self._num_structures_alloc, dtype=np.int32)
-        self.identifiers = np.empty(self._num_structures_alloc, dtype=np.dtype("U20"))
-
-    def _resize_atoms(self, new):
-        self._num_atoms_alloc = new
-        try:
-            self.symbols.resize(new)
-            self.positions.resize( (new, 3) )
-        except ValueError:
-            self.symbols = np.resize(self.symbols, new)
-            self.positions = np.resize(self.positions, (new, 3) )
-
-    def _resize_structures(self, new):
-        self._num_structures_alloc = new
-        try:
-            self.cells.resize( (new, 3, 3) )
-            self.start_indices.resize(new)
-            self.len_current_struct.resize(new)
-            self.identifiers.resize(new)
-        except ValueError:
-            self.cells = np.resize(self.cells, (new, 3, 3) )
-            self.start_indices = np.resize(self.start_indices, new)
-            self.len_current_struct = np.resize(self.len_current_struct, new)
-            self.identifiers = np.resize(self.identifiers, new)
-
-    def add_structure(self, structure, identifier):
-        n = len(structure)
-        new_atoms = self.current_atom_index + n
-        if new_atoms > self._num_atoms_alloc:
-            self._resize_atoms(max(new_atoms, self._num_atoms_alloc * 2))
-        if self.current_structure_index + 1 > self._num_structures_alloc:
-            self._resize_structures(self._num_structures_alloc * 2)
-
-        if new_atoms > self.num_atoms:
-            self.num_atoms = new_atoms
-        if self.current_structure_index + 1 > self.num_structures:
-            self.num_structures += 1
-
-        # len of structure to index into the initialized arrays
-        i = self.current_atom_index + n
-
-        self.symbols[self.current_atom_index:i] = np.array(structure.symbols)
-        self.positions[self.current_atom_index:i] = structure.positions
-
-        self.len_current_struct[self.current_structure_index] = n
-        self.cells[self.current_structure_index] = structure.cell.array
-        self.start_indices[self.current_structure_index] = self.current_atom_index
-        self.identifiers[self.current_structure_index] = identifier
-
-        self.prev_structure_index = self.current_structure_index
-        self.prev_atom_index = self.current_atom_index
-
-        # Set new current_atom_index and increase current_structure_index
-        self.current_structure_index += 1
-        self.current_atom_index = i
-        #return last_structure_index, last_atom_index
-
-
-    def to_hdf(self, hdf, group_name="flattened_structures"):
-        # truncate arrays to necessary size before writing
-        self._resize_atoms(self.num_atoms)
-        self._resize_structures(self.num_structures)
-
-        with hdf.open(group_name) as hdf_s_lst:
-            hdf_s_lst["symbols"] = self.symbols.astype(np.dtype("S2"))
-            hdf_s_lst["positions"] = self.positions
-            hdf_s_lst["cells"] = self.cells
-            hdf_s_lst["start_indices"] = self.start_indices
-            hdf_s_lst["identifiers"] = self.identifiers.astype(np.dtype("S20"))
-            hdf_s_lst["num_atoms"] =  self._num_atoms_alloc
-            hdf_s_lst["num_structures"] = self._num_structures_alloc
-            hdf_s_lst["len_current_struct"] = self.len_current_struct
-
-
-    def from_hdf(self, hdf, group_name="flattened_structures"):
-        with hdf.open(group_name) as hdf_s_lst:
-            self._num_structures_alloc = hdf_s_lst["num_structures"]
-            self._num_atoms_alloc = hdf_s_lst["num_atoms"]
-
-            self._init_arrays()
-
-            self.symbols = hdf_s_lst["symbols"].astype(np.dtype("U2"))
-            self.positions = hdf_s_lst["positions"]
-            self.cells = hdf_s_lst["cells"]
-            self.start_indices = hdf_s_lst["start_indices"]
-            self.identifiers = hdf_s_lst["identifiers"].astype(np.dtype("U20"))
-            self.len_current_struct = hdf_s_lst["len_current_struct"]
-
-    def get_structure(self, index_or_identifier=-1):
-        """
-        Create pyiron Atoms object from saved arrays.
-
-        Args:
-            index_or_identifier (int, str): if str then must one of the identifiers given to :method:`.add_structure`
-                                            otherwise must be and integer in range [-N, N) where N the number of
-                                            structures stored in the container
-
-        Returns:
-            :class:`pyiron_atomistics.atomistics.structure.atoms.Atoms`: requested structure
-        """
-        if isinstance(index_or_identifier, str):
-            try:
-                index = np.where(self.identifiers == index_or_identifier)[0][0]
-            except IndexError:
-                raise IndexError(f"No structure named {index_or_identifier} found in structure container.") from None
-        else:
-            index = index_or_identifier
-        if index < 0:
-            index += self.num_structures
-        if not (0 <= index < self.num_structures):
-            raise IndexError(f"Index {index} not in in range [-{self.num_structures}, {self.num_structures})")
-        I = self.start_indices[index]
-        E = I + self.len_current_struct[index]
-        return Atoms(symbols=self.symbols[I:E], cell=self.cells[index], positions=self.positions[I:E])
-
-
-
 class ARStructureContainer:
     def __init__(self):
         self.fit_properties = {}
@@ -180,6 +27,8 @@ class ARStructureContainer:
         # This allows to preallocate arrays and speed everything up massively
         # when writing and reading hdf5 files
 
+    __version__ = "0.2.0"
+    __hdf_version__ = "0.2.0"
 
     def init_structure_container(
         self,
@@ -197,7 +46,7 @@ class ARStructureContainer:
         self.structure_file_path = structure_file_path
 
     def _init_structure_container(self, num_structures, num_atoms):
-        self.flattened_structures = FlattenedStructureContainer(num_structures=num_structures, num_atoms=num_atoms)
+        self.flattened_structures = StructureStorage(num_structures=num_structures, num_atoms=num_atoms)
         self.fit = np.empty(num_structures, dtype=bool)
         self.clamp = np.empty(num_structures, dtype=bool)
         self.relative_weight = np.empty(num_structures)
@@ -252,9 +101,21 @@ class ARStructureContainer:
         self.fit_properties[prop].output[self.flattened_structures.prev_structure_index] = output
         self.fit_properties[prop].tolerance[self.flattened_structures.prev_structure_index] = tolerance
 
+    def _type_to_hdf(self, hdf):
+        """
+        Internal helper function to save type and version in hdf root
+
+        Args:
+            hdf (ProjectHDFio): HDF5 group object
+        """
+        hdf["NAME"] = self.__class__.__name__
+        hdf["TYPE"] = str(type(self))
+        hdf["VERSION"] = self.__version__
+        hdf["HDF_VERSION"] = self.__hdf_version__
 
     def to_hdf(self, hdf, group_name="structures"):
         with hdf.open(group_name) as h:
+            self._type_to_hdf(h)
             self.flattened_structures.to_hdf(hdf=h)
 
             h_fit = h.create_group("fit_properties")
@@ -268,8 +129,15 @@ class ARStructureContainer:
 
     def from_hdf(self, hdf, group_name="structures"):
         with hdf.open(group_name) as h:
-            num_structures = h["flattened_structures/num_structures"]
-            num_atoms = h["flattened_structures/num_atoms"]
+            version = h.get("HDF_VERSION", "0.1.0")
+            # Compatibility Old and new StructureStorage
+            if version == "0.1.0":
+                num_structures = h["flattened_structures/num_structures"]
+                num_atoms = h["flattened_structures/num_atoms"]
+            else:
+                num_structures = h["structures/num_structures"]
+                num_atoms = h["structures/num_atoms"]
+
             self._init_structure_container(num_structures, num_atoms)
             self.flattened_structures.from_hdf(hdf=h)
 
@@ -302,14 +170,14 @@ class ARStructureContainer:
 
             # write POSCAR and xml
             for i in range(self.flattened_structures.num_structures):
-                vec_start = self.flattened_structures.start_indices[i]
-                vec_end = self.flattened_structures.start_indices[i]+self.flattened_structures.len_current_struct[i]
+                vec_start = self.flattened_structures.start_index[i]
+                vec_end = self.flattened_structures.start_index[i]+self.flattened_structures.length[i]
                 write_modified_poscar(
-                    identifier=self.flattened_structures.identifiers[i],
+                    identifier=self.flattened_structures.identifier[i],
                     forces=self.fit_properties["atomic-forces"].target_value[vec_start:vec_end],
                     positions=self.flattened_structures.positions[vec_start:vec_end],
                     symbols=self.flattened_structures.symbols[vec_start:vec_end],
-                    cell=self.flattened_structures.cells[i],
+                    cell=self.flattened_structures.cell[i],
                     directory=directory
                 )
                 
@@ -318,7 +186,7 @@ class ARStructureContainer:
                     fit_properties_xml.append(flat_prop.to_xml_element(i))
 
                 struct_xml = structure_meta_xml(
-                    identifier=self.flattened_structures.identifiers[i],
+                    identifier=self.flattened_structures.identifier[i],
                     relative_weight=self.relative_weight[i],
                     clamp=self.clamp[i],
                     fit_properties=fit_properties_xml,
@@ -334,7 +202,7 @@ class ARStructureContainer:
                     fit_properties_xml.append(flat_prop.to_xml_element(i))
 
                 struct_xml = structure_meta_xml(
-                    identifier=self.flattened_structures.identifiers[i],
+                    identifier=self.flattened_structures.identifier[i],
                     relative_weight=self.relative_weight[i],
                     clamp=self.clamp[i],
                     fit_properties=fit_properties_xml,
@@ -367,14 +235,14 @@ class ARStructureContainer:
                     final_forces[index, 2] = float(l[4].rstrip(")"))
                 else:
                     force_vec_triggered = False
-                    start_index = self.flattened_structures.start_indices[s_index]
+                    start_index = self.flattened_structures.start_index[s_index]
                     self.fit_properties["atomic-forces"].final_value[start_index:start_index+len_struct] = final_forces
 
             # This has to be if and not else because it has to run in the same iteration. Empty lines get skipped.
             if not force_vec_triggered and l:
                 if l.startswith("Structure"):
                     s_id = l.split("'")[1]
-                    s_index = np.nonzero(self.flattened_structures.identifiers==s_id)[0][0]
+                    s_index = np.nonzero(self.flattened_structures.identifier==s_id)[0][0]
 
                 else:
                     if not l.startswith("atomic-forces avg/max:"):
@@ -383,7 +251,7 @@ class ARStructureContainer:
                             self.fit_properties[prop].final_value[s_index] = f_val
                     else:
                         force_vec_triggered = True
-                        len_struct = self.flattened_structures.len_current_struct[s_index]
+                        len_struct = self.flattened_structures.length[s_index]
                         final_forces = np.empty((len_struct, 3))
     
 

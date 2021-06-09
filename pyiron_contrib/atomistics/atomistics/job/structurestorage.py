@@ -67,6 +67,8 @@ class StructureStorage(HasStructure):
         - pbc           shape=(3,),  dtype=bool          per structure; periodic boundary conditions
         - symbols:      shape=(),    dtype=str,          per atom; chemical symbol
         - positions:    shape=(3,),  dtype=np.float64,   per atom: atomic positions
+    If a structure has spins/magnetic moments defined on its atoms these will be saved in a per atom array as well.  In
+    that case, however all structures in the container must either have all collinear spins or all non-collinear spins.
     """
 
     __version__ = "0.1.0"

@@ -132,6 +132,32 @@ class TestContainer(TestWithProject):
         self.assertTrue((got_R == R).all(),
                         f"Fnord returned from get_array() {got_R} does not match fnord passed to add_structure {R}")
 
+    def test_add_structure_spins(self):
+        """If saved structures have spins, they should be saved and restored, too."""
+
+        fe = self.structures[0].copy()
+
+        cont = StructureStorage()
+        spins = [1] * len(fe)
+        fe.set_initial_magnetic_moments(spins)
+        cont.add_structure(fe, "iron_spins")
+        fe_read = cont.get_structure("iron_spins")
+        self.assertTrue(fe_read.spins is not None,
+                        "Spins not restored on added structure.")
+        self.assertTrue(np.allclose(spins, fe_read.spins),
+                        f"Spins restored on added structure not equal to original spins: {spins} {fe_read.spins}.")
+
+        # repeat for vector spins
+        cont = StructureStorage()
+        spins = [(1,0,1)] * len(fe)
+        fe.set_initial_magnetic_moments(spins)
+        cont.add_structure(fe, "iron_spins")
+        fe_read = cont.get_structure("iron_spins")
+        self.assertTrue(fe_read.spins is not None,
+                        "Spins not restored on added structure.")
+        self.assertTrue(np.allclose(spins, fe_read.spins),
+                        f"Spins restored on added structure not equal to original spins: {spins} {fe_read.spins}.")
+
     def test_resize(self):
         """A dynamically resized container should behave exactly as a pre-allocated container."""
 

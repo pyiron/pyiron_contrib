@@ -346,6 +346,9 @@ class StructureStorage(HasStructure):
         self._per_structure_arrays["cells"][self.current_structure_index] = structure.cell.array
         self._per_structure_arrays["pbc"][self.current_structure_index] = structure.pbc
 
+        if structure.spins is not None:
+            arrays["spins"] = structure.spins
+
         for k, a in arrays.items():
             a = np.asarray(a)
             if len(a.shape) > 0 and a.shape[0] == n:
@@ -436,12 +439,17 @@ class StructureStorage(HasStructure):
         raise KeyError(f"No structure named {frame} in StructureStorage.")
 
     def _get_structure(self, frame=-1, wrap_atoms=True):
-        I = self._per_structure_arrays["start_indices"][frame]
-        E = I + self._per_structure_arrays["len_current_struct"][frame]
-        return Atoms(symbols=self._per_atom_arrays["symbols"][I:E],
-                     positions=self._per_atom_arrays["positions"][I:E],
+        slc = self._get_per_atom_slice(frame)
+        if "spins" in self._per_atom_arrays:
+            magmoms = self._per_atom_arrays["spins"][slc]
+        else:
+            # not all structures have spins saved on them
+            magmoms = None
+        return Atoms(symbols=self._per_atom_arrays["symbols"][slc],
+                     positions=self._per_atom_arrays["positions"][slc],
                      cell=self._per_structure_arrays["cells"][frame],
-                     pbc=self._per_structure_arrays["pbc"][frame])
+                     pbc=self._per_structure_arrays["pbc"][frame],
+                     magmoms=magmoms)
 
     def _number_of_structures(self):
         return len(self)

@@ -16,7 +16,7 @@ __date__ = "Jun 14, 2021"
 
 from pyiron_base import GenericMaster, DataContainer
 
-class StructureListMasterInteractive(GenericMaster):
+class StructureMasterInt(GenericMaster):
     """
     Runs given structures with given reference job.
 

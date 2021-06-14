@@ -42,6 +42,7 @@ JOB_CLASS_DICT['Mlip'] = 'pyiron_contrib.atomistics.mlip.mlip'
 JOB_CLASS_DICT['LammpsMlip'] = 'pyiron_contrib.atomistics.mlip.lammps'
 JOB_CLASS_DICT['MlipJob'] = 'pyiron_contrib.atomistics.mlip.mlipjob'
 JOB_CLASS_DICT['Atomicrex'] = 'pyiron_contrib.atomistics.atomicrex.atomicrex_job'
+JOB_CLASS_DICT['StructureListMasterInteractive'] = 'pyiron_contrib.atomistics.atomistics.job.structurelistmasterinteractive'
 
 
 from ._version import get_versions

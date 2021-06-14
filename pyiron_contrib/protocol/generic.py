@@ -367,7 +367,7 @@ class CompoundVertex(Vertex):
         self.define_execution_flow()
         self.define_information_flow()
 
-        # On initialization, set the active verex to starting vertex
+        # On initialization, set the active vertex to starting vertex
         self.graph.active_vertex = self.graph.starting_vertex
 
         self.finished = False
@@ -454,7 +454,6 @@ class CompoundVertex(Vertex):
             group_name (str): HDF5 subgroup name - optional
         """
         super(CompoundVertex, self).to_hdf(hdf=hdf, group_name=group_name)
-        self.graph.to_hdf(hdf=hdf, group_name="graph")
 
     def from_hdf(self, hdf=None, group_name=None):
         """
@@ -464,10 +463,7 @@ class CompoundVertex(Vertex):
             hdf (ProjectHDFio): HDF5 group object - optional
             group_name (str): HDF5 subgroup name - optional
         """
-        super(CompoundVertex, self).from_hdf(hdf=hdf, group_name=group_name or self.vertex_name)
-        with hdf.open(self.vertex_name) as hdf5_server:
-            self.graph.from_hdf(hdf=hdf5_server, group_name="graph")
-        self.define_information_flow()  # Rewire pointers
+        super(CompoundVertex, self).from_hdf(hdf=hdf, group_name=group_name)
 
     def visualize(self, execution=True, dataflow=True):
         return self.graph.visualize(self.fullname(), execution=execution, dataflow=dataflow)
@@ -484,7 +480,7 @@ class CompoundVertex(Vertex):
 
     def _set_archive_period(self, archive, n, keys=None):
         """
-        In constrast to Vertex._set_archive_period, this calls "n". if keys=None it will be applied to all vertices
+        In contrast to Vertex._set_archive_period, this calls "n". if keys=None it will be applied to all vertices
         Args:
             archive: (str) input or output
             n: (int) dump every "n" steps
@@ -642,8 +638,10 @@ class Protocol(CompoundVertex, GenericJob):
 
     def run(self, delete_existing_job=False, repair=False, debug=False, run_mode=None, continue_run=False):
         """A wrapper for the run which allows us to simply keep going with a new variable `continue_run`"""
-        if continue_run:
-            self.status.created = True
+        # This part is buggy. DO NOT USE!
+        # if continue_run:
+        #     self.status.created = True
+        #     self.define_information_flow()
         super(CompoundVertex, self).run(delete_existing_job=delete_existing_job, repair=repair, debug=debug,
                                         run_mode=run_mode)
 
@@ -665,8 +663,8 @@ class Protocol(CompoundVertex, GenericJob):
         """
         if hdf is None:
             hdf = self.project_hdf5
-        self.input['__project'] = self.project.path
-        super(CompoundVertex, self).to_hdf(hdf=hdf, group_name=group_name)
+        CompoundVertex.to_hdf(self, hdf=hdf, group_name=group_name)
+        self.graph.to_hdf(hdf=self.project_hdf5, group_name="graph")
 
     def from_hdf(self, hdf=None, group_name=None):
         """
@@ -677,16 +675,15 @@ class Protocol(CompoundVertex, GenericJob):
         """
         if hdf is None:
             hdf = self.project_hdf5
-        super(CompoundVertex, self).from_hdf(hdf=hdf, group_name=group_name)
+        CompoundVertex.from_hdf(self, hdf=hdf, group_name=group_name)
+        self.graph.from_hdf(hdf=self.project_hdf5, group_name="graph")
 
 
 class Graph(dict, LoggerMixin):
     """
     A directed graph of vertices and edges, and a method for iterating through the graph.
-
     Vertices and edges are the graph are explicitly stored as child classes inheriting from `dict` so that all
     'graphiness' is fully decoupled from the objects sitting at the vertices.
-
     Attributes:
         vertices (Vertices): Vertices of the graph.
         edges (Edges): Directed edges between the vertices.
@@ -743,12 +740,10 @@ class Graph(dict, LoggerMixin):
     def visualize(self, protocol_name, execution=True, dataflow=True):
         """
         Plot a visual representation of the graph.
-
         Args:
             protocol_name:
             execution (bool): Show the lines dictating the flow of graph traversal.
             dataflow (bool): Show the lines dictating where vertex input comes from.
-
         Returns:
             (graphviz.Digraph) The image representation of the protocols workflow
         """
@@ -879,7 +874,6 @@ class Graph(dict, LoggerMixin):
         """
         Follows the edge out of the active vertex to get the name of the next vertex and set it as the active vertex.
         If the active vertex has multiple possible states, the outbound edge for the current state will be chosen.
-
         Returns:
             (str) The name of the next vertex.
         """
@@ -896,7 +890,6 @@ class Graph(dict, LoggerMixin):
     def make_edge(self, start, end, state="next"):
         """
         Makes a directed edge connecting two vertices.
-
         Args:
             start (Vertex): The vertex for the edge to start at.
             end (Vertex): The vertex for the edge to end at.
@@ -925,7 +918,6 @@ class Graph(dict, LoggerMixin):
         """
         Adds an edge between every argument, in the order they're given. The edge is added for the vertex state "next",
         so this is only appropriate for vertices which don't have a non-trivial `vertex_state`.
-
         Args:
             *args (Vertex/str): Vertices to connect in a row, or the state connecting two vertices.
         """
@@ -1019,7 +1011,6 @@ class Edges(dict):
     def initialize(self, vertex):
         """
         Set an outbound edge to `None` for each allowable vertex state.
-
         Args:
             vertex (Vertex): The vertex to assign an edge to.
         """

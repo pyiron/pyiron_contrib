@@ -221,7 +221,6 @@ class SerialList(ListVertex):
 
         for child in self.children:
             child.execute()
-        stop_time = time.time()
 
         output_data = self._extract_output_data_from_children()
         return output_data

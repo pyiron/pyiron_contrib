@@ -92,16 +92,15 @@ class AnyVertex(BoolVertex):
         n_steps (int): The maximum number of steps.
     """
 
-    def command(self, vertices, print_strings, step=None, n_steps=None):
+    def command(self, vertex_states, print_strings, step=None, n_steps=None):
         bool_list = []
-        for i in vertices:
-            if isinstance(i, PrimitiveVertex):
-                if i.vertex_state == "true":
-                    bool_list.append(True)
-                else:
-                    bool_list.append(False)
+        for state in vertex_states:
+            if state == "true":
+                bool_list.append(1)
+            elif state == "false":
+                bool_list.append(0)
             else:
-                raise TypeError(str(i) + " is not an instance of PrimitiveVertex")
+                raise NameError("`vertex_states´ can only be `true´ or `false´")
 
         if np.any(bool_list):
             for i, val in enumerate(bool_list):

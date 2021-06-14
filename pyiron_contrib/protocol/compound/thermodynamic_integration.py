@@ -242,12 +242,12 @@ class TILDParallel(CompoundVertex):
         cores greater than the number of lambdas gives zero gain, and is wasteful if cores % lambdas != 0.
 
     Input attributes:
-        ref_job_a (job): Initial state of the system, given by a job of type LammpsInteractive/VaspInteractive/
-            SphinxInteractive/HessianJob/DecoupledOscillators.
-        ref_job_b (job): Final state of the system, given by a job of type LammpsInteractive/VaspInteractive/
-            SphinxInteractive/HessianJob/DecoupledOscillators.
-        structure_a (Atoms): The structure of ref_job_a. (Default is None, use the structure of ref_job_a.)
-        structure_b (Atoms): The structure of ref_job_b. (Default is None, use the structure of ref_job_b.)
+        ref_job_a_full_path (str): Path to the job containing the initial state of the system. Should be a job of type
+            LammpsInteractive/VaspInteractive/SphinxInteractive/HessianJob/DecoupledOscillators. The structure of this
+            job will be used as 'structure_a' in this protocol.
+        ref_job_b_full_path (str): Path to the job containing the initial state of the system. Should be a job of type
+            LammpsInteractive/VaspInteractive/SphinxInteractive/HessianJob/DecoupledOscillators. The structure of this
+            job will be used as 'structure_b' in this protocol.
         temperature (float): Temperature to run at in K. (Default is 300.)
         n_lambdas (int): How many 'lambda'/integration points to create. (Default is 3.)
         lambda_bias (float): A function to generate N points between 0 and 1, with a left, equidistant and right bias.
@@ -258,10 +258,10 @@ class TILDParallel(CompoundVertex):
             between 0.51 and 1.
             (Default is 0.5, keep the points equidistant.)
         n_steps (int): How many MD steps to run for. (Default is 100.)
-        thermalization_steps (int): Number of steps the system is thermalized for to reach equilibrium. (Default is
-            10 steps.)
-        sampling_steps (int): Collect a 'sample' every 'sampling_steps' steps. (Default is 1, collect sample
-            for every MD step.
+        thermalization_steps (int): Number of steps the system is thermalized for to reach equilibrium. Should be
+            divisible be 'n_steps'. (Default is 10 steps.)
+        sampling_steps (int): Collect a 'sample' every 'sampling_steps' steps. Should be divisible be 'n_steps'.
+            (Default is 1, collect sample for every MD step.
         time_step (float): MD time step in fs. (Default is 1.)
         temperature_damping_timescale (float): Langevin thermostat timescale in fs. (Default is None, which runs NVE.)
         overheat_fraction (float): The fraction by which to overheat the initial velocities. This can be useful for
@@ -274,8 +274,8 @@ class TILDParallel(CompoundVertex):
         zero_k_energy (float): The minimized potential energy of the static (expanded) structure. (Default is 0.)
         sleep_time (float): A delay in seconds for database access of results. For sqlite, a non-zero delay maybe
             required. (Default is 0 seconds, no delay.)
-        convergence_check_steps (int): Check for convergence once every 'convergence_check_steps'. (Default is
-            once every 10 steps.)
+        convergence_check_steps (int): Check for convergence once every 'convergence_check_steps'. Should be
+            divisible be 'n_steps'. (Default is once every 10 steps.)
         fe_tol (float): The free energy standard error tolerance. This is the convergence criterion in eV. (Default
             is 0.01 eV)
     Output attributes:
@@ -373,8 +373,8 @@ class TILDParallel(CompoundVertex):
         ip = Pointer(self.input)
 
         # validate
-        g.validate.input.ref_job_a = ip.ref_job_a
-        g.validate.input.ref_job_b = ip.ref_job_b
+        g.validate.input.ref_job_a_full_path = ip.ref_job_a_full_path
+        g.validate.input.ref_job_b_full_path = ip.ref_job_b_full_path
         g.validate.input.n_steps = ip.n_steps
         g.validate.input.thermalization_steps = ip.thermalization_steps
         g.validate.input.sampling_steps = ip.sampling_steps
@@ -385,12 +385,12 @@ class TILDParallel(CompoundVertex):
         g.build_lambdas.input.lambda_bias = ip.lambda_bias
 
         # initial_forces
-        g.initial_forces.input.shape = ip.ref_job_a.structure.positions.shape
+        g.initial_forces.input.shape = gp.validate.output.structure_a[-1].positions.shape
 
         # mass_mixer
         g.mass_mixer.input.vectors = [
-            ip.ref_job_a.structure.get_masses,
-            ip.ref_job_b.structure.get_masses
+            gp.validate.output.structure_a[-1].get_masses,
+            gp.validate.output.structure_b[-1].get_masses
         ]
         g.mass_mixer.input.weights = [0.5, 0.5]
 
@@ -402,15 +402,13 @@ class TILDParallel(CompoundVertex):
 
         # create_jobs_a
         g.create_jobs_a.input.n_images = ip.n_lambdas
-        g.create_jobs_a.input.ref_job = ip.ref_job_a
-        g.create_jobs_a.input.default.structure = ip.structure_a
-        g.create_jobs_a.input.structure = ip.ref_job_a.structure
+        g.create_jobs_a.input.ref_job_full_path = ip.ref_job_a_full_path
+        g.create_jobs_a.input.structure = gp.validate.output.structure_a[-1]
 
         # create_jobs_b
         g.create_jobs_b.input.n_images = ip.n_lambdas
-        g.create_jobs_b.input.ref_job = ip.ref_job_b
-        g.create_jobs_b.input.default.structure = ip.structure_b
-        g.create_jobs_b.input.structure = ip.ref_job_b.structure
+        g.create_jobs_b.input.ref_job_full_path = ip.ref_job_b_full_path
+        g.create_jobs_b.input.structure = gp.validate.output.structure_b[-1]
 
         # check_steps
         g.check_steps.input.target = gp.clock.output.n_counts[-1]
@@ -429,10 +427,10 @@ class TILDParallel(CompoundVertex):
         g.run_lambda_points.direct.temperature = ip.temperature
         g.run_lambda_points.direct.masses = gp.mass_mixer.output.weighted_sum[-1]
         g.run_lambda_points.direct.temperature_damping_timescale = ip.temperature_damping_timescale
-        g.run_lambda_points.direct.structure_a = ip.ref_job_a.structure
-        g.run_lambda_points.direct.structure_b = ip.ref_job_b.structure
+        g.run_lambda_points.direct.structure_a = gp.validate.output.structure_a[-1]
+        g.run_lambda_points.direct.structure_b = gp.validate.output.structure_b[-1]
 
-        g.run_lambda_points.direct.default.positions = ip.ref_job_a.structure.positions
+        g.run_lambda_points.direct.default.positions = gp.validate.output.structure_a[-1].positions
         g.run_lambda_points.broadcast.default.velocities = gp.initial_velocities.output.velocities[-1]
         g.run_lambda_points.direct.default.forces = gp.initial_forces.output.zeros[-1]
 
@@ -514,9 +512,9 @@ class TILDParallel(CompoundVertex):
         g.post.input.n_samples = gp.run_lambda_points.output.n_samples[-1][-1]
 
         # exit
-        g.exit.input.vertices = [
-            gp.check_steps,
-            gp.check_convergence
+        g.exit.input.vertex_states = [
+            gp.check_steps.vertex_state,
+            gp.check_convergence.vertex_state
         ]
         g.exit.input.print_strings = [
             "Maximum steps ({}) reached. Stopping run.",
@@ -615,6 +613,7 @@ class TILDSerial(TILDParallel):
         # Graph components
         g = self.graph
         ip = Pointer(self.input)
+        g.validate = TILDValidate()
         g.build_lambdas = BuildMixingPairs()
         g.initial_forces = Zeros()
         g.mass_mixer = WeightedSum()

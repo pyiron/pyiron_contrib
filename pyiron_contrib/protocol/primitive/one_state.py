@@ -4,6 +4,7 @@
 
 from __future__ import print_function
 
+from os.path import split
 import numpy as np
 
 from abc import ABC, abstractmethod
@@ -15,6 +16,8 @@ from ase.geometry import get_distances
 from pyiron_atomistics import Project
 from pyiron_atomistics.atomistics.job.interactive import GenericInteractive
 from pyiron_atomistics.lammps.lammps import LammpsInteractive
+from pyiron_atomistics.vasp.vasp import VaspInteractive
+from pyiron_atomistics.sphinx.sphinx import SphinxInteractive
 from pyiron_atomistics.thermodynamics.hessian import HessianJob
 from pyiron_contrib.protocol.jobs.decoupled_oscillators import DecoupledOscillators
 from pyiron_contrib.protocol.generic import PrimitiveVertex
@@ -310,13 +313,14 @@ class CreateSubJobs(PrimitiveVertex):
         self._jobs_project_path = None
         self._jobs_names = None
         id_ = self.input.default
-        id_.ref_job = None
+        id_.ref_job_full_path = None
         id_.n_images = 1
         id_.structure = None
 
-    def command(self, ref_job, n_images, structure, *args, **kwargs):
-        project_path = ref_job.project.path
+    def command(self, ref_job_full_path, n_images, structure, *args, **kwargs):
+        project_path, ref_job_name = split(ref_job_full_path)
         pr = Project(path=project_path)
+        ref_job = pr.load(ref_job_name)
         pr_sub = pr.create_group(self.vertex_name + "_children")
         self._jobs_project_path = []
         self._jobs_names = []
@@ -1326,22 +1330,21 @@ class TILDValidate(PrimitiveVertex):
     """
     Check if all the inputs fir the TILD protocol are in order.
     Input attributes:
-        ref_job_a (job): Initial state of the system, given by a job of type LammpsInteractive/VaspInteractive/
-            SphinxInteractive/HessianJob/DecoupledOscillators.
-        ref_job_b (job): Final state of the system, given by a job of type LammpsInteractive/VaspInteractive/
-            SphinxInteractive/HessianJob/DecoupledOscillators.
+         ref_job_a_full_path (str): Path to the job containing the initial state of the system. Should be a job of type
+            LammpsInteractive/VaspInteractive/SphinxInteractive/HessianJob/DecoupledOscillators.
+        ref_job_b_full_path (str): Path to the job containing the initial state of the system. Should be a job of type
+            LammpsInteractive/VaspInteractive/SphinxInteractive/HessianJob/DecoupledOscillators.
         n_steps (int): How many MD steps to run for. (Default is 100.)
         thermalization_steps (int): Number of steps the system is thermalized for to reach equilibrium. (Default is
             10 steps.)
         sampling_steps (int): Collect a 'sample' every 'sampling_steps' steps. (Default is 1, collect sample
             for every MD step.
+        convergence_check_steps (int): Check for convergence once every 'convergence_check_steps'. (Default is once
+            every 10 steps.)
     """
 
-    def command(self, ref_job_a, ref_job_b, n_steps, thermalization_steps, sampling_steps, convergence_check_steps):
-        # check if the ref jobs are of valid job types
-        self._check_job(ref_job_a)
-        self._check_job(ref_job_b)
-
+    def command(self, ref_job_a_full_path, ref_job_b_full_path, n_steps, thermalization_steps, sampling_steps,
+                convergence_check_steps):
         # check if the n_steps is divisible by (x) steps
         message = "n_steps must be divisible by thermalization steps"
         self._check_modulo(target=n_steps, mod=thermalization_steps, message=message)
@@ -1349,11 +1352,25 @@ class TILDValidate(PrimitiveVertex):
         self._check_modulo(target=n_steps, mod=sampling_steps, message=message)
         message = "n_steps must be divisible by convergence_check_steps"
         self._check_modulo(target=n_steps, mod=convergence_check_steps, message=message)
+        # extract the structures from the reference jobs
+        structure_a = self._get_structure(path=ref_job_a_full_path)
+        structure_b = self._get_structure(path=ref_job_b_full_path)
+        return {
+            'structure_a': structure_a,
+            'structure_b': structure_b
+        }
 
     @staticmethod
-    def _check_job(job):
-        if not isinstance(job, GenericInteractive):
-            raise TypeError(f"Got reference type {type(job)}, which is not a recognized interactive job")
+    def _get_structure(path):
+        project_path, ref_job_name = split(path)
+        pr = Project(path=project_path)
+        ref_job = pr.load(ref_job_name)
+        if not isinstance(ref_job, (LammpsInteractive, VaspInteractive, SphinxInteractive, HessianJob,
+                                    DecoupledOscillators)):
+            error = f"Got reference type {type(ref_job)} for " + ref_job_name + ", which is not a recognized" \
+                                                                                " reference job for this protocol"
+            raise TypeError(error)
+        return ref_job.structure.copy()
 
     @staticmethod
     def _check_modulo(target, mod, message):

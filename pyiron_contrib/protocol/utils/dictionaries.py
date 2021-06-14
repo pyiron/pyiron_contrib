@@ -253,13 +253,6 @@ class IODictionary(dict, LoggerMixin):
                     return result
                 else:
                     raise ImportError('Could not locate type(%s)' % server['FULLNAME'])
-
-        # if the group_name is a reference job saved as an hdf object, load the reference job
-        elif hdf[group_name]['TYPE'] in [str(Lammps), str(Vasp), str(Sphinx), str(HessianJob),
-                                         str(DecoupledOscillators)]:
-            pr = Project(path=hdf['__project'])
-            return pr.load(hdf[group_name].name)
-
         else:
             raise TypeError('I do not know how to deserialize type(%s)' % hdf[group_name])
 

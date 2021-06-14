@@ -14,6 +14,7 @@ __status__ = "development"
 __date__ = "Jun 14, 2021"
 
 
+from pyiron_contrib.atomistics.atomistics.job.structurestorage import StructureStorage
 from pyiron_base import GenericMaster, DataContainer
 
 class StructureMasterInt(GenericMaster):
@@ -49,6 +50,17 @@ class StructureMasterInt(GenericMaster):
     @container.setter
     def container(self, container):
         self.input.container = container
+
+    def add_structure(self, structure):
+        """
+        Add a structure to the StructureStorage to calculate.  If no container set yet, create an empty one.
+
+        Args:
+            structure (Atoms): structure to add to calculation
+        """
+        if self.input.container is None:
+            self.input.container = StructureStorage()
+        self.input.container.add_structure(structure)
 
     def validate_ready_to_run(self):
         if self.input.container is None:

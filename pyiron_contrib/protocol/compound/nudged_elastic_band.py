@@ -12,7 +12,7 @@ from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
 from pyiron_contrib.protocol.primitive.one_state import Counter, CreateSubJobs, ExternalHamiltonian, GradientDescent, \
     InitialPositions, NEBForces, NEBPostProcess
 from pyiron_contrib.protocol.primitive.two_state import IsGEq, IsLEq, AnyVertex
-from pyiron_contrib.protocol.list import SerialList, ParallelList
+from pyiron_contrib.protocol.list import SerialList
 from pyiron_contrib.protocol.utils import Pointer
 
 """

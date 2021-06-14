@@ -551,7 +551,7 @@ class TILDParallel(CompoundVertex):
         """
         return self.graph.build_lambdas.output.lambda_pairs[-1][:, 0]
 
-    def get_tild_integrands(self):
+    def _get_tild_integrands(self):
         o = Pointer(self.graph.run_lambda_points.output)
         return np.array(~o.mean_diff[-1]), ~o.std_diff[-1] / np.sqrt(~o.n_samples[-1])
 
@@ -561,7 +561,7 @@ class TILDParallel(CompoundVertex):
         """
         fig, ax = plt.subplots()
         lambdas = self.get_lambdas()
-        thermal_average, standard_error = self.get_tild_integrands()
+        thermal_average, standard_error = self._get_tild_integrands()
         ax.plot(lambdas, thermal_average, marker='o')
         ax.fill_between(lambdas, thermal_average - standard_error, thermal_average + standard_error, alpha=0.3)
         ax.set_xlabel("Lambda")

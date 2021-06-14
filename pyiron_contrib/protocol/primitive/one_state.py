@@ -260,6 +260,10 @@ class ExternalHamiltonian(PrimitiveVertex):
                 raise TypeError("Job of class {} is not compatible".format(self._job.__class__))
             else:
                 raise ValueError("Please make sure that the child jobs are created")
+
+        if isinstance(self._job, VaspInteractive):
+            interesting_keys = ['forces', 'energy_pot']
+
         return {key: self._get_interactive_value(key) for key in interesting_keys}
 
     def _job_reload(self):

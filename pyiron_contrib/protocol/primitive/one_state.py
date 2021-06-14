@@ -215,7 +215,7 @@ class ExternalHamiltonian(PrimitiveVertex):
         id_.job_name = None
         id_.positions = None
         id_.cell = None
-        id_.interesting_keys = ['forces', 'energy_pot']
+        id_.interesting_keys = ['forces', 'energy_pot', 'pressures', 'volume']
 
     def command(self, job_project_path, job_name, positions, cell, interesting_keys):
 

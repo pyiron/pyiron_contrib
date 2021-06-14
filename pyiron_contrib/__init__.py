@@ -14,8 +14,6 @@ from pyiron_base import JOB_CLASS_DICT
 # Make classes available for new pyiron version
 JOB_CLASS_DICT['ProtoMinimGradDes'] = 'pyiron_contrib.protocol.compound.minimize'
 JOB_CLASS_DICT['ProtoMD'] = 'pyiron_contrib.protocol.compound.molecular_dynamics'
-JOB_CLASS_DICT['ProtoConfinedMD'] = 'pyiron_contrib.protocol.compound.molecular_dynamics'
-JOB_CLASS_DICT['ProtoHarmMD'] = 'pyiron_contrib.protocol.compound.molecular_dynamics'
 JOB_CLASS_DICT['ProtoNEBSer'] = 'pyiron_contrib.protocol.compound.nudged_elastic_band'
 JOB_CLASS_DICT['ProtocolQMMM'] = 'pyiron_contrib.protocol.compound.qmmm'
 JOB_CLASS_DICT['ProtoTILDPar'] = 'pyiron_contrib.protocol.compound.thermodynamic_integration'

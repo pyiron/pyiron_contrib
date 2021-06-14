@@ -58,7 +58,7 @@ class StructureMasterInt(GenericMaster):
         self.ref_job.validate_ready_to_run()
         copy = self.ref_job.copy_to(
                 project=self.project_hdf5,
-                new_job_name="calculator",
+                new_job_name=f"{self.name}_calculator",
                 new_database_entry=True
         )
         self.append(copy)

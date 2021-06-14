@@ -1548,3 +1548,21 @@ class BerendsenBarostat(PrimitiveVertex):
             'structure': new_structure,
             'positions': new_structure.positions
         }
+
+
+class NEBPostProcess(PrimitiveVertex):
+    """
+    Compute the norm of the forces on the peak image.
+    Input attributes:
+        energy_pots (list): List of energy_pots of all the images in the band.
+        forces (list): List of forces of all the images in the band.
+    Output attributes:
+        force_norm (float): Norm of the forces on the peak image.
+    """
+
+    def command(self, energy_pots, forces):
+        max_index = np.argmax(energy_pots)
+        force_norm = np.linalg.norm(forces[max_index])
+        return {
+            'force_norm': force_norm
+        }

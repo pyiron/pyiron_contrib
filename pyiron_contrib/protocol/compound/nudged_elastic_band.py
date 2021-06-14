@@ -9,10 +9,10 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
 from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
-from pyiron_contrib.protocol.primitive.one_state import Counter, CreateJob, ExternalHamiltonian, GradientDescent, \
-    InitialPositions, NEBForces
-from pyiron_contrib.protocol.primitive.two_state import IsGEq
-from pyiron_contrib.protocol.list import SerialList, AutoList
+from pyiron_contrib.protocol.primitive.one_state import Counter, CreateSubJobs, ExternalHamiltonian, GradientDescent, \
+    InitialPositions, NEBForces, NEBPostProcess
+from pyiron_contrib.protocol.primitive.two_state import IsGEq, IsLEq, AnyVertex
+from pyiron_contrib.protocol.list import SerialList, ParallelList
 from pyiron_contrib.protocol.utils import Pointer
 
 """
@@ -68,23 +68,27 @@ class NEB(CompoundVertex):
         id_.n_steps = 100
         id_.f_tol = 1e-4
         id_.spring_constant = 1.
-        id_.tangent_style = 'upwinding'
+        id_.tangent_style = "upwinding"
         id_.use_climbing_image = True
         id_.smoothing = None
         id_.gamma0 = 0.1
         id_.fix_com = True
         id_.use_adagrad = False
+        id_.force_tol = 1e-4
 
     def define_vertices(self):
         # Graph components
         g = self.graph
-        g.initialize_jobs = CreateJob()
+        g.initialize_jobs = CreateSubJobs()
         g.interpolate_images = InitialPositions()
         g.check_steps = IsGEq()
-        g.calc_static = AutoList(ExternalHamiltonian)
+        g.check_convergence = IsLEq()
+        g.calc_static = SerialList(ExternalHamiltonian)
         g.neb_forces = NEBForces()
         g.gradient_descent = SerialList(GradientDescent)
+        g.post = NEBPostProcess()
         g.clock = Counter()
+        g.exit = AnyVertex()
 
     def define_execution_flow(self):
         # Execution flow
@@ -92,15 +96,20 @@ class NEB(CompoundVertex):
         g.make_pipeline(
             g.initialize_jobs,
             g.interpolate_images,
-            g.check_steps, 'false',
+            g.check_steps, "false",
             g.calc_static,
             g.neb_forces,
             g.gradient_descent,
+            g.post,
             g.clock,
-            g.check_steps
+            g.check_convergence, "true",
+            g.exit
         )
-        g.starting_vertex = self.graph.initialize_jobs
-        g.restarting_vertex = self.graph.check_steps
+        g.make_edge(g.check_steps, g.exit, "true")
+        g.make_edge(g.check_convergence, g.check_steps, "false")
+        g.make_edge(g.exit, g.check_steps, "false")
+        g.starting_vertex = g.initialize_jobs
+        g.restarting_vertex = g.check_steps
 
     def define_information_flow(self):
         # Data flow
@@ -124,9 +133,8 @@ class NEB(CompoundVertex):
 
         # calc_static
         g.calc_static.input.n_children = ip.n_images
-        g.calc_static.direct.structure = ip.structure_initial
-        g.calc_static.broadcast.project_path = gp.initialize_jobs.output.project_path[-1]
-        g.calc_static.broadcast.job_name = gp.initialize_jobs.output.job_names[-1]
+        g.calc_static.broadcast.job_project_path = gp.initialize_jobs.output.jobs_project_path[-1]
+        g.calc_static.broadcast.job_name = gp.initialize_jobs.output.jobs_names[-1]
         g.calc_static.broadcast.default.positions = gp.interpolate_images.output.initial_positions[-1]
         g.calc_static.broadcast.positions = gp.gradient_descent.output.positions[-1]
 
@@ -152,6 +160,24 @@ class NEB(CompoundVertex):
         g.gradient_descent.direct.gamma0 = ip.gamma0
         g.gradient_descent.direct.fix_com = ip.fix_com
         g.gradient_descent.direct.use_adagrad = ip.use_adagrad
+
+        # post
+        g.post.input.energy_pots = gp.calc_static.output.energy_pot[-1]
+        g.post.input.forces = gp.neb_forces.output.forces[-1]
+
+        # check_convergence
+        g.check_convergence.input.target = gp.post.output.force_norm[-1]
+        g.check_convergence.input.threshold = ip.force_tol
+
+        # exit
+        g.exit.input.vertex_states = [
+            gp.check_steps.vertex_state,
+            gp.check_convergence.vertex_state
+        ]
+        g.exit.input.print_strings = [
+            "Maximum steps ({}) reached. Stopping run.",
+            "Convergence reached in {} steps. Stopping run."]
+        g.exit.input.step = gp.clock.output.n_counts[-1]
 
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
 
@@ -193,10 +219,11 @@ class NEB(CompoundVertex):
         ax.set_ylabel("Energy")
         ax.set_xlabel("Image")
         ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+        plt.show()
         return ax
 
     def _get_directional_barrier(self, frame=None, anchor_element=0, use_minima=False):
-        energies = self._get_energies(frame=frame)
+        energies = np.array(self._get_energies(frame=frame))
         if use_minima:
             reference = energies.min()
         else:

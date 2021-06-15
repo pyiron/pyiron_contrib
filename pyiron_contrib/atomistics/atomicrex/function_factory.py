@@ -66,7 +66,7 @@ class BaseFunctionMixin():
 class MetaFunctionMixin():
     def copy_final_to_initial_params(self):
         for f in self.functions.values():
-            f.copy_final_to_inital_params()
+            f.copy_final_to_initial_params()
 
 
 class Sum(DataContainer, MetaFunctionMixin):

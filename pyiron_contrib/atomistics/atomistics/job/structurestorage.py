@@ -446,7 +446,7 @@ class StructureStorage(HasStructure):
                 self._per_structure_arrays["length"] = hdf_s_lst["len_current_struct"]
                 self._per_structure_arrays["identifier"] = hdf_s_lst["identifiers"].astype(np.dtype("U20"))
                 self._per_structure_arrays["cell"] = hdf_s_lst["cells"]
-            
+
                 self._per_structure_arrays["pbc"] = np.full((self.num_structures, 3), True)
 
 

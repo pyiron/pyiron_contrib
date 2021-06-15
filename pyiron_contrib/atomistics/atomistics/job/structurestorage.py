@@ -437,7 +437,7 @@ class StructureStorage(HasStructure):
                             self._per_atom_arrays[k] = a
                         elif a.shape[0] == self._num_structures_alloc:
                             self._per_structure_arrays[k] = a
-                            
+
             elif version == "0.0.0":
                 self._per_atom_arrays["symbols"] = hdf_s_lst["symbols"].astype(np.dtype("U2"))
                 self._per_atom_arrays["positions"] = hdf_s_lst["positions"]

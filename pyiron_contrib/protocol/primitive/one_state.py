@@ -1435,10 +1435,7 @@ class TILDPostProcess(PrimitiveVertex):
             integral = simps(x=lambda_pairs[:, 0], y=y)
             mean = float(unumpy.nominal_values(integral))
             std = float(unumpy.std_devs(integral))
-            tild_se = tild_std / np.sqrt(n_samples)
-            y_se = unumpy.uarray(tild_mean, tild_se)
-            integral_se = simps(x=lambda_pairs[:, 0], y=y_se)
-            se = float(unumpy.std_devs(integral_se))
+            se = std / np.sqrt(n_samples)
         else:
             mean = np.nan
             std = np.nan
@@ -1448,17 +1445,13 @@ class TILDPostProcess(PrimitiveVertex):
     @staticmethod
     def get_fep_free_energy(fep_exp_mean, fep_exp_std, n_samples, temperature):
         if np.nan not in [fep_exp_mean, fep_exp_std]:
-            fep_exp_se = fep_exp_std / np.sqrt(n_samples)
             y = unumpy.uarray(fep_exp_mean, fep_exp_std)
-            y_se = unumpy.uarray(fep_exp_mean, fep_exp_se)
             free_energy = 0
-            free_energy_se = 0
-            for (val, val_se) in zip(y, y_se):
+            for val in y:
                 free_energy += -KB * temperature * unumpy.log(val)
-                free_energy_se += -KB * temperature * unumpy.log(val_se)
             mean = float(unumpy.nominal_values(free_energy))
             std = float(unumpy.std_devs(free_energy))
-            se = float(unumpy.std_devs(free_energy_se))
+            se = std / np.sqrt(n_samples)
         else:
             mean = np.nan
             std = np.nan

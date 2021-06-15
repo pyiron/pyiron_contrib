@@ -506,8 +506,8 @@ class EAMPotential(AbstractPotential):
         """        
         for functions in (self.pair_interactions, self.electron_densities, self.embedding_energies):
             for f in functions.values():
-                for param in f.parameters.values():
-                    param.copy_final_to_start_value()
+                f.copy_final_to_initial_params()
+                
 
     def _potential_as_pd_df(self, job):
         """

@@ -58,8 +58,18 @@ class FunctionFactory(PyironFactory):
     def sum(identifier, species=["*", "*"]):
         return Sum(identifier=identifier, species=species)
 
+class BaseFunctionMixin():
+    def copy_final_to_initial_params(self):
+        for param in self.parameters.values():
+            param.copy_final_to_start_value()
 
-class Sum(DataContainer):
+class MetaFunctionMixin():
+    def copy_final_to_initial_params(self):
+        for f in self.functions.values():
+            f.copy_final_to_inital_params()
+
+
+class Sum(DataContainer, MetaFunctionMixin):
     def __init__(self, identifier=None, species=None):
         super().__init__()
         self.identifier = identifier
@@ -82,7 +92,7 @@ class Sum(DataContainer):
             raise KeyError(f"Function {identifier} not found in sum {self.identifier}")
 
 
-class SpecialFunction(DataContainer):
+class SpecialFunction(DataContainer, BaseFunctionMixin):
     """
     Analytic functions defined within atomicrex should inherit from this class
     https://atomicrex.org/potentials/functions.html#index-1
@@ -136,7 +146,7 @@ class SpecialFunction(DataContainer):
         param = leftover[0].rstrip(":")
         self.parameters[param].final_value = value
 
-class Poly(DataContainer):
+class Poly(DataContainer, BaseFunctionMixin):
     """
     Polynomial interpolation function.
     """    
@@ -155,7 +165,7 @@ class Poly(DataContainer):
         return poly
 
 
-class Spline(DataContainer):
+class Spline(DataContainer, BaseFunctionMixin):
     """
     Spline interpolation function
     """
@@ -468,7 +478,7 @@ class GaussianFunc(SpecialFunction):
         return super()._to_xml_element(name="gaussian")
 
 
-class UserFunction(DataContainer):
+class UserFunction(DataContainer, BaseFunctionMixin):
     """
     Analytic functions that are not implemented in atomicrex
     can be provided as user functions.

@@ -1428,14 +1428,15 @@ class TILDPostProcess(PrimitiveVertex):
             'fep_free_energy_se': fep_fe_se
         }
 
-    @staticmethod
-    def get_tild_free_energy(lambda_pairs, tild_mean, tild_std, n_samples):
+    def get_tild_free_energy(self, lambda_pairs, tild_mean, tild_std, n_samples):
         if np.nan not in [tild_mean, tild_std]:
-            y = unumpy.uarray(tild_mean, tild_std)
-            integral = simps(x=lambda_pairs[:, 0], y=y)
-            mean = float(unumpy.nominal_values(integral))
-            std = float(unumpy.std_devs(integral))
-            se = std / np.sqrt(n_samples)
+            lambdas = lambda_pairs[:, 0]
+            # calculate integral mean and std
+            mean, std = self._get_tild_integral_mean_std(lambdas=lambdas, mean=tild_mean, std=tild_std)
+            # also calculate the integral by passing in the tild_se. This way, the tild_se also propagates
+            # through the integral
+            tild_se = tild_std / np.sqrt(n_samples)
+            _, se = self._get_tild_integral_mean_std(lambdas=lambdas, mean=tild_mean, std=tild_se)
         else:
             mean = np.nan
             std = np.nan
@@ -1443,20 +1444,32 @@ class TILDPostProcess(PrimitiveVertex):
         return mean, std, se
 
     @staticmethod
-    def get_fep_free_energy(fep_exp_mean, fep_exp_std, n_samples, temperature):
+    def _get_tild_integral_mean_std(lambdas, mean, std):
+        y = unumpy.uarray(mean, std)
+        integral = simps(x=lambdas, y=y)
+        return float(unumpy.nominal_values(integral)), float(unumpy.std_devs(integral))
+
+    def get_fep_free_energy(self, fep_exp_mean, fep_exp_std, n_samples, temperature):
         if np.nan not in [fep_exp_mean, fep_exp_std]:
-            y = unumpy.uarray(fep_exp_mean, fep_exp_std)
-            free_energy = 0
-            for val in y:
-                free_energy += -KB * temperature * unumpy.log(val)
-            mean = float(unumpy.nominal_values(free_energy))
-            std = float(unumpy.std_devs(free_energy))
-            se = std / np.sqrt(n_samples)
+            # calculate integral mean and std
+            mean, std = self._get_fep_integral_mean_std(temperature=temperature, mean=fep_exp_mean, std=fep_exp_std)
+            # also calculate the integral by passing in the tild_se. This way, the tild_se also propagates
+            # through the summation
+            fep_exp_se = fep_exp_std / np.sqrt(n_samples)
+            _, se = self._get_fep_integral_mean_std(temperature=temperature, mean=fep_exp_mean, std=fep_exp_se)
         else:
             mean = np.nan
             std = np.nan
             se = np.nan
         return mean, std, se
+
+    @staticmethod
+    def _get_fep_integral_mean_std(temperature, mean, std):
+        y = unumpy.uarray(mean, std)
+        free_energy = 0
+        for val in y:
+            free_energy += -KB * temperature * unumpy.log(val)
+        return float(unumpy.nominal_values(free_energy)), float(unumpy.std_devs(free_energy))
 
 
 class BerendsenBarostat(PrimitiveVertex):

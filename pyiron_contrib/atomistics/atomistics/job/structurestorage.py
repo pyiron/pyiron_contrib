@@ -417,24 +417,38 @@ class StructureStorage(HasStructure):
 
     def from_hdf(self, hdf, group_name="structures"):
         with hdf.open(group_name) as hdf_s_lst:
+            version = hdf_s_lst.get("HDF_VERSION", "0.0.0")
             self._num_structures_alloc = self.num_structures = self.current_structure_index = hdf_s_lst["num_structures"]
             self._num_atoms_alloc = self.num_atoms = self.current_atom_index = hdf_s_lst["num_atoms"]
 
-            with hdf_s_lst.open("arrays") as hdf_arrays:
-                for k in hdf_arrays.list_nodes():
-                    a = np.array(hdf_arrays[k])
-                    if a.dtype.char == "S":
-                        # if saved as bytes, we wrote this as an encoded unicode string, so manually decode here
-                        # TODO: string arrays with shape != () not handled
-                        a = np.array([s.decode("utf8") for s in a],
-                                     # itemsize of original a is four bytes per character, so divide by four to get
-                                     # length of the orignal stored unicode string; np.dtype('U1').itemsize is just a
-                                     # platform agnostic way of knowing how wide a unicode charater is for numpy
-                                     dtype=f"U{a.dtype.itemsize//np.dtype('U1').itemsize}")
-                    if a.shape[0] == self._num_atoms_alloc:
-                        self._per_atom_arrays[k] = a
-                    elif a.shape[0] == self._num_structures_alloc:
-                        self._per_structure_arrays[k] = a
+            if version == "0.1.0":
+                with hdf_s_lst.open("arrays") as hdf_arrays:
+                    for k in hdf_arrays.list_nodes():
+                        a = np.array(hdf_arrays[k])
+                        if a.dtype.char == "S":
+                            # if saved as bytes, we wrote this as an encoded unicode string, so manually decode here
+                            # TODO: string arrays with shape != () not handled
+                            a = np.array([s.decode("utf8") for s in a],
+                                        # itemsize of original a is four bytes per character, so divide by four to get
+                                        # length of the orignal stored unicode string; np.dtype('U1').itemsize is just a
+                                        # platform agnostic way of knowing how wide a unicode charater is for numpy
+                                        dtype=f"U{a.dtype.itemsize//np.dtype('U1').itemsize}")
+                        if a.shape[0] == self._num_atoms_alloc:
+                            self._per_atom_arrays[k] = a
+                        elif a.shape[0] == self._num_structures_alloc:
+                            self._per_structure_arrays[k] = a
+
+            elif version == "0.0.0":
+                self._per_atom_arrays["symbols"] = hdf_s_lst["symbols"].astype(np.dtype("U2"))
+                self._per_atom_arrays["positions"] = hdf_s_lst["positions"]
+
+                self._per_structure_arrays["start_index"] = hdf_s_lst["start_indices"]
+                self._per_structure_arrays["length"] = hdf_s_lst["len_current_struct"]
+                self._per_structure_arrays["identifier"] = hdf_s_lst["identifiers"].astype(np.dtype("U20"))
+                self._per_structure_arrays["cell"] = hdf_s_lst["cells"]
+
+                self._per_structure_arrays["pbc"] = np.full((self.num_structures, 3), True)
+
 
     def _translate_frame(self, frame):
         for i, name in enumerate(self._per_structure_arrays["identifier"]):

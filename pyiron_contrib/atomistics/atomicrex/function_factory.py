@@ -64,7 +64,7 @@ class BaseFunctionMixin():
         for param in self.parameters.values():
             param.copy_final_to_start_value()
     
-    def lock_parameters():
+    def lock_parameters(self):
         for param in self.parameters.values():
             param.enabled = False
 
@@ -73,7 +73,7 @@ class MetaFunctionMixin():
         for f in self.functions.values():
             f.copy_final_to_initial_params()
     
-    def lock_parameters():
+    def lock_parameters(self):
         for f in self.functions.values():
             f.lock_parameters()
 

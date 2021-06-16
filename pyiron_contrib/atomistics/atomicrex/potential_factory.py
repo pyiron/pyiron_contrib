@@ -503,13 +503,17 @@ class EAMPotential(AbstractPotential, EAMlikeMixin):
             self.pair_interactions = DataContainer(table_name="pair_interactions")
             self.electron_densities = DataContainer(table_name="electron_densities")
             self.embedding_energies = DataContainer(table_name="embedding_energies")
-            self._function_tuple = (self.pair_interactions, self.electron_densities, self.embedding_energies)
+            #self._function_tuple = (self.pair_interactions, self.electron_densities, self.embedding_energies)
             self.identifier = identifier
             self.export_file = export_file
             self.rho_range_factor = rho_range_factor
             self.resolution = resolution
             self.species = species
-            
+    
+    @property
+    def _function_tuple(self):
+        return (self.pair_interactions, self.electron_densities, self.embedding_energies)
+
     def _potential_as_pd_df(self, job):
         """
         Makes the tabulated eam potential written by atomicrex usable

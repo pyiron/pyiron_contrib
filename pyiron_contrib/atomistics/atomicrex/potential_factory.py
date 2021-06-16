@@ -475,6 +475,10 @@ class EAMlikeMixin:
             for f in functions.values():
                 f.copy_final_to_initial_params()
 
+    def lock_parameters(self):
+        for functions in self._function_tuple:
+            for f in functions.values():
+                f.lock_parameters()
 
 class EAMPotential(AbstractPotential, EAMlikeMixin):
     """
@@ -503,7 +507,6 @@ class EAMPotential(AbstractPotential, EAMlikeMixin):
             self.pair_interactions = DataContainer(table_name="pair_interactions")
             self.electron_densities = DataContainer(table_name="electron_densities")
             self.embedding_energies = DataContainer(table_name="embedding_energies")
-            #self._function_tuple = None
             self.identifier = identifier
             self.export_file = export_file
             self.rho_range_factor = rho_range_factor
@@ -699,17 +702,19 @@ class MEAMPotential(AbstractPotential, EAMlikeMixin):
             self.embedding_energies = DataContainer(table_name="embedding_energies")
             self.f_functions = DataContainer(table_name="f_functions")
             self.g_functions = DataContainer(table_name="g_functions")
-            self._function_tuple = (
+            self.identifier = identifier
+            self.export_file = export_file
+            self.species = species
+
+    @property
+    def _function_tuple(self):
+        return (
                 self.pair_interactions,
                 self.electron_densities,
                 self.embedding_energies,
                 self.f_functions,
                 self.g_functions
             )
-            self.identifier = identifier
-            self.export_file = export_file
-            self.species = species
-
 
     def write_xml_file(self, directory):
         """

@@ -58,15 +58,24 @@ class FunctionFactory(PyironFactory):
     def sum(identifier, species=["*", "*"]):
         return Sum(identifier=identifier, species=species)
 
+
 class BaseFunctionMixin():
     def copy_final_to_initial_params(self):
         for param in self.parameters.values():
             param.copy_final_to_start_value()
+    
+    def lock_parameters():
+        for param in self.parameters.values():
+            param.enabled = False
 
 class MetaFunctionMixin():
     def copy_final_to_initial_params(self):
         for f in self.functions.values():
             f.copy_final_to_initial_params()
+    
+    def lock_parameters():
+        for f in self.functions.values():
+            f.lock_parameters()
 
 
 class Sum(DataContainer, MetaFunctionMixin):

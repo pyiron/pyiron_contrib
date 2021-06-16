@@ -503,7 +503,7 @@ class EAMPotential(AbstractPotential, EAMlikeMixin):
             self.pair_interactions = DataContainer(table_name="pair_interactions")
             self.electron_densities = DataContainer(table_name="electron_densities")
             self.embedding_energies = DataContainer(table_name="embedding_energies")
-            self._function_tuple = None
+            #self._function_tuple = None
             self.identifier = identifier
             self.export_file = export_file
             self.rho_range_factor = rho_range_factor

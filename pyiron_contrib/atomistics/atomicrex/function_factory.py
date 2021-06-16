@@ -60,6 +60,8 @@ class FunctionFactory(PyironFactory):
 
 
 class BaseFunctionMixin():
+    # Mixin class to implement functionality common in all types of functions
+    # Be careful with Spline class because it has params, but also derivatives, requiring some special additions to implementations
     def copy_final_to_initial_params(self):
         for param in self.parameters.values():
             param.copy_final_to_start_value()
@@ -221,6 +223,16 @@ class Spline(DataContainer, BaseFunctionMixin):
             param = float(leftover[0].split("[")[1])
             param = f"node_{param:.6g}"
             self.parameters[param].final_value = value
+    
+    def copy_final_to_initial_params(self):
+        super().copy_final_to_initial_params()
+        self.derivative_left.copy_final_to_start_value()
+        self.derivative_right.copy_final_to_start_value()
+    
+    def lock_parameters(self):
+        super().lock_parameters()
+        self.derivative_left.enabled = False
+        self.derivative_right.enabled = False
 
 class ExpA(SpecialFunction):
     def __init__(self, identifier=None, cutoff=None, species=["*", "*"], is_screening_function=True):

@@ -53,8 +53,8 @@ class AbstractPotential(DataContainer):
     def __init__(self, init=None, table_name="potential"):
         super().__init__(init, table_name=table_name)
     
-    def copy_final_to_initial_params(self):
-        raise NotImplementedError("Should be implemented in the subclass.")
+    #def copy_final_to_initial_params(self):
+    #    raise NotImplementedError("Should be implemented in the subclass.")
     
     def write_xml_file(self, directory):
         """

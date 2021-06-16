@@ -53,8 +53,8 @@ class AbstractPotential(DataContainer):
     def __init__(self, init=None, table_name="potential"):
         super().__init__(init, table_name=table_name)
     
-    def copy_final_to_initial_params(self):
-        raise NotImplementedError("Should be implemented in the subclass.")
+    #def copy_final_to_initial_params(self):
+    #    raise NotImplementedError("Should be implemented in the subclass.")
     
     def write_xml_file(self, directory):
         """
@@ -465,8 +465,22 @@ class LJPotential(AbstractPotential):
         filename = posixpath.join(directory, "potential.xml")
         write_pretty_xml(lj, filename)
 
+class EAMlikeMixin:
+    def copy_final_to_initial_params(self):
+        """
+        Copies final values of function paramters to start values.
+        This f.e. allows to continue global with local minimization.
+        """        
+        for functions in self._function_tuple:
+            for f in functions.values():
+                f.copy_final_to_initial_params()
 
-class EAMPotential(AbstractPotential):
+    def lock_parameters(self):
+        for functions in self._function_tuple:
+            for f in functions.values():
+                f.lock_parameters()
+
+class EAMPotential(AbstractPotential, EAMlikeMixin):
     """
     Embedded-Atom-Method potential.
     Usage: Create using the potential factory class.
@@ -499,15 +513,9 @@ class EAMPotential(AbstractPotential):
             self.resolution = resolution
             self.species = species
     
-    def copy_final_to_initial_params(self):
-        """
-        Copies final values of function paramters to start values.
-        This f.e. allows to continue global with local minimization.
-        """        
-        for functions in (self.pair_interactions, self.electron_densities, self.embedding_energies):
-            for f in functions.values():
-                f.copy_final_to_initial_params()
-                
+    @property
+    def _function_tuple(self):
+        return (self.pair_interactions, self.electron_densities, self.embedding_energies)
 
     def _potential_as_pd_df(self, job):
         """
@@ -685,7 +693,7 @@ class EAMPotential(AbstractPotential):
         return fig, ax
 
 
-class MEAMPotential(AbstractPotential):
+class MEAMPotential(AbstractPotential, EAMlikeMixin):
     def __init__(self, init=None, identifier=None, export_file=None, species=None):
         super().__init__(init=init)
         if init is None:
@@ -698,22 +706,15 @@ class MEAMPotential(AbstractPotential):
             self.export_file = export_file
             self.species = species
 
-    def copy_final_to_initial_params(self):
-        """
-        Copies final values of function paramters to start values.
-        This f.e. allows to continue global with local minimization.
-        """        
-        for functions in (
-            self.pair_interactions,
-            self.electron_densities,
-            self.embedding_energies,
-            self.f_functions,
-            self.g_functions
-            ):
-            for f in functions.values():
-                for param in f.parameters.values():
-                    param.copy_final_to_start_value()
-    
+    @property
+    def _function_tuple(self):
+        return (
+                self.pair_interactions,
+                self.electron_densities,
+                self.embedding_energies,
+                self.f_functions,
+                self.g_functions
+            )
 
     def write_xml_file(self, directory):
         """

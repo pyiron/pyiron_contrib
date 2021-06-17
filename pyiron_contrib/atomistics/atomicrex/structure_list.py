@@ -1,8 +1,5 @@
 import posixpath
 
-from numpy.lib.arraysetops import isin
-from pyiron_contrib.protocol.utils.misc import is_iterable
-from pyiron_contrib.protocol.primitive.one_state import Slice
 import xml.etree.ElementTree as ET
 
 import numpy as np
@@ -99,7 +96,7 @@ class ARStructureContainer:
         self.fit_properties[prop].tolerance[self.flattened_structures.prev_structure_index] = tolerance
 
     
-    def _get_per_structure_index(self, identifier):   
+    def _get_per_structure_index(self, identifier):
         """
         Takes an identifier or an ndarray of indentifiers and returns the corresponding indices in the structure/scalar_fit_properties arrays.
         Args:
@@ -116,7 +113,7 @@ class ARStructureContainer:
                 )
             )
         # This is some sorting magic that could lead to strange errors
-        # Look here if something goes wrong with the order of 
+        # Look here if something goes wrong with the order of
         ids_stored = np.array(self.flattened_structures._per_structure_arrays["identifier"][indices])
         sorter = ids_stored.argsort()[identifier.argsort()]
         return indices[sorter]

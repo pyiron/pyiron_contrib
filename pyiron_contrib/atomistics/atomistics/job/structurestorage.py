@@ -314,7 +314,7 @@ class StructureStorage(HasStructure):
             per = "structure"
         else:
             return None
-        return {shape: a.shape[1:], "dtype": a.dtype, "per": per}
+        return {"shape": a.shape[1:], "dtype": a.dtype, "per": per}
 
 
     def add_structure(self, structure, identifier=None, **arrays):

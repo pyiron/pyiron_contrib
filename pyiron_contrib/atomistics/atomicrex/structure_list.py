@@ -1,4 +1,6 @@
 import posixpath
+
+from numpy.lib.arraysetops import isin
 from pyiron_contrib.protocol.utils.misc import is_iterable
 from pyiron_contrib.protocol.primitive.one_state import Slice
 import xml.etree.ElementTree as ET
@@ -99,18 +101,25 @@ class ARStructureContainer:
     
     def _get_per_structure_index(self, identifier):   
         """
-        Takes an ndarray of indentifiers and returns the corresponding indices in the structure/scalar_fit_properties arrays.
+        Takes an identifier or an ndarray of indentifiers and returns the corresponding indices in the structure/scalar_fit_properties arrays.
         Args:
             identifiers ([type]): [description]
 
         Returns:
             [ndarray]: indices corresponding to identifiers in per structure arrays
         """
-        return np.nonzero(
+        if not isinstance(identifier, ndarray):
+            identifier = np.array(identifier)
+        indices = np.flatnonzero(
             np.isin(
                 self.flattened_structures._per_structure_arrays["identifier"], identifier, assume_unique=True
                 )
             )
+        # This is some sorting magic that could lead to strange errors
+        # Look here if something goes wrong with the order of 
+        ids_stored = np.array(self.flattened_structures._per_structure_arrays["identifier"][indices])
+        sorter = ids_stored.argsort()[identifier.argsort()]
+        return indices[sorter]
 
     def get_scalar_property(self, prop, identifier, final=True):
         """
@@ -134,7 +143,8 @@ class ARStructureContainer:
     def get_vector_property(self, prop, identifier, final=True):
         """
         Returns final or target value of a vector property based on the identifier used when adding a structure.
-        Currently only allows to return vector for a single structure
+        Currently only allows to return a vector property for a single structure, not for multiple ones like the
+        get_scalar_property function.
 
         Args:
             prop (str): property string as used when adding the property
@@ -144,7 +154,9 @@ class ARStructureContainer:
         Returns:
             [type]: [description]
         """
-        index = self._get_per_structure_index(identifier)[0][0]
+        if not isinstance(identifier, str):
+            raise NotImplementedError("Can only look up properties for single identifiers currently")
+        index = self._get_per_structure_index(identifier)[0]
         slc  = self.flattened_structures._get_per_atom_slice(index)
         if final:
             return self.fit_properties[prop].final_value[slc]

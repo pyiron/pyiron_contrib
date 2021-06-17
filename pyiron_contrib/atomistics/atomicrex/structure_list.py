@@ -144,7 +144,7 @@ class ARStructureContainer:
         Returns:
             [type]: [description]
         """
-        index = self._get_per_structure_index(identifier)
+        index = self._get_per_structure_index(identifier)[0][0]
         slc  = self.flattened_structures._get_per_atom_slice(index)
         if final:
             return self.fit_properties[prop].final_value[slc]

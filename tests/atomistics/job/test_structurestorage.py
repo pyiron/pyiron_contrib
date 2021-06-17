@@ -104,6 +104,8 @@ class TestContainer(TestWithProject):
         self.assertEqual(pbc["shape"], (3,), "has_array returns wrong shape for per atom array.")
         self.assertEqual(pbc["per"], "atom", "has_array returns wrong per for per atom array.")
 
+        self.assertEqual(self.cont.has_array("missing"), None, "has_array does not return None for nonexisting array.")
+
     def test_get_structure(self):
         """Structure from get_structure should match thoes add with add_structure exactly."""
 

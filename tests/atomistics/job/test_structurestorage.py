@@ -217,3 +217,17 @@ class TestContainer(TestWithProject):
                          "num_atoms does not match after reading from HDF twice.")
         for s1, s2 in zip(self.cont.iter_structures(), cont_read.iter_structures()):
             self.assertEqual(s1, s2, "Structure from get_structure not matching after reading from HDF twice.")
+
+        self.assertEqual(set(self.cont._per_atom_arrays.keys()),
+                         set(cont_read._per_atom_arrays.keys()),
+                         "per atom arrays read are not the same as written")
+        self.assertEqual(set(self.cont._per_structure_arrays.keys()),
+                         set(cont_read._per_structure_arrays.keys()),
+                         "per structure arrays read are not the same as written")
+
+        for n in self.cont._per_atom_arrays:
+            self.assertTrue((self.cont._per_atom_arrays[n] == cont_read._per_atom_arrays[n]).all(),
+                            f"per atom array {n} read is not the same as writen")
+        for n in self.cont._per_structure_arrays:
+            self.assertTrue((self.cont._per_structure_arrays[n] == cont_read._per_structure_arrays[n]).all(),
+                            f"per structure array {n} read is not the same as writen")

@@ -381,40 +381,31 @@ class CreateSubJobs(PrimitiveVertex):
 
 class GradientDescent(PrimitiveVertex):
     """
-    Simple gradient descent update for positions in `flex_output` and structure.
+    Simple gradient descent update for positions.
     Input attributes:
         gamma0 (float): Initial step size as a multiple of the force. (Default is 0.1.)
         fix_com (bool): Whether the center of mass motion should be subtracted off of the position update.
             (Default is True)
-        use_adagrad (bool): Whether to have the step size decay according to adagrad. (Default is False)
         output_displacements (bool): Whether to return the per-atom displacement vector in the output dictionary.
     Output attributes:
         positions (numpy.ndarray): The updated positions.
         displacements (numpy.ndarray): The displacements, if `output_displacements` is True.
-    TODO: Fix adagrad bug when GradientDescent is passed as a Serial vertex
     """
 
     def __init__(self, name=None):
         super(GradientDescent, self).__init__(name=name)
-        self._accumulated_force = 0
         id_ = self.input.default
         id_.gamma0 = 0.1
         id_.fix_com = True
-        id_.use_adagrad = False
 
-    def command(self, positions, forces, gamma0, use_adagrad, fix_com, mask=None, masses=None,
-                output_displacements=True):
+    def command(self, positions, forces, gamma0, fix_com, mask=None, masses=None, output_displacements=False):
 
-        positions = np.array(positions)
-        forces = np.array(forces)
         unmasked_positions = None
-
         if mask is not None:
             masked = True
             mask = np.array(mask)
             # Preserve data
             unmasked_positions = positions.copy()
-
             # Mask input data
             positions = positions[mask]
             forces = forces[mask]
@@ -422,38 +413,78 @@ class GradientDescent(PrimitiveVertex):
         else:
             masked = False
 
-        if use_adagrad:
-            self._accumulated_force += np.sqrt(np.sum(forces * forces))
-            gamma0 /= self._accumulated_force
-
-        pos_change = gamma0 * np.array(forces)
+        positions_change = gamma0 * -forces
 
         if fix_com:
             masses = np.array(masses)[:, np.newaxis]
             total_mass = np.sum(masses)
-            com_change = np.sum(pos_change * masses, axis=0) / total_mass
-            pos_change -= com_change
+            com_change = np.sum(positions_change * masses, axis=0) / total_mass
+            positions_change -= com_change
         # TODO: fix angular momentum
 
-        new_pos = positions + pos_change
+        new_positions = positions - positions_change
 
         if masked:
-            unmasked_positions[mask] = new_pos
-            new_pos = unmasked_positions
-            disp = np.zeros(unmasked_positions.shape)
-            disp[mask] = pos_change
+            unmasked_positions[mask] = new_positions
+            new_positions = unmasked_positions
+            displacements = np.zeros(unmasked_positions.shape)
+            displacements[mask] = positions_change
         else:
-            disp = pos_change
+            displacements = positions_change
 
         if output_displacements:
             return {
-                'positions': new_pos,
-                'displacements': disp
+                'positions': new_positions,
+                'displacements': displacements
             }
         else:
             return {
-                'positions': new_pos
+                'positions': new_positions
             }
+
+
+class GradientDescentGamma(PrimitiveVertex):
+    """
+    Calculate the step size (gamma) to be used in GradientDescent dynamically, using the line search formula in
+        https://en.wikipedia.org/wiki/Gradient_descent.
+    Input attributes:
+        gamma (float): Current step size. Value should be <= 0.2, otherwise the computation may hang.
+            (Default is 0.1.)
+        old_positions (numpy.ndarray): The positions of the previous step.
+        new_positions (numpy.ndarray): The positions of the current step.
+        old_forces (numpy.ndarray): The forces (-gradient of energy) of the previous step.
+        new_forces (numpy.ndarray): The forces (-gradient of energy) of the current step.
+        dynamic (bool): If True, calculate a new gamma for every step. Otherwise, keep the gamma fixed at gamma0.
+            (Default is True, compute gamma dynamically.)
+    Output attributes:
+        new_positions (numpy.ndarray): The positions of the current step.
+        new_forces (numpy.ndarray): The forces (-gradient of energy) of the current step.
+        new_gamma (float): The new gamma, obtained using line search.
+    """
+
+    def __init__(self, name=None):
+        super(GradientDescentGamma, self).__init__(name=name)
+        self.initialized = False
+
+    def command(self, gamma, old_positions, new_positions, old_forces, new_forces, dynamic=True):
+        if not self.initialized:
+            new_gamma = gamma
+            self.initialized = True
+        elif dynamic:
+            positions_diff = (old_positions - new_positions)
+            force_diff = -old_forces - (-new_forces)
+            denominator = np.linalg.norm(force_diff)
+            if np.isclose(denominator, 0.):
+                new_gamma = 0.
+            else:
+                new_gamma = np.tensordot(positions_diff, force_diff) / denominator
+        else:
+            new_gamma = gamma
+        return {
+            'new_positions': new_positions,
+            'new_forces': new_forces,
+            'new_gamma': new_gamma
+        }
 
 
 class InitialPositions(PrimitiveVertex):

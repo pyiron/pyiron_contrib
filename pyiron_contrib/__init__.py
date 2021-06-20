@@ -15,6 +15,7 @@ from pyiron_base import JOB_CLASS_DICT
 JOB_CLASS_DICT['ProtoMinimGradDes'] = 'pyiron_contrib.protocol.compound.minimize'
 JOB_CLASS_DICT['ProtoMD'] = 'pyiron_contrib.protocol.compound.molecular_dynamics'
 JOB_CLASS_DICT['ProtoNEBSer'] = 'pyiron_contrib.protocol.compound.nudged_elastic_band'
+JOB_CLASS_DICT['ProtoNEBPar'] = 'pyiron_contrib.protocol.compound.nudged_elastic_band'
 JOB_CLASS_DICT['ProtocolQMMM'] = 'pyiron_contrib.protocol.compound.qmmm'
 JOB_CLASS_DICT['ProtoTILDPar'] = 'pyiron_contrib.protocol.compound.thermodynamic_integration'
 JOB_CLASS_DICT['ProtoTILDSer'] = 'pyiron_contrib.protocol.compound.thermodynamic_integration'

@@ -10,9 +10,9 @@ from matplotlib.ticker import MaxNLocator
 
 from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
 from pyiron_contrib.protocol.primitive.one_state import Counter, CreateSubJobs, ExternalHamiltonian, GradientDescent, \
-    InitialPositions, NEBForces, NEBPostProcess
+    InitialPositions, NEBForces, NEBPostProcess, GradientDescentGamma
 from pyiron_contrib.protocol.primitive.two_state import IsGEq, IsLEq, AnyVertex
-from pyiron_contrib.protocol.list import SerialList
+from pyiron_contrib.protocol.list import SerialList, ParallelList
 from pyiron_contrib.protocol.utils import Pointer
 
 """
@@ -29,7 +29,7 @@ __status__ = "development"
 __date__ = "18 July, 2019"
 
 
-class NEB(CompoundVertex):
+class NEBSerial(CompoundVertex):
     """
     Relaxes a system according to the nudged elastic band method (Jonsson et al).
 
@@ -49,9 +49,10 @@ class NEB(CompoundVertex):
         smoothing (float): Strength of the smoothing spring when consecutive images form an angle. (Default is None,
             do not apply such a force.)
         gamma0 (float): Initial step size as a multiple of the force. (Default is 0.1.)
+        dynamic_gamma (bool): Whether to vary the step size (gamma) for each iteration based on line search.
+            (Default is True.)
         fix_com (bool): Whether the center of mass motion should be subtracted off of the position update. (Default
             is True)
-        use_adagrad (bool): Whether to have the step size decay according to adagrad. (Default is False)
 
     Output attributes:
         energy_pot (list[float]): Total potential energy of the system in eV.
@@ -61,7 +62,7 @@ class NEB(CompoundVertex):
     """
 
     def __init__(self, **kwargs):
-        super(NEB, self).__init__(**kwargs)
+        super(NEBSerial, self).__init__(**kwargs)
 
         # Protocol defaults
         id_ = self.input.default
@@ -72,19 +73,22 @@ class NEB(CompoundVertex):
         id_.use_climbing_image = True
         id_.smoothing = None
         id_.gamma0 = 0.1
+        id_.dynamic_gamma = True
         id_.fix_com = True
-        id_.use_adagrad = False
         id_.force_tol = 1e-4
+        id_.sleep_time = 0.
 
     def define_vertices(self):
         # Graph components
         g = self.graph
+        ip = Pointer(self.input)
         g.initialize_jobs = CreateSubJobs()
         g.interpolate_images = InitialPositions()
         g.check_steps = IsGEq()
         g.check_convergence = IsLEq()
         g.calc_static = SerialList(ExternalHamiltonian)
         g.neb_forces = NEBForces()
+        g.gamma = SerialList(GradientDescentGamma)
         g.gradient_descent = SerialList(GradientDescent)
         g.post = NEBPostProcess()
         g.clock = Counter()
@@ -99,6 +103,7 @@ class NEB(CompoundVertex):
             g.check_steps, "false",
             g.calc_static,
             g.neb_forces,
+            g.gamma,
             g.gradient_descent,
             g.post,
             g.clock,
@@ -150,16 +155,29 @@ class NEB(CompoundVertex):
         g.neb_forces.input.use_climbing_image = ip.use_climbing_image
         g.neb_forces.input.smoothing = ip.smoothing
 
+        # gamma
+        g.gamma.input.n_children = ip.n_images
+        g.gamma.broadcast.default.old_positions = gp.interpolate_images.output.initial_positions[-1]
+        g.gamma.broadcast.default.new_positions = gp.interpolate_images.output.initial_positions[-1]
+        g.gamma.broadcast.default.old_forces = gp.neb_forces.output.forces[-1]
+        g.gamma.broadcast.default.new_forces = gp.neb_forces.output.forces[-1]
+        g.gamma.direct.default.gamma = ip.gamma0
+
+        g.gamma.broadcast.old_positions = gp.gamma.output.new_positons[-1]
+        g.gamma.broadcast.new_positions = gp.gradient_descent.output.positions[-1]
+        g.gamma.broadcast.old_forces = gp.gamma.output.new_forces[-1]
+        g.gamma.broadcast.new_forces = gp.neb_forces.output.forces[-1]
+        g.gamma.broadcast.gamma = gp.gamma.output.new_gamma[-1]
+
         # gradient_descent
         g.gradient_descent.input.n_children = ip.n_images
         g.gradient_descent.broadcast.default.positions = gp.interpolate_images.output.initial_positions[-1]
 
         g.gradient_descent.broadcast.positions = gp.gradient_descent.output.positions[-1]
         g.gradient_descent.broadcast.forces = gp.neb_forces.output.forces[-1]
+        g.gradient_descent.broadcast.gamma0 = gp.gamma.output.new_gamma[-1]
         g.gradient_descent.direct.masses = ip.structure_initial.get_masses
-        g.gradient_descent.direct.gamma0 = ip.gamma0
         g.gradient_descent.direct.fix_com = ip.fix_com
-        g.gradient_descent.direct.use_adagrad = ip.use_adagrad
 
         # post
         g.post.input.energy_pots = gp.calc_static.output.energy_pot[-1]
@@ -225,10 +243,10 @@ class NEB(CompoundVertex):
     def _get_directional_barrier(self, frame=None, anchor_element=0, use_minima=False):
         energies = np.array(self._get_energies(frame=frame))
         if use_minima:
-            reference = energies.min()
+            reference = min(energies)
         else:
             reference = energies[anchor_element]
-        return energies.max() - reference
+        return max(energies) - reference
 
     def get_forward_barrier(self, frame=None, use_minima=False):
         """
@@ -263,5 +281,32 @@ class NEB(CompoundVertex):
     get_barrier.__doc__ = get_forward_barrier.__doc__
 
 
-class ProtoNEBSer(Protocol, NEB):
+class ProtoNEBSer(Protocol, NEBSerial):
+    pass
+
+
+class NEBParallel(NEBSerial):
+    """
+    Parallel version of NEBSerial. Specifically to run with DFT calculators like VASP. For Lammps, NEBSerial is
+        much faster.
+    """
+
+    def define_vertices(self):
+        # Graph components
+        g = self.graph
+        ip = Pointer(self.input)
+        g.initialize_jobs = CreateSubJobs()
+        g.interpolate_images = InitialPositions()
+        g.check_steps = IsGEq()
+        g.check_convergence = IsLEq()
+        g.calc_static = ParallelList(ExternalHamiltonian, sleep_time=ip.sleep_time)
+        g.neb_forces = NEBForces()
+        g.gamma = SerialList(GradientDescentGamma)
+        g.gradient_descent = SerialList(GradientDescent)
+        g.post = NEBPostProcess()
+        g.clock = Counter()
+        g.exit = AnyVertex()
+
+
+class ProtoNEBPar(Protocol, NEBParallel):
     pass

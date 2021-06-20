@@ -612,7 +612,6 @@ class TILDSerial(TILDParallel):
     def define_vertices(self):
         # Graph components
         g = self.graph
-        ip = Pointer(self.input)
         g.validate = TILDValidate()
         g.build_lambdas = BuildMixingPairs()
         g.initial_forces = Zeros()
@@ -622,7 +621,7 @@ class TILDSerial(TILDParallel):
         g.create_jobs_b = CreateSubJobs()
         g.check_steps = IsGEq()
         g.check_convergence = IsLEq()
-        g.run_lambda_points = SerialList(_TILDLambdaEvolution, sleep_time=ip.sleep_time)  # !!! only difference
+        g.run_lambda_points = SerialList(_TILDLambdaEvolution)  # !!! only difference
         g.clock = Counter()
         g.post = TILDPostProcess()
         g.exit = AnyVertex()
@@ -630,4 +629,3 @@ class TILDSerial(TILDParallel):
 
 class ProtoTILDSer(Protocol, TILDSerial):
     pass
-

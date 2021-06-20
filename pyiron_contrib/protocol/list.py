@@ -158,7 +158,7 @@ class ParallelList(ListVertex):
             times due to subprocess communication between the large number of workers in a single core.
     """
 
-    def __init__(self, child_type, sleep_time=0):
+    def __init__(self, child_type, sleep_time=Pointer(0.)):
         super(ParallelList, self).__init__(child_type)
         self.sleep_time = sleep_time
 
@@ -173,7 +173,6 @@ class ParallelList(ListVertex):
         sleep_time = ~self.sleep_time
 
         all_child_output = Manager().dict()
-
         jobs = []
         for i, child in enumerate(self.children):
             job = Process(target=child.execute_parallel, args=(i, all_child_output))
@@ -210,9 +209,8 @@ class SerialList(ListVertex):
     """
     A list of commands which are run in serial.
     """
-    def __init__(self, child_type, sleep_time=0):
+    def __init__(self, child_type):
         super(SerialList, self).__init__(child_type=child_type)
-        self.sleep_time = sleep_time
 
     def command(self, n_children):
         """This controls how the commands are run and is about logistics."""

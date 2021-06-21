@@ -454,6 +454,7 @@ class CompoundVertex(Vertex):
             group_name (str): HDF5 subgroup name - optional
         """
         super(CompoundVertex, self).to_hdf(hdf=hdf, group_name=group_name)
+        self.graph.to_hdf(hdf=hdf, group_name="graph")
 
     def from_hdf(self, hdf=None, group_name=None):
         """
@@ -464,6 +465,8 @@ class CompoundVertex(Vertex):
             group_name (str): HDF5 subgroup name - optional
         """
         super(CompoundVertex, self).from_hdf(hdf=hdf, group_name=group_name)
+        self.graph.from_hdf(hdf=hdf, group_name="graph")
+        self.define_information_flow()  # Rewire pointers
 
     def visualize(self, execution=True, dataflow=True):
         return self.graph.visualize(self.fullname(), execution=execution, dataflow=dataflow)
@@ -624,6 +627,7 @@ class Protocol(CompoundVertex, GenericJob):
     def __init__(self, project=None, job_name=None):
         super(Protocol, self).__init__(project=project, job_name=job_name)
         self.vertex_name = job_name
+        self.protocol_collect = False
 
     def execute(self):
         super(Protocol, self).execute()
@@ -632,6 +636,7 @@ class Protocol(CompoundVertex, GenericJob):
         """If this CompoundVertex is the highest level, it can be run as a regular pyiron job."""
         self.status.running = True
         self.execute()
+        self.protocol_collect = True
         self.status.collect = True  # Assume modal for now
         self.protocol_finished.fire()
         self.run()  # This is an artifact of inheriting from GenericJob, to get all that run functionality
@@ -663,8 +668,9 @@ class Protocol(CompoundVertex, GenericJob):
         """
         if hdf is None:
             hdf = self.project_hdf5
+        if self.protocol_collect:
+            self.graph.to_hdf(hdf=self.project_hdf5, group_name="graph")
         CompoundVertex.to_hdf(self, hdf=hdf, group_name=group_name)
-        self.graph.to_hdf(hdf=self.project_hdf5, group_name="graph")
 
     def from_hdf(self, hdf=None, group_name=None):
         """
@@ -675,8 +681,8 @@ class Protocol(CompoundVertex, GenericJob):
         """
         if hdf is None:
             hdf = self.project_hdf5
-        CompoundVertex.from_hdf(self, hdf=hdf, group_name=group_name)
         self.graph.from_hdf(hdf=self.project_hdf5, group_name="graph")
+        CompoundVertex.from_hdf(self, hdf=hdf, group_name=group_name)
 
 
 class Graph(dict, LoggerMixin):

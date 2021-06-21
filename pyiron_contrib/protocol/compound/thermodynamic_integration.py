@@ -549,11 +549,11 @@ class TILDParallel(CompoundVertex):
         """
         Get the lambda values.
         """
-        return self.graph.build_lambdas.output.lambda_pairs[-1][:, 0]
+        return self.output.lambdas[-1]
 
     def _get_tild_integrands(self):
-        o = Pointer(self.graph.run_lambda_points.output)
-        return np.array(~o.mean_diff[-1]), ~o.std_diff[-1] / np.sqrt(~o.n_samples[-1])
+        o = self.output
+        return np.array(o.integrands[-1]), o.integrands_std[-1] / np.sqrt(o.integrands_n_samples[-1])
 
     def plot_tild_integrands(self):
         """

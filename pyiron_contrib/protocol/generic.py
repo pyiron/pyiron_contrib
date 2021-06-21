@@ -32,7 +32,6 @@ DEFAULT_WHITE_LIST_ATTRIBUTE_NAME = 'DefaultWhitelist'
 class Vertex(LoggerMixin, ABC):
     """
     A parent class for objects which are valid vertices of a directed acyclic graph.
-
     Attributes:
         input (InputDictionary): A pointer-capable dictionary for inputs, including a sub-dictionary for defaults.
             (Default is a clean dictionary.)
@@ -48,11 +47,9 @@ class Vertex(LoggerMixin, ABC):
         on (bool): Whether to execute the vertex when it is the active vertex of the graph, or simply skip over it.
             (default is True -- actually execute!)
         graph_parent (Vertex): The object who owns the graph that this vertex resides in. (Default is None.)
-
     Input attributes:
         default (IODictionary): A dictionary for fall-back values in case a key is requested that isn't in the main
             input dictionary.
-
     Archive attributes:
         whitelist (IODictionary): A nested dictionary of periods for archiving input and output values. Stores on
             executions where `clock % period = 0`.
@@ -146,11 +143,9 @@ class Vertex(LoggerMixin, ABC):
     def _set_archive_whitelist(self, archive, **kwargs):
         """
         Whitelist properties of either "input" or "output" archive and set their dump period.
-
         Args:
             archive (str): either 'input' or 'output'.
             **kwargs: property names, values should be positive integers, specifies the dump freq, None = inf = < 0.
-
         """
         for k, v in kwargs.items():
             whitelist = getattr(self.archive.whitelist, archive)
@@ -160,12 +155,10 @@ class Vertex(LoggerMixin, ABC):
         """
         Sets the archive period for each property of to "n" if keys is not specified.
         If keys is a list of property names, "n" will be set a s archiving period only for those
-
         Args:
             archive (str): Either 'input' or 'output'.
             n (int): Dump at every `n` steps
             keys (list of str): The affected keys
-
         """
         if keys is None:
             keys = list(getattr(self, archive).keys())
@@ -265,7 +258,6 @@ class Vertex(LoggerMixin, ABC):
     def to_hdf(self, hdf, group_name=None):
         """
         Store the Vertex in an HDF5 file.
-
         Args:
             hdf (ProjectHDFio): HDF5 group object.
             group_name (str): HDF5 subgroup name. (Default is None.)
@@ -287,7 +279,6 @@ class Vertex(LoggerMixin, ABC):
     def from_hdf(self, hdf, group_name=None):
         """
         Load the Vertex from an HDF5 file.
-
         Args:
             hdf (ProjectHDFio): HDF5 group object.
             group_name (str): HDF5 subgroup name. (Default is None.)
@@ -341,7 +332,6 @@ class PrimitiveVertex(Vertex):
 class CompoundVertex(Vertex):
     """
     Vertices which contain a graph and produce output only after traversing their graph to its exit point.
-
     Input:
         graph (Graph): The graph of vertices to traverse.
         protocol_finished (Event):
@@ -448,29 +438,23 @@ class CompoundVertex(Vertex):
     def to_hdf(self, hdf, group_name=None):
         """
         Store the Protocol in an HDF5 file.
-
         Args:
             hdf (ProjectHDFio): HDF5 group object.
             group_name (str): HDF5 subgroup name - optional
         """
-        # super(CompoundVertex, self).to_hdf(hdf=hdf, group_name=group_name)
-        # self.graph.to_hdf(hdf=hdf, group_name="graph")
-        with hdf.open(self.vertex_name) as graph_hdf:
-            self.graph.to_hdf(hdf=graph_hdf, group_name="graph")
         super(CompoundVertex, self).to_hdf(hdf=hdf, group_name=group_name)
+        self.graph.to_hdf(hdf=hdf, group_name="graph")
 
     def from_hdf(self, hdf=None, group_name=None):
         """
         Load the Protocol from an HDF5 file.
-
         Args:
             hdf (ProjectHDFio): HDF5 group object - optional
             group_name (str): HDF5 subgroup name - optional
         """
-        # super(CompoundVertex, self).from_hdf(hdf=hdf, group_name=group_name)
-        # self.graph.from_hdf(hdf=hdf, group_name="graph")
-        super(CompoundVertex, self).from_hdf(hdf=hdf, group_name=group_name)
-        self.graph.from_hdf(hdf=hdf, group_name="graph")
+        super(CompoundVertex, self).from_hdf(hdf=hdf, group_name=group_name or self.vertex_name)
+        with hdf.open(self.vertex_name) as hdf5_server:
+            self.graph.from_hdf(hdf=hdf5_server, group_name="graph")
         self.define_information_flow()  # Rewire pointers
 
     def visualize(self, execution=True, dataflow=True):
@@ -543,7 +527,6 @@ class CompoundVertex(Vertex):
                     'structure': None
                 }
         ```
-
         Args:
             dictionary: (dict) the whitelist configuration
         """
@@ -646,10 +629,8 @@ class Protocol(CompoundVertex, GenericJob):
 
     def run(self, delete_existing_job=False, repair=False, debug=False, run_mode=None, continue_run=False):
         """A wrapper for the run which allows us to simply keep going with a new variable `continue_run`"""
-        # This part is buggy. DO NOT USE!
-        # if continue_run:
-        #     self.status.created = True
-        #     self.define_information_flow()
+        if continue_run:
+            self.status.created = True
         super(CompoundVertex, self).run(delete_existing_job=delete_existing_job, repair=repair, debug=debug,
                                         run_mode=run_mode)
 
@@ -669,13 +650,8 @@ class Protocol(CompoundVertex, GenericJob):
             hdf (ProjectHDFio): HDF5 group object - optional
             group_name (str): HDF5 subgroup name - optional
         """
-        # if hdf is None:
-        #     hdf = self.project_hdf5
-        # # self.graph.to_hdf(hdf=hdf, group_name="graph")  # here changing hdf to self.project_hdf5 works, not hdf
-        # CompoundVertex.to_hdf(self, hdf=hdf, group_name=group_name)
         if hdf is None:
             hdf = self.project_hdf5
-        self.graph.to_hdf(hdf=hdf, group_name="graph")
         super(CompoundVertex, self).to_hdf(hdf=hdf, group_name=group_name)
 
     def from_hdf(self, hdf=None, group_name=None):
@@ -685,13 +661,9 @@ class Protocol(CompoundVertex, GenericJob):
             hdf (ProjectHDFio): HDF5 group object - optional
             group_name (str): HDF5 subgroup name - optional
         """
-        # if hdf is None:
-        #     hdf = self.project_hdf5
-        # # self.graph.from_hdf(hdf=hdf, group_name="graph")
-        # CompoundVertex.from_hdf(self, hdf=hdf, group_name=group_name)
         if hdf is None:
             hdf = self.project_hdf5
-        super(Protocol, self).from_hdf(hdf=hdf, group_name=group_name)
+        super(CompoundVertex, self).from_hdf(hdf=hdf, group_name=group_name)
 
 
 class Graph(dict, LoggerMixin):

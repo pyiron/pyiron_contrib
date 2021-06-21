@@ -312,7 +312,7 @@ class TILDParallel(CompoundVertex):
         id_.cutoff_factor = 0.5
         id_.use_reflection = False
         id_.zero_k_energy = 0.
-        id_.sleep_time = 0
+        id_.sleep_time = 0.
         id_.convergence_check_steps = 10
         id_.fe_tol = 0.01
         id_._cutoff_distance = None
@@ -336,10 +336,10 @@ class TILDParallel(CompoundVertex):
         g.create_jobs_a = CreateSubJobs()
         g.create_jobs_b = CreateSubJobs()
         g.check_steps = IsGEq()
-        g.check_convergence = IsLEq()
         g.run_lambda_points = ParallelList(_TILDLambdaEvolution, sleep_time=ip.sleep_time)
         g.clock = Counter()
         g.post = TILDPostProcess()
+        g.check_convergence = IsLEq()
         g.exit = AnyVertex()
 
     def define_execution_flow(self):
@@ -357,11 +357,11 @@ class TILDParallel(CompoundVertex):
             g.run_lambda_points,
             g.clock,
             g.post,
-            g.check_convergence, "false",
+            g.check_convergence, "true",
             g.exit
         )
         g.make_edge(g.check_steps, g.exit, "true")
-        g.make_edge(g.check_convergence, g.exit, "true")
+        g.make_edge(g.check_convergence, g.check_steps, "false")
         g.make_edge(g.exit, g.check_steps, "false")
         g.starting_vertex = g.validate
         g.restarting_vertex = g.create_jobs_a
@@ -620,10 +620,10 @@ class TILDSerial(TILDParallel):
         g.create_jobs_a = CreateSubJobs()
         g.create_jobs_b = CreateSubJobs()
         g.check_steps = IsGEq()
-        g.check_convergence = IsLEq()
-        g.run_lambda_points = SerialList(_TILDLambdaEvolution)  # !!! only difference
+        g.run_lambda_points = SerialList(_TILDLambdaEvolution)
         g.clock = Counter()
         g.post = TILDPostProcess()
+        g.check_convergence = IsLEq()
         g.exit = AnyVertex()
 
 

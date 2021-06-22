@@ -76,8 +76,8 @@ class FunctionFactory(PyironFactory):
                 species = species,
                 cutoff = cutoff,
                 )
-            gauss.parameters.mu.fit = False
-            gauss.parameters.eta.fit = False
+            gauss.parameters.mu.enabled = False
+            gauss.parameters.eta.enabled = False
             sum_func.functions[gauss.identifier] = gauss
         return sum_func
 

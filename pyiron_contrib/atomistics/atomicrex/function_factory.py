@@ -51,8 +51,8 @@ class FunctionFactory(PyironFactory):
         return MorseC(identifier, A, B, mu, lambda_val, delta, species=species)
 
     @staticmethod
-    def gaussian(identifier, prefactor, eta, mu, species=["*", "*"]):
-        return GaussianFunc(identifier, prefactor, eta, mu, species)
+    def gaussian(identifier, prefactor, eta, mu, species=["*", "*"], cutoff=None):
+        return GaussianFunc(identifier, prefactor, eta, mu, species, cutoff)
 
     @staticmethod
     def sum(identifier, species=["*", "*"]):
@@ -468,7 +468,7 @@ class MorseC(SpecialFunction):
 
 ## Renamed GaussianFunc to not mess with the gaussian code when loading from hdf5
 class GaussianFunc(SpecialFunction):
-    def __init__(self, identifier=None, prefactor=None, eta=None, mu=None, species=None):
+    def __init__(self, identifier=None, prefactor=None, eta=None, mu=None, species=None, cutoff=None):
         super().__init__(identifier, species=species, is_screening_function=False)
         self.parameters.add_parameter(
             "prefactor",
@@ -487,6 +487,7 @@ class GaussianFunc(SpecialFunction):
             start_val=mu,
             enabled=True,
         )
+        self.cutoff = cutoff
 
     @property
     def func(self):
@@ -496,8 +497,13 @@ class GaussianFunc(SpecialFunction):
         return lambda r: prefactor*np.exp(-eta*(r-mu)**2)
 
     def _to_xml_element(self):
-        return super()._to_xml_element(name="gaussian")
-
+        xml = super()._to_xml_element(name="gaussian")
+        # Put this in SpecialFunction or AbstractFunction class when rewriting
+        # f.e. using getattr()
+        if self.cutoff is not None:
+            cutoff = ET.SubElement(xml, "cutoff")
+            cutoff.text = f"{self.cutoff}"
+        return xml
 
 class UserFunction(DataContainer, BaseFunctionMixin):
     """

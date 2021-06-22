@@ -57,7 +57,29 @@ class FunctionFactory(PyironFactory):
     @staticmethod
     def sum(identifier, species=["*", "*"]):
         return Sum(identifier=identifier, species=species)
-
+    
+    def product(identifier, species=["*", "*"]):
+        return Product(identifier=identifier, species=species)
+    
+    @staticmethod
+    def gaussians_sum(n_gaussians, eta, cutoff, identifier, initial_prefactors=None, species=["*", "*"]):
+        sum_func = FunctionFactory.sum(identifier=identifier, species=species)
+        node_points = np.linspace(0, cutoff, n_gaussians, endpoint=False)
+        if initial_prefactors is None:
+            initial_prefactors = np.ones(n_gaussians)
+        for i in range(n_gaussians):
+            gauss = FunctionFactory.gaussian(
+                identifier=f"gauss_{i}",
+                prefactor=initial_prefactors[i],
+                eta=eta,
+                mu = node_points[i],
+                species = species,
+                cutoff = cutoff,
+                )
+            gauss.parameters.mu.fit = False
+            gauss.parameters.eta.fit = False
+            sum_func.functions[gauss.identifier] = gauss
+        return sum_func
 
 class BaseFunctionMixin():
     # Mixin class to implement functionality common in all types of functions
@@ -79,16 +101,15 @@ class MetaFunctionMixin():
         for f in self.functions.values():
             f.lock_parameters()
 
-
-class Sum(DataContainer, MetaFunctionMixin):
-    def __init__(self, identifier=None, species=None):
+class AbstractMetaFunction(DataContainer, MetaFunctionMixin):
+    def __init__(self, identifier=None, species=None, table_name=None):
         super().__init__()
         self.identifier = identifier
-        self.functions = DataContainer(table_name="sum_functions")
+        self.functions = DataContainer(table_name=table_name)
         self.species = species
 
-    def _to_xml_element(self):
-        root = ET.Element("sum")
+    def _to_xml_element(self, func_name):
+        root = ET.Element(func_name)
         root.set("id", self.identifier)
         for k, v in self.functions.items():
             root.append(v._to_xml_element())
@@ -100,7 +121,21 @@ class Sum(DataContainer, MetaFunctionMixin):
         try:
             self.functions[identifier]._parse_final_parameter(leftover, value)
         except KeyError:
-            raise KeyError(f"Function {identifier} not found in sum {self.identifier}")
+            raise KeyError(f"Function {identifier} not found in {self.identifier}")
+
+class Sum(AbstractMetaFunction, MetaFunctionMixin):
+    def __init__(self, identifier=None, species=None):
+        super().__init__(identifier=identifier, species=species, table_name="sum_functions")
+    
+    def _to_xml_element(self):
+        return super()._to_xml_element(func_name="sum")
+
+class Product(AbstractMetaFunction, MetaFunctionMixin):
+    def __init__(self, identifier=None, species=None):
+        super().__init__(identifier=identifier, species=species, table_name="product_functions")
+    
+    def _to_xml_element(self):
+        return super()._to_xml_element(func_name="product")
 
 
 class SpecialFunction(DataContainer, BaseFunctionMixin):

@@ -66,15 +66,24 @@ class FunctionFactory(PyironFactory):
     def gaussians_sum(
         n_gaussians,
         eta,
-        cutoff,
         identifier,
+        node_points = None,
+        cutoff = None,
         initial_prefactors=None,
         min_prefactors=None,
         max_prefactors=None,
         species=["*", "*"]
     ):
         sum_func = FunctionFactory.sum(identifier=identifier, species=species)
-        node_points = np.linspace(0, cutoff, n_gaussians, endpoint=False)
+        if node_points is None:
+            if cutoff is None:
+                raise ValueError("Specify node points or a cutoff to set them automatically")
+            else:
+                node_points = np.linspace(0, cutoff, n_gaussians, endpoint=False)
+        else:
+            if len(node_points) != n_gaussians:
+                raise ValueError("Number of node points has to match n_gaussians")
+
         if initial_prefactors is None:
             initial_prefactors = np.ones(n_gaussians)
         if min_prefactors is not None:

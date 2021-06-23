@@ -58,6 +58,7 @@ class FunctionFactory(PyironFactory):
     def sum(identifier, species=["*", "*"]):
         return Sum(identifier=identifier, species=species)
     
+    @staticmethod
     def product(identifier, species=["*", "*"]):
         return Product(identifier=identifier, species=species)
     

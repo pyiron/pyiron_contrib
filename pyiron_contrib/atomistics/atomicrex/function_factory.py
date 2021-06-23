@@ -63,11 +63,27 @@ class FunctionFactory(PyironFactory):
         return Product(identifier=identifier, species=species)
     
     @staticmethod
-    def gaussians_sum(n_gaussians, eta, cutoff, identifier, initial_prefactors=None, species=["*", "*"]):
+    def gaussians_sum(
+        n_gaussians,
+        eta,
+        cutoff,
+        identifier,
+        initial_prefactors=None,
+        min_prefactors=None,
+        max_prefactors=None,
+        species=["*", "*"]
+    ):
         sum_func = FunctionFactory.sum(identifier=identifier, species=species)
         node_points = np.linspace(0, cutoff, n_gaussians, endpoint=False)
         if initial_prefactors is None:
             initial_prefactors = np.ones(n_gaussians)
+        if min_prefactors is not None:
+            if len(min_prefactors) != n_gaussians:
+                raise ValueError("min_prefactors must have length num_gaussians")
+        if max_prefactors is not None:
+            if len(max_prefactors) != n_gaussians:
+                raise ValueError("max_prefactors must have length num_gaussians")
+
         for i in range(n_gaussians):
             gauss = FunctionFactory.gaussian(
                 identifier=f"gauss_{i}",
@@ -79,6 +95,11 @@ class FunctionFactory(PyironFactory):
                 )
             gauss.parameters.mu.enabled = False
             gauss.parameters.eta.enabled = False
+            if min_prefactors is not None:
+                gauss.parameters.prefactor.min_val = min_prefactors[i]
+            if max_prefactors is not None:
+                gauss.parameters.prefactor.max_val = max_prefactors[i]
+
             sum_func.functions[gauss.identifier] = gauss
         return sum_func
 

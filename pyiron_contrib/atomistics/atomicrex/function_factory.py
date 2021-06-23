@@ -15,8 +15,8 @@ class FunctionFactory(PyironFactory):
     atomicrex documentation.
     """    
     @staticmethod
-    def user_function(identifier, input_variable="r", species=["*", "*"], is_screening_function=False):
-        return UserFunction(identifier, input_variable=input_variable, species=species, is_screening_function=is_screening_function)
+    def user_function(identifier, input_variable="r", species=["*", "*"], is_screening_function=False, cutoff=None):
+        return UserFunction(identifier, input_variable=input_variable, species=species, is_screening_function=is_screening_function, cutoff=cutoff)
 
     @staticmethod
     def poly(identifier, cutoff, species=["*", "*"]):
@@ -569,7 +569,7 @@ class UserFunction(DataContainer, BaseFunctionMixin):
     All parameters defined in the function should be added using the
     UserFunction.parameters.add_parameter() method.
     """    
-    def __init__(self, identifier=None, input_variable=None, species=["*", "*"], is_screening_function=False):
+    def __init__(self, identifier=None, input_variable=None, species=["*", "*"], is_screening_function=False, cutoff=None):
         super().__init__(table_name=f"user_func_{identifier}")
         self.input_variable = input_variable
         self.identifier = identifier
@@ -578,6 +578,7 @@ class UserFunction(DataContainer, BaseFunctionMixin):
         self.expression = None
         self.derivative = None
         self.is_screening_function = is_screening_function
+        self.cutoff = cutoff
         if not is_screening_function:
             self.screening = None
 
@@ -601,6 +602,10 @@ class UserFunction(DataContainer, BaseFunctionMixin):
             p.text = f"{param.start_val:.6g}"#6g formatting because atomicrex output is limited to 6 significant digits, prevents some errors
         
         root.append(self.parameters.fit_dofs_to_xml_element())
+        
+        if self.cutoff is not None:
+            cutoff = ET.SubElement(root, "cutoff")
+            cutoff.text = f"{self.cutoff}"
 
         if not self.is_screening_function:
             if self.screening is not None:

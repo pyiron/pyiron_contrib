@@ -234,6 +234,8 @@ class NEBSerial(CompoundVertex):
         Default is plot the string at the final frame, as only the final dump is recorded. (unless specified
             otherwise by the user!)
         """
+        if frame is not None:
+            NotImplementedError("Temporarily disabled. Set to None.")
         if ax is None:
             _, ax = plt.subplots()
         if plot_kwargs is None:
@@ -256,7 +258,7 @@ class NEBSerial(CompoundVertex):
             reference = energies[anchor_element]
         return max(energies) - reference
 
-    def get_forward_barrier(self, frame=None, use_minima=False):
+    def _get_forward_barrier(self, frame=None, use_minima=False):
         """
         Get the energy barrier from the 0th image to the highest energy (saddle state).
 
@@ -270,7 +272,7 @@ class NEBSerial(CompoundVertex):
         """
         return self._get_directional_barrier(frame=frame, use_minima=use_minima)
 
-    def get_reverse_barrier(self, frame=None, use_minima=False):
+    def _get_reverse_barrier(self, frame=None, use_minima=False):
         """
         Get the energy barrier from the final image to the highest energy (saddle state).
 
@@ -285,8 +287,8 @@ class NEBSerial(CompoundVertex):
         return self._get_directional_barrier(frame=frame, anchor_element=-1, use_minima=use_minima)
 
     def get_barrier(self, frame=None, use_minima=True):
-        return self.get_forward_barrier(frame=frame, use_minima=use_minima)
-    get_barrier.__doc__ = get_forward_barrier.__doc__
+        return self._get_forward_barrier(frame=frame, use_minima=use_minima)
+    get_barrier.__doc__ = _get_forward_barrier.__doc__
 
 
 class ProtoNEBSer(Protocol, NEBSerial):

@@ -148,17 +148,13 @@ class ListVertex(PrimitiveVertex):
 
 class ParallelList(ListVertex):
     """
-    A list of commands which are executed in in parallel. The current implementation uses multiprocessing.Pool.
-
-    Attributes:
-        pool (multiprocessing.Pool): Define the number of workers that will be utilized to run the child jobs.
-            Instantiation and closing are handled by default in `__init__` and `finish`.
-
-        Note: It is best to set the number of workers to the number of cores so as to prevent larger computation
-            times due to subprocess communication between the large number of workers in a single core.
+    A list of commands which are executed in in parallel. The current implementation uses multiprocessing.Process.
     """
-
     def __init__(self, child_type, sleep_time=Pointer(0.)):
+        """
+        sleep_time (float): A delay in seconds for database read/write of data. For sqlite, a non-zero delay maybe
+            required. (Default is 0 seconds, no delay.)
+        """
         super(ParallelList, self).__init__(child_type)
         self.sleep_time = sleep_time
 

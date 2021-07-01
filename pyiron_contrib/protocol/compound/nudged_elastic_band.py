@@ -81,7 +81,6 @@ class NEBSerial(CompoundVertex):
     def define_vertices(self):
         # Graph components
         g = self.graph
-        ip = Pointer(self.input)
         g.initialize_jobs = CreateSubJobs()
         g.interpolate_images = InitialPositions()
         g.check_steps = IsGEq()

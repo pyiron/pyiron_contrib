@@ -79,7 +79,7 @@ def requires_arguments(func):
     Returns: (bool) wether arguments (except "self" for methods) are needed
 
     """
-    args, varargs, varkw, defaults, _, _, _ = getfullargspec(func)
+    args, _, _, defaults, _, _, _ = getfullargspec(func)
     if defaults:
         args = args[:-len(defaults)]
     # It could be a bound method too

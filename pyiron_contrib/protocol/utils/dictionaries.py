@@ -5,12 +5,6 @@
 import re
 import numpy as np
 from collections import OrderedDict
-from pyiron_atomistics import Project
-from pyiron_atomistics.lammps.lammps import Lammps
-from pyiron_atomistics.vasp.vasp import Vasp
-from pyiron_atomistics.sphinx.sphinx import Sphinx
-from pyiron_atomistics.thermodynamics.hessian import HessianJob
-from pyiron_contrib.protocol.jobs.decoupled_oscillators import DecoupledOscillators
 from pyiron_contrib.protocol.utils.pointer import Pointer
 from pyiron_contrib.protocol.utils.misc import  LoggerMixin, fullname
 from pyiron_atomistics.atomistics.structure.atoms import Atoms

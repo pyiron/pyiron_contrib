@@ -6,7 +6,7 @@ from __future__ import print_function
 
 from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
 from pyiron_contrib.protocol.primitive.one_state import Counter, CreateSubJobs, ExternalHamiltonian, \
-    GradientDescent, Max, Norm
+    GradientDescent, GradientDescentGamma, Max, Norm
 from pyiron_contrib.protocol.primitive.two_state import IsGEq
 from pyiron_contrib.protocol.utils import Pointer
 
@@ -35,9 +35,12 @@ class Minimize(CompoundVertex):
         n_steps (int): How many steps to run for. (Default is 100.)
         f_tol (float): Ionic force convergence (largest atomic force). (Default is 1e-4 eV/angstrom.)
         gamma0 (float): Initial step size as a multiple of the force. (Default is 0.1.)
-        fix_com (bool): Whether the center of mass motion should be subtracted off of the position update. (Default is
-            True)
-        use_adagrad (bool): Whether to have the step size decay according to adagrad. (Default is False)
+        fix_com (bool): Whether the center of mass motion should be subtracted off of the position update.
+            (Default is True)
+        dynamic_gamma (bool): If True, calculate a new gamma for every step. Otherwise, keep the gamma fixed at gamma0.
+        c (float): A value between (0, 1) to scale the gradient. (Default is 0.1)
+        tau1 (float): A value between (0, 1) to scale up the gamma value. (Default is 1.)
+        tau1 (float): A value between (0, 1) to scale down the gamma value. (Default is 0.2)
 
     Output attributes:
         energy_pot (float): Total potential energy of the system in eV.
@@ -69,8 +72,10 @@ class Minimize(CompoundVertex):
         id_.f_tol = 1e-4
         id_.gamma0 = 0.1
         id_.fix_com = True
-        id_.use_adagrad = False
-        id_._n_children = 1
+        id_.dynamic_gamma = True
+        id_.c = 0.1
+        id_.tau1 = 1.
+        id_.tau2 = 0.2
 
     def define_vertices(self):
         # Graph components
@@ -81,6 +86,7 @@ class Minimize(CompoundVertex):
         g.check_steps = IsGEq()
         g.force_norm = Norm()
         g.max_force = Max()
+        g.gamma = GradientDescentGamma()
         g.check_force = IsGEq()
         g.gradient_descent = GradientDescent()
 
@@ -93,6 +99,7 @@ class Minimize(CompoundVertex):
             g.calc_static,
             g.force_norm,
             g.max_force,
+            g.gamma,
             g.gradient_descent,
             g.check_force, "true",
             g.clock,
@@ -130,14 +137,28 @@ class Minimize(CompoundVertex):
         # max_force
         g.max_force.input.a = gp.force_norm.output.n[-1]
 
+        # gamma
+        g.gamma.input.default.old_energy = gp.calc_static.output.energy_pot[-1]
+        g.gamma.input.default.old_forces = gp.calc_static.output.forces[-1]
+        g.gamma.input.default.gamma = ip.gamma0
+        g.gamma.input.dynamic_gamma = ip.dynamic_gamma
+        g.gamma.input.c = ip.c
+        g.gamma.input.tau1 = ip.tau1
+        g.gamma.input.tau2 = ip.tau2
+
+        g.gamma.input.old_energy = gp.gamma.output.old_energy[-1]
+        g.gamma.input.new_energy = gp.calc_static.output.energy_pot[-1]
+        g.gamma.input.old_forces = gp.gamma.output.old_forces[-1]
+        g.gamma.input.new_forces = gp.calc_static.output.forces[-1]
+        g.gamma.input.gamma = gp.gamma.output.new_gamma[-1]
+
         # gradient_descent
         g.gradient_descent.input.default.positions = ip.structure.positions
         g.gradient_descent.input.positions = gp.gradient_descent.output.positions[-1]
         g.gradient_descent.input.forces = gp.calc_static.output.forces[-1]
+        g.gradient_descent.input.gamma0 = gp.gamma.output.new_gamma[-1]
         g.gradient_descent.input.masses = ip.structure.get_masses
-        g.gradient_descent.input.gamma0 = ip.gamma0
         g.gradient_descent.input.fix_com = ip.fix_com
-        g.gradient_descent.input.use_adagrad = ip.use_adagrad
 
         # check_force
         g.check_force.input.target = gp.max_force.output.amax[-1]

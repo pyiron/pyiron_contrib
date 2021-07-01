@@ -49,10 +49,15 @@ class NEBSerial(CompoundVertex):
         smoothing (float): Strength of the smoothing spring when consecutive images form an angle. (Default is None,
             do not apply such a force.)
         gamma0 (float): Initial step size as a multiple of the force. (Default is 0.1.)
+        fix_com (bool): Whether the center of mass motion should be subtracted off of the position update.
+            (Default is True)
         dynamic_gamma (bool): Whether to vary the step size (gamma) for each iteration based on line search.
             (Default is True.)
-        fix_com (bool): Whether the center of mass motion should be subtracted off of the position update. (Default
-            is True)
+        c (float): A value between (0, 1) to scale the gradient. (Default is 0.1)
+        tau1 (float): A value between (0, 1) to scale up the gamma value. (Default is 1.)
+        tau1 (float): A value between (0, 1) to scale down the gamma value. (Default is 0.2)
+        sleep_time (float): A delay in seconds for database access of results. For sqlite, a non-zero delay maybe
+            required. (Default is 0 seconds, no delay.)
 
     Output attributes:
         energy_pot (list[float]): Total potential energy of the system in eV.
@@ -73,9 +78,11 @@ class NEBSerial(CompoundVertex):
         id_.use_climbing_image = True
         id_.smoothing = None
         id_.gamma0 = 0.1
-        id_.dynamic_gamma = True
         id_.fix_com = True
-        id_.force_tol = 1e-4
+        id_.dynamic_gamma = True
+        id_.c = 0.1
+        id_.tau1 = 1.
+        id_.tau2 = 0.2
         id_.sleep_time = 0.
 
     def define_vertices(self):
@@ -156,16 +163,18 @@ class NEBSerial(CompoundVertex):
 
         # gamma
         g.gamma.input.n_children = ip.n_images
-        g.gamma.broadcast.default.old_positions = gp.interpolate_images.output.initial_positions[-1]
-        g.gamma.broadcast.default.new_positions = gp.interpolate_images.output.initial_positions[-1]
-        g.gamma.broadcast.default.old_forces = gp.neb_forces.output.forces[-1]
-        g.gamma.broadcast.default.new_forces = gp.neb_forces.output.forces[-1]
+        g.gamma.broadcast.default.old_energy = gp.calc_static.output.energy_pot[-1]
+        g.gamma.broadcast.default.old_forces = gp.calc_static.output.forces[-1]
         g.gamma.direct.default.gamma = ip.gamma0
+        g.gamma.direct.dynamic_gamma = ip.dynamic_gamma
+        g.gamma.direct.c = ip.c
+        g.gamma.direct.tau1 = ip.tau1
+        g.gamma.direct.tau2 = ip.tau2
 
-        g.gamma.broadcast.old_positions = gp.gamma.output.new_positons[-1]
-        g.gamma.broadcast.new_positions = gp.gradient_descent.output.positions[-1]
-        g.gamma.broadcast.old_forces = gp.gamma.output.new_forces[-1]
-        g.gamma.broadcast.new_forces = gp.neb_forces.output.forces[-1]
+        g.gamma.broadcast.old_energy = gp.gamma.output.old_energy[-1]
+        g.gamma.broadcast.new_energy = gp.calc_static.output.energy_pot[-1]
+        g.gamma.broadcast.old_forces = gp.gamma.output.old_forces[-1]
+        g.gamma.broadcast.new_forces = gp.calc_static.output.forces[-1]
         g.gamma.broadcast.gamma = gp.gamma.output.new_gamma[-1]
 
         # gradient_descent
@@ -184,7 +193,7 @@ class NEBSerial(CompoundVertex):
 
         # check_convergence
         g.check_convergence.input.target = gp.post.output.force_norm[-1]
-        g.check_convergence.input.threshold = ip.force_tol
+        g.check_convergence.input.threshold = ip.f_tol
 
         # exit
         g.exit.input.vertex_states = [
@@ -208,9 +217,9 @@ class NEBSerial(CompoundVertex):
 
     def _get_energies(self, frame=None):
         if frame is None:
-            return self.graph.calc_static.output.energy_pot[-1]
+            return self.output.energy_pot[-1]
         else:
-            return self.graph.calc_static.archive.output.energy_pot.data[frame]
+            return self.output.energy_pot.data[frame]
 
     def plot_elastic_band(self, ax=None, frame=None, plot_kwargs=None):
         """

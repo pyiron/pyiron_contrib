@@ -313,7 +313,6 @@ class CreateSubJobs(PrimitiveVertex):
 
     def __init__(self, name=None):
         super(CreateSubJobs, self).__init__(name=name)
-        self._fast_lammps_mode = True
         self._jobs_project_path = None
         self._jobs_names = None
         id_ = self.input.default
@@ -330,7 +329,7 @@ class CreateSubJobs(PrimitiveVertex):
         self._jobs_names = []
         for i in np.arange(n_images):
             name = self.vertex_name + '_' + str(i)
-            _, p_path, j_name = self._initialize(pr_sub, ref_job, self._fast_lammps_mode, name, structure)
+            _, p_path, j_name = self._initialize(pr_sub, ref_job, name, structure)
             self._jobs_project_path.append(p_path)
             self._jobs_names.append(j_name)
         return {
@@ -339,7 +338,7 @@ class CreateSubJobs(PrimitiveVertex):
         }
 
     @staticmethod
-    def _initialize(pr, ref_job, fast_lammps_mode, name, structure):
+    def _initialize(pr, ref_job, name, structure):
         """
         Initialize/create the interactive job and save it.
         """
@@ -354,11 +353,10 @@ class CreateSubJobs(PrimitiveVertex):
             job.structure = structure
         if isinstance(job, GenericInteractive):
             job.interactive_open()
-            if isinstance(job, LammpsInteractive) and fast_lammps_mode:
-                # Note: This might be done by default at some point in LammpsInteractive,
-                # and could then be removed here
-                job.interactive_flush_frequency = 10 ** 10
-                job.interactive_write_frequency = 10 ** 10
+            # Note: This might be done by default at some point in LammpsInteractive,
+            # and could then be removed here
+            job.interactive_flush_frequency = 10 ** 10
+            job.interactive_write_frequency = 10 ** 10
             job.validate_ready_to_run()
             job.save()
         else:

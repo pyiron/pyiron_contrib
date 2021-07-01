@@ -278,6 +278,12 @@ class DecoupledOscillators(GenericInteractive, GenericMaster):
     def interactive_energy_pot_getter(self):
         return self.interactive_cache['energy_pot'][-1]
 
+    def interactive_pressures_getter(self):
+        pass
+
+    def interactive_volume_getter(self):
+        pass
+
     def to_hdf(self, hdf=None, group_name=None):
         """
         Store the DecoupledOscillator object in the HDF5 File

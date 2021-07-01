@@ -1,0 +1,15 @@
+version: 2
+updates:
+- package-ecosystem: pip
+  directory: "/"
+  schedule:
+    interval: weekly
+    day: monday
+  open-pull-requests-limit: 10
+  ignore:
+  - dependency-name: pyiron-base
+    versions:
+    - 0.2.11
+  - dependency-name: matplotlib
+    versions:
+    - 3.4.0

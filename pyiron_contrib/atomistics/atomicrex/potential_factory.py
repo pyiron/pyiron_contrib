@@ -1,12 +1,14 @@
 import posixpath
 import xml.etree.ElementTree as ET
+import re
+import itertools
 
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
 from pyiron_base import PyironFactory, DataContainer
-from pyiron_contrib.atomistics.atomicrex.function_factory import FunctionFactory
+from pyiron_contrib.atomistics.atomicrex.function_factory import FunctionFactory, FunctionParameterList
 from pyiron_contrib.atomistics.atomicrex.utility_functions import write_pretty_xml
 
 class ARPotFactory(PyironFactory):
@@ -24,7 +26,6 @@ class ARPotFactory(PyironFactory):
             species=species,
         )
 
-
     @staticmethod
     def meam_potential(identifier="MEAM", export_file="meam.out", species=["*", "*"]):
         return MEAMPotential(
@@ -33,10 +34,17 @@ class ARPotFactory(PyironFactory):
             species=species,
         )
 
-
     @staticmethod
     def lennard_jones_potential(sigma, epsilon, cutoff, species={"a": "*", "b": "*"}, identifier="LJ"):
         return LJPotential(sigma, epsilon, cutoff, species=species, identifier=identifier)
+
+    @staticmethod
+    def tersoff_potential(elements, param_file=None):
+        return TersoffPotential(elements=elements, param_file=param_file)
+
+    @staticmethod
+    def abop_potential(elements, param_file=None):
+        return ABOPPotential(elements=elements, param_file=param_file)
 
 
 class AbstractPotential(DataContainer):
@@ -45,9 +53,21 @@ class AbstractPotential(DataContainer):
     def __init__(self, init=None, table_name="potential"):
         super().__init__(init, table_name=table_name)
     
-    def copy_final_to_initial_params(self):
-        raise NotImplementedError("Should be implemented in the subclass.")
+    #def copy_final_to_initial_params(self):
+    #    raise NotImplementedError("Should be implemented in the subclass.")
     
+    def write_xml_file(self, directory):
+        """
+        Write the potential.xml file for the atomicrex job.
+        Has to be defined.
+        Args:
+            directory (str): working directory path
+        """    
+        raise NotImplementedError("Has to be implemented in the subclass")
+    
+    def _parse_final_parameters(self, lines):
+        raise NotImplementedError("Has to be implemented in the subclass")
+
     def _potential_as_pd_df(self, job):
         """
         Internal function used to convert a fitted potential in a pandas datafram
@@ -64,10 +84,353 @@ class AbstractPotential(DataContainer):
         raise NotImplementedError("Should be implemented in the subclass")
 
 
+class BOPAbstract(AbstractPotential):
+    def __init__(self, init=None, elements=None, param_file=None, identifier=None):
+        super().__init__(init=init)
+        if init is None:
+            self.identifier = identifier
+            if elements is not None:
+                if param_file is None:
+                    self.param_file = f"{''.join(elem for elem in elements)}.tersoff"
+                else:
+                    self.param_file = param_file
+                
+                self._tag_dict = _get_tag_dict(elements)
+                self.elements = elements
+                if self.identifier == "tersoff":
+                    self.parameters = TersoffParameters(self._tag_dict)
+                elif self.identifier == "abop":
+                    self.parameters = ABOPParameters(self._tag_dict)
+       
+
+    def write_xml_file(self, directory):
+        self.parameters._write_tersoff_file(directory)
+
+        tersoff = ET.Element(f"{self.identifier}")
+        tersoff.set("id", f"{self.identifier}")
+        tersoff.set("species-a", "*")
+        tersoff.set("species-b", "*")
+
+        output = ET.SubElement(tersoff, "export-potential")
+        output.text = f"{self.param_file}"
+
+        params = ET.SubElement(tersoff, "param-file")
+        params.text = "input.tersoff"
+
+        tersoff.append(self.parameters._to_xml_element())
+
+        filename = posixpath.join(directory, "potential.xml")
+        write_pretty_xml(tersoff, filename)
+    
+    
+    def _parse_final_parameters(self, lines):
+        for l in lines:
+            tag, param, value = _parse_tersoff_line(l)
+            self.parameters[tag][param].final_value = value
+    
+    def _potential_as_pd_df(self, job):
+        """
+        Makes the tabulated eam potential written by atomicrex usable
+        for pyiron lammps jobs.
+        """
+        if self.param_file is None:
+            raise ValueError("export_file must be set to use the potential with lammps")
+
+        species = [el for el in job.input.atom_types.keys()]
+        species_str = ""
+        for s in species:
+            species_str += f"{s} "
+
+        pot = pd.DataFrame({
+            "Name": f"{self.identifier}",
+            "Filename": [[f"{job.working_directory}/{self.param_file}"]],
+            'Model': ['Custom'],
+            "Species": [species],
+            "Config": [[
+                "pair_style tersoff\n",
+                f"pair_coeff * * {job.working_directory}/{self.param_file} {species_str}\n",
+                ]]
+        })    
+        return pot
+
+
+class TersoffPotential(BOPAbstract):
+    def __init__(self, init=None, elements=None, param_file=None):
+        super().__init__(init=init, elements=elements, param_file=param_file, identifier="tersoff")
+
+
+class ABOPPotential(BOPAbstract):
+    def __init__(self, init=None, elements=None, param_file=None):
+        super().__init__(init=init, elements=elements, param_file=param_file, identifier="abop")
+
+# tag regular expression
+tag_re = re.compile("[A-Z][a-z]?")
+# Parameters in the order of tersoff file format
+tersoff_file_params = [
+    "e1",
+    "e2",
+    "e3",
+    "m",
+    "gamma",
+    "lambda3",
+    "c",
+    "d",
+    "theta0",
+    "n",
+    "beta",
+    "lambda2",
+    "B",
+    "R",
+    "D",
+    "lambda1",
+    "A"
+]
+
+# Transform tersoff to abop parameters
+def get_r0(lam1, lam2, A, B): return 1/(lam1-lam2)*np.log(lam1*A/(lam2*B))
+def get_D0(lam1, lam2, A, B): return A*(lam1/lam2 - 1)*np.exp(-lam1/(lam1-lam2)*np.log(lam1*A/lam2*B))
+def get_beta(lam1, lam2): return lam1 / np.sqrt(2*lam1/lam2) 
+def get_S(lam1, lam2): return lam1/lam2
+# abop to tersoff parameters
+def get_lam1(beta, S): return beta*np.sqrt(2*S)
+def get_lam2(beta, S): return beta*np.sqrt(2/S)
+def get_A(beta, S, D0, r0): return D0/(S-1)*np.exp(beta*np.sqrt(2*S)*r0)
+def get_B(beta, S, D0, r0): return D0*S/(S-1)*np.exp(beta*np.sqrt(2/S)*r0)
+
+class BOPParameters(DataContainer):
+    def __init__(self, tag_dict=None):
+        super().__init__()
+        if tag_dict is not None:
+            self._setup_parameters(tag_dict)
+
+    def _setup_parameters(self, tag_dict):
+        raise NotImplementedError("Implement in subclass")
+
+    @staticmethod
+    def tags_from_elements(elements):
+        """
+        Helper function that returns a list of tags
+        from a list of elements, f.e. for the start_vals_from_file function
+
+        Args:
+            elements (list[str]): list of elements .f.e ["Si", "C"]
+
+        Returns:
+            list[str]: list of tags f.e. ["SiSiSi", "SiSiC", ...]
+        """        
+        return _tag_list(elements)
+
+class TersoffParameters(BOPParameters):
+    def __init__(self, tag_dict=None):
+        super().__init__(tag_dict)
+
+    def _setup_parameters(self, tag_dict):
+        for tag, v in tag_dict.items():
+            self[tag] = FunctionParameterList()
+
+            # Parameters are added in the same order as they appear in lammps/tersoff format
+            # If this order is kept always? this allows to iterate through it in a for loop
+            # in some sitauations, instead of looking up the keys
+            # 3 body params m(not fittable), gamma, lambda3, c, d, theta0
+            self[tag].add_parameter("m", start_val=3, fitable=False) # 3 or 1
+
+            self[tag].add_parameter("gamma", start_val=None, tag=tag)
+            self[tag].add_parameter("lambda3", start_val=None, tag=tag)
+            self[tag].add_parameter("c", start_val=None, tag=tag)
+            self[tag].add_parameter("d", start_val=None, tag=tag)
+            self[tag].add_parameter("theta0", start_val=None, tag=tag)
+
+            # 2 body params powern(only abop fittable), beta, lambda1, lambda2, A, B
+            self[tag].add_parameter("n", start_val=None, fitable=False)
+            self[tag].add_parameter("beta", start_val=None, fitable=v, tag=tag)
+            self[tag].add_parameter("lambda2", start_val=None, fitable=v, tag=tag)
+            self[tag].add_parameter("B", start_val=None, fitable=v, tag=tag)           
+            # 2 and 3 body params D and R
+            self[tag].add_parameter("D", start_val=None, fitable=False)
+            self[tag].add_parameter("R", start_val=None, fitable=False)
+            # 2 body params again
+            self[tag].add_parameter("lambda1", start_val=None, fitable=v, tag=tag)
+            self[tag].add_parameter("A", start_val=None, fitable=v, tag=tag)
+
+            
+    def start_vals_from_file(self, file, tag_list=None):
+        with open(file) as f:
+            for l in f:
+                l = l.strip()
+                if not l:
+                    continue
+                elif l.startswith("#"):
+                    continue
+                else:
+                    l = l.split()
+                    tag = "".join((l[0], l[1], l[2]))
+                    ## Allow to filter the file for certain tags by setting a tag_list
+                    if tag_list is not None:
+                        if tag not in tag_list:
+                            continue
+
+                    for i in range(3, 17):
+                        param = tersoff_file_params[i]
+                        try:
+                            self[tag][param].start_val = float(l[i])
+                        except:
+                            KeyError(
+                                f"Could not assign start value of tag: {tag} to parameter: {param}" 
+                            )
+    
+    def _write_tersoff_file(self, directory, filename="input.tersoff"):
+        filepath = posixpath.join(directory, filename)
+        with open(filepath, "w") as f:
+            f.write("# Tersoff parameter file in lammps/tersoff format written via pyiron atomicrex interface.\n")
+            f.write("# Necessary to fit tersoff and abop potentials.\n#\n")
+            f.write(f"# {' '.join(tersoff_file_params)}\n#\n") 
+            for tag in self.keys():
+                for el in tag_re.findall(tag):
+                    f.write(f"{el} ")
+                for i in range(3, 17):
+                    param = tersoff_file_params[i]
+                    f.write(f"{self[tag][param].start_val} ")
+                f.write("\n")
+    
+    def _to_xml_element(self):
+        fit_dof = ET.Element("fit-dof")
+        for tag, parameters in self.items():
+            for param in parameters.values():
+                if param.fitable:
+                    fit_dof.append(param._to_xml_element())
+        return fit_dof
+
+
+class ABOPParameters(BOPParameters):
+    def __init__(self, tag_dict=None):
+        super().__init__(tag_dict)
+
+    def _setup_parameters(self, tag_dict):
+        for tag, v in tag_dict.items():
+            self[tag] = FunctionParameterList()
+
+            #2 Body parameters, fitable only if v (see https://lammps.sandia.gov/doc/pair_tersoff.html)
+            self[tag].add_parameter("D0", start_val=None, fitable=v, tag=tag)
+            self[tag].add_parameter("S", start_val=None, fitable=v, tag=tag)
+            self[tag].add_parameter("r0", start_val=None, fitable=v, tag=tag)
+            self[tag].add_parameter("beta", start_val=None, fitable=v, tag=tag)
+            self[tag].add_parameter("beta2", start_val=None, fitable=v, tag=tag)
+            # default enable False for n in 1/2n term and standard value 1
+            self[tag].add_parameter("powern", start_val=1, fitable=v, enabled=False, tag=tag)
+            # 3 Body parameters
+            self[tag].add_parameter("gamma", start_val=None, tag=tag)
+            self[tag].add_parameter("c", start_val=None, tag=tag)
+            self[tag].add_parameter("d", start_val=None, tag=tag)
+            self[tag].add_parameter("h", start_val=None, tag=tag)
+            #twomu = lambda3?
+            self[tag].add_parameter("twomu", start_val=None, tag=tag)           
+            # m is not fittable
+            self[tag].add_parameter("m", start_val=1.0, fitable=False, tag=tag) # 3 or 1
+            # 2 and 3 body
+            # default enable False for cutoff parameters
+            self[tag].add_parameter("bigd", start_val=None, enabled=False, tag=tag)
+            self[tag].add_parameter("bigr", start_val=None, enabled=False, tag=tag)
+                    
+    def start_vals_from_file(self, file, tag_list=None):
+        if tag_list is None:
+            tag_list = self.list_groups()
+        tag_dict = _tagdict_from_taglist(tag_list)
+        t_params = TersoffParameters(tag_dict)
+        t_params.start_vals_from_file(file, tag_list=tag_list)
+        for tag, params in t_params.items():
+                lam1 = params["lambda1"].start_val
+                lam2 = params["lambda2"].start_val
+                A = params["A"].start_val
+                B = params["B"].start_val
+                
+                self[tag]["h"].start_val = -params["theta0"].start_val
+
+                if tag_dict[tag]:
+                    self[tag]["r0"].start_val = get_r0(lam1, lam2, A, B)
+                    self[tag]["D0"].start_val = get_D0(lam1, lam2, A, B)
+                    self[tag]["S"].start_val = get_S(lam1, lam2)
+                    self[tag]["beta"].start_val = get_beta(lam1, lam2)
+                else: # pair only parameters are not read for these tags and are set to 0 to prevent 0 division errors
+                    self[tag]["r0"].start_val = 0.0
+                    self[tag]["D0"].start_val = 0.0
+                    self[tag]["S"].start_val = 0.0
+                    self[tag]["beta"].start_val = 0.0
+
+                # Other parameters
+                self[tag]["m"].start_val = params["m"].start_val
+                self[tag]["powern"].start_val = params["n"].start_val
+                self[tag]["c"].start_val = params["c"].start_val
+                self[tag]["d"].start_val = params["d"].start_val
+                self[tag]["bigd"].start_val = params["D"].start_val
+                self[tag]["bigr"].start_val = params["R"].start_val
+                self[tag]["gamma"].start_val = params["gamma"].start_val
+                self[tag]["twomu"].start_val = params["lambda3"].start_val
+                self[tag]["beta2"].start_val = params["beta"].start_val
+
+    def _write_tersoff_file(self, directory, filename="input.tersoff"):
+        tersoff = abop_to_tersoff_params(self)
+        tersoff._write_tersoff_file(directory, filename=filename)
+
+    def _to_xml_element(self):
+        fit_dof = ET.Element("fit-dof")
+        for tag, parameters in self.items():
+            for param in parameters.values():
+                if param.fitable:
+                    fit_dof.append(param._to_xml_element())
+        return fit_dof
+
+
+def abop_to_tersoff_params(abop_parameters):
+    """
+    Transforms a ABOPParameters instance to TersoffParameters
+    Does not take care of min or max vals, only initial values!
+    Necessary to write the tersoff file as input.
+    Not tested for anything else.
+    Args:
+        tersoff_parameters ([type]): [description]
+    """
+
+    tag_dict = _tagdict_from_taglist(abop_parameters.groups())
+    tersoff = TersoffParameters(tag_dict)
+     
+    for tag, params in tersoff.items():
+        if tag_dict[tag]:
+            beta = abop_parameters[tag]["beta"].start_val
+            S = abop_parameters[tag]["S"].start_val
+            D0 = abop_parameters[tag]["D0"].start_val
+            r0 = abop_parameters[tag]["r0"].start_val
+
+            # parameters that need calculations
+            params["A"].start_val = get_A(beta, S, D0, r0)
+            params["B"].start_val = get_B(beta, S, D0, r0)
+            params["lambda1"].start_val = get_lam1(beta, S)
+            params["lambda2"].start_val = get_lam2(beta, S)
+        else: # pair only parameters are not read for these tags and are set to 0 to prevent 0 division errors
+            params["A"].start_val = 0.0
+            params["B"].start_val = 0.0
+            params["lambda1"].start_val = 0.0
+            params["lambda2"].start_val = 0.0
+
+        params["theta0"].start_val = -abop_parameters[tag]["h"].start_val
+
+        # Other parameters
+        params["m"].start_val = abop_parameters[tag]["m"].start_val
+        params["n"].start_val = abop_parameters[tag]["powern"].start_val
+        params["c"].start_val = abop_parameters[tag]["c"].start_val
+        params["d"].start_val = abop_parameters[tag]["d"].start_val
+        params["D"].start_val = abop_parameters[tag]["bigd"].start_val
+        params["R"].start_val = abop_parameters[tag]["bigr"].start_val
+        params["gamma"].start_val = abop_parameters[tag]["gamma"].start_val
+        params["lambda3"].start_val = abop_parameters[tag]["twomu"].start_val
+        params["beta"].start_val = abop_parameters[tag]["beta2"].start_val
+    return tersoff
+
+
 class LJPotential(AbstractPotential):
     """
     Lennard Jones potential. Lacking some functionality,
     mostly implemented for testing and demonstatration purposes.
+    TODO: Check if this still works after alls changes
     TODO: Implement missing functionality.
     """    
     def __init__(self, init=None, sigma=None, epsilon=None, cutoff=None, species=None, identifier=None):
@@ -102,8 +465,22 @@ class LJPotential(AbstractPotential):
         filename = posixpath.join(directory, "potential.xml")
         write_pretty_xml(lj, filename)
 
+class EAMlikeMixin:
+    def copy_final_to_initial_params(self):
+        """
+        Copies final values of function paramters to start values.
+        This f.e. allows to continue global with local minimization.
+        """        
+        for functions in self._function_tuple:
+            for f in functions.values():
+                f.copy_final_to_initial_params()
 
-class EAMPotential(AbstractPotential):
+    def lock_parameters(self):
+        for functions in self._function_tuple:
+            for f in functions.values():
+                f.lock_parameters()
+
+class EAMPotential(AbstractPotential, EAMlikeMixin):
     """
     Embedded-Atom-Method potential.
     Usage: Create using the potential factory class.
@@ -136,15 +513,9 @@ class EAMPotential(AbstractPotential):
             self.resolution = resolution
             self.species = species
     
-    def copy_final_to_initial_params(self):
-        """
-        Copies final values of function paramters to start values.
-        This f.e. allows to continue global with local minimization.
-        """        
-        for functions in (self.pair_interactions, self.electron_densities, self.embedding_energies):
-            for f in functions.values():
-                for param in f.parameters.values():
-                    param.copy_final_to_start_value()
+    @property
+    def _function_tuple(self):
+        return (self.pair_interactions, self.electron_densities, self.embedding_energies)
 
     def _potential_as_pd_df(self, job):
         """
@@ -224,19 +595,20 @@ class EAMPotential(AbstractPotential):
             KeyError: Raises if a parsed parameter can't be matched to a function.
         """        
         for l in lines:
-            identifier, param, value = _parse_parameter_line(l)
+            identifier, leftover, value = _parse_parameter_line(l)
             if identifier in self.pair_interactions:
-                self.pair_interactions[identifier].parameters[param].final_value = value
+                self.pair_interactions[identifier]._parse_final_parameter(leftover, value)
             elif identifier in self.electron_densities:
-                self.electron_densities[identifier].parameters[param].final_value = value
+                self.electron_densities[identifier]._parse_final_parameter(leftover, value)
             elif identifier in self.embedding_energies:
-                self.embedding_energies[identifier].parameters[param].final_value = value
+                self.embedding_energies[identifier]._parse_final_parameter(leftover, value)
             else:
 
                 raise KeyError(
                     f"Can't find {identifier} in potential, probably something went wrong during parsing.\n"
                     "Fitting parameters of screening functions probably doesn't work right now"
                 )
+
 
     def plot_final_potential(self, job, filename=None):
         """
@@ -321,7 +693,7 @@ class EAMPotential(AbstractPotential):
         return fig, ax
 
 
-class MEAMPotential(AbstractPotential):
+class MEAMPotential(AbstractPotential, EAMlikeMixin):
     def __init__(self, init=None, identifier=None, export_file=None, species=None):
         super().__init__(init=init)
         if init is None:
@@ -334,22 +706,15 @@ class MEAMPotential(AbstractPotential):
             self.export_file = export_file
             self.species = species
 
-    def copy_final_to_initial_params(self):
-        """
-        Copies final values of function paramters to start values.
-        This f.e. allows to continue global with local minimization.
-        """        
-        for functions in (
-            self.pair_interactions,
-            self.electron_densities,
-            self.embedding_energies,
-            self.f_functions,
-            self.g_functions
-            ):
-            for f in functions.values():
-                for param in f.parameters.values():
-                    param.copy_final_to_start_value()
-    
+    @property
+    def _function_tuple(self):
+        return (
+                self.pair_interactions,
+                self.electron_densities,
+                self.embedding_energies,
+                self.f_functions,
+                self.g_functions
+            )
 
     def write_xml_file(self, directory):
         """
@@ -420,15 +785,15 @@ class MEAMPotential(AbstractPotential):
         for l in lines:
             identifier, param, value = _parse_parameter_line(l)
             if identifier in self.pair_interactions:
-                self.pair_interactions[identifier].parameters[param].final_value = value
+                self.pair_interactions[identifier]._parse_final_parameter(leftover, value)
             elif identifier in self.electron_densities:
-                self.electron_densities[identifier].parameters[param].final_value = value
+                self.electron_densities[identifier]._parse_final_parameter(leftover, value)
             elif identifier in self.f_functions:
-                self.f_functions[identifier].parameters[param].final_value = value
+                self.f_functions[identifier]._parse_final_parameter(leftover, value)
             elif identifier in self.g_functions:
-                self.g_functions[identifier].parameters[param].final_value = value
+                self.g_functions[identifier]._parse_final_parameter(leftover, value)
             elif identifier in self.embedding_energies:
-                self.embedding_energies[identifier].parameters[param].final_value = value
+                self.embedding_energies[identifier]._parse_final_parameter(leftover, value)
             else:
                 raise KeyError(
                     f"Can't find {identifier} in potential, probably something went wrong during parsing.\n"
@@ -439,26 +804,102 @@ class MEAMPotential(AbstractPotential):
 def _parse_parameter_line(line):
     """
     Internal Function.
-    Parses the function identifier, name and final value of a function parameter
+    Parses the function identifier, leftover and final value of a function parameter
     from an atomicrex output line looking like:
     EAM[EAM].V_CuCu[morse-B].delta: 0.0306585 [-0.5:0.5]
     EAM[EAM].CuCu_rho[spline].node[1].y: 2.10988 [1:3]
-
-    Defined as staticmethod because it can probably be reused for other potential types.
-
+    EAM[EAM].V_CuCu[functionSum].V_rep[user-function].A: 0.680291
+    EAM[EAM].CuCu_rho[spline].derivative-left: -1000.19
+    Returns tuples like these:
+    ("V_CuCu", ["delta:"] ,0.0306585)
+    ("CuCu_rho", ["node[1", "y:"] ,2.10988)
+    ("V_CuCu", ["V_rep[user-function", "A:"],0.680291)
+    ("CuCu_rho", ["derivative-left:"] ,-1000.19)
+    This allows to flexibly parse the lines for the different types
+    of functional forms by passing leftover to a function defined
+    in the corresponding function class.
+    
     TODO: Add parsing of polynomial parameters.
     Returns:
-        [(str, str, float): [description]
+        (str, [str], float): identifier, leftover, value
     """        
-
     line = line.strip().split()
     value = float(line[1])
     info = line[0].split("].")
     identifier = info[1].split("[")[0]
-    param = info[2]
-    if param.startswith("node"):
-        x = float(param.split("[")[1])
-        param = f"node_{x}"
-    else:
-        param = param.rstrip(":")
-    return identifier, param, value
+    leftover = info[2:]
+    return identifier, leftover, value
+
+
+def _tag_list(elements):
+    """
+    Internal helper function that returns a list of tags
+    from a list of elements
+
+    Args:
+        elements (list[str]): list of elements .f.e ["Si", "C"]
+
+    Returns:
+        list[str]: list of tags f.e. ["SiSiSi", "SiSiC", ...]
+    """
+    return ["".join(el) for el in itertools.product(elements, repeat=3)]
+
+def _get_tag_dict(elements):
+    """
+    Internal helpfer function for Tersoff and ABOP potentials.
+    Uses a list of elements strings to return a dict of all tags and if these tags need 2 and 3 body parameters (True)
+    or only 3 body parameters (False).
+    F.e. ["Si", "C"] returns:
+        {'SiSiSi': True,
+        'SiSiC': False,
+        'SiCSi': False,
+        'SiCC': True,
+        'CSiSi': True,
+        'CSiC': False,
+        'CCSi': False,
+        'CCC': True}
+
+    Args:
+        list[str]: list of elements
+
+    Returns:
+        dict[dict]: elemen tags and 
+    """
+    tags = {}
+    tag_list = list(itertools.product(elements, repeat=3))
+    for l in tag_list:
+        k = "".join(l)
+        if l[1] == l[2]:
+            tags[k] = True # True if 2 and 3 body
+        else:
+            tags[k] = False # False if only 3 body
+    return tags
+
+def _parse_tersoff_line(line):
+    """
+    Internal Function.
+    Parses the tag, parameter and final value of a function parameter
+    from an atomicrex output line looking like:
+
+    tersoff[Tersoff].lambda1[SiSiSi]: 2.4799 [0:]
+    
+    Returns:
+        [(str, str, float): tag, param, value
+    """
+    line = line.strip().split()
+    value = float(line[1])
+    info = line[0].split("].")[1]
+    info = info.split("[")
+    param = info[0]
+    tag = info[1].rstrip("]:")
+    return tag, param, value
+
+def _tagdict_from_taglist(taglist):
+    tagdict = {}
+    for tag in taglist:
+        elems = tag_re.findall(tag)
+        if elems[1] == elems[2]:
+            tagdict[tag] = True
+        else:
+            tagdict[tag] = False
+    return tagdict

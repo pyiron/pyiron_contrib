@@ -4,24 +4,11 @@
 
 import os
 import unittest
-from pyiron_atomistics import Project
+from pyiron_atomistics._tests import TestWithCleanProject
 import pyiron_contrib
-print(pyiron_contrib.__file__)
 
 
-class TestTrainingContainer(unittest.TestCase):
-
-    @classmethod
-    def setUpClass(cls):
-        cls.execution_path = os.path.dirname(os.path.abspath(__file__))
-        cls.project = Project(os.path.join(cls.execution_path, "test_training"))
-
-    @classmethod
-    def tearDownClass(cls):
-        cls.execution_path = os.path.dirname(os.path.abspath(__file__))
-        project = Project(os.path.join(cls.execution_path, "test_training"))
-        project.remove_jobs_silently(recursive=True)
-        project.remove(enable=True)
+class TestTrainingContainer(TestWithCleanProject):
 
     def setUp(self):
         self.container = self.project.create.job.TrainingContainer("test")
@@ -55,7 +42,22 @@ class TestTrainingContainer(unittest.TestCase):
         self.assertEqual(self.container.get_elements(), ["Al"])
 
     def test_get_structure(self):
-        self.assertEqual(len(self.container.get_structure(iteration_step=0)), 1,
+        self.assertEqual(len(self.container.get_structure(frame=0)), 1,
                          "get_structure() returned wrong structure.")
-        self.assertEqual(len(self.container.get_structure(iteration_step=1)), 2,
+        self.assertEqual(len(self.container.get_structure(frame=1)), 2,
                          "get_structure() returned wrong structure.")
+
+    def test_hdf(self):
+        """Container read from HDF should match container written to HDF."""
+
+        container_from_hdf = self.project.load("test")
+
+        self.assertEqual(len(self.container._table), len(container_from_hdf._table),
+                         "Container has different number of structures after reading/writing.")
+
+        for i in range(len(self.container._table)):
+            self.assertEqual(self.container.get_structure(i), container_from_hdf.get_structure(i),
+                             f"{i}th structure not the same after reading/writing.")
+
+        self.assertTrue(self.container.to_pandas().equals(container_from_hdf.to_pandas()),
+                        "Conversion to pandas not the same after reading/writing.")

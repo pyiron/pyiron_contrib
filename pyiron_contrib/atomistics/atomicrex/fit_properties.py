@@ -1,5 +1,7 @@
 import xml.etree.ElementTree as ET
 
+import numpy as np
+
 from pyiron_base import DataContainer
 
 
@@ -108,7 +110,11 @@ class ARFitProperty(DataContainer):
 
     def to_xml_element(self):
         xml = ET.Element(f"{self.prop}")
-        xml.set("fit", f"{self.fit}".lower())
+
+        if self.fit:
+            xml.set("fit", "true")
+        else:
+            xml.set("fit", "false")
         #xml.set("relax", f"{self.relax}".lower())
         xml.set("relative-weight", f"{self.relative_weight}")
         if self.tolerance is not None:
@@ -127,7 +133,7 @@ class ARFitProperty(DataContainer):
             if self.min_val is not None or self.max_val is not None:
                 raise ValueError("Min and Max val can only be given for scalar properties")
             if self.output_all:
-                xml.set("output-all", f"{self.output_all}".lower())
+                xml.set("output-all", "true")
             xml.set("residual-style", f"{self.residual_style}")
         return xml
 
@@ -150,7 +156,6 @@ class ARFitProperty(DataContainer):
             return line[0].rstrip(":"), float(line[1])
 
 
-
 class ARFitPropertyList(DataContainer):
     """
     DataContainer of ARFitProperties that additionally provides utility functions
@@ -159,6 +164,7 @@ class ARFitPropertyList(DataContainer):
     """
     def __init__(self, *args, **kwargs):
         super().__init__(table_name="fit_property", *args, **kwargs)
+
 
     def add_FitProperty(
             self,
@@ -216,3 +222,166 @@ class ARFitPropertyList(DataContainer):
         properties = ET.Element("properties")
         for p in self.values():
             properties.append(p.to_xml_element)
+
+
+Residual_Styles = [
+"squared",
+"squared-relative",
+"absolute-diff"
+]
+
+
+class FlattenedARProperty:
+    """
+    Class to read and write scalar properties of a structure, f.e. the energy.
+    """    
+    def __init__(self, num_structures, prop):
+        self.num_structures = num_structures
+        self.prop = prop
+        self._init_arrays()
+    
+
+    def _init_arrays(self):
+        self.target_value = np.full(self.num_structures, np.nan)
+        self.fit = np.full(self.num_structures, fill_value=False, dtype=bool)
+        self.relative_weight = np.ones(self.num_structures) # default 1
+        # resiudal styles are "squared", "squared-relative" and "absolute-diff"
+        # Translate to 0, 1 and 2
+        self.residual_style = np.zeros(self.num_structures, dtype=np.uint8) # default 0
+        self.relax = np.full(self.num_structures, fill_value=False, dtype=bool) # default False
+        self.tolerance = np.full(self.num_structures, fill_value=np.nan)
+        self.min_val = np.full(self.num_structures, fill_value=np.nan)
+        self.max_val = np.full(self.num_structures, fill_value=np.nan)
+        self.final_value = np.full(self.num_structures, fill_value=np.nan)
+        self.output = np.full(self.num_structures, fill_value=False, dtype=bool)
+
+    def to_hdf(self, hdf, group_name=None):
+        if group_name is None:
+            group_name = f"{self.property}"
+        with hdf.open(group_name) as h:
+            h["target_value"] = self.target_value
+            h["fit"] = self.fit
+            h["relative_weight"] = self.relative_weight
+            h["residual_style"] = self.residual_style
+            h["relax"] = self.relax
+            h["tolerance"] = self.tolerance
+            h["min_val"] = self.min_val
+            h["max_val"] = self.max_val
+            h["final_value"] = self.final_value
+            h["output"] = self.output
+
+    #def _type_to_hdf(self, hdf):
+    #    """
+    #    Internal helper function to save type and version in hdf root#
+    #
+    #    Args:
+    #        hdf (ProjectHDFio): HDF5 group object
+    #    """
+    #    hdf["TYPE"] = str(type(self))
+
+    def from_hdf(self, hdf, group_name=None):
+        if group_name is None:
+            group_name = f"{self.prop}"
+        with hdf.open(group_name) as h:
+            self.target_value = h["target_value"]
+            self.fit = h["fit"]
+            self.relative_weight = h["relative_weight"]
+            self.residual_style = h["residual_style"]
+            self.relax = h["relax"]
+            self.tolerance = h["tolerance"]
+            self.min_val = h["min_val"]
+            self.max_val = h["max_val"]
+            self.output = h["output"]
+            self.final_value = h["final_value"]
+
+    def to_xml_element(self, index):
+        xml = ET.Element(f"{self.prop}")
+        if self.output[index]:
+            xml.set("output", "true")
+        if self.fit[index]:
+            xml.set("fit", "true")
+            xml.set("target", f"{self.target_value[index]}")
+            #xml.set("relax", f"{self.relax}".lower())
+            xml.set("relative-weight", f"{self.relative_weight[index]}")
+            xml.set("residual-style", f"{Residual_Styles[self.residual_style[index]]}")
+            if not np.isnan(self.tolerance[index]):
+                xml.set("tolerance", f"{self.tolerance[index]}")
+            if not np.isnan(self.min_val[index]):
+                xml.set("min", f"{self.min_val[index]}")
+            if not np.isnan(self.max_val[index]):
+                xml.set("min", f"{self.max_val[index]}")
+        return xml
+
+
+class FlattenedARVectorProperty:
+    """
+    Like AR property, but for vector properties, i.e. forces
+    """
+    def __init__(self, num_structures, num_atoms, prop):
+        self.num_structures = num_structures
+        self.num_atoms = num_atoms
+        self.prop = prop
+        self._init_arrays()
+
+    
+    def _init_arrays(self):
+        self.target_value = np.full((self.num_atoms, 3), np.nan)
+        self.fit = np.full(self.num_structures, fill_value=False, dtype=bool)
+        self.relative_weight = np.ones(self.num_structures) # default 1
+        # resiudal styles are "squared", "squared-relative" and "absolute-diff"
+        # Translate to 0, 1 and 2
+        self.residual_style = np.zeros(self.num_structures, dtype=np.uint8) # default 0
+        self.relax = np.full(self.num_structures, fill_value=False, dtype=bool) # default False
+        self.tolerance = np.full(self.num_structures, fill_value=np.nan)
+        self.final_value = np.full((self.num_atoms, 3), fill_value=np.nan)
+        self.output = np.full(self.num_structures, fill_value=False, dtype=bool)
+
+    def to_hdf(self, hdf, group_name=None):
+        if group_name is None:
+            group_name = f"{self.prop}"
+        with hdf.open(group_name) as h:
+            h["target_value"] = self.target_value
+            h["fit"] = self.fit
+            h["relative_weight"] = self.relative_weight
+            h["residual_style"] = self.residual_style
+            h["relax"] = self.relax
+            h["tolerance"] = self.tolerance
+            h["final_value"] = self.final_value
+            h["output"] = self.output
+
+    def from_hdf(self, hdf, group_name=None):
+        if group_name is None:
+            group_name = f"{self.prop}"
+        with hdf.open(group_name) as h:
+            self.target_value = h["target_value"]
+            self.fit = h["fit"]
+            self.relative_weight = h["relative_weight"]
+            self.residual_style = h["residual_style"]
+            self.relax = h["relax"]
+            self.tolerance = h["tolerance"]
+            self.final_value = h["final_value"]
+            self.output = h["output"]
+    
+#    def _type_to_hdf(self, hdf):
+#        """
+#        Internal helper function to save type and version in hdf root
+#
+#        Args:
+#            hdf (ProjectHDFio): HDF5 group object
+#        """
+#        hdf["TYPE"] = str(type(self))
+    
+    def to_xml_element(self, index):
+        xml = ET.Element(f"{self.prop}")
+        if self.output[index]:
+            xml.set("output-all", "true")
+        if self.fit[index]:
+            xml.set("output-all", "true")
+            xml.set("fit", "true")
+            #xml.set("relax", f"{self.relax}".lower())
+            xml.set("relative-weight", f"{self.relative_weight[index]}")
+            xml.set("residual-style", f"{Residual_Styles[self.residual_style[index]]}")
+            if not np.isnan(self.tolerance[index]):
+                xml.set("tolerance", f"{self.tolerance[index]}")
+        return xml
+

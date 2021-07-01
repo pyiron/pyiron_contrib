@@ -15,8 +15,8 @@ class FunctionFactory(PyironFactory):
     atomicrex documentation.
     """    
     @staticmethod
-    def user_function(identifier, input_variable="r", species=["*", "*"], is_screening_function=False):
-        return UserFunction(identifier, input_variable=input_variable, species=species, is_screening_function=is_screening_function)
+    def user_function(identifier, input_variable="r", species=["*", "*"], is_screening_function=False, cutoff=None):
+        return UserFunction(identifier, input_variable=input_variable, species=species, is_screening_function=is_screening_function, cutoff=cutoff)
 
     @staticmethod
     def poly(identifier, cutoff, species=["*", "*"]):
@@ -51,11 +51,125 @@ class FunctionFactory(PyironFactory):
         return MorseC(identifier, A, B, mu, lambda_val, delta, species=species)
 
     @staticmethod
-    def gaussian(identifier, prefactor, eta, mu, species=["*", "*"]):
-        return GaussianFunc(identifier, prefactor, eta, mu, species)
+    def gaussian(identifier, prefactor, eta, mu, species=["*", "*"], cutoff=None):
+        return GaussianFunc(identifier, prefactor, eta, mu, species, cutoff)
+
+    @staticmethod
+    def sum(identifier, species=["*", "*"]):
+        return Sum(identifier=identifier, species=species)
+    
+    @staticmethod
+    def product(identifier, species=["*", "*"]):
+        return Product(identifier=identifier, species=species)
+    
+    @staticmethod
+    def gaussians_sum(
+        n_gaussians,
+        eta,
+        identifier,
+        node_points = None,
+        cutoff = None,
+        initial_prefactors=None,
+        min_prefactors=None,
+        max_prefactors=None,
+        species=["*", "*"]
+    ):
+        sum_func = FunctionFactory.sum(identifier=identifier, species=species)
+        if node_points is None:
+            if cutoff is None:
+                raise ValueError("Specify node points or a cutoff to set them automatically")
+            else:
+                node_points = np.linspace(0, cutoff, n_gaussians, endpoint=False)
+        else:
+            if len(node_points) != n_gaussians:
+                raise ValueError("Number of node points has to match n_gaussians")
+
+        if initial_prefactors is None:
+            initial_prefactors = np.ones(n_gaussians)
+        if min_prefactors is not None:
+            if len(min_prefactors) != n_gaussians:
+                raise ValueError("min_prefactors must have length num_gaussians")
+        if max_prefactors is not None:
+            if len(max_prefactors) != n_gaussians:
+                raise ValueError("max_prefactors must have length num_gaussians")
+
+        for i in range(n_gaussians):
+            gauss = FunctionFactory.gaussian(
+                identifier=f"gauss_{i}",
+                prefactor=initial_prefactors[i],
+                eta=eta,
+                mu = node_points[i],
+                species = species,
+                cutoff = cutoff,
+                )
+            gauss.parameters.mu.enabled = False
+            gauss.parameters.eta.enabled = False
+            if min_prefactors is not None:
+                gauss.parameters.prefactor.min_val = min_prefactors[i]
+            if max_prefactors is not None:
+                gauss.parameters.prefactor.max_val = max_prefactors[i]
+
+            sum_func.functions[gauss.identifier] = gauss
+        return sum_func
+
+class BaseFunctionMixin():
+    # Mixin class to implement functionality common in all types of functions
+    # Be careful with Spline class because it has params, but also derivatives, requiring some special additions to implementations
+    def copy_final_to_initial_params(self):
+        for param in self.parameters.values():
+            param.copy_final_to_start_value()
+    
+    def lock_parameters(self):
+        for param in self.parameters.values():
+            param.enabled = False
+
+class MetaFunctionMixin():
+    def copy_final_to_initial_params(self):
+        for f in self.functions.values():
+            f.copy_final_to_initial_params()
+    
+    def lock_parameters(self):
+        for f in self.functions.values():
+            f.lock_parameters()
+
+class AbstractMetaFunction(DataContainer, MetaFunctionMixin):
+    def __init__(self, identifier=None, species=None, table_name=None):
+        super().__init__()
+        self.identifier = identifier
+        self.functions = DataContainer(table_name=table_name)
+        self.species = species
+
+    def _to_xml_element(self, func_name):
+        root = ET.Element(func_name)
+        root.set("id", self.identifier)
+        for k, v in self.functions.items():
+            root.append(v._to_xml_element())
+        return root
+    
+    def _parse_final_parameter(self, leftover, value):
+        identifier = leftover[0].split("[")[0]
+        leftover = leftover[1:]
+        try:
+            self.functions[identifier]._parse_final_parameter(leftover, value)
+        except KeyError:
+            raise KeyError(f"Function {identifier} not found in {self.identifier}")
+
+class Sum(AbstractMetaFunction, MetaFunctionMixin):
+    def __init__(self, identifier=None, species=None):
+        super().__init__(identifier=identifier, species=species, table_name="sum_functions")
+    
+    def _to_xml_element(self):
+        return super()._to_xml_element(func_name="sum")
+
+class Product(AbstractMetaFunction, MetaFunctionMixin):
+    def __init__(self, identifier=None, species=None):
+        super().__init__(identifier=identifier, species=species, table_name="product_functions")
+    
+    def _to_xml_element(self):
+        return super()._to_xml_element(func_name="product")
 
 
-class SpecialFunction(DataContainer):
+class SpecialFunction(DataContainer, BaseFunctionMixin):
     """
     Analytic functions defined within atomicrex should inherit from this class
     https://atomicrex.org/potentials/functions.html#index-1
@@ -105,8 +219,11 @@ class SpecialFunction(DataContainer):
         else:
             return plot(self.func)
 
+    def _parse_final_parameter(self, leftover, value):
+        param = leftover[0].rstrip(":")
+        self.parameters[param].final_value = value
 
-class Poly(DataContainer):
+class Poly(DataContainer, BaseFunctionMixin):
     """
     Polynomial interpolation function.
     """    
@@ -125,7 +242,7 @@ class Poly(DataContainer):
         return poly
 
 
-class Spline(DataContainer):
+class Spline(DataContainer, BaseFunctionMixin):
     """
     Spline interpolation function
     """
@@ -140,8 +257,8 @@ class Spline(DataContainer):
         super().__init__(table_name=f"Spline_{identifier}")
         self.identifier = identifier
         self.cutoff = cutoff
-        self.derivative_left = derivative_left
-        self.derivative_right = derivative_right
+        self.derivative_left = FunctionParameter(param="derivative-left", start_val=derivative_left)
+        self.derivative_right = FunctionParameter(param="derivative-right", start_val=derivative_right, enabled=False)
         self.species = species
         self.parameters = NodeList()
 
@@ -152,15 +269,38 @@ class Spline(DataContainer):
             cutoff = ET.SubElement(spline, "cutoff")
             cutoff.text = f"{self.cutoff}"
         der_l = ET.SubElement(spline, "derivative-left")
-        der_l.text = f"{self.derivative_left}"
+        der_l.text = f"{self.derivative_left.start_val}"
         der_r = ET.SubElement(spline, "derivative-right")
-        der_r.text = f"{self.derivative_right}"
+        der_r.text = f"{self.derivative_right.start_val}"
+
+        fit_dof = ET.SubElement(spline, "fit-dof")
+        fit_dof.append(self.derivative_left._to_xml_element())
+        fit_dof.append(self.derivative_right._to_xml_element())
+
         spline.append(self.parameters._to_xml_element())
         return spline
 
+    def _parse_final_parameter(self, leftover, value):
+        if "derivative-right" in leftover[-1]:
+            self.derivative_right.final_value = value
+        elif "derivative-left" in leftover[-1]:
+            self.derivative_left.final_value = value
+        else:
+            param = float(leftover[0].split("[")[1])
+            param = f"node_{param:.6g}"
+            self.parameters[param].final_value = value
+    
+    def copy_final_to_initial_params(self):
+        super().copy_final_to_initial_params()
+        self.derivative_left.copy_final_to_start_value()
+        self.derivative_right.copy_final_to_start_value()
+    
+    def lock_parameters(self):
+        super().lock_parameters()
+        self.derivative_left.enabled = False
+        self.derivative_right.enabled = False
 
 class ExpA(SpecialFunction):
-
     def __init__(self, identifier=None, cutoff=None, species=["*", "*"], is_screening_function=True):
         super().__init__(identifier, species=species, is_screening_function=is_screening_function)
         self.parameters.add_parameter(
@@ -394,7 +534,7 @@ class MorseC(SpecialFunction):
 
 ## Renamed GaussianFunc to not mess with the gaussian code when loading from hdf5
 class GaussianFunc(SpecialFunction):
-    def __init__(self, identifier=None, prefactor=None, eta=None, mu=None, species=None):
+    def __init__(self, identifier=None, prefactor=None, eta=None, mu=None, species=None, cutoff=None):
         super().__init__(identifier, species=species, is_screening_function=False)
         self.parameters.add_parameter(
             "prefactor",
@@ -413,6 +553,7 @@ class GaussianFunc(SpecialFunction):
             start_val=mu,
             enabled=True,
         )
+        self.cutoff = cutoff
 
     @property
     def func(self):
@@ -422,17 +563,22 @@ class GaussianFunc(SpecialFunction):
         return lambda r: prefactor*np.exp(-eta*(r-mu)**2)
 
     def _to_xml_element(self):
-        return super()._to_xml_element(name="gaussian")
+        xml = super()._to_xml_element(name="gaussian")
+        # Put this in SpecialFunction or AbstractFunction class when rewriting
+        # f.e. using getattr()
+        if self.cutoff is not None:
+            cutoff = ET.SubElement(xml, "cutoff")
+            cutoff.text = f"{self.cutoff}"
+        return xml
 
-
-class UserFunction(DataContainer):
+class UserFunction(DataContainer, BaseFunctionMixin):
     """
     Analytic functions that are not implemented in atomicrex
     can be provided as user functions.
     All parameters defined in the function should be added using the
     UserFunction.parameters.add_parameter() method.
     """    
-    def __init__(self, identifier=None, input_variable=None, species=["*", "*"], is_screening_function=False):
+    def __init__(self, identifier=None, input_variable=None, species=["*", "*"], is_screening_function=False, cutoff=None):
         super().__init__(table_name=f"user_func_{identifier}")
         self.input_variable = input_variable
         self.identifier = identifier
@@ -441,6 +587,7 @@ class UserFunction(DataContainer):
         self.expression = None
         self.derivative = None
         self.is_screening_function = is_screening_function
+        self.cutoff = cutoff
         if not is_screening_function:
             self.screening = None
 
@@ -461,9 +608,13 @@ class UserFunction(DataContainer):
         for param in self.parameters.values():
             p = ET.SubElement(root, "param")
             p.set("name", f"{param.param}")
-            p.text = f"{param.start_val:.6g}"
+            p.text = f"{param.start_val:.6g}"#6g formatting because atomicrex output is limited to 6 significant digits, prevents some errors
         
         root.append(self.parameters.fit_dofs_to_xml_element())
+        
+        if self.cutoff is not None:
+            cutoff = ET.SubElement(root, "cutoff")
+            cutoff.text = f"{self.cutoff}"
 
         if not self.is_screening_function:
             if self.screening is not None:
@@ -471,6 +622,10 @@ class UserFunction(DataContainer):
             return root
         else:
             return screening
+
+    def _parse_final_parameter(self, leftover, value):
+        param = leftover[0].rstrip(":")
+        self.parameters[param].final_value = value
 
 
 class FunctionParameter(DataContainer):
@@ -502,8 +657,16 @@ class FunctionParameter(DataContainer):
 
     def _to_xml_element(self):
         root = ET.Element(f"{self.param}")
-        root.set("enabled", f"{self.enabled}".lower())
-        root.set("reset", f"{self.reset}".lower())
+        if self.enabled:
+            root.set("enabled", "true")
+        else:
+            root.set("enabled", "false")
+
+        if self.reset:
+            root.set("reset", "true")
+        else:
+            root.set("reset", "false")
+
         if self.min_val is not None:
             root.set("min", f"{self.min_val:.6g}")
         if self.max_val is not None:
@@ -665,8 +828,7 @@ class NodeList(DataContainer):
         """        
         x = float(x)
         # atomicrex rounds output to 6 digits, so this is done here to prevent issues when reading the output.
-        x = round(x, 6)
-        key = f"node_{x}"
+        key = f"node_{x:.6g}"
         self[key] = Node(
             x=x,
             start_val=start_val,

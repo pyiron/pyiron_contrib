@@ -116,41 +116,6 @@ class FlattenedStorage:
                 "pbc": np.empty((self._num_atoms_alloc, 3), dtype=bool)
         }
 
-    @property
-    def symbols(self):
-        """:meta private:"""
-        return self._per_atom_arrays["symbols"]
-
-    @property
-    def positions(self):
-        """:meta private:"""
-        return self._per_atom_arrays["positions"]
-
-    @property
-    def start_index(self):
-        """:meta private:"""
-        return self._per_structure_arrays["start_index"]
-
-    @property
-    def length(self):
-        """:meta private:"""
-        return self._per_structure_arrays["length"]
-
-    @property
-    def identifier(self):
-        """:meta private:"""
-        return self._per_structure_arrays["identifier"]
-
-    @property
-    def cell(self):
-        """:meta private:"""
-        return self._per_structure_arrays["cell"]
-
-    @property
-    def pbc(self):
-        """:meta private:"""
-        return self._per_structure_arrays["pbc"]
-
     def get_elements(self):
         """
         Return a list of chemical elements in the training set.
@@ -439,6 +404,41 @@ class FlattenedStorage:
 
 
 class StructureStorage(FlattenedStorage, HasStructure):
+
+    @property
+    def symbols(self):
+        """:meta private:"""
+        return self._per_atom_arrays["symbols"]
+
+    @property
+    def positions(self):
+        """:meta private:"""
+        return self._per_atom_arrays["positions"]
+
+    @property
+    def start_index(self):
+        """:meta private:"""
+        return self._per_structure_arrays["start_index"]
+
+    @property
+    def length(self):
+        """:meta private:"""
+        return self._per_structure_arrays["length"]
+
+    @property
+    def identifier(self):
+        """:meta private:"""
+        return self._per_structure_arrays["identifier"]
+
+    @property
+    def cell(self):
+        """:meta private:"""
+        return self._per_structure_arrays["cell"]
+
+    @property
+    def pbc(self):
+        """:meta private:"""
+        return self._per_structure_arrays["pbc"]
 
     def _translate_frame(self, frame):
         for i, name in enumerate(self._per_structure_arrays["identifier"]):

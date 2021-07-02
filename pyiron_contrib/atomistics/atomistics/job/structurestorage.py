@@ -252,12 +252,12 @@ class FlattenedStorage:
         self._per_structure_arrays["start_index"][self.current_structure_index] = self.current_atom_index
         self._per_structure_arrays["length"][self.current_structure_index] = n
 
-        self.set_array("symbols", self.current_structure_index, np.array(structure.symbols))
-        self.set_array("positions", self.current_structure_index, structure.positions)
+        arrays["symbols"] = np.array(structure.symbols)
+        arrays["positions"] = structure.positions
 
-        self.set_array("identifier", self.current_structure_index, identifier)
-        self.set_array("cell", self.current_structure_index, structure.cell.array)
-        self.set_array("pbc", self.current_structure_index, structure.pbc)
+        arrays["identifier"] = identifier
+        arrays["cell"] = structure.cell.array
+        arrays["pbc"] = structure.pbc
 
         if structure.spins is not None:
             arrays["spins"] = structure.spins
@@ -321,7 +321,6 @@ class FlattenedStorage:
                                              dtype=h5py.string_dtype('utf8', a.dtype.itemsize))
                 else:
                     hdf_arrays[k] = a
-
 
     def from_hdf(self, hdf, group_name="flat_storage"):
         with hdf.open(group_name) as hdf_s_lst:
@@ -441,6 +440,7 @@ class StructureStorage(FlattenedStorage, HasStructure):
         """:meta private:"""
         return self._per_structure_arrays["pbc"]
 
+
     def _translate_frame(self, frame):
         for i, name in enumerate(self._per_structure_arrays["identifier"]):
             if name == frame:
@@ -462,6 +462,7 @@ class StructureStorage(FlattenedStorage, HasStructure):
 
     def _number_of_structures(self):
         return len(self)
+
 
     def to_hdf(self, hdf, group_name="structures"):
         # just overwrite group_name default

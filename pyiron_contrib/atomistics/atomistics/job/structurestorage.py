@@ -196,7 +196,7 @@ class FlattenedStorage:
         else:
             store[name] = np.full(shape=shape, fill_value=fill, dtype=dtype)
 
-    def add_structure(self, chunk_length, identifier=None, **arrays):
+    def add_chunk(self, chunk_length, identifier=None, **arrays):
 
         if identifier is None:
             identifier = str(self.num_structures)
@@ -437,13 +437,13 @@ class StructureStorage(FlattenedStorage, HasStructure):
         if structure.spins is not None:
             arrays["spins"] = structure.spins
 
-        super().add_structure(len(structure),
-                              identifier=identifier,
-                              symbols=np.array(structure.symbols),
-                              positions=structure.positions,
-                              cell=structure.cell.array,
-                              pbc=structure.pbc,
-                              **arrays)
+        self.add_chunk(len(structure),
+                       identifier=identifier,
+                       symbols=np.array(structure.symbols),
+                       positions=structure.positions,
+                       cell=structure.cell.array,
+                       pbc=structure.pbc,
+                       **arrays)
 
 
     def _translate_frame(self, frame):

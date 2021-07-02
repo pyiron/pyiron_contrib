@@ -14,7 +14,7 @@ import h5py
 from pyiron_atomistics.atomistics.structure.atoms import Atoms
 from pyiron_atomistics.atomistics.structure.has_structure import HasStructure
 
-class StructureStorage(HasStructure):
+class FlattenedStorage(HasStructure):
     """
     Class that can write and read lots of structures from and to hdf quickly.
 
@@ -471,3 +471,6 @@ class StructureStorage(HasStructure):
 
     def _number_of_structures(self):
         return len(self)
+
+class StructureStorage(FlattenedStorage):
+    pass

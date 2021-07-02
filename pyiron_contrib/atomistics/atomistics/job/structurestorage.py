@@ -249,14 +249,15 @@ class FlattenedStorage:
         # len of structure to index into the initialized arrays
         i = self.current_atom_index + n
 
-        self._per_atom_arrays["symbols"][self.current_atom_index:i] = np.array(structure.symbols)
-        self._per_atom_arrays["positions"][self.current_atom_index:i] = structure.positions
-
         self._per_structure_arrays["start_index"][self.current_structure_index] = self.current_atom_index
         self._per_structure_arrays["length"][self.current_structure_index] = n
-        self._per_structure_arrays["identifier"][self.current_structure_index] = identifier
-        self._per_structure_arrays["cell"][self.current_structure_index] = structure.cell.array
-        self._per_structure_arrays["pbc"][self.current_structure_index] = structure.pbc
+
+        self.set_array("symbols", self.current_structure_index, np.array(structure.symbols))
+        self.set_array("positions", self.current_structure_index, structure.positions)
+
+        self.set_array("identifier", self.current_structure_index, identifier)
+        self.set_array("cell", self.current_structure_index, structure.cell.array)
+        self.set_array("pbc", self.current_structure_index, structure.pbc)
 
         if structure.spins is not None:
             arrays["spins"] = structure.spins

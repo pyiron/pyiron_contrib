@@ -196,44 +196,12 @@ class FlattenedStorage:
         else:
             store[name] = np.full(shape=shape, fill_value=fill, dtype=dtype)
 
-    def add_structure(self, structure, identifier=None, **arrays):
-        """
-        Add a new structure to the container.
-
-        Additional keyword arguments given specify additional arrays to store for the structure.  If an array with the
-        given keyword name does not exist yet, it will be added to the container.
-
-        >>> container = StructureStorage()
-        >>> container.add_structure(Atoms(...), identifier="A", energy=3.14)
-        >>> container.get_array("energy", 0)
-        3.14
-
-        If the first axis of the extra array matches the length of the given structure, it will be added as an per atom
-        array, otherwise as an per structure array.
-
-        >>> structure = Atoms(...)
-        >>> container.add_structure(structure, identifier="B", forces=len(structure) * [[0,0,0]])
-        >>> len(container.get_array("forces", 1)) == len(structure)
-        True
-
-        Reshaping the array to have the first axis be length 1 forces the array to be set as per structure array.  That
-        axis will then be stripped.
-
-        >>> container.add_structure(Atoms(...), identifier="C", pressure=np.eye(3)[np.newaxis, :, :])
-        >>> container.get_array("pressure", 2).shape
-        (3, 3)
-
-        Args:
-            structure (:class:`.Atoms`): structure to add
-            identifier (str, optional): human-readable name for the structure, if None use current structre index as
-                                        string
-            **kwargs: additional arrays to store for structure
-        """
+    def add_structure(self, chunk_length, identifier=None, **arrays):
 
         if identifier is None:
             identifier = str(self.num_structures)
 
-        n = len(structure)
+        n = chunk_length
         new_atoms = self.current_atom_index + n
 
         if new_atoms > self._num_atoms_alloc:
@@ -251,16 +219,7 @@ class FlattenedStorage:
 
         self._per_structure_arrays["start_index"][self.current_structure_index] = self.current_atom_index
         self._per_structure_arrays["length"][self.current_structure_index] = n
-
-        arrays["symbols"] = np.array(structure.symbols)
-        arrays["positions"] = structure.positions
-
-        arrays["identifier"] = identifier
-        arrays["cell"] = structure.cell.array
-        arrays["pbc"] = structure.pbc
-
-        if structure.spins is not None:
-            arrays["spins"] = structure.spins
+        self._per_structure_arrays["identifier"][self.current_structure_index] = identifier
 
         for k, a in arrays.items():
             a = np.asarray(a)
@@ -439,6 +398,52 @@ class StructureStorage(FlattenedStorage, HasStructure):
     def pbc(self):
         """:meta private:"""
         return self._per_structure_arrays["pbc"]
+
+
+    def add_structure(self, structure, identifier=None, **arrays):
+        """
+        Add a new structure to the container.
+
+        Additional keyword arguments given specify additional arrays to store for the structure.  If an array with the
+        given keyword name does not exist yet, it will be added to the container.
+
+        >>> container = StructureStorage()
+        >>> container.add_structure(Atoms(...), identifier="A", energy=3.14)
+        >>> container.get_array("energy", 0)
+        3.14
+
+        If the first axis of the extra array matches the length of the given structure, it will be added as an per atom
+        array, otherwise as an per structure array.
+
+        >>> structure = Atoms(...)
+        >>> container.add_structure(structure, identifier="B", forces=len(structure) * [[0,0,0]])
+        >>> len(container.get_array("forces", 1)) == len(structure)
+        True
+
+        Reshaping the array to have the first axis be length 1 forces the array to be set as per structure array.  That
+        axis will then be stripped.
+
+        >>> container.add_structure(Atoms(...), identifier="C", pressure=np.eye(3)[np.newaxis, :, :])
+        >>> container.get_array("pressure", 2).shape
+        (3, 3)
+
+        Args:
+            structure (:class:`.Atoms`): structure to add
+            identifier (str, optional): human-readable name for the structure, if None use current structre index as
+                                        string
+            **kwargs: additional arrays to store for structure
+        """
+
+        if structure.spins is not None:
+            arrays["spins"] = structure.spins
+
+        super().add_structure(len(structure),
+                              identifier=identifier,
+                              symbols=np.array(structure.symbols),
+                              positions=structure.positions,
+                              cell=structure.cell.array,
+                              pbc=structure.pbc,
+                              **arrays)
 
 
     def _translate_frame(self, frame):

@@ -15,64 +15,6 @@ from pyiron_atomistics.atomistics.structure.atoms import Atoms
 from pyiron_atomistics.atomistics.structure.has_structure import HasStructure
 
 class FlattenedStorage:
-    """
-    Class that can write and read lots of structures from and to hdf quickly.
-
-    This is done by storing positions, cells, etc. into large arrays instead of writing every structure into a new
-    group.  Structures are stored together with an identifier that should be unique.  The class can be initialized with
-    the number of structures and the total number of atoms in all structures, but re-allocates memory as necessary when
-    more (or larger) structures are added than initially anticipated.
-
-    You can add structures and a human-readable name with :method:`.add_structure()`.
-
-    >>> container = StructureStorage()
-    >>> container.add_structure(Atoms(...), "fcc")
-    >>> container.add_structure(Atoms(...), "hcp")
-    >>> container.add_structure(Atoms(...), "bcc")
-
-    Accessing stored structures works with :method:`.get_strucure()`.  You can either pass the identifier you passed
-    when adding the structure or the numeric index
-
-    >>> container.get_structure(frame=0) == container.get_structure(frame="fcc")
-    True
-
-    Custom arrays may also be defined on the container
-
-    >>> container.add_array("energy", shape=(), dtype=np.float64, fill=-1, per="structure")
-
-    You can then pass arrays of the corresponding shape to :method:`add_structure()`
-
-    >>> container.add_structure(Atoms(...), "grain_boundary", energy=3.14)
-
-    Saved arrays are accessed with :method:`.get_array()`
-
-    >>> container.get_array("energy", 3)
-    3.14
-    >>> container.get_array("energy", 0)
-    -1
-
-    It is also possible to use the same names in :method:`.get_array()` as in :method:`.get_structure()`.
-
-    >>> container.get_array("energy", 0) == container.get_array("energy", "fcc")
-    True
-
-    The length of the container is the number of structures inside it.
-
-    >>> len(container)
-    4
-
-    By default the following arrays are defined for each structure:
-        - identifier    shape=(),    dtype=str,          per structure; human readable name of the structure
-        - cell          shape=(3,3), dtype=np.float64,   per structure; cell shape
-        - pbc           shape=(3,),  dtype=bool          per structure; periodic boundary conditions
-        - symbols:      shape=(),    dtype=str,          per atom; chemical symbol
-        - positions:    shape=(3,),  dtype=np.float64,   per atom: atomic positions
-    If a structure has spins/magnetic moments defined on its atoms these will be saved in a per atom array as well.  In
-    that case, however all structures in the container must either have all collinear spins or all non-collinear spins.
-
-    When adding new array follow the convention that per-structure arrays should be named in singular and per-atom
-    arrays should be named in plural.
-    """
 
     __version__ = "0.1.0"
     __hdf_version__ = "0.1.0"
@@ -404,6 +346,64 @@ class FlattenedStorage:
 
 
 class StructureStorage(FlattenedStorage, HasStructure):
+    """
+    Class that can write and read lots of structures from and to hdf quickly.
+
+    This is done by storing positions, cells, etc. into large arrays instead of writing every structure into a new
+    group.  Structures are stored together with an identifier that should be unique.  The class can be initialized with
+    the number of structures and the total number of atoms in all structures, but re-allocates memory as necessary when
+    more (or larger) structures are added than initially anticipated.
+
+    You can add structures and a human-readable name with :method:`.add_structure()`.
+
+    >>> container = StructureStorage()
+    >>> container.add_structure(Atoms(...), "fcc")
+    >>> container.add_structure(Atoms(...), "hcp")
+    >>> container.add_structure(Atoms(...), "bcc")
+
+    Accessing stored structures works with :method:`.get_strucure()`.  You can either pass the identifier you passed
+    when adding the structure or the numeric index
+
+    >>> container.get_structure(frame=0) == container.get_structure(frame="fcc")
+    True
+
+    Custom arrays may also be defined on the container
+
+    >>> container.add_array("energy", shape=(), dtype=np.float64, fill=-1, per="structure")
+
+    You can then pass arrays of the corresponding shape to :method:`add_structure()`
+
+    >>> container.add_structure(Atoms(...), "grain_boundary", energy=3.14)
+
+    Saved arrays are accessed with :method:`.get_array()`
+
+    >>> container.get_array("energy", 3)
+    3.14
+    >>> container.get_array("energy", 0)
+    -1
+
+    It is also possible to use the same names in :method:`.get_array()` as in :method:`.get_structure()`.
+
+    >>> container.get_array("energy", 0) == container.get_array("energy", "fcc")
+    True
+
+    The length of the container is the number of structures inside it.
+
+    >>> len(container)
+    4
+
+    By default the following arrays are defined for each structure:
+        - identifier    shape=(),    dtype=str,          per structure; human readable name of the structure
+        - cell          shape=(3,3), dtype=np.float64,   per structure; cell shape
+        - pbc           shape=(3,),  dtype=bool          per structure; periodic boundary conditions
+        - symbols:      shape=(),    dtype=str,          per atom; chemical symbol
+        - positions:    shape=(3,),  dtype=np.float64,   per atom: atomic positions
+    If a structure has spins/magnetic moments defined on its atoms these will be saved in a per atom array as well.  In
+    that case, however all structures in the container must either have all collinear spins or all non-collinear spins.
+
+    When adding new array follow the convention that per-structure arrays should be named in singular and per-atom
+    arrays should be named in plural.
+    """
 
     @property
     def symbols(self):

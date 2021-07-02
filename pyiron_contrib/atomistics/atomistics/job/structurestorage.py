@@ -14,7 +14,7 @@ import h5py
 from pyiron_atomistics.atomistics.structure.atoms import Atoms
 from pyiron_atomistics.atomistics.structure.has_structure import HasStructure
 
-class FlattenedStorage(HasStructure):
+class FlattenedStorage:
     """
     Class that can write and read lots of structures from and to hdf quickly.
 
@@ -450,6 +450,8 @@ class FlattenedStorage(HasStructure):
                 self._per_structure_arrays["pbc"] = np.full((self.num_structures, 3), True)
 
 
+class StructureStorage(FlattenedStorage, HasStructure):
+
     def _translate_frame(self, frame):
         for i, name in enumerate(self._per_structure_arrays["identifier"]):
             if name == frame:
@@ -471,6 +473,3 @@ class FlattenedStorage(HasStructure):
 
     def _number_of_structures(self):
         return len(self)
-
-class StructureStorage(FlattenedStorage):
-    pass

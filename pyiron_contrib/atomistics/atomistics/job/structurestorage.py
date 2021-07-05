@@ -130,15 +130,6 @@ class FlattenedStorage:
     def __len__(self):
         return self.current_chunk_index
 
-    def get_elements(self):
-        """
-        Return a list of chemical elements in the training set.
-
-        Returns:
-            :class:`list`: list of unique elements in the training set as strings of their standard abbreviations
-        """
-        return list(set(self._per_element_arrays["symbols"]))
-
     def _get_per_element_slice(self, frame):
         start = self._per_chunk_arrays["start_index"][frame]
         end = start + self._per_chunk_arrays["length"][frame]
@@ -502,6 +493,16 @@ class StructureStorage(FlattenedStorage, HasStructure):
     def pbc(self):
         """:meta private:"""
         return self._per_chunk_arrays["pbc"]
+
+
+    def get_elements(self):
+        """
+        Return a list of chemical elements in the training set.
+
+        Returns:
+            :class:`list`: list of unique elements in the training set as strings of their standard abbreviations
+        """
+        return list(set(self._per_element_arrays["symbols"]))
 
     def add_structure(self, structure, identifier=None, **arrays):
         """

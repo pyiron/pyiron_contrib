@@ -7,6 +7,7 @@ Alternative structure container that stores them in flattened arrays.
 """
 
 from itertools import chain
+import warnings
 
 import numpy as np
 import h5py
@@ -19,43 +20,43 @@ class FlattenedStorage:
     __version__ = "0.1.0"
     __hdf_version__ = "0.1.0"
 
-    def __init__(self, num_structures=1, num_atoms=1):
+    def __init__(self, num_chunks=1, num_elements=1):
         """
-        Create new structure container.
+        Create new chunk container.
 
         Args:
-            num_structures (int): pre-allocation for per structure arrays
-            num_atoms (int): pre-allocation for per atoms arrays
+            num_chunks (int): pre-allocation for per chunk arrays
+            num_elements (int): pre-allocation for per elements arrays
         """
-        # tracks allocated versed as yet used number of structures/atoms
-        self._num_structures_alloc = self.num_structures = num_structures
-        self._num_atoms_alloc = self.num_atoms = num_atoms
+        # tracks allocated versed as yet used number of chunks/elements
+        self._num_chunks_alloc = self.num_chunks = num_chunks
+        self._num_elements_alloc = self.num_elements = num_elements
         # store the starting index for properties with unknown length
-        self.current_atom_index = 0
-        # store the index for properties of known size, stored at the same index as the structure
-        self.current_structure_index = 0
-        # Also store indices of structure recently added
-        self.prev_structure_index = 0
-        self.prev_atom_index = 0
+        self.current_element_index = 0
+        # store the index for properties of known size, stored at the same index as the chunk
+        self.current_chunk_index = 0
+        # Also store indices of chunk recently added
+        self.prev_chunk_index = 0
+        self.prev_element_index = 0
 
         self._init_arrays()
 
     def __len__(self):
-        return self.current_structure_index
+        return self.current_chunk_index
 
     def _init_arrays(self):
-        self._per_atom_arrays = {
+        self._per_element_arrays = {
                 # 2 character unicode array for chemical symbols
-                "symbols": np.full(self._num_atoms_alloc, "XX", dtype=np.dtype("U2")),
-                "positions": np.empty((self._num_atoms_alloc, 3))
+                "symbols": np.full(self._num_elements_alloc, "XX", dtype=np.dtype("U2")),
+                "positions": np.empty((self._num_elements_alloc, 3))
         }
 
-        self._per_structure_arrays = {
-                "start_index": np.empty(self._num_structures_alloc, dtype=np.int32),
-                "length": np.empty(self._num_structures_alloc, dtype=np.int32),
-                "identifier": np.empty(self._num_structures_alloc, dtype=np.dtype("U20")),
-                "cell": np.empty((self._num_structures_alloc, 3, 3)),
-                "pbc": np.empty((self._num_atoms_alloc, 3), dtype=bool)
+        self._per_chunk_arrays = {
+                "start_index": np.empty(self._num_chunks_alloc, dtype=np.int32),
+                "length": np.empty(self._num_chunks_alloc, dtype=np.int32),
+                "identifier": np.empty(self._num_chunks_alloc, dtype=np.dtype("U20")),
+                "cell": np.empty((self._num_chunks_alloc, 3, 3)),
+                "pbc": np.empty((self._num_elements_alloc, 3), dtype=bool)
         }
 
     def get_elements(self):
@@ -65,22 +66,22 @@ class FlattenedStorage:
         Returns:
             :class:`list`: list of unique elements in the training set as strings of their standard abbreviations
         """
-        return list(set(self._per_atom_arrays["symbols"]))
+        return list(set(self._per_element_arrays["symbols"]))
 
-    def _get_per_atom_slice(self, frame):
-        start = self._per_structure_arrays["start_index"][frame]
-        end = start + self._per_structure_arrays["length"][frame]
+    def _get_per_element_slice(self, frame):
+        start = self._per_chunk_arrays["start_index"][frame]
+        end = start + self._per_chunk_arrays["length"][frame]
         return slice(start, end, 1)
 
     def get_array(self, name, frame):
         """
-        Fetch array for given structure.
+        Fetch array for given chunk.
 
-        Works for per atom and per arrays.
+        Works for per element and per arrays.
 
         Args:
             name (str): name of the array to fetch
-            frame (int, str): selects structure to fetch, as in :method:`.get_structure()`
+            frame (int, str): selects chunk to fetch, as in :method:`.get_chunk()`
 
         Returns:
             :class:`numpy.ndarray`: requested array
@@ -91,22 +92,22 @@ class FlattenedStorage:
 
         if isinstance(frame, str):
             frame = self._translate_frame(frame)
-        if name in self._per_atom_arrays:
-            return self._per_atom_arrays[name][self._get_per_atom_slice(frame)]
-        elif name in self._per_structure_arrays:
-            return self._per_structure_arrays[name][frame]
+        if name in self._per_element_arrays:
+            return self._per_element_arrays[name][self._get_per_element_slice(frame)]
+        elif name in self._per_chunk_arrays:
+            return self._per_chunk_arrays[name][frame]
         else:
             raise KeyError(f"no array named {name} defined on StructureStorage")
 
     def set_array(self, name, frame, value):
         """
-        Add array for given structure.
+        Add array for given chunk.
 
-        Works for per atom and per arrays.
+        Works for per element and per arrays.
 
         Args:
             name (str): name of array to set
-            frame (int, str): selects structure to set, as in :method:`.get_strucure()`
+            frame (int, str): selects chunk to set, as in :method:`.get_strucure()`
 
         Raises:
             `KeyError`: if array with name does not exists
@@ -114,82 +115,89 @@ class FlattenedStorage:
 
         if isinstance(frame, str):
             frame = self._translate_frame(frame)
-        if name in self._per_atom_arrays:
-            self._per_atom_arrays[name][self._get_per_atom_slice(frame)] = value
-        elif name in self._per_structure_arrays:
-            self._per_structure_arrays[name][frame] = value
+        if name in self._per_element_arrays:
+            self._per_element_arrays[name][self._get_per_element_slice(frame)] = value
+        elif name in self._per_chunk_arrays:
+            self._per_chunk_arrays[name][frame] = value
         else:
             raise KeyError(f"no array named {name} defined on StructureStorage")
 
-    def _resize_atoms(self, new):
-        self._num_atoms_alloc = new
-        for k, a in self._per_atom_arrays.items():
+    def _resize_elements(self, new):
+        self._num_elements_alloc = new
+        for k, a in self._per_element_arrays.items():
             new_shape = (new,) + a.shape[1:]
             try:
                 a.resize(new_shape)
             except ValueError:
-                self._per_atom_arrays[k] = np.resize(a, new_shape)
+                self._per_element_arrays[k] = np.resize(a, new_shape)
 
-    def _resize_structures(self, new):
-        self._num_structures_alloc = new
-        for k, a in self._per_structure_arrays.items():
+    def _resize_chunks(self, new):
+        self._num_chunks_alloc = new
+        for k, a in self._per_chunk_arrays.items():
             new_shape = (new,) + a.shape[1:]
             try:
                 a.resize(new_shape)
             except ValueError:
-                self._per_structure_arrays[k] = np.resize(a, new_shape)
+                self._per_chunk_arrays[k] = np.resize(a, new_shape)
 
-    def add_array(self, name, shape=(), dtype=np.float64, fill=None, per="atom"):
+    def add_array(self, name, shape=(), dtype=np.float64, fill=None, per="element"):
         """
         Add a custom array to the container.
 
-        When adding an array after some structures have been added, specifying `fill` will be used as a default value
-        for the value of the array for those structures.
+        When adding an array after some chunks have been added, specifying `fill` will be used as a default value
+        for the value of the array for those chunks.
 
         Adding an array with the same name twice is ignored, if dtype and shape match, otherwise raises an exception.
 
         >>> container = StructureStorage()
-        >>> container.add_structure(Atoms(...), "foo")
-        >>> container.add_array("energy", shape=(), dtype=np.float64, fill=42, per="structure")
+        >>> container.add_chunk(Atoms(...), "foo")
+        >>> container.add_array("energy", shape=(), dtype=np.float64, fill=42, per="chunk")
         >>> container.get_array("energy", 0)
         42
 
         Args:
             name (str): name of the new array
-            shape (tuple of int): shape of the new array per atom or structure; scalars can pass ()
+            shape (tuple of int): shape of the new array per element or chunk; scalars can pass ()
             dtype (type): data type of the new array, string arrays can pass 'U$n' where $n is the length of the string
-            fill (object): populate the new array with this value for existing structure, if given; default `None`
-            per (str): either "atom" or "structure"; denotes whether the new array should exist for every atom in a
-                       structure or only once for every structure; case-insensitive
+            fill (object): populate the new array with this value for existing chunk, if given; default `None`
+            per (str): either "element" or "chunk"; denotes whether the new array should exist for every element in a
+                       chunk or only once for every chunk; case-insensitive
 
         Raises:
             ValueError: if wrong value for `per` is given
             ValueError: if array with same name but different parameters exists already
         """
 
-        if name in self._per_atom_arrays:
-            a = self._per_atom_arrays[name]
-            if a.shape[1:] != shape or a.dtype != dtype or per != "atom":
+        if per == "structure":
+            per = "chunk"
+            warnings.warn("per=\"structure\" is deprecated, use pr=\"chunk\"", category=DeprecationWarning)
+        if per == "atom":
+            per = "element"
+            warnings.warn("per=\"atom\" is deprecated, use pr=\"element\"", category=DeprecationWarning)
+
+        if name in self._per_element_arrays:
+            a = self._per_element_arrays[name]
+            if a.shape[1:] != shape or a.dtype != dtype or per != "element":
                 raise ValueError(f"Array with name '{name}' exists with shape {a.shape[1:]} and dtype {a.dtype}.")
             else:
                 return
 
-        if name in self._per_structure_arrays:
-            a = self._per_structure_arrays[name]
-            if a.shape[1:] != shape or a.dtype != dtype or per != "structure":
+        if name in self._per_chunk_arrays:
+            a = self._per_chunk_arrays[name]
+            if a.shape[1:] != shape or a.dtype != dtype or per != "chunk":
                 raise ValueError(f"Array with name '{name}' exists with shape {a.shape[1:]} and dtype {a.dtype}.")
             else:
                 return
 
         per = per.lower()
-        if per == "atom":
-            shape = (self._num_atoms_alloc,) + shape
-            store = self._per_atom_arrays
-        elif per == "structure":
-            shape = (self._num_structures_alloc,) + shape
-            store = self._per_structure_arrays
+        if per == "element":
+            shape = (self._num_elements_alloc,) + shape
+            store = self._per_element_arrays
+        elif per == "chunk":
+            shape = (self._num_chunks_alloc,) + shape
+            store = self._per_chunk_arrays
         else:
-            raise ValueError(f"per must \"atom\" or \"structure\", not {per}")
+            raise ValueError(f"per must \"element\" or \"chunk\", not {per}")
 
         if fill is None:
             store[name] = np.empty(shape=shape, dtype=dtype)
@@ -199,48 +207,48 @@ class FlattenedStorage:
     def add_chunk(self, chunk_length, identifier=None, **arrays):
 
         if identifier is None:
-            identifier = str(self.num_structures)
+            identifier = str(self.num_chunks)
 
         n = chunk_length
-        new_atoms = self.current_atom_index + n
+        new_elements = self.current_element_index + n
 
-        if new_atoms > self._num_atoms_alloc:
-            self._resize_atoms(max(new_atoms, self._num_atoms_alloc * 2))
-        if self.current_structure_index + 1 > self._num_structures_alloc:
-            self._resize_structures(self._num_structures_alloc * 2)
+        if new_elements > self._num_elements_alloc:
+            self._resize_elements(max(new_elements, self._num_elements_alloc * 2))
+        if self.current_chunk_index + 1 > self._num_chunks_alloc:
+            self._resize_chunks(self._num_chunks_alloc * 2)
 
-        if new_atoms > self.num_atoms:
-            self.num_atoms = new_atoms
-        if self.current_structure_index + 1 > self.num_structures:
-            self.num_structures += 1
+        if new_elements > self.num_elements:
+            self.num_elements = new_elements
+        if self.current_chunk_index + 1 > self.num_chunks:
+            self.num_chunks += 1
 
-        # len of structure to index into the initialized arrays
-        i = self.current_atom_index + n
+        # len of chunk to index into the initialized arrays
+        i = self.current_element_index + n
 
-        self._per_structure_arrays["start_index"][self.current_structure_index] = self.current_atom_index
-        self._per_structure_arrays["length"][self.current_structure_index] = n
-        self._per_structure_arrays["identifier"][self.current_structure_index] = identifier
+        self._per_chunk_arrays["start_index"][self.current_chunk_index] = self.current_element_index
+        self._per_chunk_arrays["length"][self.current_chunk_index] = n
+        self._per_chunk_arrays["identifier"][self.current_chunk_index] = identifier
 
         for k, a in arrays.items():
             a = np.asarray(a)
             if len(a.shape) > 0 and a.shape[0] == n:
-                if k not in self._per_atom_arrays:
-                    self.add_array(k, shape=a.shape[1:], dtype=a.dtype, per="atom")
-                self._per_atom_arrays[k][self.current_atom_index:i] = a
+                if k not in self._per_element_arrays:
+                    self.add_array(k, shape=a.shape[1:], dtype=a.dtype, per="element")
+                self._per_element_arrays[k][self.current_element_index:i] = a
             else:
                 if len(a.shape) > 0 and a.shape[0] == 1:
                     a = a[0]
-                if k not in self._per_structure_arrays:
-                    self.add_array(k, shape=a.shape, dtype=a.dtype, per="structure")
-                self._per_structure_arrays[k][self.current_structure_index] = a
+                if k not in self._per_chunk_arrays:
+                    self.add_array(k, shape=a.shape, dtype=a.dtype, per="chunk")
+                self._per_chunk_arrays[k][self.current_chunk_index] = a
 
-        self.prev_structure_index = self.current_structure_index
-        self.prev_atom_index = self.current_atom_index
+        self.prev_chunk_index = self.current_chunk_index
+        self.prev_element_index = self.current_element_index
 
-        # Set new current_atom_index and increase current_structure_index
-        self.current_structure_index += 1
-        self.current_atom_index = i
-        #return last_structure_index, last_atom_index
+        # Set new current_element_index and increase current_chunk_index
+        self.current_chunk_index += 1
+        self.current_element_index = i
+        #return last_chunk_index, last_element_index
 
 
     def _type_to_hdf(self, hdf):
@@ -258,16 +266,16 @@ class FlattenedStorage:
 
     def to_hdf(self, hdf, group_name="flat_storage"):
         # truncate arrays to necessary size before writing
-        self._resize_atoms(self.num_atoms)
-        self._resize_structures(self.num_structures)
+        self._resize_elements(self.num_elements)
+        self._resize_chunks(self.num_chunks)
 
         with hdf.open(group_name) as hdf_s_lst:
             self._type_to_hdf(hdf_s_lst)
-            hdf_s_lst["num_atoms"] =  self._num_atoms_alloc
-            hdf_s_lst["num_structures"] = self._num_structures_alloc
+            hdf_s_lst["num_elements"] =  self._num_elements_alloc
+            hdf_s_lst["num_chunks"] = self._num_chunks_alloc
 
             hdf_arrays = hdf_s_lst.open("arrays")
-            for k, a in chain(self._per_atom_arrays.items(), self._per_structure_arrays.items()):
+            for k, a in chain(self._per_element_arrays.items(), self._per_chunk_arrays.items()):
                 if a.dtype.char == "U":
                     # numpy stores unicode data in UTF-32/UCS-4, but h5py wants UTF-8, so we manually encode them here
                     # TODO: string arrays with shape != () not handled
@@ -284,8 +292,10 @@ class FlattenedStorage:
     def from_hdf(self, hdf, group_name="flat_storage"):
         with hdf.open(group_name) as hdf_s_lst:
             version = hdf_s_lst.get("HDF_VERSION", "0.0.0")
-            self._num_structures_alloc = self.num_structures = self.current_structure_index = hdf_s_lst["num_structures"]
-            self._num_atoms_alloc = self.num_atoms = self.current_atom_index = hdf_s_lst["num_atoms"]
+            num_chunks = hdf_s_lst["num_chunks"] or hdf_s_lst["num_structures"]
+            num_elements = hdf_s_lst["num_elements"] or hdf_s_lst["num_atoms"]
+            self._num_chunks_alloc = self.num_chunks = self.current_chunk_index = num_chunks
+            self._num_elements_alloc = self.num_elements = self.current_element_index = num_elements
 
             with hdf_s_lst.open("arrays") as hdf_arrays:
                 for k in hdf_arrays.list_nodes():
@@ -298,10 +308,10 @@ class FlattenedStorage:
                                     # length of the orignal stored unicode string; np.dtype('U1').itemsize is just a
                                     # platform agnostic way of knowing how wide a unicode charater is for numpy
                                     dtype=f"U{a.dtype.itemsize//np.dtype('U1').itemsize}")
-                    if a.shape[0] == self._num_atoms_alloc:
-                        self._per_atom_arrays[k] = a
-                    elif a.shape[0] == self._num_structures_alloc:
-                        self._per_structure_arrays[k] = a
+                    if a.shape[0] == self._num_elements_alloc:
+                        self._per_element_arrays[k] = a
+                    elif a.shape[0] == self._num_chunks_alloc:
+                        self._per_chunk_arrays[k] = a
 
 
 class StructureStorage(FlattenedStorage, HasStructure):
@@ -364,41 +374,50 @@ class StructureStorage(FlattenedStorage, HasStructure):
     arrays should be named in plural.
     """
 
+    def __init__(self, num_atoms=1, num_structures=1):
+        """
+        Create new structure container.
+
+        Args:
+            num_atoms (int): total number of atoms across all structures to pre-allocate
+            num_structures (int): number of structures to pre-allocate
+        """
+        super().__init__(num_elements=num_atoms, num_chunks=num_structures)
+
     @property
     def symbols(self):
         """:meta private:"""
-        return self._per_atom_arrays["symbols"]
+        return self._per_element_arrays["symbols"]
 
     @property
     def positions(self):
         """:meta private:"""
-        return self._per_atom_arrays["positions"]
+        return self._per_element_arrays["positions"]
 
     @property
     def start_index(self):
         """:meta private:"""
-        return self._per_structure_arrays["start_index"]
+        return self._per_chunk_arrays["start_index"]
 
     @property
     def length(self):
         """:meta private:"""
-        return self._per_structure_arrays["length"]
+        return self._per_chunk_arrays["length"]
 
     @property
     def identifier(self):
         """:meta private:"""
-        return self._per_structure_arrays["identifier"]
+        return self._per_chunk_arrays["identifier"]
 
     @property
     def cell(self):
         """:meta private:"""
-        return self._per_structure_arrays["cell"]
+        return self._per_chunk_arrays["cell"]
 
     @property
     def pbc(self):
         """:meta private:"""
-        return self._per_structure_arrays["pbc"]
-
+        return self._per_chunk_arrays["pbc"]
 
     def add_structure(self, structure, identifier=None, **arrays):
         """
@@ -447,22 +466,21 @@ class StructureStorage(FlattenedStorage, HasStructure):
 
 
     def _translate_frame(self, frame):
-        for i, name in enumerate(self._per_structure_arrays["identifier"]):
+        for i, name in enumerate(self._per_chunk_arrays["identifier"]):
             if name == frame:
                 return i
         raise KeyError(f"No structure named {frame} in StructureStorage.")
 
     def _get_structure(self, frame=-1, wrap_atoms=True):
-        slc = self._get_per_atom_slice(frame)
-        if "spins" in self._per_atom_arrays:
-            magmoms = self._per_atom_arrays["spins"][slc]
-        else:
+        try:
+            magmoms = self.get_array("spins", frame)
+        except KeyError:
             # not all structures have spins saved on them
             magmoms = None
-        return Atoms(symbols=self._per_atom_arrays["symbols"][slc],
-                     positions=self._per_atom_arrays["positions"][slc],
-                     cell=self._per_structure_arrays["cell"][frame],
-                     pbc=self._per_structure_arrays["pbc"][frame],
+        return Atoms(symbols=self.get_array("symbols", frame),
+                     positions=self.get_array("positions", frame),
+                     cell=self.get_array("cell", frame),
+                     pbc=self.get_array("pbc", frame),
                      magmoms=magmoms)
 
     def _number_of_structures(self):
@@ -480,12 +498,12 @@ class StructureStorage(FlattenedStorage, HasStructure):
                 super().from_hdf(hdf=hdf, group_name=group_name)
 
             elif version == "0.0.0":
-                self._per_atom_arrays["symbols"] = hdf_s_lst["symbols"].astype(np.dtype("U2"))
-                self._per_atom_arrays["positions"] = hdf_s_lst["positions"]
+                self._per_element_arrays["symbols"] = hdf_s_lst["symbols"].astype(np.dtype("U2"))
+                self._per_element_arrays["positions"] = hdf_s_lst["positions"]
 
-                self._per_structure_arrays["start_index"] = hdf_s_lst["start_indices"]
-                self._per_structure_arrays["length"] = hdf_s_lst["len_current_struct"]
-                self._per_structure_arrays["identifier"] = hdf_s_lst["identifiers"].astype(np.dtype("U20"))
-                self._per_structure_arrays["cell"] = hdf_s_lst["cells"]
+                self._per_chunk_arrays["start_index"] = hdf_s_lst["start_indices"]
+                self._per_chunk_arrays["length"] = hdf_s_lst["len_current_struct"]
+                self._per_chunk_arrays["identifier"] = hdf_s_lst["identifiers"].astype(np.dtype("U20"))
+                self._per_chunk_arrays["cell"] = hdf_s_lst["cells"]
 
-                self._per_structure_arrays["pbc"] = np.full((self.num_structures, 3), True)
+                self._per_chunk_arrays["pbc"] = np.full((self.num_structures, 3), True)

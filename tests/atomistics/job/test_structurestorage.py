@@ -38,27 +38,27 @@ class TestContainer(TestWithProject):
         self.cont.add_array("forces", shape=(3,), per="atom")
         self.cont.add_array("fnorble", shape=(), dtype=np.int64, fill=0, per="atom")
 
-        self.assertTrue("energy" in self.cont._per_structure_arrays,
+        self.assertTrue("energy" in self.cont._per_chunk_arrays,
                         "no 'energy' array present after adding it with add_array()")
-        self.assertEqual(self.cont._per_structure_arrays["energy"].shape, (self.cont._num_structures_alloc,),
+        self.assertEqual(self.cont._per_chunk_arrays["energy"].shape, (self.cont._num_chunks_alloc,),
                         "'energy' array has wrong shape")
 
-        self.assertTrue("forces" in self.cont._per_atom_arrays,
+        self.assertTrue("forces" in self.cont._per_element_arrays,
                         "no 'forces' array present after adding it with add_array()")
-        self.assertEqual(self.cont._per_atom_arrays["forces"].shape, (self.cont._num_atoms_alloc, 3),
+        self.assertEqual(self.cont._per_element_arrays["forces"].shape, (self.cont._num_elements_alloc, 3),
                         "'forces' array has wrong shape")
 
-        self.assertEqual(self.cont._per_atom_arrays["fnorble"].dtype, np.int64,
+        self.assertEqual(self.cont._per_element_arrays["fnorble"].dtype, np.int64,
                          "'fnorble' array has wrong dtype after adding it with add_array()")
-        self.assertTrue((self.cont._per_atom_arrays["fnorble"] == 0).all(),
+        self.assertTrue((self.cont._per_element_arrays["fnorble"] == 0).all(),
                          "'fnorble' array not initialized with given fill value")
 
         self.cont.add_array("fnorble", shape=(), dtype=np.int64, fill=42, per="atom")
-        self.assertTrue(not (self.cont._per_atom_arrays["fnorble"] == 42).all(),
+        self.assertTrue(not (self.cont._per_element_arrays["fnorble"] == 42).all(),
                          "Duplicate add_array call was not ignored")
 
         self.cont.add_array("energy", fill=42, per="structure")
-        self.assertTrue(not (self.cont._per_structure_arrays["energy"] == 42).all(),
+        self.assertTrue(not (self.cont._per_chunk_arrays["energy"] == 42).all(),
                          "Duplicate add_array call was not ignored")
 
     def test_get_array(self):
@@ -122,17 +122,17 @@ class TestContainer(TestWithProject):
         R = np.ones(len(self.structures[0]))
         self.cont.add_structure(self.structures[0], self.structures[0].get_chemical_formula(),
                                 energy=E, forces=F, pressure=P, fnord=R[None, :])
-        self.assertEqual(self.cont.get_array("energy", self.cont.num_structures - 1), E,
+        self.assertEqual(self.cont.get_array("energy", self.cont.number_of_structures - 1), E,
                          "Energy returned from get_array() does not match energy passed to add_structure")
-        got_F = self.cont.get_array("forces", self.cont.num_structures - 1)
+        got_F = self.cont.get_array("forces", self.cont.number_of_structures - 1)
         self.assertTrue(np.allclose(got_F, F),
                         f"Forces returned from get_array() {got_F} do not match forces passed to add_structure {F}")
-        got_P = self.cont.get_array("pressure", self.cont.num_structures - 1)
+        got_P = self.cont.get_array("pressure", self.cont.number_of_structures - 1)
         self.assertTrue(np.allclose(got_P, P),
                         f"Pressure returned from get_array() {got_P} does not match pressure passed to add_structure {P}")
-        self.assertTrue("fnord" in self.cont._per_structure_arrays,
+        self.assertTrue("fnord" in self.cont._per_chunk_arrays,
                         "array 'fnord' not in per structure array, even though shape[0]==1")
-        got_R = self.cont.get_array("fnord", self.cont.num_structures - 1)
+        got_R = self.cont.get_array("fnord", self.cont.number_of_structures - 1)
         self.assertEqual(got_R.shape, R.shape,
                         f"array 'fnord' added with wrong shape {got_R.shape}, even though shape[0]==1 ({R.shape})")
         self.assertTrue((got_R == R).all(),
@@ -173,21 +173,21 @@ class TestContainer(TestWithProject):
         for s in self.structures:
             cont_dynamic.add_structure(s, s.get_chemical_formula())
 
-        self.assertEqual(cont_static.current_atom_index, cont_dynamic.current_atom_index,
+        self.assertEqual(cont_static.current_element_index, cont_dynamic.current_element_index,
                          "Dynamic container doesn't have the same current atom after adding structures.")
-        self.assertEqual(cont_static.current_structure_index, cont_dynamic.current_structure_index,
+        self.assertEqual(cont_static.current_chunk_index, cont_dynamic.current_chunk_index,
                          "Dynamic container doesn't have the same current structure after adding structures.")
-        self.assertTrue( (cont_static.symbols[:cont_static.current_atom_index] \
-                            == cont_dynamic.symbols[:cont_dynamic.current_atom_index]).all(),
+        self.assertTrue( (cont_static.symbols[:cont_static.current_element_index] \
+                            == cont_dynamic.symbols[:cont_dynamic.current_element_index]).all(),
                         "Array of chemical symbols not equal after adding structures.")
-        self.assertTrue(np.isclose(cont_static.positions[:cont_static.current_atom_index],
-                                   cont_static.positions[:cont_dynamic.current_atom_index]).all(),
+        self.assertTrue(np.isclose(cont_static.positions[:cont_static.current_element_index],
+                                   cont_static.positions[:cont_dynamic.current_element_index]).all(),
                         "Array of chemical symbols not equal after adding structures.")
-        self.assertTrue(np.isclose(cont_static.cell[:cont_static.current_structure_index],
-                                   cont_dynamic.cell[:cont_dynamic.current_structure_index]).all(),
+        self.assertTrue(np.isclose(cont_static.cell[:cont_static.current_chunk_index],
+                                   cont_dynamic.cell[:cont_dynamic.current_chunk_index]).all(),
                         "Array of chemical symbols not equal after adding structures.")
-        self.assertTrue( (cont_static.identifier[:cont_static.current_structure_index] \
-                            == cont_dynamic.identifier[:cont_dynamic.current_structure_index]).all(),
+        self.assertTrue( (cont_static.identifier[:cont_static.current_chunk_index] \
+                            == cont_dynamic.identifier[:cont_dynamic.current_chunk_index]).all(),
                         "Array of chemical symbols not equal after adding structures.")
 
     def test_hdf(self):
@@ -198,10 +198,10 @@ class TestContainer(TestWithProject):
         cont_read.from_hdf(hdf)
 
         self.assertEqual(len(self.cont), len(cont_read), "Container size not matching after reading from HDF.")
-        self.assertEqual(self.cont.num_structures, cont_read.num_structures,
-                         "num_structures does not match after reading from HDF.")
-        self.assertEqual(self.cont.num_atoms, cont_read.num_atoms,
-                         "num_atoms does not match after reading from HDF.")
+        self.assertEqual(self.cont.num_chunks, cont_read.num_chunks,
+                         "num_chunks does not match after reading from HDF.")
+        self.assertEqual(self.cont.num_elements, cont_read.num_elements,
+                         "num_elements does not match after reading from HDF.")
         for s1, s2 in zip(self.cont.iter_structures(), cont_read.iter_structures()):
             self.assertEqual(s1, s2, "Structure from get_structure not matching after reading from HDF.")
 
@@ -211,23 +211,23 @@ class TestContainer(TestWithProject):
         # bug regression: if you mess up reading some variables it might work fine when you use but it could write
         # itself wrongly to the HDF, thus double check here.
         self.assertEqual(len(self.cont), len(cont_read), "Container size not matching after reading from HDF twice.")
-        self.assertEqual(self.cont.num_structures, cont_read.num_structures,
+        self.assertEqual(self.cont.num_chunks, cont_read.num_chunks,
                          "num_structures does not match after reading from HDF twice.")
-        self.assertEqual(self.cont.num_atoms, cont_read.num_atoms,
+        self.assertEqual(self.cont.num_elements, cont_read.num_elements,
                          "num_atoms does not match after reading from HDF twice.")
         for s1, s2 in zip(self.cont.iter_structures(), cont_read.iter_structures()):
             self.assertEqual(s1, s2, "Structure from get_structure not matching after reading from HDF twice.")
 
-        self.assertEqual(set(self.cont._per_atom_arrays.keys()),
-                         set(cont_read._per_atom_arrays.keys()),
+        self.assertEqual(set(self.cont._per_element_arrays.keys()),
+                         set(cont_read._per_element_arrays.keys()),
                          "per atom arrays read are not the same as written")
-        self.assertEqual(set(self.cont._per_structure_arrays.keys()),
-                         set(cont_read._per_structure_arrays.keys()),
+        self.assertEqual(set(self.cont._per_chunk_arrays.keys()),
+                         set(cont_read._per_chunk_arrays.keys()),
                          "per structure arrays read are not the same as written")
 
-        for n in self.cont._per_atom_arrays:
-            self.assertTrue((self.cont._per_atom_arrays[n] == cont_read._per_atom_arrays[n]).all(),
+        for n in self.cont._per_element_arrays:
+            self.assertTrue((self.cont._per_element_arrays[n] == cont_read._per_element_arrays[n]).all(),
                             f"per atom array {n} read is not the same as writen")
-        for n in self.cont._per_structure_arrays:
-            self.assertTrue((self.cont._per_structure_arrays[n] == cont_read._per_structure_arrays[n]).all(),
+        for n in self.cont._per_chunk_arrays:
+            self.assertTrue((self.cont._per_chunk_arrays[n] == cont_read._per_chunk_arrays[n]).all(),
                             f"per structure array {n} read is not the same as writen")

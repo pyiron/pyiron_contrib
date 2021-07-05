@@ -1,7 +1,44 @@
 from pyiron_atomistics._tests import TestWithProject
-from pyiron_contrib.atomistics.atomistics.job.structurestorage import StructureStorage
+from pyiron_contrib.atomistics.atomistics.job.structurestorage import FlattenedStorage, StructureStorage
 import os.path
 import numpy as np
+
+class TestFlattenedStorage(TestWithProject):
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.store = FlattenedStorage()
+
+    def test_add_array(self):
+        """Custom arrays added with add_array should be properly allocated with matching shape, dtype and fill"""
+
+        self.store.add_array("energy", per="chunk")
+        self.store.add_array("forces", shape=(3,), per="atom")
+        self.store.add_array("fnorble", shape=(), dtype=np.int64, fill=0, per="atom")
+
+        self.assertTrue("energy" in self.store._per_chunk_arrays,
+                        "no 'energy' array present after adding it with add_array()")
+        self.assertEqual(self.store._per_chunk_arrays["energy"].shape, (self.store._num_chunks_alloc,),
+                        "'energy' array has wrong shape")
+
+        self.assertTrue("forces" in self.store._per_element_arrays,
+                        "no 'forces' array present after adding it with add_array()")
+        self.assertEqual(self.store._per_element_arrays["forces"].shape, (self.store._num_elements_alloc, 3),
+                        "'forces' array has wrong shape")
+
+        self.assertEqual(self.store._per_element_arrays["fnorble"].dtype, np.int64,
+                         "'fnorble' array has wrong dtype after adding it with add_array()")
+        self.assertTrue((self.store._per_element_arrays["fnorble"] == 0).all(),
+                         "'fnorble' array not initialized with given fill value")
+
+        self.store.add_array("fnorble", shape=(), dtype=np.int64, fill=42, per="atom")
+        self.assertTrue(not (self.store._per_element_arrays["fnorble"] == 42).all(),
+                         "Duplicate add_array call was not ignored")
+
+        self.store.add_array("energy", fill=42, per="chunk")
+        self.assertTrue(not (self.store._per_chunk_arrays["energy"] == 42).all(),
+                         "Duplicate add_array call was not ignored")
 
 class TestContainer(TestWithProject):
 
@@ -30,36 +67,6 @@ class TestContainer(TestWithProject):
         """get_elements() should return all unique chemical elements stored in its structures."""
         self.assertEqual(sorted(self.elements), sorted(self.cont.get_elements()),
                          "Results from get_elements() do not match added elements.")
-
-    def test_add_array(self):
-        """Custom arrays added with add_array should be properly allocated with matching shape, dtype and fill"""
-
-        self.cont.add_array("energy", per="structure")
-        self.cont.add_array("forces", shape=(3,), per="atom")
-        self.cont.add_array("fnorble", shape=(), dtype=np.int64, fill=0, per="atom")
-
-        self.assertTrue("energy" in self.cont._per_chunk_arrays,
-                        "no 'energy' array present after adding it with add_array()")
-        self.assertEqual(self.cont._per_chunk_arrays["energy"].shape, (self.cont._num_chunks_alloc,),
-                        "'energy' array has wrong shape")
-
-        self.assertTrue("forces" in self.cont._per_element_arrays,
-                        "no 'forces' array present after adding it with add_array()")
-        self.assertEqual(self.cont._per_element_arrays["forces"].shape, (self.cont._num_elements_alloc, 3),
-                        "'forces' array has wrong shape")
-
-        self.assertEqual(self.cont._per_element_arrays["fnorble"].dtype, np.int64,
-                         "'fnorble' array has wrong dtype after adding it with add_array()")
-        self.assertTrue((self.cont._per_element_arrays["fnorble"] == 0).all(),
-                         "'fnorble' array not initialized with given fill value")
-
-        self.cont.add_array("fnorble", shape=(), dtype=np.int64, fill=42, per="atom")
-        self.assertTrue(not (self.cont._per_element_arrays["fnorble"] == 42).all(),
-                         "Duplicate add_array call was not ignored")
-
-        self.cont.add_array("energy", fill=42, per="structure")
-        self.assertTrue(not (self.cont._per_chunk_arrays["energy"] == 42).all(),
-                         "Duplicate add_array call was not ignored")
 
     def test_get_array(self):
         """get_array should return the arrays for the correct structures."""

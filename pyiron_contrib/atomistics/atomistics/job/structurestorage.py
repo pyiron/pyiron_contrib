@@ -212,10 +212,12 @@ class FlattenedStorage:
 
         if per == "structure":
             per = "chunk"
-            warnings.warn("per=\"structure\" is deprecated, use pr=\"chunk\"", category=DeprecationWarning)
+            warnings.warn("per=\"structure\" is deprecated, use pr=\"chunk\"",
+                          category=DeprecationWarning, stacklevel=2)
         if per == "atom":
             per = "element"
-            warnings.warn("per=\"atom\" is deprecated, use pr=\"element\"", category=DeprecationWarning)
+            warnings.warn("per=\"atom\" is deprecated, use pr=\"element\"",
+                          category=DeprecationWarning, stacklevel=2)
 
         if name in self._per_element_arrays:
             a = self._per_element_arrays[name]

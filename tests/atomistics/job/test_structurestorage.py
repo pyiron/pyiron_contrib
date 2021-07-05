@@ -14,8 +14,8 @@ class TestFlattenedStorage(TestWithProject):
         """Custom arrays added with add_array should be properly allocated with matching shape, dtype and fill"""
 
         self.store.add_array("energy", per="chunk")
-        self.store.add_array("forces", shape=(3,), per="atom")
-        self.store.add_array("fnorble", shape=(), dtype=np.int64, fill=0, per="atom")
+        self.store.add_array("forces", shape=(3,), per="element")
+        self.store.add_array("fnorble", shape=(), dtype=np.int64, fill=0, per="element")
 
         self.assertTrue("energy" in self.store._per_chunk_arrays,
                         "no 'energy' array present after adding it with add_array()")
@@ -32,7 +32,7 @@ class TestFlattenedStorage(TestWithProject):
         self.assertTrue((self.store._per_element_arrays["fnorble"] == 0).all(),
                          "'fnorble' array not initialized with given fill value")
 
-        self.store.add_array("fnorble", shape=(), dtype=np.int64, fill=42, per="atom")
+        self.store.add_array("fnorble", shape=(), dtype=np.int64, fill=42, per="element")
         self.assertTrue(not (self.store._per_element_arrays["fnorble"] == 42).all(),
                          "Duplicate add_array call was not ignored")
 

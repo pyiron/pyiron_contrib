@@ -48,8 +48,8 @@ class TrainingContainer(GenericJob, HasStructure):
         self.__name__ = "TrainingContainer"
         self.__hdf_version__ = "0.2.0"
         self._container = StructureStorage()
-        self._container.add_array("energy", dtype=np.float64, per="structure")
-        self._container.add_array("forces", shape=(3,), dtype=np.float64, per="atom")
+        self._container.add_array("energy", dtype=np.float64, per="chunk")
+        self._container.add_array("forces", shape=(3,), dtype=np.float64, per="element")
         self._table_cache = None
 
     @property

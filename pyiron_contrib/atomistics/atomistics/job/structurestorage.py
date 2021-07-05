@@ -41,23 +41,17 @@ class FlattenedStorage:
 
         self._init_arrays()
 
-    def __len__(self):
-        return self.current_chunk_index
-
     def _init_arrays(self):
-        self._per_element_arrays = {
-                # 2 character unicode array for chemical symbols
-                "symbols": np.full(self._num_elements_alloc, "XX", dtype=np.dtype("U2")),
-                "positions": np.empty((self._num_elements_alloc, 3))
-        }
+        self._per_element_arrays = {}
 
         self._per_chunk_arrays = {
                 "start_index": np.empty(self._num_chunks_alloc, dtype=np.int32),
                 "length": np.empty(self._num_chunks_alloc, dtype=np.int32),
-                "identifier": np.empty(self._num_chunks_alloc, dtype=np.dtype("U20")),
-                "cell": np.empty((self._num_chunks_alloc, 3, 3)),
-                "pbc": np.empty((self._num_elements_alloc, 3), dtype=bool)
+                "identifier": np.empty(self._num_chunks_alloc, dtype=np.dtype("U20"))
         }
+
+    def __len__(self):
+        return self.current_chunk_index
 
     def get_elements(self):
         """
@@ -383,6 +377,16 @@ class StructureStorage(FlattenedStorage, HasStructure):
             num_structures (int): number of structures to pre-allocate
         """
         super().__init__(num_elements=num_atoms, num_chunks=num_structures)
+
+    def _init_arrays(self):
+        super()._init_arrays()
+        # 2 character unicode array for chemical symbols
+        self._per_element_arrays["symbols"] = np.full(self._num_elements_alloc, "XX", dtype=np.dtype("U2"))
+        self._per_element_arrays["positions"] = np.empty((self._num_elements_alloc, 3))
+
+        self._per_chunk_arrays["cell"] = np.empty((self._num_chunks_alloc, 3, 3))
+        self._per_chunk_arrays["pbc"] = np.empty((self._num_elements_alloc, 3), dtype=bool)
+
 
     @property
     def symbols(self):

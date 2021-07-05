@@ -40,6 +40,32 @@ class TestFlattenedStorage(TestWithProject):
         self.assertTrue(not (self.store._per_chunk_arrays["energy"] == 42).all(),
                          "Duplicate add_array call was not ignored")
 
+    def test_resize(self):
+        """A dynamically resized container should behave exactly as a pre-allocated container."""
+
+        foo = [ [1], [2, 3], [4, 5, 6] ]
+        bar = [ 1, 2, 3 ]
+        store_static = FlattenedStorage(num_chunks=3, num_elements=6)
+        store_dynamic = FlattenedStorage(num_chunks=1, num_elements=1)
+
+        store_static.add_array("foo", per="element")
+        store_static.add_array("bar", per="chunk")
+
+        for f, b in zip(foo, bar):
+            store_static.add_chunk(len(f), foo=f, bar=b)
+            store_dynamic.add_chunk(len(f), foo=f, bar=b)
+
+        self.assertEqual(store_static.current_element_index, store_dynamic.current_element_index,
+                         "Dynamic storeainer doesn't have the same current element after adding chunks.")
+        self.assertEqual(store_static.current_chunk_index, store_dynamic.current_chunk_index,
+                         "Dynamic storeainer doesn't have the same current chunk after adding chunks.")
+        self.assertTrue( (store_static._per_element_arrays["foo"][:store_static.current_element_index] \
+                            == store_dynamic._per_element_arrays["foo"][:store_dynamic.current_element_index]).all(),
+                        "Array of per element quantity not equal after adding chunks.")
+        self.assertTrue(np.isclose(store_static._per_chunk_arrays["bar"][:store_static.current_element_index],
+                                   store_static._per_chunk_arrays["bar"][:store_dynamic.current_element_index]).all(),
+                        "Array of per chunk quantity not equal after adding chunks.")
+
 class TestContainer(TestWithProject):
 
     @classmethod
@@ -170,32 +196,6 @@ class TestContainer(TestWithProject):
                         "Spins not restored on added structure.")
         self.assertTrue(np.allclose(spins, fe_read.spins),
                         f"Spins restored on added structure not equal to original spins: {spins} {fe_read.spins}.")
-
-    def test_resize(self):
-        """A dynamically resized container should behave exactly as a pre-allocated container."""
-
-        cont_static = self.cont
-        cont_dynamic = StructureStorage(num_structures=2, num_atoms=10)
-
-        for s in self.structures:
-            cont_dynamic.add_structure(s, s.get_chemical_formula())
-
-        self.assertEqual(cont_static.current_element_index, cont_dynamic.current_element_index,
-                         "Dynamic container doesn't have the same current atom after adding structures.")
-        self.assertEqual(cont_static.current_chunk_index, cont_dynamic.current_chunk_index,
-                         "Dynamic container doesn't have the same current structure after adding structures.")
-        self.assertTrue( (cont_static.symbols[:cont_static.current_element_index] \
-                            == cont_dynamic.symbols[:cont_dynamic.current_element_index]).all(),
-                        "Array of chemical symbols not equal after adding structures.")
-        self.assertTrue(np.isclose(cont_static.positions[:cont_static.current_element_index],
-                                   cont_static.positions[:cont_dynamic.current_element_index]).all(),
-                        "Array of chemical symbols not equal after adding structures.")
-        self.assertTrue(np.isclose(cont_static.cell[:cont_static.current_chunk_index],
-                                   cont_dynamic.cell[:cont_dynamic.current_chunk_index]).all(),
-                        "Array of chemical symbols not equal after adding structures.")
-        self.assertTrue( (cont_static.identifier[:cont_static.current_chunk_index] \
-                            == cont_dynamic.identifier[:cont_dynamic.current_chunk_index]).all(),
-                        "Array of chemical symbols not equal after adding structures.")
 
     def test_hdf(self):
         """Containers written to, then read from HDF should match."""

@@ -87,6 +87,11 @@ class FlattenedStorage:
     119
     >>> store.get_array("even", 3)
     array([14, 16, 18, 20])
+
+    It is usually not necessary to call :method:`.add_array` before :method:`.add_chunk`, the type of the array will be
+    inferred in this case.
+
+    Arrays may be of more complicated shape, too, see :method:`.add_array` for details.
     """
 
     __version__ = "0.1.0"

@@ -30,7 +30,7 @@ class FlattenedStorage:
     >>> a_flat = [ 1,  2, 3,  4,  5,  6 ]
     >>> b_flat = [ 2,  4, 6,  8, 10, 12 ]
 
-    with additionaly metadata to indicate where the boundaries of each chunk are. 
+    with additional metadata to indicate where the boundaries of each chunk are. 
 
     First add arrays and chunks like this
 
@@ -88,10 +88,20 @@ class FlattenedStorage:
     >>> store.get_array("even", 3)
     array([14, 16, 18, 20])
 
+    Chunks may be given string names, either by passing `identifier` to :method:`.add_chunk` or by setting to the
+    special per chunk array "identifier"
+
+    >>> store.set_array("identifier", 1, "second")
+    >>> all(store.get_array("even", "second") == store.get_array("even", 1))
+    True
+
     It is usually not necessary to call :method:`.add_array` before :method:`.add_chunk`, the type of the array will be
     inferred in this case.
 
     Arrays may be of more complicated shape, too, see :method:`.add_array` for details.
+
+    When adding new arrays follow the convention that per-structure arrays should be named in singular and per-atom
+    arrays should be named in plural.
     """
 
     __version__ = "0.1.0"
@@ -130,6 +140,24 @@ class FlattenedStorage:
     def __len__(self):
         return self.current_chunk_index
 
+    def find_chunk(self, identifier):
+        """
+        Return integer index for given identifier.
+
+        Args:
+            identifier (str): name of chunk previously passed to :method:`.add_chunk`
+
+        Returns:
+            int: integer index for chunk
+
+        Raises:
+            KeyError: if identifier is not found in storage
+        """
+        for i, name in enumerate(self._per_chunk_arrays["identifier"]):
+            if name == identifier:
+                return i
+        raise KeyError(f"No chunk named {identifier}")
+
     def _get_per_element_slice(self, frame):
         start = self._per_chunk_arrays["start_index"][frame]
         end = start + self._per_chunk_arrays["length"][frame]
@@ -153,7 +181,7 @@ class FlattenedStorage:
         """
 
         if isinstance(frame, str):
-            frame = self._translate_frame(frame)
+            frame = self.find_chunk(frame)
         if name in self._per_element_arrays:
             return self._per_element_arrays[name][self._get_per_element_slice(frame)]
         elif name in self._per_chunk_arrays:
@@ -176,7 +204,7 @@ class FlattenedStorage:
         """
 
         if isinstance(frame, str):
-            frame = self._translate_frame(frame)
+            frame = self.find_chunk(frame)
         if name in self._per_element_arrays:
             self._per_element_arrays[name][self._get_per_element_slice(frame)] = value
         elif name in self._per_chunk_arrays:
@@ -434,9 +462,6 @@ class StructureStorage(FlattenedStorage, HasStructure):
         - positions:    shape=(3,),  dtype=np.float64,   per element: atomic positions
     If a structure has spins/magnetic moments defined on its atoms these will be saved in a per atom array as well.  In
     that case, however all structures in the container must either have all collinear spins or all non-collinear spins.
-
-    When adding new array follow the convention that per-structure arrays should be named in singular and per-atom
-    arrays should be named in plural.
     """
 
     def __init__(self, num_atoms=1, num_structures=1):
@@ -551,10 +576,10 @@ class StructureStorage(FlattenedStorage, HasStructure):
 
 
     def _translate_frame(self, frame):
-        for i, name in enumerate(self._per_chunk_arrays["identifier"]):
-            if name == frame:
-                return i
-        raise KeyError(f"No structure named {frame} in StructureStorage.")
+        try:
+            return self.find_chunk(frame)
+        except KeyError:
+            raise KeyError(f"No structure named {frame}.") from None
 
     def _get_structure(self, frame=-1, wrap_atoms=True):
         try:

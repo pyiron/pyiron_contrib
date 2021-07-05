@@ -239,11 +239,11 @@ class FlattenedStorage:
 
         Adding an array with the same name twice is ignored, if dtype and shape match, otherwise raises an exception.
 
-        >>> container = StructureStorage()
-        >>> container.add_chunk(Atoms(...), "foo")
-        >>> container.add_array("energy", shape=(), dtype=np.float64, fill=42, per="chunk")
-        >>> container.get_array("energy", 0)
-        42
+        >>> store = FlattenedStorage()
+        >>> store.add_chunk(1, "foo")
+        >>> store.add_array("energy", shape=(), dtype=np.float64, fill=42, per="chunk")
+        >>> store.get_array("energy", 0)
+        42.0
 
         Args:
             name (str): name of the new array

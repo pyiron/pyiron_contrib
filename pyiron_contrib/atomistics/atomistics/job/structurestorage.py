@@ -295,6 +295,36 @@ class FlattenedStorage:
             store[name] = np.full(shape=shape, fill_value=fill, dtype=dtype)
 
     def add_chunk(self, chunk_length, identifier=None, **arrays):
+        """
+        Add a new chunk to the storeage.
+
+        Additional keyword arguments given specify arrays to store for the chunk.  If an array with the given keyword
+        name does not exist yet, it will be added to the container.
+
+        >>> container = FlattenedStorage()
+        >>> container.add_chunk(2, identifier="A", energy=3.14)
+        >>> container.get_array("energy", 0)
+        3.14
+
+        If the first axis of the extra array matches the length of the chunk, it will be added as an per element array,
+        otherwise as an per chunk array.
+
+        >>> container.add_chunk(2, identifier="B", forces=2 * [[0,0,0]])
+        >>> len(container.get_array("forces", 1)) == 2
+        True
+
+        Reshaping the array to have the first axis be length 1 forces the array to be set as per chunk array.  That axis
+        will then be stripped.
+
+        >>> container.add_chunk(2, identifier="C", pressure=np.eye(3)[np.newaxis, :, :])
+        >>> container.get_array("pressure", 2).shape
+        (3, 3)
+
+        Args:
+            chunk_length (int): length of the new chunk
+            identifier (str, optional): human-readable name for the chunk, if None use current chunk index as string
+            **kwargs: additional arrays to store for the chunk
+        """
 
         if identifier is None:
             identifier = str(self.num_chunks)

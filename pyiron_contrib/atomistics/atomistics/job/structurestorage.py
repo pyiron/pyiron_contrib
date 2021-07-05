@@ -16,13 +16,85 @@ from pyiron_atomistics.atomistics.structure.atoms import Atoms
 from pyiron_atomistics.atomistics.structure.has_structure import HasStructure
 
 class FlattenedStorage:
+    """
+    Efficient storage of ragged arrays in flattened arrays.
+
+    This class stores multiple arrays at the same time.  Storage is organized in "chunks" that may be of any size, but
+    all arrays within chunk are of the same size, e.g.
+
+    >>> a = [ [1], [2, 3], [4,  5,  6] ]
+    >>> b = [ [2], [4, 6], [8, 10, 12] ]
+
+    are stored as in three chunks like
+
+    >>> a_flat = [ 1,  2, 3,  4,  5,  6 ]
+    >>> b_flat = [ 2,  4, 6,  8, 10, 12 ]
+
+    with additionaly metadata to indicate where the boundaries of each chunk are. 
+
+    First add arrays and chunks like this
+
+    >>> store = FlattenedStorage()
+    >>> store.add_array("even", dtype=np.int64)
+    >>> store.add_chunk(1, even=[2])
+    >>> store.add_chunk(2, even=[4,  6])
+    >>> store.add_chunk(3, even=[8, 10, 12])
+
+    where the first argument indicates the length of each chunk.  You may retrieve stored values like this
+
+    >>> store.get_array("even", 1)
+    array([4, 6])
+    >>> store.get_array("even", 0)
+    array([2])
+
+    where the second arguments are integer indices in the order of insertion.  After intial storage you may modify
+    arrays.
+
+    >>> store.set_array("even", 0, [0])
+    >>> store.get_array("even", 0)
+    array([0])
+
+    You can add arrays to the storage even after you added already other arrays and chunks.
+
+    >>> store.add_array("odd", dtype=np.int64, fill=0)
+    >>> store.get_array("odd", 1)
+    array([0, 0])
+    >>> store.set_array("odd", 0, [1])
+    >>> store.set_array("odd", 1, [3, 5])
+    >>> store.set_array("odd", 2, [7, 9, 11])
+    >>> store.get_array("odd", 2)
+    array([ 7,  9, 11])
+
+    Because the second chunk is already known to be of length two and `fill` was specified the 'odd' array has been
+    appropriatly allocated.
+
+    Additionally arrays may also only have one value per chunk ("per chunk", previous examples are "per element").
+
+    >>> store.add_array("sum", dtype=np.int64, per="chunk")
+    >>> for i in range(len(store)):
+    ...    store.set_array("sum", i, sum(store.get_array("even", i) + store.get_array("odd", i)))
+    >>> store.get_array("sum", 0)
+    1
+    >>> store.get_array("sum", 1)
+    18
+    >>> store.get_array("sum", 2)
+    57
+
+    Finally you may add multiple arrays in one call to :method:`.add_chunk` by using keyword arguments
+
+    >>> store.add_chunk(4, even=[14, 16, 18, 20], odd=[13, 15, 17, 19], sum=119)
+    >>> store.get_array("sum", 3)
+    119
+    >>> store.get_array("even", 3)
+    array([14, 16, 18, 20])
+    """
 
     __version__ = "0.1.0"
     __hdf_version__ = "0.1.0"
 
     def __init__(self, num_chunks=1, num_elements=1):
         """
-        Create new chunk container.
+        Create new flattened storage.
 
         Args:
             num_chunks (int): pre-allocation for per chunk arrays
@@ -332,7 +404,9 @@ class StructureStorage(FlattenedStorage, HasStructure):
 
     Custom arrays may also be defined on the container
 
-    >>> container.add_array("energy", shape=(), dtype=np.float64, fill=-1, per="structure")
+    >>> container.add_array("energy", shape=(), dtype=np.float64, fill=-1, per="chunk")
+
+    (chunk means structure in this case, see below and :class:`.FlattenedStorage`)
 
     You can then pass arrays of the corresponding shape to :method:`add_structure()`
 
@@ -355,12 +429,13 @@ class StructureStorage(FlattenedStorage, HasStructure):
     >>> len(container)
     4
 
-    By default the following arrays are defined for each structure:
-        - identifier    shape=(),    dtype=str,          per structure; human readable name of the structure
-        - cell          shape=(3,3), dtype=np.float64,   per structure; cell shape
-        - pbc           shape=(3,),  dtype=bool          per structure; periodic boundary conditions
-        - symbols:      shape=(),    dtype=str,          per atom; chemical symbol
-        - positions:    shape=(3,),  dtype=np.float64,   per atom: atomic positions
+    Each structure corresponds to a chunk in :class:`.FlattenedStorage` and each atom to an element.  By default the
+    following arrays are defined for each structure:
+        - identifier    shape=(),    dtype=str,          per chunk; human readable name of the structure
+        - cell          shape=(3,3), dtype=np.float64,   per chunk; cell shape
+        - pbc           shape=(3,),  dtype=bool          per chunk; periodic boundary conditions
+        - symbols:      shape=(),    dtype=str,          per element; chemical symbol
+        - positions:    shape=(3,),  dtype=np.float64,   per element: atomic positions
     If a structure has spins/magnetic moments defined on its atoms these will be saved in a per atom array as well.  In
     that case, however all structures in the container must either have all collinear spins or all non-collinear spins.
 

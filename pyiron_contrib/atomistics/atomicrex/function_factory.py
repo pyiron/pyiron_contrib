@@ -15,8 +15,8 @@ class FunctionFactory(PyironFactory):
     atomicrex documentation.
     """    
     @staticmethod
-    def user_function(identifier, input_variable="r", species=["*", "*"], is_screening_function=False):
-        return UserFunction(identifier, input_variable=input_variable, species=species, is_screening_function=is_screening_function)
+    def user_function(identifier, input_variable="r", species=["*", "*"], is_screening_function=False, cutoff=None):
+        return UserFunction(identifier, input_variable=input_variable, species=species, is_screening_function=is_screening_function, cutoff=cutoff)
 
     @staticmethod
     def poly(identifier, cutoff, species=["*", "*"]):
@@ -51,13 +51,66 @@ class FunctionFactory(PyironFactory):
         return MorseC(identifier, A, B, mu, lambda_val, delta, species=species)
 
     @staticmethod
-    def gaussian(identifier, prefactor, eta, mu, species=["*", "*"]):
-        return GaussianFunc(identifier, prefactor, eta, mu, species)
+    def gaussian(identifier, prefactor, eta, mu, species=["*", "*"], cutoff=None):
+        return GaussianFunc(identifier, prefactor, eta, mu, species, cutoff)
 
     @staticmethod
     def sum(identifier, species=["*", "*"]):
         return Sum(identifier=identifier, species=species)
+    
+    @staticmethod
+    def product(identifier, species=["*", "*"]):
+        return Product(identifier=identifier, species=species)
+    
+    @staticmethod
+    def gaussians_sum(
+        n_gaussians,
+        eta,
+        identifier,
+        node_points = None,
+        cutoff = None,
+        initial_prefactors=None,
+        min_prefactors=None,
+        max_prefactors=None,
+        species=["*", "*"]
+    ):
+        sum_func = FunctionFactory.sum(identifier=identifier, species=species)
+        if node_points is None:
+            if cutoff is None:
+                raise ValueError("Specify node points or a cutoff to set them automatically")
+            else:
+                node_points = np.linspace(0, cutoff, n_gaussians, endpoint=False)
+        else:
+            if len(node_points) != n_gaussians:
+                raise ValueError("Number of node points has to match n_gaussians")
 
+        if initial_prefactors is None:
+            initial_prefactors = np.ones(n_gaussians)
+        if min_prefactors is not None:
+            if len(min_prefactors) != n_gaussians:
+                raise ValueError("min_prefactors must have length num_gaussians")
+        if max_prefactors is not None:
+            if len(max_prefactors) != n_gaussians:
+                raise ValueError("max_prefactors must have length num_gaussians")
+
+        for i in range(n_gaussians):
+            gauss = FunctionFactory.gaussian(
+                identifier=f"gauss_{i}",
+                prefactor=initial_prefactors[i],
+                eta=eta,
+                mu = node_points[i],
+                species = species,
+                cutoff = cutoff,
+                )
+            gauss.parameters.mu.enabled = False
+            gauss.parameters.eta.enabled = False
+            if min_prefactors is not None:
+                gauss.parameters.prefactor.min_val = min_prefactors[i]
+            if max_prefactors is not None:
+                gauss.parameters.prefactor.max_val = max_prefactors[i]
+
+            sum_func.functions[gauss.identifier] = gauss
+        return sum_func
 
 class BaseFunctionMixin():
     # Mixin class to implement functionality common in all types of functions
@@ -79,16 +132,15 @@ class MetaFunctionMixin():
         for f in self.functions.values():
             f.lock_parameters()
 
-
-class Sum(DataContainer, MetaFunctionMixin):
-    def __init__(self, identifier=None, species=None):
+class AbstractMetaFunction(DataContainer, MetaFunctionMixin):
+    def __init__(self, identifier=None, species=None, table_name=None):
         super().__init__()
         self.identifier = identifier
-        self.functions = DataContainer(table_name="sum_functions")
+        self.functions = DataContainer(table_name=table_name)
         self.species = species
 
-    def _to_xml_element(self):
-        root = ET.Element("sum")
+    def _to_xml_element(self, func_name):
+        root = ET.Element(func_name)
         root.set("id", self.identifier)
         for k, v in self.functions.items():
             root.append(v._to_xml_element())
@@ -100,7 +152,21 @@ class Sum(DataContainer, MetaFunctionMixin):
         try:
             self.functions[identifier]._parse_final_parameter(leftover, value)
         except KeyError:
-            raise KeyError(f"Function {identifier} not found in sum {self.identifier}")
+            raise KeyError(f"Function {identifier} not found in {self.identifier}")
+
+class Sum(AbstractMetaFunction, MetaFunctionMixin):
+    def __init__(self, identifier=None, species=None):
+        super().__init__(identifier=identifier, species=species, table_name="sum_functions")
+    
+    def _to_xml_element(self):
+        return super()._to_xml_element(func_name="sum")
+
+class Product(AbstractMetaFunction, MetaFunctionMixin):
+    def __init__(self, identifier=None, species=None):
+        super().__init__(identifier=identifier, species=species, table_name="product_functions")
+    
+    def _to_xml_element(self):
+        return super()._to_xml_element(func_name="product")
 
 
 class SpecialFunction(DataContainer, BaseFunctionMixin):
@@ -468,7 +534,7 @@ class MorseC(SpecialFunction):
 
 ## Renamed GaussianFunc to not mess with the gaussian code when loading from hdf5
 class GaussianFunc(SpecialFunction):
-    def __init__(self, identifier=None, prefactor=None, eta=None, mu=None, species=None):
+    def __init__(self, identifier=None, prefactor=None, eta=None, mu=None, species=None, cutoff=None):
         super().__init__(identifier, species=species, is_screening_function=False)
         self.parameters.add_parameter(
             "prefactor",
@@ -487,6 +553,7 @@ class GaussianFunc(SpecialFunction):
             start_val=mu,
             enabled=True,
         )
+        self.cutoff = cutoff
 
     @property
     def func(self):
@@ -496,8 +563,13 @@ class GaussianFunc(SpecialFunction):
         return lambda r: prefactor*np.exp(-eta*(r-mu)**2)
 
     def _to_xml_element(self):
-        return super()._to_xml_element(name="gaussian")
-
+        xml = super()._to_xml_element(name="gaussian")
+        # Put this in SpecialFunction or AbstractFunction class when rewriting
+        # f.e. using getattr()
+        if self.cutoff is not None:
+            cutoff = ET.SubElement(xml, "cutoff")
+            cutoff.text = f"{self.cutoff}"
+        return xml
 
 class UserFunction(DataContainer, BaseFunctionMixin):
     """
@@ -506,7 +578,7 @@ class UserFunction(DataContainer, BaseFunctionMixin):
     All parameters defined in the function should be added using the
     UserFunction.parameters.add_parameter() method.
     """    
-    def __init__(self, identifier=None, input_variable=None, species=["*", "*"], is_screening_function=False):
+    def __init__(self, identifier=None, input_variable=None, species=["*", "*"], is_screening_function=False, cutoff=None):
         super().__init__(table_name=f"user_func_{identifier}")
         self.input_variable = input_variable
         self.identifier = identifier
@@ -515,6 +587,7 @@ class UserFunction(DataContainer, BaseFunctionMixin):
         self.expression = None
         self.derivative = None
         self.is_screening_function = is_screening_function
+        self.cutoff = cutoff
         if not is_screening_function:
             self.screening = None
 
@@ -538,6 +611,10 @@ class UserFunction(DataContainer, BaseFunctionMixin):
             p.text = f"{param.start_val:.6g}"#6g formatting because atomicrex output is limited to 6 significant digits, prevents some errors
         
         root.append(self.parameters.fit_dofs_to_xml_element())
+        
+        if self.cutoff is not None:
+            cutoff = ET.SubElement(root, "cutoff")
+            cutoff.text = f"{self.cutoff}"
 
         if not self.is_screening_function:
             if self.screening is not None:

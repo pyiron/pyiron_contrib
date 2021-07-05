@@ -1,7 +1,9 @@
 import posixpath
+
 import xml.etree.ElementTree as ET
 
 import numpy as np
+from numpy import ndarray
 from ase import Atoms as ASEAtoms
 from pyiron_base import DataContainer
 from pyiron_atomistics import pyiron_to_ase, ase_to_pyiron, Atoms
@@ -72,7 +74,7 @@ class ARStructureContainer:
         self.fit_properties[prop].min_val[self.flattened_structures.prev_structure_index] = min_val
         self.fit_properties[prop].max_val[self.flattened_structures.prev_structure_index] = max_val
 
-        
+
     def add_vector_fit_property(
         self,
         prop="atomic-forces",
@@ -92,6 +94,72 @@ class ARStructureContainer:
         self.fit_properties[prop].residual_style[self.flattened_structures.prev_structure_index] = residual_style
         self.fit_properties[prop].output[self.flattened_structures.prev_structure_index] = output
         self.fit_properties[prop].tolerance[self.flattened_structures.prev_structure_index] = tolerance
+
+    
+    def _get_per_structure_index(self, identifier):
+        """
+        Takes an identifier or an ndarray of indentifiers and returns the corresponding indices in the structure/scalar_fit_properties arrays.
+        Args:
+            identifiers ([type]): [description]
+
+        Returns:
+            [ndarray]: indices corresponding to identifiers in per structure arrays
+        """
+        if not isinstance(identifier, ndarray):
+            identifier = np.array(identifier)
+        indices = np.flatnonzero(
+            np.isin(
+                self.flattened_structures._per_structure_arrays["identifier"], identifier, assume_unique=True
+                )
+            )
+        # This is some sorting magic that could lead to strange errors
+        # Look here if something goes wrong with the order of
+        ids_stored = np.array(self.flattened_structures._per_structure_arrays["identifier"][indices])
+        sorter = ids_stored.argsort()[identifier.argsort()]
+        return indices[sorter]
+
+    def get_scalar_property(self, prop, identifier, final=True):
+        """
+        Returns final or target value of a scalar property based on the identifier used when adding a structure
+        If identifier is an array of identifiers the return value is an array of values.
+
+        Args:
+            prop (str): property string as used when adding the property
+            identifier (str or array(str)): identifier as used when adding the structure
+            final (bool, optional): Whether to return the final or target value. Defaults to True.
+
+        Returns:
+            [type]: [description]
+        """
+        index = self._get_per_structure_index(identifier)
+        if final:
+            return self.fit_properties[prop].final_value[index]
+        else:
+            return self.fit_properties[prop].target_value[index]
+
+    def get_vector_property(self, prop, identifier, final=True):
+        """
+        Returns final or target value of a vector property based on the identifier used when adding a structure.
+        Currently only allows to return a vector property for a single structure, not for multiple ones like the
+        get_scalar_property function.
+
+        Args:
+            prop (str): property string as used when adding the property
+            identifier (str): identifier as used when adding the structure
+            final (bool, optional): Whether to return the final or target value. Defaults to True.
+
+        Returns:
+            [type]: [description]
+        """
+        if not isinstance(identifier, str):
+            raise NotImplementedError("Can only look up properties for single identifiers currently")
+        index = self._get_per_structure_index(identifier)[0]
+        slc  = self.flattened_structures._get_per_atom_slice(index)
+        if final:
+            return self.fit_properties[prop].final_value[slc]
+        else:
+            return self.fit_properties[prop].target_value[slc]
+
 
     def _type_to_hdf(self, hdf):
         """

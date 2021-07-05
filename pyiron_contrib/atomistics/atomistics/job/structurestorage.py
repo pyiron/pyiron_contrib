@@ -163,54 +163,6 @@ class FlattenedStorage:
         end = start + self._per_chunk_arrays["length"][frame]
         return slice(start, end, 1)
 
-    def get_array(self, name, frame):
-        """
-        Fetch array for given chunk.
-
-        Works for per element and per arrays.
-
-        Args:
-            name (str): name of the array to fetch
-            frame (int, str): selects chunk to fetch, as in :method:`.get_chunk()`
-
-        Returns:
-            :class:`numpy.ndarray`: requested array
-
-        Raises:
-            `KeyError`: if array with name does not exists
-        """
-
-        if isinstance(frame, str):
-            frame = self.find_chunk(frame)
-        if name in self._per_element_arrays:
-            return self._per_element_arrays[name][self._get_per_element_slice(frame)]
-        elif name in self._per_chunk_arrays:
-            return self._per_chunk_arrays[name][frame]
-        else:
-            raise KeyError(f"no array named {name} defined on StructureStorage")
-
-    def set_array(self, name, frame, value):
-        """
-        Add array for given chunk.
-
-        Works for per element and per arrays.
-
-        Args:
-            name (str): name of array to set
-            frame (int, str): selects chunk to set, as in :method:`.get_strucure()`
-
-        Raises:
-            `KeyError`: if array with name does not exists
-        """
-
-        if isinstance(frame, str):
-            frame = self.find_chunk(frame)
-        if name in self._per_element_arrays:
-            self._per_element_arrays[name][self._get_per_element_slice(frame)] = value
-        elif name in self._per_chunk_arrays:
-            self._per_chunk_arrays[name][frame] = value
-        else:
-            raise KeyError(f"no array named {name} defined on StructureStorage")
 
     def _resize_elements(self, new):
         self._num_elements_alloc = new
@@ -293,6 +245,83 @@ class FlattenedStorage:
             store[name] = np.empty(shape=shape, dtype=dtype)
         else:
             store[name] = np.full(shape=shape, fill_value=fill, dtype=dtype)
+
+    def get_array(self, name, frame):
+        """
+        Fetch array for given structure.
+
+        Works for per atom and per arrays.
+
+        Args:
+            name (str): name of the array to fetch
+            frame (int, str): selects structure to fetch, as in :method:`.get_structure()`
+
+        Returns:
+            :class:`numpy.ndarray`: requested array
+
+        Raises:
+            `KeyError`: if array with name does not exists
+        """
+
+        if isinstance(frame, str):
+            frame = self.find_chunk(frame)
+        if name in self._per_element_arrays:
+            return self._per_element_arrays[name][self._get_per_element_slice(frame)]
+        elif name in self._per_chunk_arrays:
+            return self._per_chunk_arrays[name][frame]
+        else:
+            raise KeyError(f"no array named {name}")
+
+    def set_array(self, name, frame, value):
+        """
+        Add array for given structure.
+
+        Works for per atom and per arrays.
+
+        Args:
+            name (str): name of array to set
+            frame (int, str): selects structure to set, as in :method:`.get_strucure()`
+
+        Raises:
+            `KeyError`: if array with name does not exists
+        """
+
+        if isinstance(frame, str):
+            frame = self.find_chunk(frame)
+        if name in self._per_element_arrays:
+            self._per_element_arrays[name][self._get_per_element_slice(frame)] = value
+        elif name in self._per_chunk_arrays:
+            self._per_chunk_arrays[name][frame] = value
+        else:
+            raise KeyError(f"no array named {name}")
+
+    def has_array(self, name):
+        """
+        Checks whether an array of the given name exists and returns meta data given to :method:`.add_array()`.
+
+
+        >>> container.has_array("energy")
+        {'shape': (), 'dtype': np.float64, 'per': 'atom'}
+        >>> container.has_array("fnorble")
+        None
+
+        Args:
+            name (str): name of the array to check
+
+        Returns:
+            None: if array does not exist
+            dict: if array exists, 
+        """
+        if name in self._per_element_arrays:
+            a = self._per_element_arrays[name]
+            per = "atom"
+        elif name in self._per_chunk_arrays:
+            a = self._per_chunk_arrays[name]
+            per = "structure"
+        else:
+            return None
+        return {"shape": a.shape[1:], "dtype": a.dtype, "per": per}
+
 
     def add_chunk(self, chunk_length, identifier=None, **arrays):
         """

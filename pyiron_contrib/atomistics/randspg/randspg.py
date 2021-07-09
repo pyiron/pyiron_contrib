@@ -8,6 +8,7 @@ import os
 import posixpath
 
 from pyiron_atomistics.atomistics.structure.atoms import Atoms
+from pyiron_atomistics.atomistics.structure.has_structure import HasStructure
 from pyiron_base import GenericParameters, GenericJob
 from pyiron_atomistics.vasp.structure import read_atoms
 
@@ -21,7 +22,7 @@ __status__ = "development"
 __date__ = "Sep 1, 2017"
 
 
-class RandSpg(GenericJob):
+class RandSpg(GenericJob, HasStructure):
     """
     RandSpg is a program that generates random crystals with specific space groups.
     The user inputs a specific composition and space group to be generated. The
@@ -52,6 +53,19 @@ class RandSpg(GenericJob):
             return self._lst_of_struct
         else:
             return []
+
+    def _number_of_structures(self):
+        return len(self.list_of_structures)
+
+    def _translate_frame(self, frame):
+        for i, (name, _) in enumerate(self.list_of_structures):
+            if name == frame:
+                return i
+
+        raise KeyError(f"No structure named {frame} defined!")
+
+    def _get_structure(self, frame, wrap_atoms=True):
+        return self.list_of_structures[frame][1]
 
     def set_input_to_read_only(self):
         """

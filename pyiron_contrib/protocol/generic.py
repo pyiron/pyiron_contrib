@@ -435,27 +435,33 @@ class CompoundVertex(Vertex):
             if recursive and isinstance(vertex, CompoundVertex):
                 vertex.set_graph_archive_clock(clock, recursive=True)
 
-    def to_hdf(self, hdf, group_name=None):
+    def to_hdf(self, hdf, group_name=None, with_graph=True):
         """
         Store the Protocol in an HDF5 file.
         Args:
             hdf (ProjectHDFio): HDF5 group object.
             group_name (str): HDF5 subgroup name - optional
+            with_graph (bool): Whether or not to save the graph I/O
         """
         super(CompoundVertex, self).to_hdf(hdf=hdf, group_name=group_name)
-        self.graph.to_hdf(hdf=hdf, group_name="graph")
+        if with_graph:
+            with hdf.open(self.vertex_name) as hdf5_server:
+                self.graph.to_hdf(hdf=hdf5_server, group_name="graph")
+            self.graph.to_hdf(hdf=hdf, group_name="graph")
 
-    def from_hdf(self, hdf=None, group_name=None):
+    def from_hdf(self, hdf=None, group_name=None, with_graph=True):
         """
         Load the Protocol from an HDF5 file.
         Args:
             hdf (ProjectHDFio): HDF5 group object - optional
             group_name (str): HDF5 subgroup name - optional
+            with_graph (bool): Whether or not to load the graph I/O
         """
         super(CompoundVertex, self).from_hdf(hdf=hdf, group_name=group_name or self.vertex_name)
-        with hdf.open(self.vertex_name) as hdf5_server:
-            self.graph.from_hdf(hdf=hdf5_server, group_name="graph")
-        self.define_information_flow()  # Rewire pointers
+        if with_graph:
+            with hdf.open(self.vertex_name) as hdf5_server:
+                self.graph.from_hdf(hdf=hdf5_server, group_name="graph")
+        self.define_information_flow()
 
     def visualize(self, execution=True, dataflow=True):
         return self.graph.visualize(self.fullname(), execution=execution, dataflow=dataflow)
@@ -631,6 +637,7 @@ class Protocol(CompoundVertex, GenericJob):
         """A wrapper for the run which allows us to simply keep going with a new variable `continue_run`"""
         if continue_run:
             self.status.created = True
+            self.define_information_flow()
         super(CompoundVertex, self).run(delete_existing_job=delete_existing_job, repair=repair, debug=debug,
                                         run_mode=run_mode)
 
@@ -643,27 +650,29 @@ class Protocol(CompoundVertex, GenericJob):
         # what I should be using this for. But, I get a NotImplementedError if I leave it out, so here it is. -Liam
         pass
 
-    def to_hdf(self, hdf=None, group_name=None):
+    def to_hdf(self, hdf=None, group_name=None, with_graph=True):
         """
         Store the Protocol in an HDF5 file.
         Args:
             hdf (ProjectHDFio): HDF5 group object - optional
             group_name (str): HDF5 subgroup name - optional
+            with_graph (bool): Whether or not to save the graph I/O
         """
         if hdf is None:
             hdf = self.project_hdf5
-        super(CompoundVertex, self).to_hdf(hdf=hdf, group_name=group_name)
+        CompoundVertex.to_hdf(self, hdf=hdf, group_name=group_name, with_graph=with_graph)
 
-    def from_hdf(self, hdf=None, group_name=None):
+    def from_hdf(self, hdf=None, group_name=None, with_graph=True):
         """
         Load the Protocol from an HDF5 file.
         Args:
             hdf (ProjectHDFio): HDF5 group object - optional
             group_name (str): HDF5 subgroup name - optional
+            with_graph (bool): Whether or not to load the graph I/O
         """
         if hdf is None:
             hdf = self.project_hdf5
-        super(CompoundVertex, self).from_hdf(hdf=hdf, group_name=group_name)
+        CompoundVertex.from_hdf(self, hdf=hdf, group_name=group_name, with_graph=with_graph)
 
 
 class Graph(dict, LoggerMixin):
@@ -967,16 +976,20 @@ class Vertices(dict):
         with hdf.open(group_name) as hdf5_server:
             hdf5_server["TYPE"] = str(type(self))
             for name, vertex in self.items():
-                if isinstance(vertex, Vertex):
+                if isinstance(vertex, PrimitiveVertex):
                     vertex.to_hdf(hdf=hdf5_server, group_name=name)
+                elif isinstance(vertex, CompoundVertex):
+                    vertex.to_hdf(hdf=hdf5_server, group_name=name, with_graph=False)
                 else:
                     raise TypeError("Cannot save non-Vertex-like vertices")
 
     def from_hdf(self, hdf, group_name="vertices"):
         with hdf.open(group_name) as hdf5_server:
             for name, vertex in self.items():
-                if isinstance(vertex, (CompoundVertex, Vertex)):
+                if isinstance(vertex, PrimitiveVertex):
                     vertex.from_hdf(hdf=hdf5_server, group_name=name)
+                elif isinstance(vertex, CompoundVertex):
+                    vertex.from_hdf(hdf=hdf5_server, group_name=name, with_graph=False)
                 else:
                     raise TypeError("Cannot load non-Vertex-like vertices")
 

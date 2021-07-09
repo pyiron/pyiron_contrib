@@ -219,7 +219,7 @@ class NEBSerial(CompoundVertex):
         if frame is None:
             return self.output.energy_pot[-1]
         else:
-            return self.output.energy_pot.data[frame]
+            return self.graph.calc_static.archive.output.energy_pot.data[frame]
 
     def plot_elastic_band(self, ax=None, frame=None, plot_kwargs=None):
         """
@@ -234,8 +234,6 @@ class NEBSerial(CompoundVertex):
         Default is plot the string at the final frame, as only the final dump is recorded. (unless specified
             otherwise by the user!)
         """
-        if frame is not None:
-            NotImplementedError("Temporarily disabled. Set to None.")
         if ax is None:
             _, ax = plt.subplots()
         if plot_kwargs is None:

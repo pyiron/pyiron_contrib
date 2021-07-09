@@ -633,11 +633,7 @@ class Protocol(CompoundVertex, GenericJob):
         self.protocol_finished.fire()
         self.run()  # This is an artifact of inheriting from GenericJob, to get all that run functionality
 
-    def run(self, delete_existing_job=False, repair=False, debug=False, run_mode=None, continue_run=False):
-        """A wrapper for the run which allows us to simply keep going with a new variable `continue_run`"""
-        if continue_run:
-            self.status.created = True
-            self.define_information_flow()
+    def run(self, delete_existing_job=False, repair=False, debug=False, run_mode=None):
         super(CompoundVertex, self).run(delete_existing_job=delete_existing_job, repair=repair, debug=debug,
                                         run_mode=run_mode)
 

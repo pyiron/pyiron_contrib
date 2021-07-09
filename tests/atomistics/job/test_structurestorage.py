@@ -66,6 +66,32 @@ class TestFlattenedStorage(TestWithProject):
                                    store_static._per_chunk_arrays["bar"][:store_dynamic.current_element_index]).all(),
                         "Array of per chunk quantity not equal after adding chunks.")
 
+    def test_init(self):
+        """Adding arrays via __init__ should be equivalent to adding them via add_chunks manually."""
+
+        even = [ list(range(0, 2, 2)), list(range(2, 6, 2)), list(range(6, 12, 2)) ]
+        odd = np.array([ np.arange(1, 2, 2), np.arange(3, 6, 2), np.arange(7, 12, 2) ], dtype=object)
+
+        store = FlattenedStorage(even=even, odd=odd)
+        self.assertEqual(len(store), 3, "Length of storage doesn't match length of initializer!")
+        self.assertTrue( (store.get_array("even", 1) == np.array([2, 4])).all(),
+                        "Values added via init don't match expected values!")
+        self.assertTrue( (store.get_array("odd", 2) == np.array([7, 9, 11])).all(),
+                        "Values added via init don't match expected values!")
+
+        all_sum = [sum(e + o) for e, o in zip(even, odd)]
+        try:
+            FlattenedStorage(even=even, odd=odd, sum=all_sum)
+        except ValueError:
+            self.fail("Adding per chunk values to initializers raises error, but shouldn't!")
+
+        with self.assertRaises(ValueError, msg="No error on inconsistent initializers!"):
+            odd[1] = [1,3,4]
+            FlattenedStorage(even=even, odd=odd)
+
+        with self.assertRaises(ValueError, msg="No error on initializers of different length!"):
+            FlattenedStorage(foo=[ [1] ], bar=[ [2], [2, 3] ])
+
 class TestContainer(TestWithProject):
 
     @classmethod

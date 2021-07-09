@@ -102,12 +102,31 @@ class FlattenedStorage:
 
     When adding new arrays follow the convention that per-structure arrays should be named in singular and per-atom
     arrays should be named in plural.
+
+    You may initialize flattened storage objects with a ragged lists or numpy arrays of dtype object
+
+    >>> even = [ list(range(0, 2, 2)), list(range(2, 6, 2)), list(range(6, 12, 2)) ]
+    >>> even
+    [[0], [2, 4], [6, 8, 10]]
+
+    >>> import numpy as np
+    >>> odd = np.array([ np.arange(1, 2, 2), np.arange(3, 6, 2), np.arange(7, 12, 2) ], dtype=object)
+    >>> odd
+    array([array([1]), array([3, 5]), array([ 7,  9, 11])], dtype=object)
+
+    >>> store = FlattenedStorage(even=even, odd=odd)
+    >>> store.get_array("even", 1)
+    array([2, 4])
+    >>> store.get_array("odd", 2)
+    array([ 7,  9, 11])
+    >>> len(store)
+    3
     """
 
     __version__ = "0.1.0"
     __hdf_version__ = "0.1.0"
 
-    def __init__(self, num_chunks=1, num_elements=1):
+    def __init__(self, num_chunks=1, num_elements=1, **kwargs):
         """
         Create new flattened storage.
 
@@ -127,6 +146,20 @@ class FlattenedStorage:
         self.prev_element_index = 0
 
         self._init_arrays()
+
+        if len(kwargs) == 0: return
+
+        if len(set(len(chunks) for chunks in kwargs.values())) != 1:
+            raise ValueError("Not all initializers provide the same number of chunks!")
+        keys = kwargs.keys()
+        for chunk_list in zip(*kwargs.values()):
+            chunk_length = len(chunk_list[0])
+            # values in chunk_list may either be a sequence of chunk_length, scalars (see hasattr check) or a sequence of
+            # length 1
+            if any(hasattr(c, '__len__') and len(c) != chunk_length and len(c) != 1 for c in chunk_list):
+                # breakpoint()
+                raise ValueError("Inconsistent chunk length in initializer!")
+            self.add_chunk(chunk_length, **{k: c for k, c in zip(keys, chunk_list)})
 
     def _init_arrays(self):
         self._per_element_arrays = {}

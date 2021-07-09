@@ -157,7 +157,6 @@ class FlattenedStorage:
             # values in chunk_list may either be a sequence of chunk_length, scalars (see hasattr check) or a sequence of
             # length 1
             if any(hasattr(c, '__len__') and len(c) != chunk_length and len(c) != 1 for c in chunk_list):
-                # breakpoint()
                 raise ValueError("Inconsistent chunk length in initializer!")
             self.add_chunk(chunk_length, **{k: c for k, c in zip(keys, chunk_list)})
 

@@ -1382,7 +1382,7 @@ class TILDValidate(PrimitiveVertex):
     def command(self, ref_job_a_full_path, ref_job_b_full_path, n_steps, thermalization_steps, sampling_steps,
                 convergence_check_steps):
         # check if the n_steps is divisible by (x) steps
-        message = "n_steps must be divisible by thermalization steps"
+        message = "n_steps must be divisible by thermalization_steps"
         self._check_modulo(target=n_steps, mod=thermalization_steps, message=message)
         message = "n_steps must be divisible by sampling_steps"
         self._check_modulo(target=n_steps, mod=sampling_steps, message=message)
@@ -1390,8 +1390,8 @@ class TILDValidate(PrimitiveVertex):
         self._check_modulo(target=n_steps, mod=convergence_check_steps, message=message)
 
         # check if convergence_check_steps > thermalization_steps
-        if convergence_check_steps < thermalization_steps:
-            raise ValueError("convergence_check_steps must be greater than thermalization steps")
+        if convergence_check_steps <= thermalization_steps:
+            raise ValueError("convergence_check_steps must be greater than thermalization_steps")
 
         # extract the structures from the reference jobs
         structure_a = self._get_structure(path=ref_job_a_full_path)

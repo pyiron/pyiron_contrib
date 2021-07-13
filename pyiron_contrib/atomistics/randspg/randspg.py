@@ -55,7 +55,7 @@ class RandSpg(GenericJob, HasStructure):
             return []
 
     def _number_of_structures(self):
-        return len(self.list_of_structures)
+        return len(self._lst_of_struct)
 
     def _translate_frame(self, frame):
         for i, name in enumerate(self._lst_of_struct):
@@ -65,7 +65,7 @@ class RandSpg(GenericJob, HasStructure):
         raise KeyError(f"No structure named {frame} defined!")
 
     def _get_structure(self, frame, wrap_atoms=True):
-        return self.list_of_structures[frame][1]
+        return self._lst_of_struct[frame]
 
     def set_input_to_read_only(self):
         """

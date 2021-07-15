@@ -333,9 +333,8 @@ class FlattenedStorage:
         """
         Checks whether an array of the given name exists and returns meta data given to :method:`.add_array()`.
 
-
         >>> container.has_array("energy")
-        {'shape': (), 'dtype': np.float64, 'per': 'atom'}
+        {'shape': (), 'dtype': np.float64, 'per': 'chunk'}
         >>> container.has_array("fnorble")
         None
 

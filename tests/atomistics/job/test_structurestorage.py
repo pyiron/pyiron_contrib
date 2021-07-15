@@ -10,58 +10,63 @@ class TestFlattenedStorage(TestWithProject):
         super().setUpClass()
         cls.store = FlattenedStorage()
 
+        cls.even = [ list(range(0, 2, 2)), list(range(2, 6, 2)), list(range(6, 12, 2)) ]
+        cls.odd = np.array([ np.arange(1, 2, 2), np.arange(3, 6, 2), np.arange(7, 12, 2) ], dtype=object)
+
+
     def test_add_array(self):
         """Custom arrays added with add_array should be properly allocated with matching shape, dtype and fill"""
 
-        self.store.add_array("energy", per="chunk")
-        self.store.add_array("forces", shape=(3,), per="element")
-        self.store.add_array("fnorble", shape=(), dtype=np.int64, fill=0, per="element")
+        store = FlattenedStorage()
+        store.add_array("energy", per="chunk")
+        store.add_array("forces", shape=(3,), per="element")
+        store.add_array("fnorble", shape=(), dtype=np.int64, fill=0, per="element")
 
-        self.assertTrue("energy" in self.store._per_chunk_arrays,
+        self.assertTrue("energy" in store._per_chunk_arrays,
                         "no 'energy' array present after adding it with add_array()")
-        self.assertEqual(self.store._per_chunk_arrays["energy"].shape, (self.store._num_chunks_alloc,),
+        self.assertEqual(store._per_chunk_arrays["energy"].shape, (store._num_chunks_alloc,),
                         "'energy' array has wrong shape")
 
-        self.assertTrue("forces" in self.store._per_element_arrays,
+        self.assertTrue("forces" in store._per_element_arrays,
                         "no 'forces' array present after adding it with add_array()")
-        self.assertEqual(self.store._per_element_arrays["forces"].shape, (self.store._num_elements_alloc, 3),
+        self.assertEqual(store._per_element_arrays["forces"].shape, (store._num_elements_alloc, 3),
                         "'forces' array has wrong shape")
 
-        self.assertEqual(self.store._per_element_arrays["fnorble"].dtype, np.int64,
+        self.assertEqual(store._per_element_arrays["fnorble"].dtype, np.int64,
                          "'fnorble' array has wrong dtype after adding it with add_array()")
-        self.assertTrue((self.store._per_element_arrays["fnorble"] == 0).all(),
+        self.assertTrue((store._per_element_arrays["fnorble"] == 0).all(),
                          "'fnorble' array not initialized with given fill value")
 
         try:
-            self.store.add_array("energy", dtype=np.float64, per="chunk")
+            store.add_array("energy", dtype=np.float64, per="chunk")
         except ValueError:
             self.fail("Duplicate calls to add_array should be ignored if types/shapes are compatible!")
 
         with self.assertRaises(ValueError, msg="Duplicate calls to add_array with invalid shape!"):
-            self.store.add_array("energy", shape=(5,), dtype=np.float64, per="chunk")
+            store.add_array("energy", shape=(5,), dtype=np.float64, per="chunk")
 
         with self.assertRaises(ValueError, msg="Duplicate calls to add_array with invalid type!"):
-            self.store.add_array("energy", dtype=np.complex64, per="chunk")
+            store.add_array("energy", dtype=np.complex64, per="chunk")
 
         try:
-            self.store.add_array("forces", shape=(3,), dtype=np.float64, per="element")
+            store.add_array("forces", shape=(3,), dtype=np.float64, per="element")
         except ValueError:
             self.fail("Duplicate calls to add_array should be ignored if types/shapes are compatible!")
 
         with self.assertRaises(ValueError, msg="Duplicate calls to add_array with invalid type!"):
-            self.store.add_array("forces", shape=(3,), dtype=np.complex64, per="element")
+            store.add_array("forces", shape=(3,), dtype=np.complex64, per="element")
 
         with self.assertRaises(ValueError, msg="Duplicate calls to add_array with invalid shape!"):
-            self.store.add_array("forces", shape=(5,), dtype=np.float64, per="element")
+            store.add_array("forces", shape=(5,), dtype=np.float64, per="element")
 
         with self.assertRaises(ValueError, msg="Cannot have per-chunk and per-element array of the same name!"):
-            self.store.add_array("energy", per="element")
+            store.add_array("energy", per="element")
 
         with self.assertRaises(ValueError, msg="Cannot have per-chunk and per-element array of the same name!"):
-            self.store.add_array("forces", per="chunk")
+            store.add_array("forces", per="chunk")
 
         with self.assertRaises(ValueError, msg="Invalid per value!"):
-            self.store.add_array("foobar", per="xyzzy")
+            store.add_array("foobar", per="xyzzy")
 
     def test_resize(self):
         """A dynamically resized container should behave exactly as a pre-allocated container."""
@@ -92,25 +97,23 @@ class TestFlattenedStorage(TestWithProject):
     def test_init(self):
         """Adding arrays via __init__ should be equivalent to adding them via add_chunks manually."""
 
-        even = [ list(range(0, 2, 2)), list(range(2, 6, 2)), list(range(6, 12, 2)) ]
-        odd = np.array([ np.arange(1, 2, 2), np.arange(3, 6, 2), np.arange(7, 12, 2) ], dtype=object)
-
-        store = FlattenedStorage(even=even, odd=odd)
+        store = FlattenedStorage(even=self.even, odd=self.odd)
         self.assertEqual(len(store), 3, "Length of storage doesn't match length of initializer!")
         self.assertTrue( (store.get_array("even", 1) == np.array([2, 4])).all(),
                         "Values added via init don't match expected values!")
         self.assertTrue( (store.get_array("odd", 2) == np.array([7, 9, 11])).all(),
                         "Values added via init don't match expected values!")
 
-        all_sum = [sum(e + o) for e, o in zip(even, odd)]
+        all_sum = [sum(e + o) for e, o in zip(self.even, self.odd)]
         try:
-            FlattenedStorage(even=even, odd=odd, sum=all_sum)
+            FlattenedStorage(even=self.even, odd=self.odd, sum=all_sum)
         except ValueError:
             self.fail("Adding per chunk values to initializers raises error, but shouldn't!")
 
         with self.assertRaises(ValueError, msg="No error on inconsistent initializers!"):
+            odd = self.odd.copy()
             odd[1] = [1,3,4]
-            FlattenedStorage(even=even, odd=odd)
+            FlattenedStorage(even=self.even, odd=odd)
 
         with self.assertRaises(ValueError, msg="No error on initializers of different length!"):
             FlattenedStorage(foo=[ [1] ], bar=[ [2], [2, 3] ])
@@ -129,6 +132,35 @@ class TestFlattenedStorage(TestWithProject):
 
         with self.assertRaises(KeyError, msg="No KeyError raised on non-existing identifier!"):
             store.find_chunk("asdf")
+
+    def test_get_array(self):
+        """get_array should return the arrays for the correct structures."""
+
+        store = FlattenedStorage()
+
+        for n, e, o in zip( ("first", None, "third"), self.even, self.odd):
+            store.add_chunk(len(e), identifier=n, even=e, odd=o, sum=sum(e + o))
+
+        self.assertTrue(np.array_equal(store.get_array("even", 0), self.even[0]),
+                        "get_array returns wrong array for numeric index!")
+
+        self.assertTrue(np.array_equal(store.get_array("even", "first"), self.even[0]),
+                        "get_array returns wrong array for string identifier!")
+
+        self.assertTrue(np.array_equal(store.get_array("even", "1"), self.even[1]),
+                        "get_array returns wrong array for automatic identifier!")
+
+        self.assertTrue(np.array_equal(store.get_array("sum", 0), sum(self.even[0] + self.odd[0])),
+                        "get_array returns wrong array for numeric index!")
+
+        self.assertTrue(np.array_equal(store.get_array("sum", "first"), sum(self.even[0] + self.odd[0])),
+                        "get_array returns wrong array for string identifier!")
+
+        self.assertTrue(np.array_equal(store.get_array("sum", "1"), sum(self.even[1] + self.odd[1])),
+                        "get_array returns wrong array for automatic identifier!")
+
+        with self.assertRaises(KeyError, msg="Non-existing identifier!"):
+            store.get_array("even", "foo")
 
 class TestContainer(TestWithProject):
 
@@ -157,15 +189,6 @@ class TestContainer(TestWithProject):
         """get_elements() should return all unique chemical elements stored in its structures."""
         self.assertEqual(sorted(self.elements), sorted(self.cont.get_elements()),
                          "Results from get_elements() do not match added elements.")
-
-    def test_get_array(self):
-        """get_array should return the arrays for the correct structures."""
-
-        for i, structure in enumerate(self.structures):
-            self.assertTrue(np.allclose(self.cont.get_array("positions", i), structure.positions),
-                            f"get_array returns wrong positions for structure {i}")
-            self.assertTrue(np.allclose(self.cont.get_array("cell", i), structure.cell.array),
-                            f"get_array returns wrong positions for structure {i}")
 
     def test_set_array(self):
         """set_array should set the arrays for the correct structures and only those."""

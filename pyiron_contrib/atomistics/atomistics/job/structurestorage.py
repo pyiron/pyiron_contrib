@@ -662,8 +662,8 @@ class StructureStorage(FlattenedStorage, HasStructure):
                        identifier=identifier,
                        symbols=np.array(structure.symbols),
                        positions=structure.positions,
-                       cell=structure.cell.array,
-                       pbc=structure.pbc,
+                       cell=[structure.cell.array],
+                       pbc=[structure.pbc],
                        **arrays)
 
 

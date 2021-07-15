@@ -9,7 +9,7 @@ import posixpath
 
 from pyiron_atomistics.atomistics.structure.atoms import Atoms
 from pyiron_atomistics.atomistics.structure.has_structure import HasStructure
-from pyiron_base import GenericParameters, GenericJob, DataContainer
+from pyiron_base import GenericParameters, GenericJob, DataContainer, deprecate
 from pyiron_atomistics.vasp.structure import read_atoms
 
 __author__ = "Jan Janssen"
@@ -45,9 +45,18 @@ class RandSpg(GenericJob, HasStructure):
         self._executable_activate()
 
     @property
+    def structure_lst(self):
+        """
+        :class:`.DataContainer`: list of :class:`~.Atoms`
+        """
+        return self._structure_lst
+
+    @property
+    @deprecate("Use get_structure()/iter_structures()/structure_lst instead!")
     def list_of_structures(self):
         return list(self._lst_of_struct.items())
 
+    @deprecate("Use get_structure()/iter_structures()/structure_lst instead!")
     def list_structures(self):
         if self.status.finished:
             return self.list_of_structures

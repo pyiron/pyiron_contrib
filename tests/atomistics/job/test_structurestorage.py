@@ -162,6 +162,25 @@ class TestFlattenedStorage(TestWithProject):
         with self.assertRaises(KeyError, msg="Non-existing identifier!"):
             store.get_array("even", "foo")
 
+    def test_has_array(self):
+        """hasarray should return correct information for added array; None otherwise."""
+
+        store = FlattenedStorage()
+        store.add_array("energy", per="chunk")
+        store.add_array("forces", shape=(3,), per="element")
+
+        info = store.has_array("energy")
+        self.assertEqual(info["dtype"], np.float64, "has_array returns wrong dtype for per structure array.")
+        self.assertEqual(info["shape"], (), "has_array returns wrong shape for per structure array.")
+        self.assertEqual(info["per"], "chunk", "has_array returns wrong per for per structure array.")
+
+        info = store.has_array("forces")
+        self.assertEqual(info["dtype"], np.float64, "has_array returns wrong dtype for per atom array.")
+        self.assertEqual(info["shape"], (3,), "has_array returns wrong shape for per atom array.")
+        self.assertEqual(info["per"], "element", "has_array returns wrong per for per atom array.")
+
+        self.assertEqual(store.has_array("missing"), None, "has_array does not return None for nonexisting array.")
+
 class TestContainer(TestWithProject):
 
     @classmethod
@@ -210,21 +229,6 @@ class TestContainer(TestWithProject):
 
             self.assertTrue(np.allclose(self.cont.get_array("positions", i), structure.positions),
                             f"set_array modified arrray for different structure than instructured.")
-
-    def test_has_array(self):
-        """hasarray should return correct information for added array; None otherwise."""
-
-        pbc = self.cont.has_array("pbc")
-        self.assertEqual(pbc["dtype"], bool, "has_array returns wrong dtype for per structure array.")
-        self.assertEqual(pbc["shape"], (3,), "has_array returns wrong shape for per structure array.")
-        self.assertEqual(pbc["per"], "structure", "has_array returns wrong per for per structure array.")
-
-        pbc = self.cont.has_array("positions")
-        self.assertEqual(pbc["dtype"], np.float64, "has_array returns wrong dtype for per atom array.")
-        self.assertEqual(pbc["shape"], (3,), "has_array returns wrong shape for per atom array.")
-        self.assertEqual(pbc["per"], "atom", "has_array returns wrong per for per atom array.")
-
-        self.assertEqual(self.cont.has_array("missing"), None, "has_array does not return None for nonexisting array.")
 
     def test_get_structure(self):
         """Structure from get_structure should match thoes add with add_structure exactly."""

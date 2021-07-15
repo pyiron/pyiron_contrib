@@ -344,14 +344,14 @@ class FlattenedStorage:
 
         Returns:
             None: if array does not exist
-            dict: if array exists, 
+            dict: if array exists, keys corresponds to the shape, dtype and per arguments of :method:`.add_array`
         """
         if name in self._per_element_arrays:
             a = self._per_element_arrays[name]
-            per = "atom"
+            per = "element"
         elif name in self._per_chunk_arrays:
             a = self._per_chunk_arrays[name]
-            per = "structure"
+            per = "chunk"
         else:
             return None
         return {"shape": a.shape[1:], "dtype": a.dtype, "per": per}

@@ -32,13 +32,36 @@ class TestFlattenedStorage(TestWithProject):
         self.assertTrue((self.store._per_element_arrays["fnorble"] == 0).all(),
                          "'fnorble' array not initialized with given fill value")
 
-        self.store.add_array("fnorble", shape=(), dtype=np.int64, fill=42, per="element")
-        self.assertTrue(not (self.store._per_element_arrays["fnorble"] == 42).all(),
-                         "Duplicate add_array call was not ignored")
+        try:
+            self.store.add_array("energy", dtype=np.float64, per="chunk")
+        except ValueError:
+            self.fail("Duplicate calls to add_array should be ignored if types/shapes are compatible!")
 
-        self.store.add_array("energy", fill=42, per="chunk")
-        self.assertTrue(not (self.store._per_chunk_arrays["energy"] == 42).all(),
-                         "Duplicate add_array call was not ignored")
+        with self.assertRaises(ValueError, msg="Duplicate calls to add_array with invalid shape!"):
+            self.store.add_array("energy", shape=(5,), dtype=np.float64, per="chunk")
+
+        with self.assertRaises(ValueError, msg="Duplicate calls to add_array with invalid type!"):
+            self.store.add_array("energy", dtype=np.complex64, per="chunk")
+
+        try:
+            self.store.add_array("forces", shape=(3,), dtype=np.float64, per="element")
+        except ValueError:
+            self.fail("Duplicate calls to add_array should be ignored if types/shapes are compatible!")
+
+        with self.assertRaises(ValueError, msg="Duplicate calls to add_array with invalid type!"):
+            self.store.add_array("forces", shape=(3,), dtype=np.complex64, per="element")
+
+        with self.assertRaises(ValueError, msg="Duplicate calls to add_array with invalid shape!"):
+            self.store.add_array("forces", shape=(5,), dtype=np.float64, per="element")
+
+        with self.assertRaises(ValueError, msg="Cannot have per-chunk and per-element array of the same name!"):
+            self.store.add_array("energy", per="element")
+
+        with self.assertRaises(ValueError, msg="Cannot have per-chunk and per-element array of the same name!"):
+            self.store.add_array("forces", per="chunk")
+
+        with self.assertRaises(ValueError, msg="Invalid per value!"):
+            self.store.add_array("foobar", per="xyzzy")
 
     def test_resize(self):
         """A dynamically resized container should behave exactly as a pre-allocated container."""

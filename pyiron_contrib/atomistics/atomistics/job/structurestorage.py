@@ -253,14 +253,14 @@ class FlattenedStorage:
 
         if name in self._per_element_arrays:
             a = self._per_element_arrays[name]
-            if a.shape[1:] != shape or a.dtype != dtype or per != "element":
+            if a.shape[1:] != shape or not np.can_cast(dtype, a.dtype) or per != "element":
                 raise ValueError(f"Array with name '{name}' exists with shape {a.shape[1:]} and dtype {a.dtype}.")
             else:
                 return
 
         if name in self._per_chunk_arrays:
             a = self._per_chunk_arrays[name]
-            if a.shape[1:] != shape or a.dtype != dtype or per != "chunk":
+            if a.shape[1:] != shape or not np.can_cast(dtype, a.dtype) or per != "chunk":
                 raise ValueError(f"Array with name '{name}' exists with shape {a.shape[1:]} and dtype {a.dtype}.")
             else:
                 return

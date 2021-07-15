@@ -92,6 +92,21 @@ class TestFlattenedStorage(TestWithProject):
         with self.assertRaises(ValueError, msg="No error on initializers of different length!"):
             FlattenedStorage(foo=[ [1] ], bar=[ [2], [2, 3] ])
 
+    def test_find_chunk(self):
+        """find_chunk() should return the correct indices given an identifier."""
+
+        store = FlattenedStorage()
+        store.add_chunk(2, "first", integers=[1, 2])
+        store.add_chunk(3, integers=[3, 4, 5])
+        store.add_chunk(1, "third", integers=[5])
+
+        self.assertEqual(store.find_chunk("first"), 0, "Incorrect chunk index returned!")
+        self.assertEqual(store.find_chunk("1"), 1, "Incorrect chunk index returned for unamed identifier!")
+        self.assertEqual(store.find_chunk("third"), 2, "Incorrect chunk index returned!")
+
+        with self.assertRaises(KeyError, msg="No KeyError raised on non-existing identifier!"):
+            store.find_chunk("asdf")
+
 class TestContainer(TestWithProject):
 
     @classmethod

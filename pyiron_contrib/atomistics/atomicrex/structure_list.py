@@ -197,7 +197,7 @@ class ARStructureContainer:
                 group_name_2 = "flattened_structures"
             else:
                 num_structures = h["structures/num_chunks"] or h["structures/num_structures"]
-                num_atoms = h["structures/num_elements"]  or h["structures/num_atoms"] 
+                num_atoms = h["structures/num_elements"]  or h["structures/num_atoms"]
                 group_name_2 = "structures"
 
             self._init_structure_container(num_structures, num_atoms)

@@ -708,4 +708,4 @@ class StructureStorage(FlattenedStorage, HasStructure):
                 self._per_chunk_arrays["identifier"] = hdf_s_lst["identifiers"].astype(np.dtype("U20"))
                 self._per_chunk_arrays["cell"] = hdf_s_lst["cells"]
 
-                self._per_chunk_arrays["pbc"] = np.full((self.num_structures, 3), True)
+                self._per_chunk_arrays["pbc"] = np.full((self.num_chunks, 3), True)

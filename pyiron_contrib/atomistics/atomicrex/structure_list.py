@@ -258,7 +258,7 @@ class ARStructureContainer:
                 root.append(struct_xml)
         else:
             # write only xml and use POSCARs written already to some path
-            for i in range(self.flattened_structures.num_structures):
+            for i in range(self.flattened_structures.num_chunks):
                 fit_properties_xml = ET.Element("properties")
                 for flat_prop in self.fit_properties.values():
                     fit_properties_xml.append(flat_prop.to_xml_element(i))

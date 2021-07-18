@@ -196,8 +196,12 @@ class ARStructureContainer:
                 num_atoms = h["flattened_structures/num_atoms"]
                 group_name_2 = "flattened_structures"
             else:
-                num_structures = h["structures/num_chunks"] or h["structures/num_structures"]
-                num_atoms = h["structures/num_elements"]  or h["structures/num_atoms"]
+                try:
+                    num_structures = h["structures/num_chunks"]
+                    num_atoms = h["structures/num_elements"]
+                except:
+                    num_structures = h["structures/num_structures"]
+                    num_atoms = h["structures/num_atoms"]
                 group_name_2 = "structures"
 
             self._init_structure_container(num_structures, num_atoms)
@@ -592,7 +596,6 @@ class ARStructureList(object):
                     else:
                         force_vec_triggered = True
                         final_forces = np.empty((len(s.structure), 3))
-
 
 
 def write_modified_poscar(identifier, forces, directory, structure=None, positions=None, cell=None, symbols=None):

@@ -39,6 +39,7 @@ class StorageType:  # TODO: make this subclass of DataContainer
     def storage_type(self, storage_type):
         if self._read_only:
             raise RuntimeError("The storage type cannot be changed when it is already in use.")
+        self._storage_type = storage_type
         for storage in self._available_storage_types:
             setattr(self, storage, False)
         setattr(self, storage_type, True)
@@ -52,7 +53,7 @@ class StorageJob(GenericJob):
         self._input = DataContainer(table_name='_input')
         self._stored_files = DataContainer(table_name='stored_files')
         self._storage_type = StorageType('local')
-        self._input['storage_type'] = 'local'
+        self._input.storage_type = 'local'
         self._external_storage = None
 
     def remove_child(self):
@@ -77,9 +78,11 @@ class StorageJob(GenericJob):
         self._input.s3.config = config
         self._input.s3.bucket_name = bucket_name
         self._storage_type.storage_type = 's3'
+        self._input.storage_type = 's3'
 
     def use_local_storage(self):
         self._storage_type.storage_type = 'local'
+        self._input.storage_type = 'local'
         self._external_storage = None
 
     @property

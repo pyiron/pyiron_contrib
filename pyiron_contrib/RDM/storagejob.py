@@ -47,8 +47,8 @@ class StorageType:  # TODO: make this subclass of DataContainer
 
 class StorageJob(GenericJob):
 
-    def __init__(self, project, name):
-        super().__init__(project, name)
+    def __init__(self, project, job_name):
+        super().__init__(project, job_name)
         self.server.run_mode.interactive = True
         self._input = DataContainer(table_name='_input')
         self._stored_files = DataContainer(table_name='stored_files')

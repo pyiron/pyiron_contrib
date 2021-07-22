@@ -4,12 +4,21 @@ import io
 import json
 import os
 import posixpath
+from abc import ABC
 from functools import lru_cache
 
 import boto3
 from botocore.client import Config
 
-from pyiron_base.generic.filedata import FileDataTemplate, load_file
+from pyiron_base.generic.filedata import load_file
+
+
+# TODO: use this as general foundation for all FileData classes (base this on pyiron object?!)
+class FileDataTemplate(ABC):
+    @property
+    def data(self):
+        """Return the associated data."""
+        raise NotImplementedError
 
 
 class S3FileData(FileDataTemplate):

@@ -4,7 +4,7 @@ import shutil
 
 from pyiron_base import GenericJob, DataContainer
 from pyiron_base.generic.filedata import FileData
-from pyiron_base.generic.s3io import FileS3IO
+from pyiron_contrib.generic.s3io import FileS3IO
 
 
 def _remove_s3_working_directory(file_s3_io_handle, group_to_remove):

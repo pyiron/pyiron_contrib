@@ -34,3 +34,13 @@ class RDMProject(Project):
     def save_projectinfo(self):
         self.data.write()
 
+    def list_resources(self):
+        """
+        Return a list of names of all configured resources (aka StorageJobs).
+
+        Returns:
+            list of str: names of nodes which are StorageJobs
+        """
+        table = self.job_table(recursive=False)
+        bool_vec = table["hamilton"] == "StorageJob"
+        return table[bool_vec]["job"].tolist()

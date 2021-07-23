@@ -59,6 +59,7 @@ class StorageJob(GenericJob):
     def remove_child(self):
         if self._storage_type.s3:
             _remove_s3_working_directory(self._external_storage, self.path)
+        self._hdf5["REQ_OBJ_RM"] = False
         super().remove_child()
     remove_child.__doc__ = GenericJob.remove_child.__doc__
 
@@ -225,6 +226,8 @@ class StorageJob(GenericJob):
 
     def to_hdf(self, hdf=None, group_name=None):
         super().to_hdf(hdf, group_name)
+        if self._storage_type.s3:
+            self._hdf5['REQ_OBJ_RM'] = True
         self._stored_files.to_hdf(hdf=self._hdf5, group_name=group_name)
         self._input.to_hdf(hdf=self._hdf5, group_name=group_name)
 

@@ -8,7 +8,9 @@ from pyiron_contrib.generic.s3io import FileS3IO
 
 
 def _remove_s3_working_directory(file_s3_io_handle, group_to_remove):
-    file_s3_io_handle.remove_group(path=group_to_remove)
+    # Upon moving s3 to base, this should be moved to pyiron_base/job/util.py
+    if file_s3_io_handle.is_dir(group_to_remove):
+        file_s3_io_handle.remove_group(path=group_to_remove)
 
 
 class StorageType:  # TODO: make this subclass of DataContainer
@@ -214,8 +216,8 @@ class StorageJob(GenericJob):
 
     def from_hdf(self, hdf=None, group_name=None):
         super().from_hdf(hdf, group_name)
-        self._stored_files.from_hdf(hdf=self._hdf5, group_name=group_name)
-        self._input.from_hdf(hdf=self._hdf5, group_name=group_name)
+        self._stored_files.from_hdf(hdf=self._hdf5)
+        self._input.from_hdf(hdf=self._hdf5)
         self._storage_type = StorageType(self._input.storage_type, self._input.storage_type_read_only)
         if self._storage_type.s3 and self.status != "initialized":
             self._external_storage = FileS3IO(
@@ -228,8 +230,8 @@ class StorageJob(GenericJob):
         super().to_hdf(hdf, group_name)
         if self._storage_type.s3:
             self._hdf5['REQ_OBJ_RM'] = True
-        self._stored_files.to_hdf(hdf=self._hdf5, group_name=group_name)
-        self._input.to_hdf(hdf=self._hdf5, group_name=group_name)
+        self._stored_files.to_hdf(hdf=self._hdf5)
+        self._input.to_hdf(hdf=self._hdf5)
 
     def __getitem__(self, item):
         # copied from super().__getitem__ changing the output of returning a file

@@ -13,38 +13,57 @@ def _remove_s3_working_directory(file_s3_io_handle, group_to_remove):
         file_s3_io_handle.remove_group(path=group_to_remove)
 
 
-class StorageType:  # TODO: make this subclass of DataContainer
-    _available_storage_types = ['local', 's3']
-
-    def __init__(self, storage_type, _read_only=False):
+class StorageType(DataContainer):
+    def __init__(self, *, init=None, storage_type=None, table_name=None):
         """What type of storage is used
 
         Parameters:
             storage_type(str): one of ['local', 's3']
         """
+        super().__init__(init=init, table_name=table_name)
+        self._available_storage_types = ['local', 's3']
         self._storage_type = None
-        self._read_only = False
-        if storage_type in self._available_storage_types:
-            self.storage_type = storage_type
-        else:
-            raise ValueError(f"Expected one of {self._available_storage_types} but got {storage_type}")
-        self._read_only = _read_only
+        self.storage_type = storage_type
+
+    def create_group(self, name):
+        """
+        Add a new empty subcontainer under the given key.
+
+        Args:
+            name (str): key under which to store the new subcontainer in this container
+
+        Returns:
+            DataContainer: the newly created subcontainer
+
+        >>> pl = DataContainer({})
+        >>> pl.create_group("group_name")
+        DataContainer([])
+        >>> list(pl.group_name)
+        []
+        """
+        self[name] = DataContainer()
+        return self[name]
+
+    @classmethod
+    def _read_only_error(cls):
+        raise RuntimeError("The storage type cannot be changed when it is already in use.")
+
+    def set_read_only(self):
+        self.read_only = True
 
     @property
     def storage_type(self):
         return self._storage_type
 
-    def set_read_only(self):
-        self._read_only = True
-
     @storage_type.setter
     def storage_type(self, storage_type):
-        if self._read_only:
-            raise RuntimeError("The storage type cannot be changed when it is already in use.")
+        if storage_type not in self._available_storage_types:
+            raise ValueError(f"Expected 'storage_type' to be one of {self._available_storage_types} "
+                             f"but got {storage_type}.")
         self._storage_type = storage_type
         for storage in self._available_storage_types:
-            setattr(self, storage, False)
-        setattr(self, storage_type, True)
+            self[storage] = False
+        self[storage_type] = True
 
 
 class StorageJob(GenericJob):
@@ -52,10 +71,10 @@ class StorageJob(GenericJob):
     def __init__(self, project, job_name):
         super().__init__(project, job_name)
         self.server.run_mode.interactive = True
-        self._input = DataContainer(table_name='_input')
+        # self._input = DataContainer(table_name='_input')
         self._stored_files = DataContainer(table_name='stored_files')
-        self._storage_type = StorageType('local')
-        self._input.storage_type = 'local'
+        self._storage_type = StorageType(storage_type='local', table_name="storage_type")
+        # self._input.storage_type = 'local'
         self._external_storage = None
 
     def remove_child(self):
@@ -77,15 +96,15 @@ class StorageJob(GenericJob):
             else:
                 self._logger.warning("Storage NOT empty - Danger of data loss!")
         self._external_storage = external_storage
-        self._input.create_group("s3")
-        self._input.s3.config = config
-        self._input.s3.bucket_name = bucket_name
         self._storage_type.storage_type = 's3'
-        self._input.storage_type = 's3'
+        self._storage_type.create_group("s3_config")
+        self._storage_type.s3_config.config = config
+        self._storage_type.s3_config.bucket_name = bucket_name
 
     def use_local_storage(self):
         self._storage_type.storage_type = 'local'
-        self._input.storage_type = 'local'
+        if 's3_config' in self._storage_type.keys():
+            del self._storage_type.s3_config
         self._external_storage = None
 
     @property
@@ -96,10 +115,8 @@ class StorageJob(GenericJob):
         if self._storage_type.local:
             self._create_working_directory()
             self._storage_type.set_read_only()
-            self._input.storage_type_read_only = True
         elif self._storage_type.s3:
             self._storage_type.set_read_only()
-            self._input.storage_type_read_only = True
         else:
             raise NotImplementedError("No available Storage found.")
 
@@ -217,8 +234,8 @@ class StorageJob(GenericJob):
     def reconnect_s3_storage(self, config=None, bucket_name=None):
         # TODO: add consistency checks (Do we get the same server/bucket as before?) Fail with nice error on
         # instantiated job such that this method may be used to restore the s3 connection.
-        config = config or self._input.s3.config
-        bucket_name = bucket_name or self._input.s3.bucket_name
+        config = config or self._storage_type.s3_config.config
+        bucket_name = bucket_name or self._storage_type.s3_config.bucket_name
         self._external_storage = FileS3IO(
             config=config,
             path=self.path,
@@ -228,8 +245,7 @@ class StorageJob(GenericJob):
     def from_hdf(self, hdf=None, group_name=None):
         super().from_hdf(hdf, group_name)
         self._stored_files.from_hdf(hdf=self._hdf5)
-        self._input.from_hdf(hdf=self._hdf5)
-        self._storage_type = StorageType(self._input.storage_type, self._input.storage_type_read_only)
+        self._storage_type.from_hdf(hdf=self._hdf5)
         if self._storage_type.s3 and self.status != "initialized":
             self.reconnect_s3_storage()
 
@@ -238,7 +254,7 @@ class StorageJob(GenericJob):
         if self._storage_type.s3:
             self._hdf5['REQUIRE_FULL_OBJ_FOR_RM'] = True
         self._stored_files.to_hdf(hdf=self._hdf5)
-        self._input.to_hdf(hdf=self._hdf5)
+        self._storage_type.to_hdf(hdf=self._hdf5)
 
     def __getitem__(self, item):
         # copied from super().__getitem__ changing the output of returning a file

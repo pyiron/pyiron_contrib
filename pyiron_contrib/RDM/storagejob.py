@@ -61,7 +61,7 @@ class StorageJob(GenericJob):
     def remove_child(self):
         if self._storage_type.s3:
             _remove_s3_working_directory(self._external_storage, self.path)
-        self._hdf5["REQ_OBJ_RM"] = False
+        self._hdf5["REQUIRE_FULL_OBJ_FOR_RM"] = False
         super().remove_child()
     remove_child.__doc__ = GenericJob.remove_child.__doc__
 
@@ -214,17 +214,24 @@ class StorageJob(GenericJob):
     def write_input(self):
         pass
 
+    def reconnect_s3_storage(self, config=None, bucket_name=None):
+        # TODO: add consistency checks (Do we get the same server/bucket as before?) Fail with nice error on
+        # instantiated job such that this method may be used to restore the s3 connection.
+        config = config or self._input.s3.config
+        bucket_name = bucket_name or self._input.s3.bucket_name
+        self._external_storage = FileS3IO(
+            config=config,
+            path=self.path,
+            bucket_name=bucket_name
+        )
+
     def from_hdf(self, hdf=None, group_name=None):
         super().from_hdf(hdf, group_name)
         self._stored_files.from_hdf(hdf=self._hdf5)
         self._input.from_hdf(hdf=self._hdf5)
         self._storage_type = StorageType(self._input.storage_type, self._input.storage_type_read_only)
         if self._storage_type.s3 and self.status != "initialized":
-            self._external_storage = FileS3IO(
-                config=self._input.s3.config,
-                path=self.path,
-                bucket_name=self._input.s3.bucket_name
-            )
+            self.reconnect_s3_storage()
 
     def to_hdf(self, hdf=None, group_name=None):
         super().to_hdf(hdf, group_name)

@@ -236,7 +236,7 @@ class StorageJob(GenericJob):
     def to_hdf(self, hdf=None, group_name=None):
         super().to_hdf(hdf, group_name)
         if self._storage_type.s3:
-            self._hdf5['REQ_OBJ_RM'] = True
+            self._hdf5['REQUIRE_FULL_OBJ_FOR_RM'] = True
         self._stored_files.to_hdf(hdf=self._hdf5)
         self._input.to_hdf(hdf=self._hdf5)
 

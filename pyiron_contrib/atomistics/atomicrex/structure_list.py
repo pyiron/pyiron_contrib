@@ -47,9 +47,9 @@ class ARStructureContainer:
 
     def add_structure(self, structure, identifier, fit=True, relative_weight=1, clamp=True):
         self.flattened_structures.add_structure(structure, identifier)
-        self.fit[self.flattened_structures.prev_structure_index] = fit
-        self.relative_weight[self.flattened_structures.prev_structure_index] = relative_weight
-        self.clamp[self.flattened_structures.prev_structure_index] = clamp
+        self.fit[self.flattened_structures.prev_chunk_index] = fit
+        self.relative_weight[self.flattened_structures.prev_chunk_index] = relative_weight
+        self.clamp[self.flattened_structures.prev_chunk_index] = clamp
 
     def add_scalar_fit_property(
         self,
@@ -64,15 +64,15 @@ class ARStructureContainer:
         min_val=np.nan,
         max_val=np.nan,
         ):
-        self.fit_properties[prop].target_value[self.flattened_structures.prev_structure_index] = target_value
-        self.fit_properties[prop].fit[self.flattened_structures.prev_structure_index] = fit
-        self.fit_properties[prop].relax[self.flattened_structures.prev_structure_index] = relax
-        self.fit_properties[prop].relative_weight[self.flattened_structures.prev_structure_index] = relative_weight
-        self.fit_properties[prop].residual_style[self.flattened_structures.prev_structure_index] = residual_style
-        self.fit_properties[prop].output[self.flattened_structures.prev_structure_index] = output
-        self.fit_properties[prop].tolerance[self.flattened_structures.prev_structure_index] = tolerance
-        self.fit_properties[prop].min_val[self.flattened_structures.prev_structure_index] = min_val
-        self.fit_properties[prop].max_val[self.flattened_structures.prev_structure_index] = max_val
+        self.fit_properties[prop].target_value[self.flattened_structures.prev_chunk_index] = target_value
+        self.fit_properties[prop].fit[self.flattened_structures.prev_chunk_index] = fit
+        self.fit_properties[prop].relax[self.flattened_structures.prev_chunk_index] = relax
+        self.fit_properties[prop].relative_weight[self.flattened_structures.prev_chunk_index] = relative_weight
+        self.fit_properties[prop].residual_style[self.flattened_structures.prev_chunk_index] = residual_style
+        self.fit_properties[prop].output[self.flattened_structures.prev_chunk_index] = output
+        self.fit_properties[prop].tolerance[self.flattened_structures.prev_chunk_index] = tolerance
+        self.fit_properties[prop].min_val[self.flattened_structures.prev_chunk_index] = min_val
+        self.fit_properties[prop].max_val[self.flattened_structures.prev_chunk_index] = max_val
 
 
     def add_vector_fit_property(
@@ -87,13 +87,13 @@ class ARStructureContainer:
         output=True,
         ):
         if target_value is not None:
-            self.fit_properties[prop].target_value[self.flattened_structures.prev_atom_index:self.flattened_structures.current_atom_index] = target_value
-        self.fit_properties[prop].fit[self.flattened_structures.prev_structure_index] = fit
-        self.fit_properties[prop].relax[self.flattened_structures.prev_structure_index] = relax
-        self.fit_properties[prop].relative_weight[self.flattened_structures.prev_structure_index] = relative_weight
-        self.fit_properties[prop].residual_style[self.flattened_structures.prev_structure_index] = residual_style
-        self.fit_properties[prop].output[self.flattened_structures.prev_structure_index] = output
-        self.fit_properties[prop].tolerance[self.flattened_structures.prev_structure_index] = tolerance
+            self.fit_properties[prop].target_value[self.flattened_structures.prev_element_index:self.flattened_structures.current_element_index] = target_value
+        self.fit_properties[prop].fit[self.flattened_structures.prev_chunk_index] = fit
+        self.fit_properties[prop].relax[self.flattened_structures.prev_chunk_index] = relax
+        self.fit_properties[prop].relative_weight[self.flattened_structures.prev_chunk_index] = relative_weight
+        self.fit_properties[prop].residual_style[self.flattened_structures.prev_chunk_index] = residual_style
+        self.fit_properties[prop].output[self.flattened_structures.prev_chunk_index] = output
+        self.fit_properties[prop].tolerance[self.flattened_structures.prev_chunk_index] = tolerance
 
     
     def _get_per_structure_index(self, identifier):
@@ -109,15 +109,15 @@ class ARStructureContainer:
             identifier = np.array(identifier)
         indices = np.flatnonzero(
             np.isin(
-                self.flattened_structures._per_structure_arrays["identifier"], identifier, assume_unique=True
+                self.flattened_structures._per_chunk_arrays["identifier"], identifier, assume_unique=True
                 )
             )
         # This is some sorting magic that could lead to strange errors
-        # Look here if something goes wrong with the order of
-        ids_stored = np.array(self.flattened_structures._per_structure_arrays["identifier"][indices])
+        # Look here if something goes wrong with the ordering
+        ids_stored = np.array(self.flattened_structures._per_chunk_arrays["identifier"][indices])
         sorter = ids_stored.argsort()[identifier.argsort()]
         return indices[sorter]
-
+ 
     def get_scalar_property(self, prop, identifier, final=True):
         """
         Returns final or target value of a scalar property based on the identifier used when adding a structure
@@ -154,7 +154,7 @@ class ARStructureContainer:
         if not isinstance(identifier, str):
             raise NotImplementedError("Can only look up properties for single identifiers currently")
         index = self._get_per_structure_index(identifier)[0]
-        slc  = self.flattened_structures._get_per_atom_slice(index)
+        slc  = self.flattened_structures._get_per_element_slice(index)
         if final:
             return self.fit_properties[prop].final_value[slc]
         else:
@@ -196,8 +196,12 @@ class ARStructureContainer:
                 num_atoms = h["flattened_structures/num_atoms"]
                 group_name_2 = "flattened_structures"
             else:
-                num_structures = h["structures/num_structures"]
-                num_atoms = h["structures/num_atoms"]
+                try:
+                    num_structures = h["structures/num_chunks"]
+                    num_atoms = h["structures/num_elements"]
+                except:
+                    num_structures = h["structures/num_structures"]
+                    num_atoms = h["structures/num_atoms"]
                 group_name_2 = "structures"
 
             self._init_structure_container(num_structures, num_atoms)
@@ -231,7 +235,7 @@ class ARStructureContainer:
         if self.structure_file_path is None:
 
             # write POSCAR and xml
-            for i in range(self.flattened_structures.num_structures):
+            for i in range(self.flattened_structures.num_chunks):
                 vec_start = self.flattened_structures.start_index[i]
                 vec_end = self.flattened_structures.start_index[i]+self.flattened_structures.length[i]
                 write_modified_poscar(
@@ -258,7 +262,7 @@ class ARStructureContainer:
                 root.append(struct_xml)
         else:
             # write only xml and use POSCARs written already to some path
-            for i in range(self.flattened_structures.num_structures):
+            for i in range(self.flattened_structures.num_chunks):
                 fit_properties_xml = ET.Element("properties")
                 for flat_prop in self.fit_properties.values():
                     fit_properties_xml.append(flat_prop.to_xml_element(i))
@@ -592,7 +596,6 @@ class ARStructureList(object):
                     else:
                         force_vec_triggered = True
                         final_forces = np.empty((len(s.structure), 3))
-
 
 
 def write_modified_poscar(identifier, forces, directory, structure=None, positions=None, cell=None, symbols=None):

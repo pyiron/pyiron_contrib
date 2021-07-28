@@ -474,8 +474,12 @@ class FlattenedStorage:
     def from_hdf(self, hdf, group_name="flat_storage"):
         with hdf.open(group_name) as hdf_s_lst:
             version = hdf_s_lst.get("HDF_VERSION", "0.0.0")
-            num_chunks = hdf_s_lst["num_chunks"] or hdf_s_lst["num_structures"]
-            num_elements = hdf_s_lst["num_elements"] or hdf_s_lst["num_atoms"]
+            try:
+                num_chunks = hdf_s_lst["num_chunks"]
+                num_elements = hdf_s_lst["num_elements"]
+            except:
+                num_chunks = hdf_s_lst["num_structures"]
+                num_elements = hdf_s_lst["num_atoms"]
             self._num_chunks_alloc = self.num_chunks = self.current_chunk_index = num_chunks
             self._num_elements_alloc = self.num_elements = self.current_element_index = num_elements
 
@@ -708,4 +712,4 @@ class StructureStorage(FlattenedStorage, HasStructure):
                 self._per_chunk_arrays["identifier"] = hdf_s_lst["identifiers"].astype(np.dtype("U20"))
                 self._per_chunk_arrays["cell"] = hdf_s_lst["cells"]
 
-                self._per_chunk_arrays["pbc"] = np.full((self.num_structures, 3), True)
+                self._per_chunk_arrays["pbc"] = np.full((self.num_chunks, 3), True)

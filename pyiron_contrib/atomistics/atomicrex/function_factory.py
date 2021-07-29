@@ -147,7 +147,7 @@ class MetaFunctionMixin():
         parameters = 0
         for f in self.functions.values():
             parameters += f.count_parameters(enabled_only=enabled_only)
-        return parameters 
+        return parameters
 
 class AbstractMetaFunction(DataContainer, MetaFunctionMixin):
     def __init__(self, identifier=None, species=None, table_name=None):

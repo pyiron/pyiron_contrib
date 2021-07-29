@@ -122,6 +122,17 @@ class BaseFunctionMixin():
     def lock_parameters(self):
         for param in self.parameters.values():
             param.enabled = False
+    
+    def count_parameters(self, enabled_only=True):
+        parameters = 0
+        if enabled_only:
+            for param in self.parameters.values():
+                if param.enabled:
+                    parameters += 1
+        else:
+            for param in self.parameters.values():
+                parameters += 1
+        return parameters
 
 class MetaFunctionMixin():
     def copy_final_to_initial_params(self):
@@ -131,6 +142,12 @@ class MetaFunctionMixin():
     def lock_parameters(self):
         for f in self.functions.values():
             f.lock_parameters()
+    
+    def count_parameters(self, enabled_only=True):
+        parameters = 0
+        for f in self.functions.values():
+            parameters += f.count_parameters(enabled_only=enabled_only)
+        return parameters
 
 class AbstractMetaFunction(DataContainer, MetaFunctionMixin):
     def __init__(self, identifier=None, species=None, table_name=None):
@@ -299,6 +316,17 @@ class Spline(DataContainer, BaseFunctionMixin):
         super().lock_parameters()
         self.derivative_left.enabled = False
         self.derivative_right.enabled = False
+
+    def count_parameters(self, enabled_only=True):
+        parameters = super().count_parameters(enabled_only=enabled_only)
+        if enabled_only:
+            if self.derivative_left.enabled:
+                parameters += 1
+            if self.derivative_right.enabled:
+                parameters += 1
+        else:
+            parameters += 2
+        return parameters
 
 class ExpA(SpecialFunction):
     def __init__(self, identifier=None, cutoff=None, species=["*", "*"], is_screening_function=True):

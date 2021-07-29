@@ -480,6 +480,13 @@ class EAMlikeMixin:
             for f in functions.values():
                 f.lock_parameters()
 
+    def count_parameters(self, enabled_only=True):
+        parameters = 0
+        for functions in self._function_tuple:
+            for f in functions.values():
+                parameters += f.count_parameters(enabled_only=enabled_only)
+        return parameters
+
 class EAMPotential(AbstractPotential, EAMlikeMixin):
     """
     Embedded-Atom-Method potential.

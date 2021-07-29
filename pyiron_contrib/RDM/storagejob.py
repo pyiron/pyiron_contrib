@@ -77,12 +77,9 @@ class StorageJob(GenericJob):
         # self._input.storage_type = 'local'
         self._external_storage = None
 
-    def remove_child(self):
+    def _before_generic_remove_child(self):
         if self._storage_type.s3:
             _remove_s3_working_directory(self._external_storage, self.path)
-        self._hdf5["REQUIRE_FULL_OBJ_FOR_RM"] = False
-        super().remove_child()
-    remove_child.__doc__ = GenericJob.remove_child.__doc__
 
     @property
     def storage_type(self):

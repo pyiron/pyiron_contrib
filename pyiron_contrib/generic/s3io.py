@@ -10,15 +10,7 @@ from functools import lru_cache
 import boto3
 from botocore.client import Config
 
-from pyiron_base.generic.filedata import load_file
-
-
-# TODO: use this as general foundation for all FileData classes (base this on pyiron object?!)
-class FileDataTemplate(ABC):
-    @property
-    def data(self):
-        """Return the associated data."""
-        raise NotImplementedError
+from pyiron_base.generic.filedata import load_file, FileDataTemplate
 
 
 class S3FileData(FileDataTemplate):
@@ -133,6 +125,10 @@ class S3ioConnect:
 
         self.bucket = self.s3resource.Bucket(self.bucket_name)
 
+    @property
+    def endpoint_url(self):
+        return self.s3resource.meta.client.meta.endpoint
+
 
 class FileS3IO:
     def __init__(self, config=None, path='/', *, bucket_name=None):
@@ -204,9 +200,10 @@ class FileS3IO:
         """
         return self._s3_path[1:]
 
-    def print_bucket_info(self):
-        """ Print name of the associated bucket. """
-        print('Bucket name: {}'.format(self._bucket.name))
+    @property
+    def bucket_info(self):
+        return {'bucket_name': self._bucket.name,
+                'endpoint_url': self._s3io.endpoint_url}
 
     def list_groups(self):
         """
@@ -340,12 +337,8 @@ class FileS3IO:
             files = [files]
 
         for file in files:
-            [path, filename] = os.path.split(file)
+            [_, filename] = os.path.split(file)
 
-            #def printBytes(x):
-            #    print('{} {}/{} bytes'.format(filename, x, s))
-            #s = os.path.getsize(file)
-            # Upload file accepts extra_args: Dictionary with predefined keys. One key is Metadata
             self._bucket.upload_file(
                 file,
                 self._bucket_path + filename,
@@ -570,335 +563,4 @@ class FileS3IO:
                 s3_object = self.copy()
                 s3_object.s3_path = "/".join(item_abs_lst[:-1])
                 return s3_object[item_abs_lst[-1]]
-
-
-"""
-Some information about the bucket object:
-
-o.bucket= self.bucket   has the following   options:
---------------------------------------------------------------------------------------------------------------
-o.bucket.Acl(                         o.bucket.Website(                     o.bucket.multipart_uploads
-o.bucket.Cors(                        o.bucket.copy(                        o.bucket.name
-o.bucket.Lifecycle(                   o.bucket.create(                      o.bucket.object_versions
-o.bucket.LifecycleConfiguration(      o.bucket.creation_date                o.bucket.objects
-o.bucket.Logging(                     o.bucket.delete(                      o.bucket.put_object(
-o.bucket.Notification(                o.bucket.delete_objects(              o.bucket.upload_file(
-o.bucket.Object(                      o.bucket.download_file(               o.bucket.upload_fileobj(
-o.bucket.Policy(                      o.bucket.download_fileobj(            o.bucket.wait_until_exists(
-o.bucket.RequestPayment(              o.bucket.get_available_subresources(  o.bucket.wait_until_not_exists(
-o.bucket.Tagging(                     o.bucket.load(
-o.bucket.Versioning(                  o.bucket.meta
-
-o.bucket.objects   has the following  options:
---------------------------------------------------------------------------------------------------------------
-o.bucket.objects.all(        o.bucket.objects.filter(     o.bucket.objects.limit(      o.bucket.objects.pages(
-o.bucket.objects.delete(     o.bucket.objects.iterator(   o.bucket.objects.page_size(
-
-o.bucket.Object  is an object of the object store. It is identified by a key, i.e. the full path + file name in the bucket.
-Actually, there is no such thing as directories inside the bucket. '/' is a valid character in filenames and we use this fact 
-to separate files into directories. 
-obj=o.bucket.Object(/path/to/file)  has the following option:
---------------------------------------------------------------------------------------------------------------
-obj.Acl(                           obj.download_fileobj(              obj.put(
-obj.Bucket(                        obj.e_tag                          obj.reload(
-obj.MultipartUpload(               obj.expiration                     obj.replication_status
-obj.Version(                       obj.expires                        obj.request_charged
-obj.accept_ranges                  obj.get(                           obj.restore
-obj.bucket_name                    obj.get_available_subresources(    obj.restore_object(
-obj.cache_control                  obj.initiate_multipart_upload(     obj.server_side_encryption
-obj.content_disposition            obj.key                            obj.sse_customer_algorithm
-obj.content_encoding               obj.last_modified                  obj.sse_customer_key_md5
-obj.content_language               obj.load(                          obj.ssekms_key_id
-obj.content_length                 obj.meta                           obj.storage_class
-obj.content_type                   obj.metadata                       obj.upload_file(
-obj.copy(                          obj.missing_meta                   obj.upload_fileobj(
-obj.copy_from(                     obj.object_lock_legal_hold_status  obj.version_id
-obj.delete(                        obj.object_lock_mode               obj.wait_until_exists(
-obj.delete_marker                  obj.object_lock_retain_until_date  obj.wait_until_not_exists(
-obj.download_file(                 obj.parts_count                    obj.website_redirect_location
-
-with obj.get() one gets the object.
-with obj.download_file('Filename') one downloads the associated file to 'Filename'
-
-getobj=o.bucket.Object(object_key).get() has the following options:
---------------------------------------------------------------------------------------------------------------
-getobj.clear(       getobj.fromkeys(    getobj.items(       getobj.pop(         getobj.setdefault(  getobj.values(
-getobj.copy(        getobj.get(         getobj.keys(        getobj.popitem(     getobj.update(
-
-"""
-
-class ProjectS3IO(FileS3IO):
-    """Class connecting the S3IO with the Project class."""
-    def __init__(self, project, config, path='/'):
-        self._project = project.copy()
-        super().__init__(config=config, path=path)
-        self._project.data_backend = "S3"
-
-    @property
-    def base_name(self):
-        """
-        The absolute path to of the current pyiron project - absolute path on the file system, not including the S3
-        path.
-
-        Returns:
-            str: current project path
-        """
-        return self._project.path
-
-    @property
-    def db(self):
-        """
-        Get connection to the SQL database
-
-        Returns:
-            DatabaseAccess: database conncetion
-        """
-        return self._project.db
-
-    @property
-    def path(self):
-        """
-        Absolute path of the S3 group starting from the system root - combination of the absolute system path plus the
-        absolute path inside the S3 object store starting from the root group.
-
-        Returns:
-            str: absolute path
-        """
-        return os.path.join(self._project.path, self._bucket_path).replace("\\", "/")
-
-    @property
-    def project(self):
-        """
-        Get the project instance the ProjectS3io object is located in
-
-        Returns:
-            Project: pyiron project
-        """
-        return self._project
-
-    @property
-    def project_path(self):
-        """
-        the relative path of the current project / folder starting from the root path
-        of the pyiron user directory
-
-        Returns:
-            str: relative path of the current project / folder
-        """
-        return self._project.project_path
-
-    @property
-    def root_path(self):
-        """
-        the pyiron user directory, defined in the .pyiron configuration
-
-        Returns:
-            str: pyiron user directory of the current project
-        """
-        return self._project.root_path
-
-    @property
-    def working_directory(self):
-        """
-        Get the working directory of the current ProjectS3io object. The working directory equals the path but it is
-        represented by the filesystem:
-            /absolute/path/to/the/project/path/inside/the/s3/store
-
-        Returns:
-            str: absolute path to the working directory
-        """
-        return self.path
-
-    @property
-    def sql_query(self):
-        """
-        Get the SQL query for the project
-
-        Returns:
-            str: SQL query
-        """
-        return self._project.sql_query
-
-    @sql_query.setter
-    def sql_query(self, new_query):
-        """
-        Set the SQL query for the project
-
-        Args:
-            new_query (str): SQL query
-        """
-        self._project.sql_query = new_query
-
-    @property
-    def user(self):
-        """
-        Get current unix/linux/windows user who is running pyiron
-
-        Returns:
-            str: username
-        """
-        return self._project.user
-
-    @property
-    def _filter(self):
-        """
-        Get project filter
-
-        Returns:
-            str: project filter
-        """
-        return self._project._filter
-
-    @_filter.setter
-    def _filter(self, new_filter):
-        """
-        Set project filter
-
-        Args:
-            new_filter (str): project filter
-        """
-        self._project._filter = new_filter
-
-    @property
-    def _inspect_mode(self):
-        """
-        Check if inspect mode is activated
-
-        Returns:
-            bool: [True/False]
-        """
-        return self._project._inspect_mode
-
-    @_inspect_mode.setter
-    def _inspect_mode(self, read_mode):
-        """
-        Activate or deactivate inspect mode
-
-        Args:
-            read_mode (bool): [True/False]
-        """
-        self._project._inspect_mode = read_mode
-
-    def copy(self):
-        """
-        Copy the ProjectS3IO object - copying just the Python object but maintaining the same pyiron path
-
-        Returns:
-            ProjectS3IO: copy of the ProjectS3IO object
-        """
-        new_s3 = ProjectS3IO(
-            project=self._project, config=self._s3io, path=self.s3_path
-        )
-        new_s3._filter = self._filter
-        return new_s3
-
-    def import_class(self, class_name):
-        """
-        Import given class from fully qualified name and return class object.
-
-        Args:
-            class_name (str): fully qualified name of a pyiron class
-
-        Returns:
-            type: class object of the given name
-        """
-        internal_class_name = class_name.split(".")[-1][:-2]
-        if internal_class_name in self._project.job_type.job_class_dict:
-            module_path = self._project.job_type.job_class_dict[internal_class_name]
-        else:
-            class_path = class_name.split()[-1].split(".")[:-1]
-            class_path[0] = class_path[0][1:]
-            module_path = '.'.join(class_path)
-        return getattr(
-            importlib.import_module(module_path),
-            internal_class_name,
-        )
-
-    #def to_object(self, class_name=None, **qwargs):
-
-    def get_job_id(self, job_specifier):
-        """
-        get the job_id for job named job_name in the local project path from database
-
-        Args:
-            job_specifier (str, int): name of the job or job ID
-
-        Returns:
-            int: job ID of the job
-        """
-        return self._project.get_job_id(job_specifier=job_specifier)
-
-    def inspect(self, job_specifier):
-        """
-        Inspect an existing pyiron object - most commonly a job - from the database
-
-        Args:
-            job_specifier (str, int): name of the job or job ID
-
-        Returns:
-            JobCore: Access to the HDF5 object - not a GenericJob object - use load() instead.
-        """
-        return self._project.inspect(job_specifier=job_specifier)
-
-    def load(self, job_specifier, convert_to_object=True):
-        """
-        Load an existing pyiron object - most commonly a job - from the database
-
-        Args:
-            job_specifier (str, int): name of the job or job ID
-            convert_to_object (bool): convert the object to an pyiron object or only access the HDF5 file - default=True
-                                      accessing only the HDF5 file is about an order of magnitude faster, but only
-                                      provides limited functionality. Compare the GenericJob object to JobCore object.
-
-        Returns:
-            GenericJob, JobCore: Either the full GenericJob object or just a reduced JobCore object
-        """
-        return self._project.load(
-            job_specifier=job_specifier, convert_to_object=convert_to_object
-        )
-
-    def load_from_jobpath(self, job_id=None, db_entry=None, convert_to_object=True):
-        """
-        Internal function to load an existing job either based on the job ID or based on the database entry dictionary.
-
-        Args:
-            job_id (int): Job ID - optional, but either the job_id or the db_entry is required.
-            db_entry (dict): database entry dictionary - optional, but either the job_id or the db_entry is required.
-            convert_to_object (bool): convert the object to an pyiron object or only access the HDF5 file - default=True
-                                      accessing only the HDF5 file is about an order of magnitude faster, but only
-                                      provides limited functionality. Compare the GenericJob object to JobCore object.
-
-        Returns:
-            GenericJob, JobCore: Either the full GenericJob object or just a reduced JobCore object
-        """
-        return self._project.load_from_jobpath(
-            job_id=job_id, db_entry=db_entry, convert_to_object=convert_to_object
-        )
-
-    def remove_job(self, job_specifier, _unprotect=False):
-        """
-        Remove a single job from the project based on its job_specifier - see also remove_jobs()
-
-        Args:
-            job_specifier (str, int): name of the job or job ID
-            _unprotect (bool): [True/False] delete the job without validating the dependencies to other jobs
-                               - default=False
-        """
-        self._project.remove_job(job_specifier=job_specifier, _unprotect=_unprotect)
-
-    def __getitem__(self, item):
-        """Check if the result is within the S3 store or at the project level and return corresponding object."""
-        if isinstance(item, slice):
-            raise NotImplementedError("Implement if needed, e.g. for [:]")
-        else:
-            item_abs_path = (
-                os.path.relpath(os.path.join(self.path, item), self.project.path)
-                    .replace("\\", "/")
-            )
-            if item_abs_path.split('/')[0] == ".":
-                return self._project
-            elif item_abs_path.split('/')[0] != "..":
-                return super().__getitem__(item)
-            else:
-                return self._project[item_abs_path]
 

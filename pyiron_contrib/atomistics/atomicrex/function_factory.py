@@ -132,7 +132,7 @@ class BaseFunctionMixin():
         else:
             for param in self.parameters.values():
                 parameters += 1
-        return parameters 
+        return parameters
 
 class MetaFunctionMixin():
     def copy_final_to_initial_params(self):

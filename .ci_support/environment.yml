@@ -1,8 +1,6 @@
 channels:
 - conda-forge
 dependencies:
-
-
 - ase =3.22.0
 - coveralls
 - coverage
@@ -16,5 +14,4 @@ dependencies:
 - scikit-image =0.18.2
 - randspg =0.0.1
 - boto3
-
 - moto

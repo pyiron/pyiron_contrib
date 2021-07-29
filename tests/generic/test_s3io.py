@@ -4,7 +4,7 @@ import json
 
 from moto import mock_s3
 import boto3
-from pyiron_base.generic.s3io import FileS3IO
+from pyiron_contrib.generic.s3io import FileS3IO
 
 MY_BUCKET = "MY_BUCKET"
 TEST_BUCKET = "TEST_BUCKET"

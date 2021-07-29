@@ -127,7 +127,7 @@ class S3ioConnect:
 
     @property
     def endpoint_url(self):
-        return self.s3resource.meta.client.meta.endpoint
+        return self.s3resource.meta.client.meta.endpoint_url
 
 
 class FileS3IO:

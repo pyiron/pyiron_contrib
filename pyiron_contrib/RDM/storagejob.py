@@ -96,6 +96,7 @@ class StorageJob(GenericJob):
         self._storage_type.storage_type = 's3'
         self._storage_type.create_group("s3_config")
         self._storage_type.s3_config.config = config
+        self._storage_type.s3_config.bucket_info = self._external_storage.bucket_info
         self._storage_type.s3_config.bucket_name = bucket_name
 
     def use_local_storage(self):
@@ -229,15 +230,21 @@ class StorageJob(GenericJob):
         pass
 
     def reconnect_s3_storage(self, config=None, bucket_name=None):
-        # TODO: add consistency checks (Do we get the same server/bucket as before?) Fail with nice error on
-        # instantiated job such that this method may be used to restore the s3 connection.
         config = config or self._storage_type.s3_config.config
         bucket_name = bucket_name or self._storage_type.s3_config.bucket_name
-        self._external_storage = FileS3IO(
-            config=config,
-            path=self.path,
-            bucket_name=bucket_name
-        )
+        try:
+            external_storage = FileS3IO(
+                config=config,
+                path=self.path,
+                bucket_name=bucket_name
+            )
+        except Exception as e:
+            raise RuntimeError(f"Could not restore connection to the S3 storage.") from e
+        if self._storage_type.s3_config.bucket_info == external_storage.bucket_info:
+            self._external_storage = external_storage
+        else:
+            raise RuntimeError(f"New and saved s3 storage do not match! Got {external_storage.bucket_info}"
+                               f" but expected {self._storage_type.s3_config.bucket_info}.")
 
     def from_hdf(self, hdf=None, group_name=None):
         super().from_hdf(hdf, group_name)

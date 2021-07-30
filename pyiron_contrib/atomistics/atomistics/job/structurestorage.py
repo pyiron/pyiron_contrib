@@ -214,10 +214,7 @@ class StructureStorage(FlattenedStorage, HasStructure):
     def from_hdf(self, hdf, group_name="structures"):
         with hdf.open(group_name) as hdf_s_lst:
             version = hdf_s_lst.get("HDF_VERSION", "0.0.0")
-            if version == "0.1.0":
-                super().from_hdf(hdf=hdf, group_name=group_name)
-
-            elif version == "0.0.0":
+            if version == "0.0.0":
                 self._per_element_arrays["symbols"] = hdf_s_lst["symbols"].astype(np.dtype("U2"))
                 self._per_element_arrays["positions"] = hdf_s_lst["positions"]
 
@@ -227,3 +224,5 @@ class StructureStorage(FlattenedStorage, HasStructure):
                 self._per_chunk_arrays["cell"] = hdf_s_lst["cells"]
 
                 self._per_chunk_arrays["pbc"] = np.full((self.num_chunks, 3), True)
+            else:
+                super().from_hdf(hdf=hdf, group_name=group_name)

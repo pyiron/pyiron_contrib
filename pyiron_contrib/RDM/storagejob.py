@@ -67,19 +67,36 @@ class StorageType(DataContainer):
 
 
 class StorageJob(GenericJob):
+    """Job to store files associated with meta data either locally, or at a remote data service like s3."""
 
     def __init__(self, project, job_name):
+
         super().__init__(project, job_name)
         self.server.run_mode.interactive = True
-        # self._input = DataContainer(table_name='_input')
         self._stored_files = DataContainer(table_name='stored_files')
         self._storage_type = StorageType(storage_type='local', table_name="storage_type")
-        # self._input.storage_type = 'local'
         self._external_storage = None
 
     def _before_generic_remove_child(self):
         if self._storage_type.s3:
             _remove_s3_working_directory(self._external_storage, self.path)
+
+    def check_setup(self):
+        pass
+        """
+        this function is called in self._run_if_new() if self.server.run_mode.queue
+        i.e. print(self.server.run_mode) = queue if one sets a queue 
+        afterwards self.save() and self.run() is called again -> self.run_if_created  followed by (in this case always) 
+        self.run_if_scheduler 
+        run_if_scheduler is the function called to sent the job to the cluster, however, it already sends the 
+        stuff to the queue which is obviously not intended. 
+        TODO: 
+        - overwrite run_if_scheduler to not trigger a job to be run on the queing system. 
+        - make some file_handler class to allow for 'store/receive/delete file' with a uniform interface for
+            - local
+            - s3
+            - ssh
+        """
 
     @property
     def storage_type(self):
@@ -98,6 +115,12 @@ class StorageJob(GenericJob):
         self._storage_type.s3_config.config = config
         self._storage_type.s3_config.bucket_info = self._external_storage.bucket_info
         self._storage_type.s3_config.bucket_name = bucket_name
+
+    def _list_groups(self):
+        return []
+
+    def _list_nodes(self):
+        return self.files_stored
 
     def use_local_storage(self):
         self._storage_type.storage_type = 'local'
@@ -293,7 +316,7 @@ class StorageJob(GenericJob):
             else:
                 return child["/".join(name_lst[1:])]
 
-        # Here this funtion is changed to return a FileData object.
+        # Here this function is changed to return a FileData object.
         if self._storage_type.local:
             if name_lst[0] in self.list_files():
                 file_name = posixpath.join(self.working_directory, "{}".format(item_obj))

@@ -42,5 +42,8 @@ class RDMProject(Project):
             list of str: names of nodes which are StorageJobs
         """
         table = self.job_table(recursive=False)
-        bool_vec = table["hamilton"] == "StorageJob"
-        return table[bool_vec]["job"].tolist()
+        if len(table) > 0:
+            bool_vec = table["hamilton"] == "StorageJob"
+            return table[bool_vec]["job"].tolist()
+        else:
+            return []

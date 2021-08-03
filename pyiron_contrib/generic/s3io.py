@@ -39,7 +39,7 @@ class S3FileData(FileDataTemplate):
         self._metadata = self._s3obj.metadata
 
     @property
-    @lru_cache
+    @lru_cache()
     def data(self):
         """Return the associated data."""
         if self._data is None:

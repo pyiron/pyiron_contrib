@@ -121,16 +121,14 @@ class TestS3IO(unittest.TestCase):
     def test_download(self):
         self.assertFalse(os.path.exists(self.current_dir + '/any'))
         self.s3io.download(['any'], self.current_dir)
-        with open('any') as f:
+        with open(os.path.join(self.current_dir, 'any')) as f:
             self.assertEqual(f.read(), 'any text')
         os.remove(self.current_dir + '/any')
 
     def test___getitem__(self):
-        other_s3_obj = self.s3io['other']
-        other = other_s3_obj.get()
-        self.assertEqual(other["Metadata"], {'file_loc': '/'})
-        self.assertEqual(other["Body"].read().decode('utf8'), 'any text')
-        self.assertEqual(other_s3_obj.metadata, {'file_loc': '/'})
+        other = self.s3io['other']
+        self.assertEqual(other.metadata, {'file_loc': '/'})
+        self.assertEqual(other.data, [b'any text'])
 
         some_grp = self.s3io['some']
         self.assertIsInstance(some_grp, FileS3IO)
@@ -138,7 +136,7 @@ class TestS3IO(unittest.TestCase):
 
         any_s3_obj = self.s3io['some/path_to/any']
         self.assertEqual(any_s3_obj.metadata, {'file_loc': '/some/path_to'})
-        self.assertEqual(any_s3_obj.get()['Body'].read().decode('utf8'), 'any path')
+        self.assertEqual(any_s3_obj.data, [b'any path'])
 
         self.assertTrue(self.s3io[""] is self.s3io)
 

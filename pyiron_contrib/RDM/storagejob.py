@@ -48,9 +48,6 @@ class StorageType(DataContainer):
     def _read_only_error(cls):
         raise RuntimeError("The storage type cannot be changed when it is already in use.")
 
-    def set_read_only(self):
-        self.read_only = True
-
     @property
     def storage_type(self):
         return self._storage_type
@@ -82,14 +79,13 @@ class StorageJob(GenericJob):
             _remove_s3_working_directory(self._external_storage, self.path)
 
     def check_setup(self):
-        pass
         """
         this function is called in self._run_if_new() if self.server.run_mode.queue
-        i.e. print(self.server.run_mode) = queue if one sets a queue 
+        i.e. self.server.run_mode = queue if one sets a queue
         afterwards self.save() and self.run() is called again -> self.run_if_created  followed by (in this case always) 
         self.run_if_scheduler 
         run_if_scheduler is the function called to sent the job to the cluster, however, it already sends the 
-        stuff to the queue which is obviously not intended. 
+        stuff to the queue which is obviously not intended if this is used as ssh storage system.
         TODO: 
         - overwrite run_if_scheduler to not trigger a job to be run on the queing system. 
         - make some file_handler class to allow for 'store/receive/delete file' with a uniform interface for
@@ -97,6 +93,7 @@ class StorageJob(GenericJob):
             - s3
             - ssh
         """
+        raise NotImplementedError("Storing files remotely is not yet supported.")
 
     @property
     def storage_type(self):
@@ -135,9 +132,9 @@ class StorageJob(GenericJob):
     def validate_ready_to_run(self):
         if self._storage_type.local:
             self._create_working_directory()
-            self._storage_type.set_read_only()
+            self._storage_type.read_only = True
         elif self._storage_type.s3:
-            self._storage_type.set_read_only()
+            self._storage_type.read_only = True
         else:
             raise NotImplementedError("No available Storage found.")
 
@@ -161,8 +158,8 @@ class StorageJob(GenericJob):
                              f"but got len(filenames)={len(filenames)} and len(metadata)={len(metadata)}.")
 
         for i, file in enumerate(filenames):
-            if not overwrite and file in self._stored_files.keys():
-                print(f"WARNING: {file} not copied, since already present and 'overwrite'=False.")
+            if not overwrite and os.path.basename(file) in self._stored_files.keys():
+                self._logger.warning(f"{file} not copied, since already present and 'overwrite'=False.")
                 continue
             _metadata = metadata[i] if isinstance(metadata, list) else metadata
             self._store_file(file, _metadata)
@@ -178,7 +175,7 @@ class StorageJob(GenericJob):
         except Exception as e:
             raise IOError(f"Storing {file} failed") from e
         else:
-            self._stored_files[file] = metadata
+            self._stored_files[os.path.basename(file)] = metadata
 
     def _remove_file(self, file):
         try:

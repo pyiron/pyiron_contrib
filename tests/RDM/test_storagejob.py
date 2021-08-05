@@ -34,7 +34,6 @@ class TestStorageJob(TestWithCleanProject):
         cls.res = boto3.resource('s3', **aws_credentials)
         cls.bucket = cls.res.create_bucket(Bucket=full_bucket)
         cls.bucket.put_object(Key='any', Body=b'any text', Metadata={'File_loc': 'root'})
-        cls.bucket.put_object(Key=f'{cls.project.path}test/some.txt', Body=b'any text')
         cls.io_bucket = cls.res.create_bucket(Bucket=io_bucket)
 
     @classmethod
@@ -62,8 +61,16 @@ class TestStorageJob(TestWithCleanProject):
         self.assertTrue(job.server.run_mode.interactive)
 
     def test_use_s3_storage(self):
+        # occupy storage of job and remove job without removing the files on s3:
         job = self.project.create.job.StorageJob('test')
-        job2 = self.project.create.job.StorageJob('test')
+        job.use_s3_storage(config=aws_credentials, bucket_name=full_bucket, _only_warn=True)
+        job.add_files(self.file1)
+        job._hdf5['REQUIRE_FULL_OBJ_FOR_RM'] = False
+        # Call remove from the project level
+        self.project.remove_job('test')
+
+        job = self.project.create.job.StorageJob('test')
+        job2 = self.project.create.job.StorageJob('test2')
 
         with self.subTest("ValueError: Occupied storage"):
             self.assertRaises(ValueError, job.use_s3_storage, config=aws_credentials, bucket_name=full_bucket)

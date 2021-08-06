@@ -3,9 +3,6 @@ Pyiron interface to atomicrex
 """
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
-import posixpath
-import os
-import subprocess
 
 import numpy as np
 import pandas as pd
@@ -43,8 +40,6 @@ class Atomicrex(PotentialFittingBase):
         self.input = GeneralARInput()
         self.potential = None
         self.structures = ARStructureContainer()
-        ## temprorary set working directory manually before full pyiron integration
-        self._working_directory = None
         self.output = Output()
         self.factories = Factories()
         

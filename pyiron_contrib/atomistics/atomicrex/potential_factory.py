@@ -653,6 +653,24 @@ class EAMPotential(AbstractPotential, EAMlikeMixin):
                 ax[i+k, 0].set(ylim=(-5,5), title=f"{el} {pot}", xlabel=xlabel)
         return fig, ax
 
+    def count_local_extrema(self, job, filename=None, count_minima=True, count_maxima=False):
+        if filename is None:
+            filename = f"{job.working_directory}/{self.export_file}"
+        elements = read_eam_fs_file(filename=filename)
+
+        extrema_dict = {}
+        for el, func in elements.items():
+            extrema_dict[el] = {}
+            for func_name, a in func:
+                extrema = 0
+                if count_minima:
+                    min_arr = np.r_[True, a[1:] < a[:-1]] & np.r_[a[:-1] < a[1:], True]
+                    extrema += len(min_arr[min_arr])
+                if count_maxima:
+                    max_arr = np.r_[True, a[1:] > a[:-1]] & np.r_[a[:-1] > a[1:], True]
+                    extrema += len(max_arr[max_arr])
+                extrema_dict[el][func_name] = extrema
+        return extrema_dict
 
 class MEAMPotential(AbstractPotential, EAMlikeMixin):
     def __init__(self, init=None, identifier=None, export_file=None, species=None):

@@ -671,7 +671,7 @@ class EAMPotential(AbstractPotential, EAMlikeMixin):
                     extrema += len(max_arr[max_arr])
                 extrema_dict[el][func_name] = extrema
         return extrema_dict
-
+        
 class MEAMPotential(AbstractPotential, EAMlikeMixin):
     def __init__(self, init=None, identifier=None, export_file=None, species=None):
         super().__init__(init=init)
@@ -762,7 +762,7 @@ class MEAMPotential(AbstractPotential, EAMlikeMixin):
             KeyError: Raises if a parsed parameter can't be matched to a function.
         """        
         for l in lines:
-            identifier, param, value = _parse_parameter_line(l)
+            identifier, leftover, value = _parse_parameter_line(l)
             if identifier in self.pair_interactions:
                 self.pair_interactions[identifier]._parse_final_parameter(leftover, value)
             elif identifier in self.electron_densities:

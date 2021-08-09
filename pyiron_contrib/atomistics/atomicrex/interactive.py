@@ -1,5 +1,9 @@
 import posixpath
 import os
+import subprocess
+
+from pyiron_contrib.atomistics.atomicrex.utility_functions import OutputCatcher
+from pyiron_contrib.atomistics.atomicrex import output
 
 from pyiron_base.job.interactive import InteractiveBase
 from pyiron_contrib.atomistics.atomicrex.base import AtomicrexBase
@@ -19,7 +23,7 @@ class AtomicrexInteractive(AtomicrexBase, InteractiveBase):
     def __init__(self, project, job_name):
         super().__init__(project, job_name)
         self._interactive_library = atomicrex.Job()
-        self._is_prepared = False
+        self._read_input_files = False
 
     @property
     def atomicrex_job_object(self):
@@ -29,17 +33,18 @@ class AtomicrexInteractive(AtomicrexBase, InteractiveBase):
         """
         Writes input files and calls necessary functions of the underlying atomicrex.Job class.
         """
-        if not self._is_prepared:
+        # Reading the input file again causes several issues
+        if not self._read_input_files:
             if not os.path.isdir(self.path):
                 os.makedirs(self.path)
             self.write_input(directory=self.path)
             input_file = posixpath.join(self.path, "main.xml")
-        
             self._interactive_library.parse_input_file(input_file)
-            self._interactive_library.prepare_fitting()
-            self._interactive_library.set_verbosity(2)
-            self._is_prepared = True
-    
+            self._read_input_files = True
+        self._interactive_library.prepare_fitting()
+        self._interactive_library.set_verbosity(2)
+        
+
     def interactive_add_structure(identifier, structure, forces=None, params=None):
         """
         This should be done when the FlattenedARProperty is reworked to use the new FlattenedStorage,
@@ -75,4 +80,20 @@ class AtomicrexInteractive(AtomicrexBase, InteractiveBase):
     def run_if_interactive(self):
         self.interactive_prepare_job()
         # Catching the output seems impossible?
+        filename = posixpath.join(self.path, "error.out")
+        #with OutputCatcher(filename):
         self._interactive_library.perform_fitting()
+        #self.interactive_collect()
+        
+    # Use the library functions to collect output, since no output is produced
+    # when fitting using scipy
+    def interactive_collect(self):
+        for identifier, structure in self._interactive_library.structures.items():
+            pass
+        print("Collected")
+
+    def _interactive_parse_parameters(self):
+        filename = posixpath.join(self.path, "parameters.out")
+        with OutputCatcher(filename):
+            self._interactive_library.print_potential_parameters()
+        

@@ -354,14 +354,14 @@ class TILDParallel(CompoundVertex):
             g.create_jobs_a,
             g.create_jobs_b,
             g.check_steps, "false",
+            g.check_convergence, "false",
             g.run_lambda_points,
             g.clock,
             g.post,
-            g.check_convergence, "true",
             g.exit
         )
         g.make_edge(g.check_steps, g.exit, "true")
-        g.make_edge(g.check_convergence, g.check_steps, "false")
+        g.make_edge(g.check_convergence, g.exit, "true")
         g.make_edge(g.exit, g.check_steps, "false")
         g.starting_vertex = g.validate
         g.restarting_vertex = g.create_jobs_a

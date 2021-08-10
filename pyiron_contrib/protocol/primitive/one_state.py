@@ -355,6 +355,8 @@ class CreateSubJobs(PrimitiveVertex):
             job.interactive_open()
             # Note: This might be done by default at some point in LammpsInteractive,
             # and could then be removed here
+            if isinstance(job, LammpsInteractive):
+                job.interactive_initialize_interface()
             job.interactive_flush_frequency = 10 ** 10
             job.interactive_write_frequency = 10 ** 10
             job.validate_ready_to_run()

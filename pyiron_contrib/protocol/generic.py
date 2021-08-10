@@ -323,10 +323,9 @@ class PrimitiveVertex(Vertex):
         """The command method controls the physics"""
         pass
 
-    def execute_parallel(self, n, return_dict):
+    def execute_parallel(self):
         """How to execute in parallel when there's a list of these vertices together."""
-        output_data = self.command(**self.input.resolve())
-        return_dict[n] = output_data
+        return self.command(**self.input.resolve())
 
 
 class CompoundVertex(Vertex):
@@ -424,10 +423,10 @@ class CompoundVertex(Vertex):
         self.graph.active_vertex = self.graph.restarting_vertex
         self.update_and_archive(self.get_output())
 
-    def execute_parallel(self, n, all_child_output):
+    def execute_parallel(self):
         """How to execute in parallel when there's a list of these vertices together."""
         self.execute()
-        all_child_output[n] = self.get_output()
+        return self.get_output()
 
     def set_graph_archive_clock(self, clock, recursive=False):
         for _, vertex in self.graph.vertices.items():

@@ -169,20 +169,18 @@ class ParallelList(ListVertex):
 
         sleep_time = ~self.sleep_time
 
-        def run_child(n, return_dict, n_child, logger, affinity):
+        def run_child(n, return_dict, n_child, logger):
             proc = psutil.Process()  # get self pid
-            proc.cpu_affinity(affinity)
-            logger.info("child {} running on core {}".format(n, affinity))
+            available_cpus = proc.cpu_affinity()
+            proc.cpu_affinity([available_cpus[n]])
+            logger.info("child {} running on core {}".format(n, [available_cpus[n]]))
             return_dict[n] = n_child.execute_parallel()
 
         all_child_output = Manager().dict()
-        n_cores = psutil.cpu_count()
 
         jobs = []
-        for i, (core, child) in enumerate(zip(np.arange(n_cores), self.children)):
-            affinity = [core]
-            d = dict(affinity=affinity)
-            job = Process(target=run_child, args=(i, all_child_output, child, self.logger), kwargs=d)
+        for i, child in enumerate(self.children):
+            job = Process(target=run_child, args=(i, all_child_output, child, self.logger))
             jobs.append(job)
             job.start()
             time.sleep(sleep_time)

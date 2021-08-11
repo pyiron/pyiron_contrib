@@ -1,6 +1,6 @@
 import posixpath
 import os
-import subprocess
+import io
 
 from pyiron_contrib.atomistics.atomicrex.utility_functions import OutputCatcher
 from pyiron_contrib.atomistics.atomicrex import output
@@ -81,9 +81,10 @@ class AtomicrexInteractive(AtomicrexBase, InteractiveBase):
         self.interactive_prepare_job()
         # Catching the output seems impossible?
         filename = posixpath.join(self.path, "error.out")
-        #with OutputCatcher(filename):
-        self._interactive_library.perform_fitting()
+        with OutputCatcher(filename) as out:
+            self._interactive_library.perform_fitting()
         #self.interactive_collect()
+        return out
         
     # Use the library functions to collect output, since no output is produced
     # when fitting using scipy

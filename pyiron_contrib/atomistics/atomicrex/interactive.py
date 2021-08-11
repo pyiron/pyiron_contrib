@@ -1,6 +1,5 @@
 import posixpath
-import os
-import io
+import os, sys
 
 from pyiron_contrib.atomistics.atomicrex.utility_functions import OutputCatcher
 from pyiron_contrib.atomistics.atomicrex import output
@@ -84,7 +83,7 @@ class AtomicrexInteractive(AtomicrexBase, InteractiveBase):
         with OutputCatcher(filename) as out:
             self._interactive_library.perform_fitting()
         #self.interactive_collect()
-        return out
+        
         
     # Use the library functions to collect output, since no output is produced
     # when fitting using scipy
@@ -97,4 +96,13 @@ class AtomicrexInteractive(AtomicrexBase, InteractiveBase):
         filename = posixpath.join(self.path, "parameters.out")
         with OutputCatcher(filename):
             self._interactive_library.print_potential_parameters()
-        
+    
+    def _interactive_parse_structures(self):
+        filename = posixpath.join(self.path, "structures.out")
+        with OutputCatcher(filename):
+            for name, structure in sorted(self._interactive_library.structures.items()):
+                print(f"Structure {name}:\n")
+                structure.compute_properties()
+                structure.print_properties()
+                #print("\n")
+

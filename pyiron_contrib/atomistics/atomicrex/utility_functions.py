@@ -8,7 +8,6 @@ import select
 import ctypes
 
 
-
 def write_pretty_xml(elem, filename):
     """
     The files directly written with xml.etree.ElemenTrees contain no newlines and indents. 
@@ -64,4 +63,3 @@ class OutputCatcher():
             char = os.read(self.stdout_new, 1024)
             self.file_out.write(char)
             r, _, _ = select.select([self.stdout_new], [], [], 0)
-

@@ -44,7 +44,6 @@ class OutputCatcher():
         os.dup2(self.file_out, 1)
         sys.stdout = os.fdopen(self.stdout_new, 'w')
         if self.threaded:
-            self.sys_fileno = sys.stdout.fileno()
             self.worker = threading.Thread(target=self.read_output)
             self.worker.start()
             time.sleep(0.01)

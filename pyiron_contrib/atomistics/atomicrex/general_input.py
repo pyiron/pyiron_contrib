@@ -15,6 +15,8 @@ class GeneralARInput(DataContainer):
     Class to store general input of an atomicrex job,
     f.e. the fit algorithm.
     """  
+    __version__ = "0.1.0"
+
     def __init__(
         self,
         table_name="general_input",
@@ -38,7 +40,8 @@ class GeneralARInput(DataContainer):
         self.fit_algorithm = fit_algorithm
         self.output_interval = output_interval
         self.enable_fitting = enable_fitting
-        
+        # version "0.1.0"
+        self.output_file = "atomicrex.out"
 
     def _write_xml_file(self, directory):
         """Internal function.
@@ -48,6 +51,9 @@ class GeneralARInput(DataContainer):
             directory (str): Working directory
         """        
         job = ET.Element("job")
+        
+        output_file = ET.SubElement(job, "output-file")
+        output_file.text = self.output_file
 
         name = ET.SubElement(job, "name")
         name.text = self.name
@@ -244,7 +250,6 @@ class SpaMinimizer:
         if self.local_minimizer is not None:
             spa.append(self.local_minimizer._to_xml_element())
         return spa
-
 
 class NloptAlgorithm(DataContainer):
     """

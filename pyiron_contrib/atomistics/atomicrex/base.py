@@ -95,7 +95,10 @@ class AtomicrexBase(PotentialFittingBase):
         #self.input.from_hdf(self._hdf5)
         if cwd is None:
             cwd = self.working_directory
-        filepath = f"{cwd}/error.out"
+        if self.input.__version__ == "0.1.0":
+            filepath = f"{cwd}/atomicrex.out"
+        else:
+            filepath = f"{cwd}/error.out"
         
         finished_triggered = False
         params_triggered = False
@@ -103,12 +106,15 @@ class AtomicrexBase(PotentialFittingBase):
 
         # Allocate numpy arrays for iterations and residual
         # I assume this is better than appending to a list if many iterations are done
-        residuals = np.zeros(self.input.fit_algorithm.max_iter)
+        if self.input.fit_algorithm.name == "BFGS":
+            residuals = np.zeros(self.input.fit_algorithm.max_iter + 1)
+        else:
+            residuals = np.zeros(self.input.fit_algorithm.max_iter)
        
         # Since every step is written out in atomicrex arange can be used.
         # Needs to be adapted when atomicrex output is changed to write only every xth step.
         # Unsinged 32 bit int should be enough or this will overflow anyway in most cases.
-        iterations = np.arange(start=1, stop=self.input.fit_algorithm.max_iter+1, dtype=np.uintc)
+        iterations = np.arange(start=1, stop=len(residuals)+1, dtype=np.uintc)
         iter_index = 0
 
         with open(filepath, "r") as f:

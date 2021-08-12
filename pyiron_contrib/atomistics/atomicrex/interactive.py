@@ -1,7 +1,6 @@
 import posixpath
 import os, sys
 
-from pyiron_contrib.atomistics.atomicrex.utility_functions import OutputCatcher
 from pyiron_contrib.atomistics.atomicrex import output
 
 from pyiron_base.job.interactive import InteractiveBase
@@ -78,31 +77,19 @@ class AtomicrexInteractive(AtomicrexBase, InteractiveBase):
     
     def run_if_interactive(self):
         self.interactive_prepare_job()
-        # Catching the output seems impossible?
-        filename = posixpath.join(self.path, "error.out")
-        with OutputCatcher(filename) as out:
-            self._interactive_library.perform_fitting()
-        #self.interactive_collect()
-        
+        self._interactive_library.perform_fitting()
+        self.interactive_collect()
         
     # Use the library functions to collect output, since no output is produced
     # when fitting using scipy
     def interactive_collect(self):
-        for identifier, structure in self._interactive_library.structures.items():
-            pass
-        print("Collected")
+        pass
 
     def _interactive_parse_parameters(self):
-        filename = posixpath.join(self.path, "parameters.out")
-        with OutputCatcher(filename):
-            self._interactive_library.print_potential_parameters()
+        self._interactive_library.print_potential_parameters()
     
     def _interactive_parse_structures(self):
-        filename = posixpath.join(self.path, "structures.out")
-        with OutputCatcher(filename):
-            for name, structure in sorted(self._interactive_library.structures.items()):
-                print(f"Structure {name}:\n")
-                structure.compute_properties()
-                structure.print_properties()
-                #print("\n")
+        for name, structure in self._interactive_library.structures.items():
+            structure.compute_properties()
+            structure.print_properties()
 

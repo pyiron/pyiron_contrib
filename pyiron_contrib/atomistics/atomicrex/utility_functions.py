@@ -24,6 +24,11 @@ def write_pretty_xml(elem, filename):
         f.write(reparsed)
     return
 
+
+"""
+This was supposed to catch the output of atomicrex when running it using its python interface.
+It never worked completely but maybe this will be useful for some other code
+
 class OutputCatcher():
     libc = ctypes.CDLL(None)
     c_stdout = ctypes.c_void_p.in_dll(libc, 'stdout')
@@ -48,6 +53,7 @@ class OutputCatcher():
             time.sleep(0.01)
  
     def __exit__(self, exc_type, exc_val, exc_tb):
+        os.close()
         if self.threaded:
             self.worker.join()
         else:
@@ -63,3 +69,4 @@ class OutputCatcher():
             char = os.read(self.stdout_new, 1024)
             self.file_out.write(char)
             r, _, _ = select.select([self.stdout_new], [], [], 0)
+"""

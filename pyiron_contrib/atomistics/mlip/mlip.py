@@ -4,6 +4,7 @@
 
 from __future__ import print_function
 from itertools import islice
+import numbers
 import numpy as np
 import os
 import pandas as pd
@@ -195,7 +196,10 @@ class Mlip(GenericJob):
 
     def get_suggested_number_of_configuration(self, species_count=None, multiplication_factor=2.0):
         if self.input['filepath'] == 'auto':
-            source = self._find_potential(self.input['potential'])
+            potential = self.input['potential']
+            if isinstance(potential, numbers.Integral):
+                potential = f"{potential:02}g.mtp"
+            source = self._find_potential(potential)
         else:
             source = self.input['filepath']
         with open(source) as f:
@@ -246,7 +250,10 @@ class Mlip(GenericJob):
         if cwd is not None:
             file_name = posixpath.join(cwd, file_name)
         if self.input['filepath'] == 'auto':
-            source = self._find_potential(self.input['potential'])
+            potential = self.input['potential']
+            if isinstance(potential, numbers.Integral):
+                potential = f"{potential:02}g.mtp"
+            source = self._find_potential(potential)
         else:
             source = self.input['filepath']
         with open(source) as f:

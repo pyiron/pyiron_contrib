@@ -69,6 +69,15 @@ class Mlip(GenericJob):
     def potential_dataframe(self, elements=None):
         """
         :class:`pandas.DataFrame`: potential dataframe for lammps jobs
+
+        .. attention::
+
+            The `elements` argument must be given for in any case for non-unary alloys, as the scrapping code from the
+            training data is currently broken!
+
+        Args:
+            elements (list of str, optional): name of elements in this potential in the order of their indices in pyiron
+                                              structures, if not given use elements seen in training data
         """
         if elements is None:
             elements = self.input["species"]

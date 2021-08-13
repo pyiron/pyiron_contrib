@@ -203,6 +203,9 @@ class AlgorithmFactory(PyironFactory):
     def gn_isres(stopval=1e-10, max_iter=50, maxtime=None, ftol_rel=None, ftol_abs=None, xtol_rel=None, seed=None):
         return NloptAlgorithm(name="GN_ISRES", stopval=stopval, max_iter=max_iter, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed)
 
+    @staticmethod
+    def scipy_algorithm():
+        return ScipyAlgorithm()
 
 class AtomicrexAlgorithm(DataContainer):
     """
@@ -327,4 +330,40 @@ class NloptGlobalLocal(NloptAlgorithm):
         local = self.local_minimizer._to_xml_element()
         nlopt.append(local)
         return nlopt
-        
+    
+
+class ScipyAlgorithm:
+    __version__ = "0.0.1"
+    __hdf_version__ = "0.0.1"
+
+    def __init__(self):
+        self.global_minimizer = None
+        self.local_minimizer_kwargs = {
+            "method": "L-BFGS-B",
+            "jac": None,
+            "hess": None,
+            "bounds": None,
+            "constraints": (),
+            "tol": None,
+            "options": None,
+        }
+        self.global_minimizer_kwargs = {
+        }
+
+    def to_hdf(self, hdf, group):
+        pass
+
+    def from_hdf(self, hdf, group):
+        pass
+
+    def _type_to_hdf(self, hdf):
+        """
+        Internal helper function to save type and version in hdf root
+
+        Args:
+            hdf (ProjectHDFio): HDF5 group object
+        """
+        hdf["NAME"] = self.__class__.__name__
+        hdf["TYPE"] = str(type(self))
+        hdf["VERSION"] = self.__version__
+        hdf["HDF_VERSION"] = self.__hdf_version__

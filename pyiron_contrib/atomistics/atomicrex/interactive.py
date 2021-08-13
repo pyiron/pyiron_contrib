@@ -1,5 +1,8 @@
-import posixpath
-import os, sys
+import posixpath, os
+
+from scipy import optimize
+
+from pyiron_contrib.atomistics.atomicrex.general_input import ScipyAlgorithm
 
 from pyiron_contrib.atomistics.atomicrex import output
 
@@ -35,12 +38,13 @@ class AtomicrexInteractive(AtomicrexBase, InteractiveBase):
         if not self._read_input_files:
             if not os.path.isdir(self.path):
                 os.makedirs(self.path)
+            os.chdir(self.path)
             self.write_input(directory=self.path)
-            input_file = posixpath.join(self.path, "main.xml")
+            input_file = ("main.xml")
             self._interactive_library.parse_input_file(input_file)
             self._read_input_files = True
         self._interactive_library.prepare_fitting()
-        self._interactive_library.set_verbosity(2)
+        #self._interactive_library.set_verbosity(2)
         
 
     def interactive_add_structure(identifier, structure, forces=None, params=None):
@@ -77,12 +81,37 @@ class AtomicrexInteractive(AtomicrexBase, InteractiveBase):
     
     def run_if_interactive(self):
         self.interactive_prepare_job()
-        self._interactive_library.perform_fitting()
-        self.interactive_collect()
+        if isinstance(self.fit_algorithm, ScipyAlgorithm):
+            if self.fit_algorithm.global_minimizer is None:
+                res = optimize.minimize(
+                    fun = self._interactive_library.calculate_residual,
+                    x0 = self._interactive_library.get_potential_parameters(),
+                    **self.fit_algorithm.local_minimizer_kwargs)
+            else:
+                minimizer_func = optimize.__getattribute__(self.global_minimizer)
+                res = minimizer_func(
+                    func=self._interactive_library.calculate_residual,
+                    **self.fit_algorithm.global_minimizer_kwargs,
+                )
+            
+            self._interactive_library.set_potential_parameters(res.x)
+            self.output.residual = self._interactive_library.calculate_residual()
+            self.output.iterations = res.nit
+            self._interactive_library.output_results()
+            self._interactive_library.print_properties()
+
+            ## Delete the atomicrex object at the end to flush outputs to file
+            del(self._interactive_library)
+             
+        else:
+            self._interactive_library.perform_fitting()
+            ## Delete the atomicrex object at the end to flush outputs to file
+            del(self._interactive_library)
+            self.collect_output(cwd=self.path)
         
     # Use the library functions to collect output, since no output is produced
     # when fitting using scipy
-    def interactive_collect(self):
+    def _scipy_collect(self):
         pass
 
     def _interactive_parse_parameters(self):

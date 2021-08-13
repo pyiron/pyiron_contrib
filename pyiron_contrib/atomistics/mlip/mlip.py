@@ -50,6 +50,7 @@ class Mlip(GenericJob):
                 self._executable = Executable(
                     codename=self.__name__, path_binary_codes=s.resource_paths
                 )
+
     @property
     def calculation_dataframe(self):
         job_id_lst, time_step_start_lst, time_step_end_lst, time_step_delta_lst = self._job_dict_lst(self._job_dict)
@@ -65,18 +66,23 @@ class Mlip(GenericJob):
         if os.path.exists(pot) and os.path.exists(states):
             return [pot, states]
 
-    def potential_dataframe(self, elements):
+    def potential_dataframe(self, elements=None):
         """
         :class:`pandas.DataFrame`: potential dataframe for lammps jobs
         """
+        if elements is None:
+            elements = self.input["species"]
+            if elements is None:
+                raise ValueError("elements not defined in input, elements must be explicitely passed!")
+
         if self.status.finished:
             return pd.DataFrame({
-                        'Name': [''.join(elements)],
-                        'Filename': [[self.potential_files[0]]],
-                        'Model': ['Custom'],
-                        'Species': [elements],
-                        'Config': [['pair_style mlip mlip.ini\n',
-                                    'pair_coeff * *\n'
+                        "Name": ["".join(elements)],
+                        "Filename": [[self.potential_files[0]]],
+                        "Model": ["Custom"],
+                        "Species": [elements],
+                        "Config": [["pair_style mlip mlip.ini\n",
+                                    "pair_coeff * *\n"
                         ]]
             })
 
@@ -101,7 +107,9 @@ class Mlip(GenericJob):
                 for f in self._restart_file_list
             ] + list(self._restart_file_dict.values())
         if 'testing.cfg' not in restart_file_lst:
-            species_count = self._write_test_set(file_name='testing.cfg', cwd=self.working_directory)
+            species = self._write_test_set(file_name='testing.cfg', cwd=self.working_directory)
+            species_count = len(species)
+            self.input['species'] = species
         elif self.input['filepath'] != 'auto':
             species_count = 0
         else: 
@@ -249,10 +257,11 @@ class Mlip(GenericJob):
         return np.array([stresses[0][0], stresses[1][1], stresses[2][2],
                          stresses[1][2], stresses[0][1], stresses[0][2]]) * gpa_to_ev_ang
 
-    def _write_configurations(self, file_name='training.cfg', cwd=None, respect_step=True, return_max_index=False):
+    def _write_configurations(self, file_name='training.cfg', cwd=None, respect_step=True):
         if cwd is not None:
             file_name = posixpath.join(cwd, file_name)
         indices_lst, position_lst, forces_lst, cell_lst, energy_lst, track_lst, stress_lst = [], [], [], [], [], [], []
+        all_species = set()
         for job_id, value in self._job_dict.items():
             ham = self.project.inspect(job_id)
             if respect_step:
@@ -265,6 +274,7 @@ class Mlip(GenericJob):
             # HACK: until the training container has a proper HDF5 interface
             if ham.__name__ == "TrainingContainer":
                 job = ham.to_object()
+                all_species.update(job.get_elements())
                 pd = job.to_pandas()
                 for time_step, (name, atoms, energy, forces, _) in islice(enumerate(pd.itertuples(index=False)),
                                                                           start, end, delta):
@@ -278,6 +288,9 @@ class Mlip(GenericJob):
                 continue
             original_dict = {el: ind for ind, el in enumerate(sorted(ham['input/structure/species']))}
             species_dict = {ind: original_dict[el] for ind, el in enumerate(ham['input/structure/species'])}
+            # HACK: this does not preserve element order, but the old code is broken for structures with different
+            # species anyway
+            all_species.update(ham['input/structure/species'])
             if ham.__name__ in ['Vasp', 'ThermoIntDftEam', 'ThermoIntDftMtp', 'ThermoIntVasp']:
                 if len(ham['output/outcar/stresses']) != 0:
                     for position, forces, cell, energy, stresses, volume in zip(ham['output/generic/positions'][start:end:delta],
@@ -344,19 +357,10 @@ class Mlip(GenericJob):
                   energy_lst=energy_lst,
                   track_lst=track_lst,
                   stress_lst=stress_lst)
-        if return_max_index:
-            total_lst = []
-            for ind_lst in indices_lst:
-                if isinstance(ind_lst, list):
-                    total_lst += ind_lst
-                elif isinstance(ind_lst, np.ndarray):
-                    total_lst += ind_lst.tolist()
-                else:
-                    raise TypeError()
-            return np.max(total_lst) + 1
+        return list(all_species)
 
     def _write_test_set(self, file_name='testing.cfg', cwd=None):
-        return self._write_configurations(file_name=file_name, cwd=cwd, respect_step=False, return_max_index=True)
+        return self._write_configurations(file_name=file_name, cwd=cwd, respect_step=False)
 
     def _write_training_set(self, file_name='training.cfg', cwd=None):
         self._write_configurations(file_name=file_name, cwd=cwd, respect_step=True)

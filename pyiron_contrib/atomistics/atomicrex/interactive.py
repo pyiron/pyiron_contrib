@@ -103,8 +103,7 @@ class AtomicrexInteractive(AtomicrexBase, InteractiveBase):
             ## Delete the atomicrex object at the end to flush outputs to file
             del(self._interactive_library)
             self._scipy_collect()
-            self.status.finished = True
-            self.to_hdf()
+            
              
         else:
             self._interactive_library.perform_fitting()
@@ -112,6 +111,9 @@ class AtomicrexInteractive(AtomicrexBase, InteractiveBase):
             del(self._interactive_library)
             self.collect_output(cwd=self.path)
         
+        self.status.finished = True
+        self.to_hdf()
+
     def _scipy_collect(self):
         pass
 

@@ -109,9 +109,7 @@ class AtomicrexInteractive(AtomicrexBase, InteractiveBase):
             del(self._interactive_library)
             self.collect_output(cwd=self.path)
         
-        self.status.finished = True
         
-
     def _scipy_collect(self, cwd=None):
         """Internal function that parses the output of an atomicrex job
         fitted using scipy.
@@ -157,6 +155,8 @@ class AtomicrexInteractive(AtomicrexBase, InteractiveBase):
                             # Collecting structure information finished, hand over structures class
                             self.structures._parse_final_properties(final_property_lines)
                             structures_triggered = False
+        
+        self.status.finished = True
         self.to_hdf()
 
 

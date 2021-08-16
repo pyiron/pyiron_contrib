@@ -132,22 +132,19 @@ class AtomicrexInteractive(AtomicrexBase, InteractiveBase):
                     self.output.error = l
                 
                 else:
-                    if l.startswith("Potential parameters"):
-                        # Get the number of dofs
-                        n_fit_dofs = int(l.split("=")[1][:-3])
-                        params_triggered = True
-                
-                    elif params_triggered:
+                    if params_triggered:
                         if not l.startswith("---"):
                             final_parameter_lines.append(l)
                         else:
                             # Collecting lines with final parameters finished, hand over to the potential class
                             self.potential._parse_final_parameters(final_parameter_lines)
                             params_triggered = False
-                
-                    elif l.startswith("Computing"):
-                        structures_triggered = True
-                     
+                            
+                    elif l.startswith("Potential parameters"):
+                        # Get the number of dofs
+                        n_fit_dofs = int(l.split("=")[1][:-3])
+                        params_triggered = True
+
                     elif structures_triggered:
                         if not l.startswith("---"):
                             final_property_lines.append(l)
@@ -155,6 +152,11 @@ class AtomicrexInteractive(AtomicrexBase, InteractiveBase):
                             # Collecting structure information finished, hand over structures class
                             self.structures._parse_final_properties(final_property_lines)
                             structures_triggered = False
+                    
+                    elif l.startswith("Computing"):
+                        structures_triggered = True
+                     
+                    
         
         self.status.finished = True
         self.to_hdf()

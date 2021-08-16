@@ -80,13 +80,14 @@ class GeneralARInput(DataContainer):
             species.set("mass", f"{mass}")
             species.set("atomic-number", f"{index}")
 
-        fitting = ET.SubElement(job, "fitting")
-        if self.enable_fitting:
-            fitting.set("enabled", "true")
-        else:
-            fitting.set("enabled", "false")
-        fitting.set("output-interval", f"{self.output_interval}")
-        fitting.append(self.fit_algorithm._to_xml_element())
+        if not isinstance(self.fit_algorithm, ScipyAlgorithm):
+            fitting = ET.SubElement(job, "fitting")
+            if self.enable_fitting:
+                fitting.set("enabled", "true")
+            else:
+                fitting.set("enabled", "false")
+            fitting.set("output-interval", f"{self.output_interval}")
+            fitting.append(self.fit_algorithm._to_xml_element())
 
         potentials = ET.SubElement(job, "potentials")
         include = ET.SubElement(potentials, "xi:include")
@@ -347,14 +348,20 @@ class ScipyAlgorithm:
             "tol": None,
             "options": None,
         }
-        self.global_minimizer_kwargs = {
-        }
+        self.global_minimizer_kwargs = {}
 
-    def to_hdf(self, hdf, group):
-        pass
+    def to_hdf(self, hdf, group_name):
+        with hdf.open(group_name) as h:
+            self._type_to_hdf(h)
+            h["global_minimizer"] = self.global_minimizer
+            h.put("local_minimizer_kwargs", self.local_minimizer_kwargs)
+            h.put("global_minimizer_kwargs", self.global_minimizer_kwargs)
 
-    def from_hdf(self, hdf, group):
-        pass
+    def from_hdf(self, hdf, group_name):
+        with hdf.open(group_name) as h:
+            self._type_to_hdf(h)
+            self.global_minimizer = h["global_minimizer"]
+
 
     def _type_to_hdf(self, hdf):
         """

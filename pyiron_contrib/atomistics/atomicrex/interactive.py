@@ -81,17 +81,17 @@ class AtomicrexInteractive(AtomicrexBase, InteractiveBase):
     
     def run_if_interactive(self):
         self.interactive_prepare_job()
-        if isinstance(self.fit_algorithm, ScipyAlgorithm):
-            if self.fit_algorithm.global_minimizer is None:
+        if isinstance(self.input.fit_algorithm, ScipyAlgorithm):
+            if self.input.fit_algorithm.global_minimizer is None:
                 res = optimize.minimize(
                     fun = self._interactive_library.calculate_residual,
                     x0 = self._interactive_library.get_potential_parameters(),
-                    **self.fit_algorithm.local_minimizer_kwargs)
+                    **self.input.fit_algorithm.local_minimizer_kwargs)
             else:
-                minimizer_func = optimize.__getattribute__(self.global_minimizer)
+                minimizer_func = optimize.__getattribute__(self.input.fit_algorithm.global_minimizer)
                 res = minimizer_func(
                     func=self._interactive_library.calculate_residual,
-                    **self.fit_algorithm.global_minimizer_kwargs,
+                    **self.input.fit_algorithm.global_minimizer_kwargs,
                 )
             
             self._interactive_library.set_potential_parameters(res.x)
@@ -102,6 +102,9 @@ class AtomicrexInteractive(AtomicrexBase, InteractiveBase):
 
             ## Delete the atomicrex object at the end to flush outputs to file
             del(self._interactive_library)
+            self._scipy_collect()
+            self.status.finished = True
+            self.to_hdf()
              
         else:
             self._interactive_library.perform_fitting()
@@ -109,16 +112,7 @@ class AtomicrexInteractive(AtomicrexBase, InteractiveBase):
             del(self._interactive_library)
             self.collect_output(cwd=self.path)
         
-    # Use the library functions to collect output, since no output is produced
-    # when fitting using scipy
     def _scipy_collect(self):
         pass
 
-    def _interactive_parse_parameters(self):
-        self._interactive_library.print_potential_parameters()
-    
-    def _interactive_parse_structures(self):
-        for name, structure in self._interactive_library.structures.items():
-            structure.compute_properties()
-            structure.print_properties()
 

@@ -35,7 +35,7 @@ setup(
         'numpy==1.21.2',
         'pyiron_base==0.2.20',
         'scipy==1.7.1',
-        'seaborn==0.11.1'
+        'seaborn==0.11.2'
     ],
     extras_require={
         'atomistic': [

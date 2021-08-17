@@ -2,7 +2,6 @@ from pyiron_atomistics._tests import TestWithProject
 from pyiron_contrib.atomistics.atomistics.job.structurestorage import StructureStorage
 import os.path
 import numpy as np
-import unittest
 
 class TestContainer(TestWithProject):
 
@@ -74,8 +73,18 @@ class TestContainer(TestWithProject):
             self.assertEqual(self.cont.get_array("identifier", len(self.structures) + i),
                              str(len(self.structures) + i),
                              "Default identifier is incorrect.")
-    
-    @unittest.skip("Skip failing test to test own additional implementation")
+
+        self.assertTrue("cell" in self.cont._per_chunk_arrays, "Cells are not saved as per chunk array!")
+        try:
+            # regression test for a bug, where adding a structure with 3 atoms caused the cells to be saved as per
+            # element rather than per chunk
+            self.cont.add_structure(self.project.create.structure.atoms(
+                    symbols=['Fe', 'Fe', 'Fe'], positions=[ [0, 0, 0], [1, 0, 0], [2, 0, 0] ],
+                    cell=[10, 10, 10]
+            ))
+        except ValueError:
+            self.fail("Adding a structure with three atoms should not mess with cell storage!")
+
     def test_add_structure_kwargs(self):
         """Additional kwargs given to add_structure should create appropriate custom arrays."""
 

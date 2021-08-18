@@ -1,4 +1,4 @@
-import posixpath, os
+import posixpath, os, time
 
 from scipy import optimize
 
@@ -13,12 +13,6 @@ try:
     import atomicrex
 except ImportError:
     pass
-
-
-## Class defined for future addition of other codes
-## Not sure which functionality (if any) can be extracted yet, but a similar pattern is followed in other pyiron modules
-
-
 
 class AtomicrexInteractive(AtomicrexBase, InteractiveBase):
     def __init__(self, project, job_name):
@@ -82,34 +76,40 @@ class AtomicrexInteractive(AtomicrexBase, InteractiveBase):
     def run_if_interactive(self):
         self.interactive_prepare_job()
         if isinstance(self.input.fit_algorithm, ScipyAlgorithm):
-            if self.input.fit_algorithm.global_minimizer is None:
-                res = optimize.minimize(
-                    fun = self._interactive_library.calculate_residual,
-                    x0 = self._interactive_library.get_potential_parameters(),
-                    **self.input.fit_algorithm.local_minimizer_kwargs)
-            else:
-                minimizer_func = optimize.__getattribute__(self.input.fit_algorithm.global_minimizer)
-                res = minimizer_func(
-                    func=self._interactive_library.calculate_residual,
-                    **self.input.fit_algorithm.global_minimizer_kwargs,
-                )
-            
-            self._interactive_library.set_potential_parameters(res.x)
-            self.output.residual = self._interactive_library.calculate_residual()
-            self.output.iterations = res.nit
-            self._interactive_library.print_potential_parameters()
-            self._interactive_library.print_properties()
-            self._interactive_library.output_results()
-            ## Delete the atomicrex object at the end to flush outputs to file
-            del(self._interactive_library)
-            self._scipy_collect(cwd=self.path) 
+            self._scipy_run()
+            self._scipy_collect(cwd=self.path)
         else:
             self._interactive_library.perform_fitting()
             ## Delete the atomicrex object at the end to flush outputs to file
             del(self._interactive_library)
             self.collect_output(cwd=self.path)
         
+    def _scipy_run(self):
+        if self.input.fit_algorithm.global_minimizer is None:
+            res = optimize.minimize(
+                fun = self._interactive_library.calculate_residual,
+                x0 = self._interactive_library.get_potential_parameters(),
+                **self.input.fit_algorithm.local_minimizer_kwargs
+            )
+        else:
+            minimizer_func = optimize.__getattribute__(self.input.fit_algorithm.global_minimizer)
+            res = minimizer_func(
+                func=self._interactive_library.calculate_residual,
+                **self.input.fit_algorithm.global_minimizer_kwargs,
+            )
         
+        self._interactive_library.set_potential_parameters(res.x)
+        self.output.residual = self._interactive_library.calculate_residual()
+        self.output.iterations = res.nit
+        print(res)
+        self._interactive_library.print_potential_parameters()
+        self._interactive_library.print_properties()
+        self._interactive_library.output_results()
+        ## Delete the atomicrex object at the end to flush outputs to file
+        del(self._interactive_library)
+        time.sleep(1.0)
+        return res
+
     def _scipy_collect(self, cwd=None):
         """Internal function that parses the output of an atomicrex job
         fitted using scipy.

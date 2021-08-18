@@ -15,6 +15,8 @@ from pyiron_contrib.atomistics.atomicrex.function_factory import FunctionFactory
 s = Settings()
 
 
+## Class defined for future addition of other codes
+## Not sure which functionality (if any) can be extracted yet, but a similar pattern is followed in other pyiron modules
 class PotentialFittingBase(GenericJob):
     def __init__(self, project, job_name):
         super().__init__(project, job_name)

@@ -13,6 +13,7 @@ import scipy.constants
 from pyiron_base import Settings, GenericParameters, GenericJob, Executable
 from pyiron_atomistics import ase_to_pyiron
 from pyiron_contrib.atomistics.mlip.cfgs import savecfgs, loadcfgs, Cfg
+from pyiron_contrib.atomistics.mlip.potential import MtpPotential
 
 __author__ = "Jan Janssen"
 __copyright__ = "Copyright 2020, Max-Planck-Institut für Eisenforschung GmbH - " \
@@ -28,7 +29,6 @@ s = Settings()
 
 gpa_to_ev_ang = 1e22 / scipy.constants.physical_constants['joule-electron volt relationship'][0]
 
-
 class Mlip(GenericJob):
     def __init__(self, project, job_name):
         super(Mlip, self).__init__(project, job_name)
@@ -38,6 +38,7 @@ class Mlip(GenericJob):
         self._job_dict = {}
         self.input = MlipParameter()
         self._command_line = CommandLine()
+        self._potential = MtpPotential()
 
     def _executable_activate(self, enforce=False):
         if self._executable is None or enforce:
@@ -95,6 +96,12 @@ class Mlip(GenericJob):
                                     "pair_coeff * *\n"
                         ]]
             })
+
+    def potential(self):
+        if self.status.finished:
+            return self._potential
+        else:
+            raise ValueError("potential only available on successfully finished jobs")
 
     def set_input_to_read_only(self):
         """
@@ -154,6 +161,7 @@ class Mlip(GenericJob):
             _, _, _, _, _, _, grades_lst, job_id_grades_lst, timestep_grades_lst = read_cgfs(file_name)
         else:
             grades_lst, job_id_grades_lst, timestep_grades_lst = [], [], []
+        self._potential.load(os.path.join(self.working_directory, "Trained.mtp_"))
         with self.project_hdf5.open('output') as hdf5_output:
             hdf5_output['grades'] = grades_lst
             hdf5_output['job_id'] = job_id_grades_lst
@@ -162,6 +170,7 @@ class Mlip(GenericJob):
             hdf5_output['timestep_diff'] = timestep_diff_lst
             hdf5_output['job_id_new'] = job_id_new_training_lst
             hdf5_output['timestep_new'] = timestep_new_training_lst
+            potential.to_hdf(hdf=hdf5_output)
 
     def get_structure(self, iteration_step=-1):
         job = self.project.load(self['output/job_id_diff'][iteration_step])
@@ -193,6 +202,8 @@ class Mlip(GenericJob):
                     time_step_end=end,
                     time_step_delta=delta
                 )
+        with self._hdf5.open("output") as hdf_output:
+            self._potential.from_hdf(hdf=hdf_output)
 
     def get_suggested_number_of_configuration(self, species_count=None, multiplication_factor=2.0):
         if self.input['filepath'] == 'auto':

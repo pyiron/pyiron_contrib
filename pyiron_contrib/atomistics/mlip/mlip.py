@@ -202,8 +202,9 @@ class Mlip(GenericJob):
                     time_step_end=end,
                     time_step_delta=delta
                 )
-        with self._hdf5.open("output") as hdf_output:
-            self._potential.from_hdf(hdf=hdf_output)
+        if self.status.finished:
+            with self._hdf5.open("output") as hdf_output:
+                self._potential.from_hdf(hdf=hdf_output)
 
     def get_suggested_number_of_configuration(self, species_count=None, multiplication_factor=2.0):
         if self.input['filepath'] == 'auto':

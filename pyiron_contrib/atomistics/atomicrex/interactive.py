@@ -77,6 +77,8 @@ class AtomicrexInteractive(AtomicrexBase, InteractiveBase):
         self.interactive_prepare_job()
         if isinstance(self.input.fit_algorithm, ScipyAlgorithm):
             self._scipy_run()
+            # sleep between running and collecting so atomicrex output is flushed to file
+            time.sleep(2.0)
             self._scipy_collect(cwd=self.path)
         else:
             self._interactive_library.perform_fitting()
@@ -107,7 +109,6 @@ class AtomicrexInteractive(AtomicrexBase, InteractiveBase):
         self._interactive_library.output_results()
         ## Delete the atomicrex object at the end to flush outputs to file
         del(self._interactive_library)
-        time.sleep(1.0)
         return res
 
     def _scipy_collect(self, cwd=None):

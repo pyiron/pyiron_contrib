@@ -32,7 +32,7 @@ gpa_to_ev_ang = 1e22 / scipy.constants.physical_constants['joule-electron volt r
 class Mlip(GenericJob):
     def __init__(self, project, job_name):
         super(Mlip, self).__init__(project, job_name)
-        self.__version__ = None
+        self.__version__ = '0.1.0'
         self.__name__ = "Mlip"
         self._executable_activate()
         self._job_dict = {}

@@ -58,7 +58,7 @@ class MtpPotential:
     def load(self, filename):
         with open(filename) as f:
             self._store.clear()
-            self._store.update(parse_potential(f.read()))
+            self._store.update(parse_potential(f.read()), wrap=True)
 
     def to_hdf(self, hdf, group_name=None):
         self._store.to_hdf(hdf=hdf, group_name=group_name)

@@ -82,46 +82,51 @@ class S3ioConnect:
                 bucket (str)
             Each additional keyword is passed on to boto3 as is.
         """
-        if (isinstance(credentials, boto3.resources.base.ServiceResource)):
-            if bucket_name is None:
-                raise ValueError("Only boto3.resource given. The bucket_name needs to be specified!")
-            self.s3resource = credentials
-            self.bucket_name = bucket_name
-        # boto3 looks for the (missing) credentials at  ~/.aws/credentials or at environment variables:
-        # AWS_ACCESS_KEY_ID  AWS_SECRET_ACCESS_KEY  etc.
-        elif credentials is None:
-            if bucket_name is None:
-                raise ValueError("The bucket_name needs to be specified!")
-            self.s3resource = boto3.resource('s3')
-        else:
-            if isinstance(credentials, str):
-                with open(credentials) as json_file:
-                    credentials = json.load(json_file)
-            if not isinstance(credentials, dict):
-                raise TypeError("credentials is not one of the supported types but {}.".format(type(credentials)))
-            credentials = credentials.copy()
-            config = credentials.pop('config', Config(s3={'addressing_style': 'path'}))
-            key = credentials.pop('access_key', None) or credentials.pop('aws_access_key_id', None)
-            if key is not None:
-                credentials['aws_access_key_id'] = key
-            key = credentials.pop('secret_key', None) or credentials.pop('aws_secret_access_key', None)
-            if key is not None:
-                credentials['aws_secret_access_key'] = key
-            key = credentials.pop('endpoint', None) or credentials.pop('endpoint_url', None)
-            if key is not None:
-                credentials['endpoint_url'] = key
-            self.bucket_name = credentials.pop("bucket", None)
-            if bucket_name is not None:
-                self.bucket_name = bucket_name
-            if self.bucket_name is None:
-                raise ValueError("Bucket name needs to be provided.")
+        self.bucket_name = None
+        self.s3resource = self._init_s3resource(credentials)
 
-            self.s3resource = boto3.resource('s3',
-                                             config=config,
-                                             **credentials
-                                             )
-
+        self.bucket_name = bucket_name or self.bucket_name
+        self._check_for_bucket_name()
         self.bucket = self.s3resource.Bucket(self.bucket_name)
+
+    def _init_s3resource(self, credentials):
+        if isinstance(credentials, boto3.resources.base.ServiceResource):
+            return credentials
+        elif credentials is None:
+            # boto3 looks for the (missing) credentials at  ~/.aws/credentials or at environment variables:
+            # AWS_ACCESS_KEY_ID  AWS_SECRET_ACCESS_KEY  etc.
+            return boto3.resource('s3')
+        else:
+            credentials = self._get_credentials_dict(credentials)
+
+            config = credentials.pop('config', Config(s3={'addressing_style': 'path'}))
+
+            self._normalize_key(credentials, 'aws_access_key_id', 'access_key')
+            self._normalize_key(credentials, 'aws_secret_access_key', 'secret_key')
+            self._normalize_key(credentials, 'endpoint_url', 'endpoint')
+
+            self.bucket_name = credentials.pop("bucket", None)
+
+            return boto3.resource('s3', config=config, **credentials)
+
+    def _check_for_bucket_name(self):
+        if self.bucket_name is None:
+            raise ValueError("Bucket name needs to be provided.")
+
+    @staticmethod
+    def _normalize_key(credentials, key, alias_key):
+        value = credentials.pop(alias_key, None) or credentials.pop(key, None)
+        if value is not None:
+            credentials[key] = value
+
+    @staticmethod
+    def _get_credentials_dict(credentials):
+        if isinstance(credentials, str):
+            with open(credentials) as json_file:
+                credentials = json.load(json_file)
+        if not isinstance(credentials, dict):
+            raise TypeError(f"credentials is not one of the supported types but {type(credentials)}.")
+        return credentials.copy()
 
     @property
     def endpoint_url(self):
@@ -433,7 +438,7 @@ class FileS3IO:
             recursively including sub groups.
         """
         for obj in self._bucket.objects.filter(Prefix=self._bucket_path):
-            print('/{} {} {} bytes'.format(obj.key, obj.last_modified, obj.size))
+            print(f'/{obj.key} {obj.last_modified} {obj.size} bytes')
 
     def _list_all_files_of_bucket(self):
         return list(self._bucket.objects.all())
@@ -465,7 +470,7 @@ class FileS3IO:
                 filelist (list): List containing objects from a bucket.
         """
         for obj in filelist:
-            print('/{} {} {} bytes'.format(obj.key, obj.last_modified, obj.size))
+            print(f'/{obj.key} {obj.last_modified} {obj.size} bytes')
 
     def remove_file(self, file):
         """
@@ -475,7 +480,7 @@ class FileS3IO:
                 file (str/None): path like string to the file to be removed.
         """
         if not self.is_file(file):
-            raise ValueError("{} is not a file.".format(file))
+            raise ValueError(f"{file} is not a file.")
         file = self._to_abs_bucketpath(file)
         self._bucket.Object(file).delete()
         #self._remove_object(prefix=file, debug=debug)
@@ -491,7 +496,7 @@ class FileS3IO:
         if path is None:
             path = self._s3_path
         if not self.is_dir(path):
-            raise ValueError("{} is not a group.".format(path))
+            raise ValueError(f"{path} is not a group.")
         path = self._to_abs_bucketpath(path)
         self._remove_object(prefix=path, debug=debug)
 
@@ -504,12 +509,12 @@ class FileS3IO:
                 debug(bool): If True, additional information is printed.
         """
         if debug:
-            print('\nDeleting all objects with sample prefix {}/{}.'.format(self._bucket.name, prefix))
+            print(f'\nDeleting all objects with sample prefix {self._bucket.name}/{prefix}.')
         delete_responses = self._bucket.objects.filter(Prefix=prefix).delete()
         if debug:
             for delete_response in delete_responses:
                 for deleted in delete_response['Deleted']:
-                    print('\t Deleted: {}'.format(deleted['Key']))
+                    print(f'\t Deleted: {deleted["Key"]}')
 
     def __enter__(self):
         """ Compatibility function for the with statement."""
@@ -549,7 +554,7 @@ class FileS3IO:
                     return self._s3io_object(item)
                 if item in self.list_groups():
                     return self.open(item)
-                raise ValueError("Unknown item: {}".format(item))
+                raise ValueError(f"Unknown item: {item}")
             else:
                 item_abs_lst = (
                     os.path.normpath(os.path.join(self.s3_path, item))

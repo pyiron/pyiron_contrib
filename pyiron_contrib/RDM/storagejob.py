@@ -57,7 +57,6 @@ class StorageType(DataContainer):
 
         Returns:
             DataContainer: the newly created DataContainer
-
         """
         self[name] = DataContainer()
         return self[name]
@@ -80,7 +79,6 @@ class StorageType(DataContainer):
 
 class StorageJob(GenericJob):
     """Job to store files associated with meta data either locally, or at a remote data service like s3."""
-
     def __init__(self, project, job_name):
 
         super().__init__(project, job_name)
@@ -95,7 +93,7 @@ class StorageJob(GenericJob):
 
     def check_setup(self):
         """
-        this function is called in self._run_if_new() if self.server.run_mode.queue
+        This function is called in self._run_if_new() if self.server.run_mode.queue
         i.e. self.server.run_mode = queue if one sets a queue
         afterwards self.save() and self.run() is called again -> self.run_if_created  followed by (in this case always) 
         self.run_if_scheduler 
@@ -108,7 +106,7 @@ class StorageJob(GenericJob):
             - s3
             - ssh
         """
-        raise NotImplementedError("Storing files remotely is not yet supported.")
+        raise NotImplementedError("Storing files remotely via ssh is not yet supported.")
 
     @property
     def storage_type(self):
@@ -240,7 +238,7 @@ class StorageJob(GenericJob):
         pass
 
     def append(self, job):
-        pass
+        raise NotImplementedError('Only implemented for meta jobs. To add files to the storage use add_files().')
 
     def run_if_interactive(self):
         self.status.running = True

@@ -14,32 +14,50 @@ def _remove_s3_working_directory(file_s3_io_handle, group_to_remove):
 
 
 class StorageType(DataContainer):
-    def __init__(self, *, init=None, storage_type=None, table_name=None):
+    """
+    In this DataContainer subclass the information about the type of storage are stored.
+
+    The StorageType has to be instantiated with one of the available storage types and cannot be instantiated
+    with positional arguments to avoid confusion with a DataContainer.
+
+    Attributes:
+       storage_type(str): type of the storage, one of _available_storage_types
+       local(bool): storage_type == 'local'
+       s3(bool): storage_type == 's3'
+       read_only (bool): read only StorageType cannot be changed
+
+    """
+    _available_storage_types = ['local', 's3']
+
+    def __init__(self, *, storage_type=None, table_name=None):
         """What type of storage is used
 
         Parameters:
             storage_type(str): one of ['local', 's3']
         """
-        super().__init__(init=init, table_name=table_name)
-        self._available_storage_types = ['local', 's3']
+        super().__init__(init=None, table_name=table_name)
         self._storage_type = None
         self.storage_type = storage_type
 
+    @property
+    def local(self):
+        return self.storage_type == 'local'
+
+    @property
+    def s3(self):
+        return self.storage_type == 's3'
+
     def create_group(self, name):
         """
-        Add a new empty subcontainer under the given key.
+        Add a new empty standard DataContainer under the given key to store storage_type related information.
+
 
         Args:
-            name (str): key under which to store the new subcontainer in this container
+            name (str): key under which to store the new DataContainer in this container
 
         Returns:
-            DataContainer: the newly created subcontainer
+            DataContainer: the newly created DataContainer
 
-        >>> pl = DataContainer({})
-        >>> pl.create_group("group_name")
-        DataContainer([])
-        >>> list(pl.group_name)
-        []
         """
         self[name] = DataContainer()
         return self[name]
@@ -58,9 +76,6 @@ class StorageType(DataContainer):
             raise ValueError(f"Expected 'storage_type' to be one of {self._available_storage_types} "
                              f"but got {storage_type}.")
         self._storage_type = storage_type
-        for storage in self._available_storage_types:
-            self[storage] = False
-        self[storage_type] = True
 
 
 class StorageJob(GenericJob):

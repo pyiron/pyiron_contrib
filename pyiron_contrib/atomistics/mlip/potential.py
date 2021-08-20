@@ -76,7 +76,10 @@ class MtpPotential:
         rmax = self._store.radial.info.max_dist
         scaling = self._store.scaling
         if basis_type == 'Chebyshev':
-            return [scaling * np.polynomial.Chebyshev(coeffs, domain=(rmin, rmax)) for coeffs in self._store.radial.funcs]
+            return {types: [scaling * np.polynomial.Chebyshev(coeffs, domain=(rmin, rmax))
+                                for coeffs in funcs]
+                                    for types, funcs in self._store.radial.funcs.items()}
+
         else:
             raise NotImplementedError(f"unknown basis type {basis_type}")
 

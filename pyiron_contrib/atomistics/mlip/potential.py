@@ -74,7 +74,7 @@ class MtpPotential:
         basis_type = self._store.radial.basis_type
         rmin = self._store.radial.info.min_dist
         rmax = self._store.radial.info.max_dist
-        scaling = self._store.radial.scaling
+        scaling = self._store.scaling
         if basis_type == 'Chebyshev':
             return [scaling * np.polynomial.Chebyshev(coeffs, domain=(rmin, rmax)) for coeffs in self._store.radial.funcs]
         else:

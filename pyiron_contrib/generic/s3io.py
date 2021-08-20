@@ -417,9 +417,7 @@ class FileS3IO:
 
         data = data_obj.data()
         if metadata is None:
-            metadata = data_obj.metadata
-        if metadata is None:
-            metadata = {}
+            metadata = data_obj.metadata if data_obj.metadata is not None else {}
         if not isinstance(path, str):
             raise ValueError
         if data is None:

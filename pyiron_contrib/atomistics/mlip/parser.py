@@ -54,7 +54,7 @@ def _make_potential_parser():
     )).setResultsName("info")
 
     radial_func_types = pp.Word(pp.nums) + pp.Suppress("-") + pp.Word(pp.nums)
-    radial_func_types.setParseAction(lambda tokens: (int(tokens[0]), int(tokens[1])))
+    radial_func_types.setParseAction(lambda tokens: f"{tokens[0]}-{tokens[1]}")
     radial_func_coeffs = LB + pp.delimitedList(pp.pyparsing_common.fnumber) + RB
     radial_funcs = make_keyword("radial_coeffs") + pp.indentedBlock(
                     radial_func_types + pp.indentedBlock(radial_func_coeffs, indentStack)[1, ...],

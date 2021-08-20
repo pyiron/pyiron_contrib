@@ -22,7 +22,7 @@ __date__ = "Aug 18, 2021"
 
 class MtpPotential:
     """
-    Represantation of a fitted MTP.
+    Representation of a fitted MTP.
 
     Potentials may be loaded from a file when initializing
 

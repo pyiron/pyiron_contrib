@@ -97,6 +97,7 @@ class Mlip(GenericJob):
                         ]]
             })
 
+    @property
     def potential(self):
         if self.status.finished:
             return self._potential

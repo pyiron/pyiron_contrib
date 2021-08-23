@@ -165,6 +165,10 @@ class StorageJob(GenericJob):
             raise ValueError(f"Length of filenames and metadata have to match, "
                              f"but got len(filenames)={len(filenames)} and len(metadata)={len(metadata)}.")
 
+        files = [os.path.basename(file) for file in filenames]
+        if len(set(files)) != len(files):
+            raise ValueError(f"Resulting filenames {files} have duplicates.")
+
         for i, file in enumerate(filenames):
             if not overwrite and os.path.basename(file) in self._stored_files.keys():
                 self._logger.warning(f"{file} not copied, since already present and 'overwrite'=False.")

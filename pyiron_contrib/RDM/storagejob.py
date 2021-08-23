@@ -95,12 +95,12 @@ class StorageJob(GenericJob):
         """
         This function is called in self._run_if_new() if self.server.run_mode.queue
         i.e. self.server.run_mode = queue if one sets a queue
-        afterwards self.save() and self.run() is called again -> self.run_if_created  followed by (in this case always) 
-        self.run_if_scheduler 
-        run_if_scheduler is the function called to sent the job to the cluster, however, it already sends the 
+        afterwards self.save() and self.run() is called again -> self.run_if_created  followed by (in this case always)
+        self.run_if_scheduler
+        run_if_scheduler is the function called to sent the job to the cluster, however, it already sends the
         stuff to the queue which is obviously not intended if this is used as ssh storage system.
-        TODO: 
-        - overwrite run_if_scheduler to not trigger a job to be run on the queing system. 
+        TODO:
+        - overwrite run_if_scheduler to not trigger a job to be run on the queing system.
         - make some file_handler class to allow for 'store/receive/delete file' with a uniform interface for
             - local
             - s3
@@ -272,7 +272,7 @@ class StorageJob(GenericJob):
                 bucket_name=bucket_name
             )
         except Exception as e:
-            raise RuntimeError(f"Could not restore connection to the S3 storage.") from e
+            raise RuntimeError("Could not restore connection to the S3 storage.") from e
         if self._storage_type.s3_config.bucket_info == external_storage.bucket_info:
             self._external_storage = external_storage
         else:

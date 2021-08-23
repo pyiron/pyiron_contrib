@@ -316,7 +316,7 @@ class FileS3IO:
         return new
 
     def close(self):
-        """   Close current group and open previous group.         """
+        """Close current group and open previous group."""
         if len(self.history) > 1:
             del self.history[-1]
         elif len(self.history) == 1:
@@ -517,7 +517,7 @@ class FileS3IO:
                     print(f'\t Deleted: {deleted["Key"]}')
 
     def __enter__(self):
-        """ Compatibility function for the with statement."""
+        """Compatibility function for the with statement."""
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):

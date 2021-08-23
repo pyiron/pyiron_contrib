@@ -7,12 +7,6 @@ from pyiron_base.generic.filedata import FileData
 from pyiron_contrib.generic.s3io import FileS3IO
 
 
-def _remove_s3_working_directory(file_s3_io_handle, group_to_remove):
-    # Upon moving s3 to base, this should be moved to pyiron_base/job/util.py
-    if file_s3_io_handle.is_dir(group_to_remove):
-        file_s3_io_handle.remove_group(path=group_to_remove)
-
-
 class StorageType(DataContainer):
     """
     In this DataContainer subclass the information about the type of storage are stored.
@@ -88,8 +82,8 @@ class StorageJob(GenericJob):
         self._external_storage = None
 
     def _before_generic_remove_child(self):
-        if self._storage_type.s3:
-            _remove_s3_working_directory(self._external_storage, self.path)
+        if self._storage_type.s3 and self._external_storage.is_dir(self.path):
+            self._external_storage.remove_group(path=self.path)
 
     def check_setup(self):
         """
@@ -155,7 +149,8 @@ class StorageJob(GenericJob):
         """Add files to the storage
 
         Parameters:
-            filenames(str/list of str): Files to save in the Storage
+            filenames(str/list of str): Files to save in the Storage; each file is stored under the same filename,
+                beware name clashes if retrieved from different sources.
             metadata(dict/list of dict/None): metadata to attach to the files:
                 if dict: apply this metadata dict to all files
                 if list: has to be of same length as filenames, one metadata per file

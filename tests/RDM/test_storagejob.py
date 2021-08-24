@@ -132,6 +132,8 @@ class TestStorageJob(TestWithCleanProject):
             self.assertTrue(os.path.isfile(os.path.join(job.working_directory, 'test_file.txt')))
             self.assertIn("test_file2.txt", job.files_stored)
             self.assertTrue(os.path.isfile(os.path.join(job.working_directory, 'test_file2.txt')))
+        with self.subTest(msg="Test copy list of identical files"):
+            self.assertRaises(ValueError, job.add_files, [self.file1, self.file1])
 
         rmtree('tmp_dir')
 

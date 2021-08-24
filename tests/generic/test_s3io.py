@@ -43,13 +43,7 @@ class TestS3IO(unittest.TestCase):
         cls.bucket.put_object(Key='some/path_to/any', Body=b'any path', Metadata={'File_loc': '/some/path_to'})
         cls.bucket.put_object(Key='some/path_to/some', Body=b'path', Metadata={'File_loc': '/some/path_to'})
         cls.bucket.put_object(Key='random/location', Body=b'text', Metadata={'File_loc': '/random'})
-        cls.i_o_bucket = cls.res.create_bucket(Bucket=TEST_BUCKET)
-        cls.i_o_bucket.put_object(Key='other', Body=b'any text', Metadata={'File_loc': '/'})
-        cls.i_o_bucket.put_object(Key='to_be_removed', Body=b'some text', Metadata={'File_loc': '/'})
-        cls.i_o_bucket.put_object(Key='some/path', Body=b'some text', Metadata={'File_loc': '/some'})
-        cls.i_o_bucket.put_object(Key='grp_to_be_removed/some', Body=b'foo')
         cls.s3io = FileS3IO(cls.res, bucket_name=MY_BUCKET)
-        cls.s3io_io = FileS3IO(cls.res, bucket_name=TEST_BUCKET)
 
     @classmethod
     def tearDownClass(cls):
@@ -63,6 +57,18 @@ class TestS3IO(unittest.TestCase):
         bucket.objects.all().delete()
         bucket.delete()
         cls.moto.stop()
+
+    def setUp(self):
+        self.i_o_bucket = self.res.create_bucket(Bucket=TEST_BUCKET)
+        self.i_o_bucket.put_object(Key='other', Body=b'any text', Metadata={'File_loc': '/'})
+        self.i_o_bucket.put_object(Key='to_be_removed', Body=b'some text', Metadata={'File_loc': '/'})
+        self.i_o_bucket.put_object(Key='some/path', Body=b'some text', Metadata={'File_loc': '/some'})
+        self.i_o_bucket.put_object(Key='grp_to_be_removed/some', Body=b'foo')
+        self.s3io_io = FileS3IO(self.res, bucket_name=TEST_BUCKET)
+
+    def tearDown(self):
+        self.i_o_bucket.objects.all().delete()
+        self.i_o_bucket.delete()
 
     def test___init__(self):
         s3io = FileS3IO(self.res, bucket_name=MY_BUCKET)
@@ -91,10 +97,40 @@ class TestS3IO(unittest.TestCase):
         self.assertEqual(self.s3io.list_groups(), ['random', 'some'])
         self.assertEqual(self.s3io.list_nodes(), ['any', 'other', 'other2'])
 
-    def test_get(self):
-        other = self.s3io.get('other')
+    def test_get_s3_object(self):
+        other = self.s3io.get_s3_object('other')
         self.assertEqual(other["Metadata"], {'file_loc': '/'})
         self.assertEqual(other["Body"].read().decode('utf8'), 'any text')
+
+    def test_get(self):
+        other = self.s3io.get('other')
+        self.assertEqual(other.metadata, {'file_loc': '/'})
+        self.assertEqual(other.data, [b'any text'])
+
+    def test_put(self):
+        with open(os.path.join(self.current_dir, 'some_file.txt'), 'rb') as f:
+            self.s3io_io.put(f)
+        self.assertTrue(self.s3io_io.is_file('some_file.txt'))
+        self.assertEqual(self.s3io_io.get_s3_object('some_file.txt')['Body'].read().decode('utf8'), 'text')
+
+        with open(os.path.join(self.current_dir, 'some_file.txt'), 'rb') as f:
+            self.s3io_io.put(f, path='some')
+        self.assertTrue(self.s3io_io.is_file('some/some_file.txt'))
+        self.assertEqual(self.s3io_io.get_s3_object('some/some_file.txt')['Body'].read().decode('utf8'), 'text')
+
+        with open(os.path.join(self.current_dir, 'some_file.txt'), 'rb') as f:
+            self.s3io_io.put(f, filename='dummy')
+        self.assertTrue(self.s3io_io.is_file('dummy'))
+        self.assertEqual(self.s3io_io.get_s3_object('dummy')['Body'].read().decode('utf8'), 'text')
+
+        with self.assertRaises(ValueError):
+            self.s3io_io.put(b'random text', metadata={'random': 'metadata'})
+
+        self.s3io_io.put(b'random text', filename="w_metadata", metadata={'random': 'metadata'})
+        self.assertTrue(self.s3io_io.is_file('w_metadata'))
+        s3_obj = self.s3io_io.get_s3_object('w_metadata')
+        self.assertEqual(s3_obj['Body'].read(), b'random text')
+        self.assertEqual(s3_obj['Metadata'], {'random': 'metadata'})
 
     def test_open(self):
         some = self.s3io.open('some')
@@ -159,7 +195,7 @@ class TestS3IO(unittest.TestCase):
         file = self.current_dir + '/some_file.txt'
         self.s3io_io.upload([file])
         self.assertTrue(self.s3io_io.is_file('some_file.txt'))
-        self.assertEqual(self.s3io_io.get('some_file.txt')['Body'].read().decode('utf8'), 'text')
+        self.assertEqual(self.s3io_io.get_s3_object('some_file.txt')['Body'].read().decode('utf8'), 'text')
 
     def test_remove_file(self):
         self.assertTrue(self.s3io_io.is_file('to_be_removed'))

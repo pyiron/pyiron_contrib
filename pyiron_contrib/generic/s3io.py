@@ -75,7 +75,7 @@ class S3ioConnect:
                         if None: use Credentials as obtained by boto3, requires bucket_name to be specified.
                 bucket_name(str/None): Name of the bucket, overwrites name given in the config.
 
-            The configuration needs to provide the following information:
+            The credentials needs to provide the following information:
                 access_key or aws_access_key_id (str)
                 secret_key or aws_secret_access_key (str)
             And may contain these additional fields:

@@ -317,13 +317,6 @@ class StorageJob(GenericJob):
 
         name_lst = item.split("/")
         item_obj = name_lst[0]
-        if item_obj in self._list_ext_childs():
-            child = self._hdf5[self._name + "_hdf5/" + item_obj]
-            print("job get: ", self._name + "_jobs")
-            if len(name_lst) == 1:
-                return child
-            else:
-                return child["/".join(name_lst[1:])]
 
         # Here this function is changed to return a FileData object.
         if self._storage_type.local:

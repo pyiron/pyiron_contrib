@@ -163,6 +163,8 @@ class Mlip(GenericJob):
         else:
             grades_lst, job_id_grades_lst, timestep_grades_lst = [], [], []
         self._potential.load(os.path.join(self.working_directory, "Trained.mtp_"))
+        training_energies = np.loadtxt(os.path.join(self.working_directory, "training_energies.txt"))
+        testing_energies  = np.loadtxt(os.path.join(self.working_directory, "testing_energies.txt"))
         with self.project_hdf5.open('output') as hdf5_output:
             hdf5_output['grades'] = grades_lst
             hdf5_output['job_id'] = job_id_grades_lst
@@ -172,6 +174,8 @@ class Mlip(GenericJob):
             hdf5_output['job_id_new'] = job_id_new_training_lst
             hdf5_output['timestep_new'] = timestep_new_training_lst
             self._potential.to_hdf(hdf=hdf5_output)
+            hdf5_output['training_energies'] = training_energies
+            hdf5_output['testing_energies'] = testing_energies
 
     def get_structure(self, iteration_step=-1):
         job = self.project.load(self['output/job_id_diff'][iteration_step])
@@ -455,6 +459,12 @@ $MLP_COMMAND_PARALLEL train --energy-weight=energy_auto --force-weight=force_aut
             file_content = '''\
 $MLP_COMMAND_PARALLEL train --energy-weight=energy_auto --force-weight=force_auto --stress-weight=stress_auto --max-iter=iteration_auto start.mtp training.cfg > training.log
 $MLP_COMMAND_SERIAL calc-grade Trained.mtp_ training.cfg testing.cfg grades.cfg --mvs-filename=state.mvs > grading.log
+$MLP_COMMAND_SERIAL calc-errors Trained.mtp_ training.cfg > training.errors
+$MLP_COMMAND_SERIAL calc-errors Trained.mtp_ testing.cfg > testing.errors
+$MLP_COMMAND_SERIAL calc-efs Trained.mtp_ training.cfg training_efs.cfg
+grep Energy -A 1 training_efs.cfg | awk 'NR%3==2 {print}' > training_energies.txt
+$MLP_COMMAND_SERIAL calc-efs Trained.mtp_ testing.cfg testing_efs.cfg
+grep Energy -A 1 testing_efs.cfg | awk 'NR%3==2 {print}' > testing_energies.txt
 $MLP_COMMAND_SERIAL select-add Trained.mtp_ training.cfg testing.cfg diff.cfg > select.log
 cp training.cfg training_new.cfg 
 cat diff.cfg >> training_new.cfg

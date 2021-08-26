@@ -51,6 +51,7 @@ class MtpPotential:
             filename (str, optional): from where to load the potential
             table_name (str, optional): default group name when saving to HDF, default 'potential'
         """
+        self.__hdf_version__ = "0.0.1"
         self._store = DataContainer(table_name=table_name)
         if filename is not None:
             self.load(filename)
@@ -60,8 +61,26 @@ class MtpPotential:
             self._store.clear()
             self._store.update(parse_potential(f.read()), wrap=True)
 
+    def _type_to_hdf(self, hdf):
+        """
+        Internal helper function to save type and version in hdf root
+
+        Args:
+            hdf (ProjectHDFio): HDF5 group object
+        """
+        hdf["NAME"] = self.__class__.__name__
+        hdf["TYPE"] = str(type(self))
+        hdf["HDF_VERSION"] = self.__hdf_version__
+
     def to_hdf(self, hdf, group_name=None):
-        self._store.to_hdf(hdf=hdf, group_name=group_name)
+        if group_name is not None:
+            hdf = hdf.open(group_name)
+        # force DataContainer to write into hdf group directly
+        self._store.to_hdf(hdf=hdf, group_name=None)
+        # then overwrite type information with ours, so we get reinstantiated later
+        self._type_to_hdf(hdf)
+        if group_name is not None:
+            hdf.close()
 
     def from_hdf(self, hdf, group_name=None):
         self._store.from_hdf(hdf=hdf, group_name=group_name)

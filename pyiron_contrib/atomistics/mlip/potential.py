@@ -61,6 +61,43 @@ class MtpPotential:
             self._store.clear()
             self._store.update(parse_potential(f.read()), wrap=True)
 
+    def write(self, filename):
+        """
+        Write potential to a text file readable by mlp.
+
+        Args:
+            filename (str): file path
+        """
+        def format_array(a):
+            return "{" + ', '.join(map(str, a)) + "}"
+
+        with open(filename, "w") as f:
+            f.write("MTP\n")
+            f.write(f"version = {self._store.version}\n")
+            f.write(f"potential_name = {self._store.potential_name}\n")
+            f.write(f"scaling = {self._store.scaling:.15e}\n")
+            f.write(f"species_count = {self._store.species_count}\n")
+            f.write(f"potential_tag = {self._store.get('potential_tag', '')}\n")
+            f.write(f"radial_basis_type = RB{self._store.radial.basis_type}\n")
+            f.write(f"\tmin_dist = {self._store.radial.info.min_dist:.15e}\n")
+            f.write(f"\tmax_dist = {self._store.radial.info.max_dist:.15e}\n")
+            f.write(f"\tradial_basis_size = {self._store.radial.info.basis_size}\n")
+            f.write(f"\tradial_funcs_count = {self._store.radial.info.funcs_count}\n")
+            f.write(f"\tradial_coeffs\n")
+            for types, funcs in self._store.radial.funcs.items():
+                f.write(f"\t\t{types}\n")
+                for coeffs in funcs:
+                    f.write("\t\t\t" + format_array(coeffs) + "\n")
+            f.write(f"alpha_moments_count = {self._store.alpha_moments_count}\n")
+            f.write(f"alpha_index_basic_count = {self._store.alpha_index_basic_count}\n")
+            f.write(f"alpha_index_basic = {format_array(map(format_array, self._store.alpha_index_basic))}\n")
+            f.write(f"alpha_index_times_count = {self._store.alpha_index_times_count}\n")
+            f.write(f"alpha_index_times = {format_array(map(format_array, self._store.alpha_index_times))}\n")
+            f.write(f"alpha_scalar_moments = {self._store.alpha_scalar_moments}\n")
+            f.write(f"alpha_moment_mapping = {format_array(self._store.alpha_moment_mapping)}\n")
+            f.write(f"species_coeffs = {format_array(self._store.species_coeffs)}\n")
+            f.write(f"moment_coeffs = {format_array(self._store.moment_coeffs)}\n")
+
     def _type_to_hdf(self, hdf):
         """
         Internal helper function to save type and version in hdf root

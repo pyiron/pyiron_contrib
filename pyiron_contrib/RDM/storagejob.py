@@ -237,9 +237,6 @@ class StorageJob(GenericJob):
     def collect_output(self):
         pass
 
-    def append(self, job):
-        raise NotImplementedError('Only implemented for meta jobs. To add files to the storage use add_files().')
-
     def run_if_interactive(self):
         self.status.running = True
         self.to_hdf()

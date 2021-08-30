@@ -14,3 +14,6 @@ dependencies:
 - seaborn =0.11.2
 - scikit-image =0.18.3
 - randspg =0.0.1
+- boto3
+- moto
+- more-itertools

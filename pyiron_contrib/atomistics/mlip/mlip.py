@@ -92,7 +92,7 @@ class Mlip(GenericJob):
                         "Filename": [[self.potential_files[0]]],
                         "Model": ["Custom"],
                         "Species": [elements],
-                        "Config": [["pair_style mlip mlip.ini\n",
+                        "Config": [["pair_style MLIP mlip.ini\n",
                                     "pair_coeff * *\n"
                         ]]
             })

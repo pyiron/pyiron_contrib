@@ -627,55 +627,9 @@ class EAMPotential(AbstractPotential, EAMlikeMixin):
             job (AtomicrexJob): Instance of the job to construct filename.
             filename (str, optional): If a filename is given this eam is plotted instead of the fitted one. Defaults to None.
         """        
-
-
-        # Read the cotents of the eam file
-        # this is copy pasted from one of my old scripts and could probably be reworked
-        elements = {}
-        
         if filename is None:
             filename = f"{job.working_directory}/{self.export_file}"
-
-        with open(filename, "r") as f:
-            # skip comment lines
-            for _ in range(3):
-                f.readline()
-            
-            element_list =  f.readline().split()
-            for element in element_list[1:]:
-                elements[element] = {}
-            
-            Nrho, drho, Nr, dr, cutoff = f.readline().split()
-            Nrho = int(Nrho)
-            drho = float(drho)
-            Nr = int(Nr)
-            dr = float(dr)
-            cutoff = float(cutoff)
-
-            rho_values = np.linspace(0,Nrho*drho, Nrho, endpoint=False)
-            r_values = np.linspace(0, Nr*dr, Nr, endpoint=False)
-
-            for element in elements:
-                # skip a line with unnecessary information
-                f.readline()
-                elements[element]["F"] = np.fromfile(f, count=Nrho, sep=" ")
-                for rho_element in elements:
-                    elements[element]["rho_{}{}".format(element, rho_element)] = np.fromfile(f, count = Nr, sep=" ")
-
-            # V_ij = V_ji so it is written only once in the file => avoid attempts to read it twice
-            # with a list of elements where it has been read
-            # TODO: Have another look how to do this checking
-            V_written = []
-            for element in elements:
-                for V_element in elements:
-                    elementV_element = "{}{}".format(element, V_element)
-                    V_elementelement = "{}{}".format(V_element, element)
-                    if not elementV_element in V_written and not V_elementelement in V_written:
-                        elements[element]["V_{}".format(elementV_element)] = np.fromfile(f, count = Nr, sep=" ")
-                        # The tabulated values are not V(r) but V(r) * r, so they are divided by r here,
-                        # with exception of the first value to prevent division by 0.
-                        elements[element]["V_{}".format(elementV_element)][1:] = elements[element]["V_{}".format(elementV_element)][1:] / r_values[1:]
-                        V_written.append(elementV_element)
+        elements = read_eam_fs_file(filename=filename)
         
         # TODO: figure out how to index ax for multiple elements
         fig, ax = plt.subplots(nrows=3*len(elements), ncols=len(elements), figsize=(len(elements)*8, len(elements)*3*6), squeeze=False)
@@ -699,7 +653,25 @@ class EAMPotential(AbstractPotential, EAMlikeMixin):
                 ax[i+k, 0].set(ylim=(-5,5), title=f"{el} {pot}", xlabel=xlabel)
         return fig, ax
 
+    def count_local_extrema(self, job, filename=None, count_minima=True, count_maxima=False):
+        if filename is None:
+            filename = f"{job.working_directory}/{self.export_file}"
+        elements = read_eam_fs_file(filename=filename)
 
+        extrema_dict = {}
+        for el, func in elements.items():
+            extrema_dict[el] = {}
+            for func_name, a in func:
+                extrema = 0
+                if count_minima:
+                    min_arr = np.r_[True, a[1:] < a[:-1]] & np.r_[a[:-1] < a[1:], True]
+                    extrema += len(min_arr[min_arr])
+                if count_maxima:
+                    max_arr = np.r_[True, a[1:] > a[:-1]] & np.r_[a[:-1] > a[1:], True]
+                    extrema += len(max_arr[max_arr])
+                extrema_dict[el][func_name] = extrema
+        return extrema_dict
+        
 class MEAMPotential(AbstractPotential, EAMlikeMixin):
     def __init__(self, init=None, identifier=None, export_file=None, species=None):
         super().__init__(init=init)
@@ -790,7 +762,7 @@ class MEAMPotential(AbstractPotential, EAMlikeMixin):
             KeyError: Raises if a parsed parameter can't be matched to a function.
         """        
         for l in lines:
-            identifier, param, value = _parse_parameter_line(l)
+            identifier, leftover, value = _parse_parameter_line(l)
             if identifier in self.pair_interactions:
                 self.pair_interactions[identifier]._parse_final_parameter(leftover, value)
             elif identifier in self.electron_densities:
@@ -910,3 +882,49 @@ def _tagdict_from_taglist(taglist):
         else:
             tagdict[tag] = False
     return tagdict
+
+def read_eam_fs_file(filename):
+    # Read the cotents of an eam/fs file and returns it as a dicitionary of numpy arrays
+    # this is copy pasted from one of my old scripts and could probably be reworked
+    elements = {}
+    with open(filename, "r") as f:
+        # skip comment lines
+        for _ in range(3):
+            f.readline()
+        
+        element_list =  f.readline().split()
+        for element in element_list[1:]:
+            elements[element] = {}
+        
+        Nrho, drho, Nr, dr, cutoff = f.readline().split()
+        Nrho = int(Nrho)
+        drho = float(drho)
+        Nr = int(Nr)
+        dr = float(dr)
+        cutoff = float(cutoff)
+
+        rho_values = np.linspace(0,Nrho*drho, Nrho, endpoint=False)
+        r_values = np.linspace(0, Nr*dr, Nr, endpoint=False)
+
+        for element in elements:
+            # skip a line with unnecessary information
+            f.readline()
+            elements[element]["F"] = np.fromfile(f, count=Nrho, sep=" ")
+            for rho_element in elements:
+                elements[element]["rho_{}{}".format(element, rho_element)] = np.fromfile(f, count = Nr, sep=" ")
+
+        # V_ij = V_ji so it is written only once in the file => avoid attempts to read it twice
+        # with a list of elements where it has been read
+        # TODO: Have another look how to do this checking
+        V_written = []
+        for element in elements:
+            for V_element in elements:
+                elementV_element = "{}{}".format(element, V_element)
+                V_elementelement = "{}{}".format(V_element, element)
+                if not elementV_element in V_written and not V_elementelement in V_written:
+                    elements[element]["V_{}".format(elementV_element)] = np.fromfile(f, count = Nr, sep=" ")
+                    # The tabulated values are not V(r) but V(r) * r, so they are divided by r here,
+                    # with exception of the first value to prevent division by 0.
+                    elements[element]["V_{}".format(elementV_element)][1:] = elements[element]["V_{}".format(elementV_element)][1:] / r_values[1:]
+                    V_written.append(elementV_element)
+    return elements

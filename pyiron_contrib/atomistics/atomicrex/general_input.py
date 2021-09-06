@@ -15,6 +15,8 @@ class GeneralARInput(DataContainer):
     Class to store general input of an atomicrex job,
     f.e. the fit algorithm.
     """  
+    __version__ = "0.1.0"
+
     def __init__(
         self,
         table_name="general_input",
@@ -38,7 +40,8 @@ class GeneralARInput(DataContainer):
         self.fit_algorithm = fit_algorithm
         self.output_interval = output_interval
         self.enable_fitting = enable_fitting
-        
+        # version "0.1.0"
+        self.output_file = "atomicrex.out"
 
     def _write_xml_file(self, directory):
         """Internal function.
@@ -48,6 +51,9 @@ class GeneralARInput(DataContainer):
             directory (str): Working directory
         """        
         job = ET.Element("job")
+        
+        output_file = ET.SubElement(job, "output-file")
+        output_file.text = self.output_file
 
         name = ET.SubElement(job, "name")
         name.text = self.name
@@ -74,13 +80,14 @@ class GeneralARInput(DataContainer):
             species.set("mass", f"{mass}")
             species.set("atomic-number", f"{index}")
 
-        fitting = ET.SubElement(job, "fitting")
-        if self.enable_fitting:
-            fitting.set("enabled", "true")
-        else:
-            fitting.set("enabled", "false")
-        fitting.set("output-interval", f"{self.output_interval}")
-        fitting.append(self.fit_algorithm._to_xml_element())
+        if not isinstance(self.fit_algorithm, ScipyAlgorithm):
+            fitting = ET.SubElement(job, "fitting")
+            if self.enable_fitting:
+                fitting.set("enabled", "true")
+            else:
+                fitting.set("enabled", "false")
+            fitting.set("output-interval", f"{self.output_interval}")
+            fitting.append(self.fit_algorithm._to_xml_element())
 
         potentials = ET.SubElement(job, "potentials")
         include = ET.SubElement(potentials, "xi:include")
@@ -197,6 +204,9 @@ class AlgorithmFactory(PyironFactory):
     def gn_isres(stopval=1e-10, max_iter=50, maxtime=None, ftol_rel=None, ftol_abs=None, xtol_rel=None, seed=None):
         return NloptAlgorithm(name="GN_ISRES", stopval=stopval, max_iter=max_iter, maxtime=maxtime, ftol_rel=ftol_rel, ftol_abs=ftol_abs, xtol_rel=xtol_rel, seed=seed)
 
+    @staticmethod
+    def scipy_algorithm():
+        return ScipyAlgorithm()
 
 class AtomicrexAlgorithm(DataContainer):
     """
@@ -244,7 +254,6 @@ class SpaMinimizer:
         if self.local_minimizer is not None:
             spa.append(self.local_minimizer._to_xml_element())
         return spa
-
 
 class NloptAlgorithm(DataContainer):
     """
@@ -322,4 +331,46 @@ class NloptGlobalLocal(NloptAlgorithm):
         local = self.local_minimizer._to_xml_element()
         nlopt.append(local)
         return nlopt
-        
+    
+
+class ScipyAlgorithm:
+    __version__ = "0.0.1"
+    __hdf_version__ = "0.0.1"
+
+    def __init__(self):
+        self.global_minimizer = None
+        self.local_minimizer_kwargs = {
+            "method": "L-BFGS-B",
+            "jac": None,
+            "hess": None,
+            "bounds": None,
+            "constraints": (),
+            "tol": None,
+            "options": None,
+        }
+        self.global_minimizer_kwargs = {}
+
+    def to_hdf(self, hdf, group_name):
+        with hdf.open(group_name) as h:
+            self._type_to_hdf(h)
+            h["global_minimizer"] = self.global_minimizer
+            h.put("local_minimizer_kwargs", self.local_minimizer_kwargs)
+            h.put("global_minimizer_kwargs", self.global_minimizer_kwargs)
+
+    def from_hdf(self, hdf, group_name):
+        with hdf.open(group_name) as h:
+            self._type_to_hdf(h)
+            self.global_minimizer = h["global_minimizer"]
+
+
+    def _type_to_hdf(self, hdf):
+        """
+        Internal helper function to save type and version in hdf root
+
+        Args:
+            hdf (ProjectHDFio): HDF5 group object
+        """
+        hdf["NAME"] = self.__class__.__name__
+        hdf["TYPE"] = str(type(self))
+        hdf["VERSION"] = self.__version__
+        hdf["HDF_VERSION"] = self.__hdf_version__

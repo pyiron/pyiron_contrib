@@ -1,12 +1,9 @@
 import posixpath, os, time
 
 from scipy import optimize
+from pyiron_base.job.interactive import InteractiveBase
 
 from pyiron_contrib.atomistics.atomicrex.general_input import ScipyAlgorithm
-
-from pyiron_contrib.atomistics.atomicrex import output
-
-from pyiron_base.job.interactive import InteractiveBase
 from pyiron_contrib.atomistics.atomicrex.base import AtomicrexBase
 
 try:
@@ -39,7 +36,7 @@ class AtomicrexInteractive(AtomicrexBase, InteractiveBase):
             self._read_input_files = True
         self._interactive_library.prepare_fitting()
         #self._interactive_library.set_verbosity(2)
-        
+
 
     def interactive_add_structure(identifier, structure, forces=None, params=None):
         """
@@ -52,7 +49,7 @@ class AtomicrexInteractive(AtomicrexBase, InteractiveBase):
             identifier ([type]): [description]
             structure ([type]): [description]
             params ([type], optional): [description]. Defaults to None.
-        """        
+        """
         raise NotImplementedError("Changes needed in the atomicrex class before this can be implemented")
     
     def interactive_calculate_residual(self):
@@ -112,9 +109,10 @@ class AtomicrexInteractive(AtomicrexBase, InteractiveBase):
         return res
 
     def _scipy_collect(self, cwd=None):
-        """Internal function that parses the output of an atomicrex job
+        """
+        Internal function that parses the output of an atomicrex job
         fitted using scipy.
-        """        
+        """
         if cwd is None:
             cwd = self.working_directory
         if self.input.__version__ == "0.1.0":

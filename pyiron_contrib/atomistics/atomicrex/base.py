@@ -1,8 +1,5 @@
-"""
-Pyiron interface to atomicrex
-"""
+"""Pyiron interface to atomicrex"""
 import numpy as np
-import pandas as pd
 
 from pyiron_base import GenericJob, Settings, Executable
 
@@ -14,7 +11,6 @@ from pyiron_contrib.atomistics.atomicrex.function_factory import FunctionFactory
 
 s = Settings()
 
-
 ## Class defined for future addition of other codes
 ## Not sure which functionality (if any) can be extracted yet, but a similar pattern is followed in other pyiron modules
 class PotentialFittingBase(GenericJob):
@@ -22,8 +18,7 @@ class PotentialFittingBase(GenericJob):
         super().__init__(project, job_name)
 
 class AtomicrexBase(PotentialFittingBase):
-    """Class to set up and run atomicrex jobs
-    """    
+    """Class to set up and run atomicrex jobs"""
     def __init__(self, project, job_name):
         super().__init__(project, job_name)
 
@@ -32,14 +27,13 @@ class AtomicrexBase(PotentialFittingBase):
             None
         )
         #self._executable_activate(enforce=True)
-
         s.publication_add(self.publication)
         self.input = GeneralARInput()
         self.potential = None
         self.structures = ARStructureContainer()
         self.output = Output()
         self.factories = Factories()
-        
+
 
     def plot_final_potential(self):
         """
@@ -48,13 +42,12 @@ class AtomicrexBase(PotentialFittingBase):
 
         Returns:
             [matplotlib figure, axis]: [description]
-        """        
+        """
         return self.potential.plot_final_potential(self)
 
 
     def to_hdf(self, hdf=None, group_name=None):
-        """Internal function to store the job in hdf5 format
-        """        
+        """Internal function to store the job in hdf5 format"""        
         super().to_hdf(hdf=hdf, group_name=group_name)
         self.input.to_hdf(hdf=self.project_hdf5)
         self.potential.to_hdf(hdf=self.project_hdf5)
@@ -62,8 +55,7 @@ class AtomicrexBase(PotentialFittingBase):
         self.output.to_hdf(hdf=self.project_hdf5)
 
     def from_hdf(self, hdf=None, group_name=None):
-        """Internal function to reload the job object from hdf5
-        """        
+        """Internal function to reload the job object from hdf5"""        
         super().from_hdf(hdf=hdf, group_name=group_name)
         self.input.from_hdf(hdf=self.project_hdf5)
         self.potential = self.project_hdf5["potential"].to_object()
@@ -171,8 +163,7 @@ class AtomicrexBase(PotentialFittingBase):
         self.to_hdf()
 
     def convergence_check(self):
-        """Internal function, TODO
-        """        
+        """Internal function, TODO"""        
         return
 
     def write_input(self, directory=None):

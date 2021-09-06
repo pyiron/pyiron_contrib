@@ -21,8 +21,8 @@ class ARStructureContainer:
         # This allows to preallocate arrays and speed everything up massively
         # when writing and reading hdf5 files
 
-    __version__ = "0.2.0"
-    __hdf_version__ = "0.2.0"
+    __version__ = "0.3.0"
+    __hdf_version__ = "0.3.0"
 
     def init_structure_container(
         self,
@@ -38,18 +38,45 @@ class ARStructureContainer:
                 self.fit_properties[p] = FlattenedARProperty(num_structures=num_structures, prop=p)
         self._init_structure_container(num_structures, num_atoms)
         self.structure_file_path = structure_file_path
+        self._predefined_storage = DataContainer(table_name="predefined_structures")
 
     def _init_structure_container(self, num_structures, num_atoms):
         self.flattened_structures = StructureStorage(num_structures=num_structures, num_atoms=num_atoms)
         self.fit = np.empty(num_structures, dtype=bool)
         self.clamp = np.empty(num_structures, dtype=bool)
+        self.predefined = np.full(num_structures, fill_value=False, dtype=bool)
         self.relative_weight = np.empty(num_structures)
 
-    def add_structure(self, structure, identifier, fit=True, relative_weight=1, clamp=True):
+    def add_structure(
+        self,
+        structure,
+        identifier,
+        fit=True,
+        relative_weight=1,
+        clamp=True,
+        predefined=False,
+        lattice=None, 
+        lattice_parameter=None,
+        ca_ratio=None,
+        atom_type_A=None,
+        atom_type_B=None,
+        ):
         self.flattened_structures.add_structure(structure, identifier)
         self.fit[self.flattened_structures.prev_chunk_index] = fit
         self.relative_weight[self.flattened_structures.prev_chunk_index] = relative_weight
         self.clamp[self.flattened_structures.prev_chunk_index] = clamp
+        if predefined:
+            self.predefined[self.flattened_structures.prev_chunk_index] = True
+            storage = DataContainer(table_name=identifier)
+            storage["lattice"] = lattice,
+            storage["lattice_parameter"] = lattice_parameter,
+            storage["ca_ratio"] = ca_ratio,
+            storage["atom_type_A"] = atom_type_A,
+            storage["atom_type_B"] = atom_type_B,
+            self._predefined_storage[identifier] = storage
+        else:
+            self.predefined[self.flattened_structures.prev_chunk_index] = False
+
 
     def add_scalar_fit_property(
         self,
@@ -186,6 +213,8 @@ class ARStructureContainer:
             h["clamp"] = self.clamp
             h["relative_weight"] = self.relative_weight
             h["structure_file_path"] = self.structure_file_path
+            h["predefined"] = self.predefined
+            self._predefined_storage.to_hdf(hdf=h)
 
     def from_hdf(self, hdf, group_name="structures"):
         with hdf.open(group_name) as h:
@@ -220,7 +249,9 @@ class ARStructureContainer:
             self.fit = h["fit"]
             self.relative_weight = h["relative_weight"]
             self.structure_file_path = h["structure_file_path"]
-    
+            if version == "0.3.0":
+                self.predefined = h["predefined"]
+                self._predefined_storage.from_hdf(hdf=h)
 
     def write_xml_file(self, directory, name="structures.xml"):
         """
@@ -232,25 +263,32 @@ class ARStructureContainer:
             name (str, optional): . Defaults to "structures.xml".
         """        
         root = ET.Element("group")
-        if self.structure_file_path is None:
-
-            # write POSCAR and xml
+        if self.structure_file_path is None and "atomic-forces" in self.fit_properties:
+            # write POSCARs
             for i in range(self.flattened_structures.num_chunks):
                 vec_start = self.flattened_structures.start_index[i]
-                vec_end = self.flattened_structures.start_index[i]+self.flattened_structures.length[i]
-                write_modified_poscar(
-                    identifier=self.flattened_structures.identifier[i],
-                    forces=self.fit_properties["atomic-forces"].target_value[vec_start:vec_end],
-                    positions=self.flattened_structures.positions[vec_start:vec_end],
-                    symbols=self.flattened_structures.symbols[vec_start:vec_end],
-                    cell=self.flattened_structures.cell[i],
-                    directory=directory
-                )
+                vec_end = self.flattened_structures.start_index[i]+self.flattened_structures.length[i]            
+                forces = self.fit_properties["atomic-forces"].target_value[vec_start:vec_end]
+                if not self.predefined[i]:
+                    write_modified_poscar(
+                        identifier=self.flattened_structures.identifier[i],
+                        forces=forces,
+                        positions=self.flattened_structures.positions[vec_start:vec_end],
+                        symbols=self.flattened_structures.symbols[vec_start:vec_end],
+                        cell=self.flattened_structures.cell[i],
+                        directory=directory
+                    )
+                #Maybe implement a check for forces when setting up a predefined structure?
+                #else:
+                #    if not np.all(np.isnan(forces)):
                 
-                fit_properties_xml = ET.Element("properties")
-                for flat_prop in self.fit_properties.values():
-                    fit_properties_xml.append(flat_prop.to_xml_element(i))
+        # write xml
+        for i in range(self.flattened_structures.num_chunks):
+            fit_properties_xml = ET.Element("properties")
+            for flat_prop in self.fit_properties.values():
+                fit_properties_xml.append(flat_prop.to_xml_element(i))
 
+            if not self.predefined[i]:
                 struct_xml = structure_meta_xml(
                     identifier=self.flattened_structures.identifier[i],
                     relative_weight=self.relative_weight[i],
@@ -259,23 +297,21 @@ class ARStructureContainer:
                     struct_file_path=self.structure_file_path,
                     fit = self.fit[i],
                 )
-                root.append(struct_xml)
-        else:
-            # write only xml and use POSCARs written already to some path
-            for i in range(self.flattened_structures.num_chunks):
-                fit_properties_xml = ET.Element("properties")
-                for flat_prop in self.fit_properties.values():
-                    fit_properties_xml.append(flat_prop.to_xml_element(i))
-
-                struct_xml = structure_meta_xml(
+            else:
+                data = self._predefined_storage[self.flattened_structures.identifier[i]]
+                struct_xml = predefined_structure_xml(
                     identifier=self.flattened_structures.identifier[i],
+                    lattice=data["lattice"],
+                    lattice_param=data["lattice_parameter"],
+                    ca_ratio=data["ca_ratio"],
+                    atom_type_A=data["atom_type_A"],
+                    atom_type_B=data["atom_type_B"],
                     relative_weight=self.relative_weight[i],
                     clamp=self.clamp[i],
                     fit_properties=fit_properties_xml,
-                    struct_file_path=self.structure_file_path,
                     fit = self.fit[i],
                 )
-                root.append(struct_xml)
+            root.append(struct_xml)
         filename = posixpath.join(directory, name)
         write_pretty_xml(root, filename)
 
@@ -322,7 +358,7 @@ class ARStructureContainer:
     
 
 ### This is probably useless like this in most cases because forces can't be passed.
-def structure_to_xml_element(structure):
+def user_structure_to_xml_element(structure):
     """
     Converts an ase/pyiron atoms object to an atomicrex xml element
     Right now forces can't be passed in the xml file, so this is not really helpful.
@@ -525,11 +561,6 @@ class ARStructureList(object):
             root.append(s._write_poscar_return_xml(directory, self.struct_file_path))
         filename = posixpath.join(directory, name)
         write_pretty_xml(root, filename)
-
-
-    #def to_hdf(self, hdf=None, group_name="arstructurelist"):
-
-    #def from_hdf(self, hdf=None, group_name="arstructurelist"):
     
     def to_hdf(self, hdf=None, group_name="arstructurelist"):
         """
@@ -730,4 +761,69 @@ def structure_meta_xml(
     else:
         struct_xml.append(fit_properties)
 
+    return struct_xml
+
+def predefined_structure_xml(
+        identifier,
+        lattice,
+        lattice_param,
+        ca_ratio,
+        atom_type_A,
+        atom_type_B,
+        relative_weight,
+        clamp, ## Not sure if and how this combines with relax in the ARFitParameter sets
+        fit_properties,
+        fit,
+):
+    """
+    Internal function. Creates xml element for predefined structure.
+    Args:
+        identifier (str): Unique identifier.
+        relative_weight (float): weight in objective function
+        clamp (bool): clamp the structure (no relaxation)
+        fit (bool): whether to fit the structure
+
+    Returns:
+        [ElementTree xml element]: atomicrex predefined structure xml element.
+    """
+
+    struct_xml = ET.Element(f"{lattice}-lattice")
+    struct_xml.set("id", f"{identifier}")
+    struct_xml.set("relative-weight", f"{relative_weight}")
+    if fit: 
+        struct_xml.set("fit", "true")
+    else:
+        struct_xml.set("fit", "false")
+    
+    if atom_type_A is None:
+        raise ValueError("atom type A has to be given for predefined structures")
+    else:
+        if atom_type_B is None:
+            atomA = ET.SubElement(struct_xml, "atom-type")
+        else:
+            atomA = ET.SubElement(struct_xml, "atom-type-A")
+            atomB = ET.SubElement(struct_xml, "atom-type-B")
+            atomB.text = atom_type_B
+        atomA.text = atom_type_A
+
+    if lattice_param is None:
+        raise ValueError("lattice parameter has to be set for predefined structures")
+    else:
+        a = ET.SubElement(struct_xml, "lattice-parameter")
+        a.text = lattice_param
+    
+    if ca_ratio is not None:
+        ca = ET.SubElement(struct_xml, "ca-ratio")
+        ca.text = ca
+
+    if not clamp:
+        relax_dof = ET.SubElement(struct_xml, "relax-dof")
+        ET.SubElement(relax_dof, "atom-coordinates")
+     
+    if isinstance(fit_properties, ARFitPropertyList):
+        properties = ET.SubElement(struct_xml, "properties")
+        for prop in fit_properties.values():
+            properties.append(prop.to_xml_element())
+    else:
+        struct_xml.append(fit_properties)
     return struct_xml

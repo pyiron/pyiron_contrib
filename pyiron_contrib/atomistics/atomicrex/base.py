@@ -159,7 +159,6 @@ class AtomicrexBase(PotentialFittingBase):
                             # Collecting structure information finished, hand over structures class
                             self.structures._parse_final_properties(final_property_lines)
                             structures_triggered = False
-
         self.to_hdf()
 
     def convergence_check(self):

@@ -40,7 +40,8 @@ class MlipDescriptors(GenericJob):
     """
     def __init__(self, project, job_name):
         super().__init__(project, job_name)
-        self.input = DataContainer({'potential_job_id': None, 'structure_container_id': None})
+        self.input = DataContainer({'potential_job_id': None, 'structure_container_id': None},
+                                   table_name="parameters")
         self._executable_activate()
 
     @property
@@ -104,3 +105,11 @@ class MlipDescriptors(GenericJob):
 
         with self.project_hdf5.open("output") as hdf:
             hdf["descriptors"] = descriptors
+
+    def to_hdf(self, hdf=None, group_name=None):
+        super().to_hdf(hdf=hdf, group_name=group_name)
+        self.input.to_hdf(hdf=self.project_hdf5)
+
+    def from_hdf(self, hdf=None, group_name=None):
+        super().from_hdf(hdf=hdf, group_name=group_name)
+        self.input.from_hdf(hdf=self.project_hdf5)

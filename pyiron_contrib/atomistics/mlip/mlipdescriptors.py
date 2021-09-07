@@ -15,7 +15,7 @@ __email__ = "poul@mpie.de"
 __status__ = "development"
 __date__ = "Mar 25, 2021"
 
-from pyiron_base import Settings, DataContainer, GenericJob, Executable
+from pyiron_base import Settings, DataContainer, GenericJob, Executable, FlattenedStorage
 from .cfgs import Cfg, savecfgs
 
 import os.path
@@ -100,11 +100,12 @@ class MlipDescriptors(GenericJob):
                 s = f.readline()
 
         file_name = os.path.join(self.working_directory, _OUTPUT_PATH)
+        self._descriptors = FlattenedStorage()
         with open(file_name) as f:
-            descriptors = np.array(list(parse(f)), dtype=object)
-
+            for chunk in parse(f):
+                self._descriptors.add_chunk(chunk.shape[0], descriptors=chunk)
         with self.project_hdf5.open("output") as hdf:
-            hdf["descriptors"] = descriptors
+            self._descriptors.to_hdf(hdf=hdf, group_name="descriptors")
 
     def to_hdf(self, hdf=None, group_name=None):
         super().to_hdf(hdf=hdf, group_name=group_name)
@@ -113,3 +114,4 @@ class MlipDescriptors(GenericJob):
     def from_hdf(self, hdf=None, group_name=None):
         super().from_hdf(hdf=hdf, group_name=group_name)
         self.input.from_hdf(hdf=self.project_hdf5)
+        self._descriptors.from_hdf(hdf=self.project_hdf5, group_name="descriptors")

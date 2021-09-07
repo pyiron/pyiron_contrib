@@ -231,8 +231,11 @@ class ARStructureContainer:
             return self.fit_properties[prop]._per_element_arrays["target_val"][index]
 
     def _shrink(self):
-        self._structures.num_elements = self._structures.current_element_index
-        self._structures.num_chunks = self._structures.current_chunk_index
+        self._resize_all(num_chunks=self._structures.current_chunk_index, num_elements=self._structures.current_element_index)
+
+    def _resize_all(self, num_chunks, num_elements):
+        self._structures.num_elements = num_elements
+        self._structures.num_chunks = num_chunks
         self._structures._resize_elements(self._structures.num_elements)
         self._structures._resize_chunks(self._structures.num_chunks)
         for flat in self.fit_properties.values():
@@ -275,24 +278,15 @@ class ARStructureContainer:
                     num_structures = h["structures/num_chunks"]
                     num_atoms = h["structures/num_elements"]
                 except:
-                    num_structures = h["structures/num_structures"]
+                    num_strucures = h["structures/num_structures"]
                     num_atoms = h["structures/num_atoms"]
                 group_name_2 = "structures"
 
+            self._resize_all(num_chunks=num_structures, num_elements=num_atoms)
             self._structures.from_hdf(hdf=h, group_name=group_name_2)
             self.fit_properties.from_hdf(hdf=h)
             self._predefined_storage.from_hdf(hdf=h)
             self.structure_file_path = h["structure_file_path"]
-            """
-            h_fit = h["fit_properties"]
-            for group in h_fit.list_groups():
-                if group == "atomic-forces":
-                    self.fit_properties[group] = FlattenedARVectorProperty(num_structures, num_atoms, group)
-                    self.fit_properties[group].from_hdf(h_fit, group_name=group)
-                else:
-                    self.fit_properties[group] = FlattenedARProperty(num_structures, group)
-                    self.fit_properties[group].from_hdf(h_fit, group_name=group)
-            """
 
             if version in ["0.1.0", "0.2.0"]:
                 self._structures._per_chunk_arrays["clamp"] = h["clamp"]

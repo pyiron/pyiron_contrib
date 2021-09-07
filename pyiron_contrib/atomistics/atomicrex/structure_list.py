@@ -68,11 +68,19 @@ class ARStructureContainer:
         if predefined:
             self.predefined[self.flattened_structures.prev_chunk_index] = True
             storage = DataContainer(table_name=identifier)
-            storage["lattice"] = lattice,
-            storage["lattice_parameter"] = lattice_parameter,
-            storage["ca_ratio"] = ca_ratio,
-            storage["atom_type_A"] = atom_type_A,
-            storage["atom_type_B"] = atom_type_B,
+            storage["lattice"] = lattice
+            if lattice_parameter is None:
+                lattice_parameter = structure.cell[0][0]
+                if ca_ratio is None:
+                    c = structure.cell[0][0]
+                    if c==lattice_parameter:
+                        ca_ratio = None
+                    else:
+                        ca_ratio = c / lattice_parameter
+            storage["lattice_parameter"] = lattice_parameter
+            storage["ca_ratio"] = ca_ratio
+            storage["atom_type_A"] = atom_type_A
+            storage["atom_type_B"] = atom_type_B
             self._predefined_storage[identifier] = storage
         else:
             self.predefined[self.flattened_structures.prev_chunk_index] = False
@@ -285,10 +293,10 @@ class ARStructureContainer:
         # write xml
         for i in range(self.flattened_structures.num_chunks):
             fit_properties_xml = ET.Element("properties")
-            for flat_prop in self.fit_properties.values():
-                fit_properties_xml.append(flat_prop.to_xml_element(i))
-
             if not self.predefined[i]:
+                for k, flat_prop in self.fit_properties.items():
+                    if not k in ("lattice-parameter", "ca-ratio"):
+                        fit_properties_xml.append(flat_prop.to_xml_element(i))
                 struct_xml = structure_meta_xml(
                     identifier=self.flattened_structures.identifier[i],
                     relative_weight=self.relative_weight[i],
@@ -298,6 +306,8 @@ class ARStructureContainer:
                     fit = self.fit[i],
                 )
             else:
+                for flat_prop in self.fit_properties.values():
+                    fit_properties_xml.append(flat_prop.to_xml_element(i))
                 data = self._predefined_storage[self.flattened_structures.identifier[i]]
                 struct_xml = predefined_structure_xml(
                     identifier=self.flattened_structures.identifier[i],
@@ -760,7 +770,6 @@ def structure_meta_xml(
             properties.append(prop.to_xml_element())
     else:
         struct_xml.append(fit_properties)
-
     return struct_xml
 
 def predefined_structure_xml(
@@ -810,11 +819,11 @@ def predefined_structure_xml(
         raise ValueError("lattice parameter has to be set for predefined structures")
     else:
         a = ET.SubElement(struct_xml, "lattice-parameter")
-        a.text = lattice_param
+        a.text = f"{lattice_param}"
     
     if ca_ratio is not None:
         ca = ET.SubElement(struct_xml, "ca-ratio")
-        ca.text = ca
+        ca.text = f"{ca_ratio}"
 
     if not clamp:
         relax_dof = ET.SubElement(struct_xml, "relax-dof")

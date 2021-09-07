@@ -16,6 +16,7 @@ __status__ = "development"
 __date__ = "Mar 25, 2021"
 
 from pyiron_base import Settings, DataContainer, GenericJob, Executable, FlattenedStorage
+from pyiron_atomistics.atomistics.structure.has_structure import HasStructure
 from .cfgs import Cfg, savecfgs
 
 import os.path
@@ -42,6 +43,7 @@ class MlipDescriptors(GenericJob):
         super().__init__(project, job_name)
         self.input = DataContainer({'potential_job_id': None, 'structure_container_id': None},
                                    table_name="parameters")
+        self._descriptors = FlattenedStorage()
         self._executable_activate()
 
     @property
@@ -58,13 +60,15 @@ class MlipDescriptors(GenericJob):
     @property
     def structures(self):
         """
-        :class:`pyiron_atomistics.atomistics.job.structurecontainer.StructureContainer`:
+        :class:`pyiron_atomistics.atomistics.structure.has_structure.HasStructure`:
                 structure container that keeps the structures to be evaluated
         """
         return self.project.load(self.input.structure_container_id)
 
     @potential.setter
-    def structures(self, job):
+    def structures(self, job: HasStructure):
+        if not isinstance(job, HasStructure):
+            raise TypeError("job class must derive from HasStructure")
         self.input.structure_container_id = job.id
 
     def write_input(self):
@@ -76,7 +80,7 @@ class MlipDescriptors(GenericJob):
 
         cfgs = []
         container = self.project.load(self.input.structure_container_id)
-        for structure in container.structure_lst.values():
+        for structure in container.iter_structures():
             c = Cfg()
             c.pos = structure.positions
             c.lat = structure.cell

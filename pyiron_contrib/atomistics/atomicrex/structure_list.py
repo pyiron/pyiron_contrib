@@ -284,9 +284,20 @@ class ARStructureContainer:
 
             self._resize_all(num_chunks=num_structures, num_elements=num_atoms)
             self._structures.from_hdf(hdf=h, group_name=group_name_2)
-            self.fit_properties.from_hdf(hdf=h)
-            self._predefined_storage.from_hdf(hdf=h)
             self.structure_file_path = h["structure_file_path"]
+
+            if version == "0.3.0":
+                self.fit_properties.from_hdf(hdf=h)
+                self._predefined_storage.from_hdf(hdf=h)
+            else:
+                with h.open("fit_properties") as g:
+                    for k in g.list_groups():
+                        if k == "atomic-forces":
+                            self.fit_properties[k] = FlattenedARVectorProperty(num_chunks=num_structures, num_elements=num_atoms)
+                        else:
+                            self.fit_properties[k] = FlattenedARVectorProperty(num_chunks=num_structures, num_elements=num_atoms)
+                        self.fit_properties[k].from_hdf(group_name=k)
+
 
             if version in ["0.1.0", "0.2.0"]:
                 self._structures._per_chunk_arrays["clamp"] = h["clamp"]

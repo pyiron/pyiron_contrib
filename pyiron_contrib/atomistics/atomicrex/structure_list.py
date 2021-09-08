@@ -58,7 +58,7 @@ class ARStructureContainer:
     def add_predefined_structure(
         self,
         identifier,
-        lattice, 
+        lattice,
         lattice_parameter,
         atom_type_A,
         ca_ratio=None,
@@ -226,9 +226,9 @@ class ARStructureContainer:
         index = self._get_per_structure_index(identifier)[0]
         slc  = self._structures._get_per_element_slice(index)
         if final:
-            return self.fit_properties[prop]._per_element_arrays["final_val"][index]
+            return self.fit_properties[prop]._per_element_arrays["final_val"][slc]
         else:
-            return self.fit_properties[prop]._per_element_arrays["target_val"][index]
+            return self.fit_properties[prop]._per_element_arrays["target_val"][slc]
 
     def _shrink(self):
         self._resize_all(num_chunks=self._structures.current_chunk_index, num_elements=self._structures.current_element_index)
@@ -261,7 +261,7 @@ class ARStructureContainer:
             self._type_to_hdf(h)
             self._structures.to_hdf(hdf=h)
             self.fit_properties.to_hdf(hdf=h,)
-            self._predefined_storage.to_hdf(hdf=h)            
+            self._predefined_storage.to_hdf(hdf=h)
             h["structure_file_path"] = self.structure_file_path
 
 
@@ -278,7 +278,7 @@ class ARStructureContainer:
                     num_structures = h["structures/num_chunks"]
                     num_atoms = h["structures/num_elements"]
                 except:
-                    num_strucures = h["structures/num_structures"]
+                    num_structures = h["structures/num_structures"]
                     num_atoms = h["structures/num_atoms"]
                 group_name_2 = "structures"
 
@@ -319,7 +319,7 @@ class ARStructureContainer:
             # write POSCARs
             for i in range(self._structures.num_chunks):
                 vec_start = self._structures.start_index[i]
-                vec_end = self._structures.start_index[i]+self._structures.length[i]            
+                vec_end = self._structures.start_index[i]+self._structures.length[i]
                 forces = self.fit_properties["atomic-forces"]._per_element_arrays["target_val"][vec_start:vec_end]
                 if not self._structures._per_chunk_arrays["predefined"][i]:
                     write_modified_poscar(

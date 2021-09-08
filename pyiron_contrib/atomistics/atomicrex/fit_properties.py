@@ -290,7 +290,7 @@ class FlattenedARScalarProperty(FlattenedARProperty):
         xml = ET.Element(prop)
         if self._per_chunk_arrays["output"][index]:
             xml.set("output", "true")
-        if self._per_chunk_arrays[f"fit"][index]:
+        if self._per_chunk_arrays["fit"][index]:
             xml.set("fit", "true")
             xml.set("target", f"{self._per_chunk_arrays['target_val'][index]}")
             #xml.set("relax", f"{self.relax}".lower())

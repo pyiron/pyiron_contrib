@@ -295,9 +295,8 @@ class ARStructureContainer:
                         if k == "atomic-forces":
                             self.fit_properties[k] = FlattenedARVectorProperty(num_chunks=num_structures, num_elements=num_atoms)
                         else:
-                            self.fit_properties[k] = FlattenedARVectorProperty(num_chunks=num_structures, num_elements=num_atoms)
-                        self.fit_properties[k].from_hdf(group_name=k)
-
+                            self.fit_properties[k] = FlattenedARScalarProperty(num_chunks=num_structures, num_elements=num_atoms)
+                        self.fit_properties[k].from_hdf(hdf=g, group_name=k)
 
             if version in ["0.1.0", "0.2.0"]:
                 self._structures._per_chunk_arrays["clamp"] = h["clamp"]

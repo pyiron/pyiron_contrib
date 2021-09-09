@@ -118,7 +118,7 @@ class ARStructureContainer:
                 flat.add_array("max_val", per="chunk")
         try:
             flat._per_chunk_arrays["target_val"][self._structures.prev_chunk_index] = target_val
-        except IndexError:
+        except (IndexError, ValueError):
             for v in self.fit_properties.values():
                 v._resize_chunks(self._structures._num_chunks_alloc)
                 v._resize_elements(self._structures._num_elements_alloc)
@@ -151,7 +151,7 @@ class ARStructureContainer:
             flat = self.fit_properties[prop]
         try:
             flat._per_chunk_arrays["fit"][self._structures.prev_chunk_index] = fit
-        except IndexError:
+        except (IndexError, ValueError):
             for v in self.fit_properties.values():
                 v._resize_chunks(self._structures._num_elements_alloc)
             flat._per_chunk_arrays["fit"][self._structures.prev_chunk_index] = fit
@@ -159,7 +159,7 @@ class ARStructureContainer:
         if target_val is not None:
             try:
                 flat._per_element_arrays["target_val"][self._structures.prev_element_index:self._structures.current_element_index] = target_val
-            except IndexError:
+            except (IndexError, ValueError):
                 for v in self.fit_properties.values():
                     v._resize_elements(self._structures._num_elements_alloc)
                 flat._per_element_arrays["target_val"][self._structures.prev_element_index:self._structures.current_element_index] = target_val

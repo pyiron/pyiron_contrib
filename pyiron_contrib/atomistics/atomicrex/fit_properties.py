@@ -235,7 +235,7 @@ class FlattenedARProperty(FlattenedStorage):
     """
     Class to read and write scalar properties of a structure, f.e. the energy.
     """    
-    def __init__(self, num_chunks=100, num_elements=1000, **kwargs):
+    def __init__(self, num_chunks=1, num_elements=1, **kwargs):
         super().__init__(num_chunks=num_chunks, num_elements=num_elements, **kwargs)
         self._per_chunk_arrays={}
         self.add_array("fit", dtype=bool, per="chunk", fill=False)
@@ -275,7 +275,7 @@ class FlattenedARProperty(FlattenedStorage):
 
 
 class FlattenedARScalarProperty(FlattenedARProperty):
-    def __init__(self, num_chunks=100, num_elements=1000, **kwargs):
+    def __init__(self, num_chunks=1, num_elements=1, **kwargs):
         super().__init__(num_chunks=num_chunks, num_elements=num_elements, **kwargs)
         self.add_array("target_val", per="chunk", fill=np.nan)
         self.add_array("final_val", per="chunk", fill=np.nan)
@@ -310,7 +310,7 @@ class FlattenedARVectorProperty(FlattenedARProperty):
     """
     Like AR property, but for vector properties, i.e. forces
     """
-    def __init__(self, num_chunks=100, num_elements=1000, **kwargs):
+    def __init__(self, num_chunks=1, num_elements=1, **kwargs):
         super().__init__(num_chunks=num_chunks, num_elements=num_elements, **kwargs)
         self.add_array("target_val", shape=(3,), per="element", fill=np.nan)
         self.add_array("final_val", shape=(3,), per="element", fill=np.nan)

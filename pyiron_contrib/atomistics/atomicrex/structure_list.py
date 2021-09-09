@@ -162,6 +162,7 @@ class ARStructureContainer:
             except IndexError:
                 for v in self.fit_properties.values():
                     v._resize_elements(self._structures._num_elements_alloc)
+                flat._per_element_arrays["target_val"][self._structures.prev_element_index:self._structures.current_element_index] = target_val
         flat._per_chunk_arrays["relax"][self._structures.prev_chunk_index] = relax
         flat._per_chunk_arrays["relative_weight"][self._structures.prev_chunk_index] = relative_weight
         flat._per_chunk_arrays["residual_style"][self._structures.prev_chunk_index] = residual_style

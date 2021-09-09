@@ -120,7 +120,7 @@ class ARStructureContainer:
             flat._per_chunk_arrays["target_val"][self._structures.prev_chunk_index] = target_val
         except IndexError:
             for v in self.fit_properties.values():
-                v._resize_chunks(self._structures._num_elements_alloc)
+                v._resize_chunks(self._structures._num_chunks_alloc)
                 v._resize_elements(self._structures._num_elements_alloc)
             flat._per_chunk_arrays["target_val"][self._structures.prev_chunk_index] = target_val
         flat._per_chunk_arrays["fit"][self._structures.prev_chunk_index] = fit
@@ -154,11 +154,14 @@ class ARStructureContainer:
         except IndexError:
             for v in self.fit_properties.values():
                 v._resize_chunks(self._structures._num_elements_alloc)
-                v._resize_elements(self._structures._num_elements_alloc)
             flat._per_chunk_arrays["fit"][self._structures.prev_chunk_index] = fit
 
         if target_val is not None:
-            flat._per_element_arrays["target_val"][self._structures.prev_element_index:self._structures.current_element_index] = target_val
+            try:
+                flat._per_element_arrays["target_val"][self._structures.prev_element_index:self._structures.current_element_index] = target_val
+            except IndexError:
+                for v in self.fit_properties.values():
+                    v._resize_elements(self._structures._num_elements_alloc)
         flat._per_chunk_arrays["relax"][self._structures.prev_chunk_index] = relax
         flat._per_chunk_arrays["relative_weight"][self._structures.prev_chunk_index] = relative_weight
         flat._per_chunk_arrays["residual_style"][self._structures.prev_chunk_index] = residual_style
@@ -231,7 +234,7 @@ class ARStructureContainer:
             return self.fit_properties[prop]._per_element_arrays["target_val"][slc]
 
     def _shrink(self):
-        self._resize_all(num_chunks=self._structures.current_chunk_index, num_elements=self._structures.current_element_index)
+        self._resize_all(num_chunks=self._structures.current_chunk_index, num_elements=self._structures.num_elements)
 
     def _resize_all(self, num_chunks, num_elements):
         self._structures.num_elements = num_elements

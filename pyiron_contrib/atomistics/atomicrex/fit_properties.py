@@ -242,7 +242,7 @@ class FlattenedARProperty(FlattenedStorage):
         self.add_array("relative_weight", per="chunk", fill=np.nan)
         self.add_array("relax", dtype=bool, per="chunk")
         self.add_array("residual_style", per="chunk", dtype=np.ubyte, fill=0)
-        self.add_array("output", dtype=bool, per="chunk", fill=True)
+        self.add_array("output", dtype=bool, per="chunk", fill=False)
         self.add_array("tolerance", per="chunk", fill=np.nan)
     
     @property

@@ -261,6 +261,7 @@ class ARStructureContainer:
         hdf["HDF_VERSION"] = self.__hdf_version__
 
     def to_hdf(self, hdf, group_name="structures"):
+        self._shrink()
         with hdf.open(group_name) as h:
             self._type_to_hdf(h)
             self._structures.to_hdf(hdf=h)
@@ -302,7 +303,7 @@ class ARStructureContainer:
                             self.fit_properties[k] = FlattenedARScalarProperty(num_chunks=num_structures, num_elements=num_atoms)
                         self.fit_properties[k].from_hdf(hdf=g, group_name=k)
 
-            if version in ["0.1.0", "0.2.0"]:
+            if version < "0.3.0":
                 self._structures._per_chunk_arrays["clamp"] = h["clamp"]
                 self._structures._per_chunk_arrays["fit"] = h["fit"]
                 self._structures._per_chunk_arrays["relative_weight"] = h["relative_weight"]

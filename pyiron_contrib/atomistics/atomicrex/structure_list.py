@@ -22,7 +22,7 @@ s  = Settings()
 class ARStructureContainer:
     __version__ = "0.3.0"
     __hdf_version__ = "0.3.0"
-    def __init__(self, num_atoms=1000, num_structures=100):
+    def __init__(self, num_atoms=1, num_structures=1):
         self.fit_properties = DataContainer(table_name="fit_properties")
         self._structures = StructureStorage(num_atoms=num_atoms, num_structures=num_structures)
         self._predefined_storage = DataContainer(table_name="predefined_structures")
@@ -153,7 +153,7 @@ class ARStructureContainer:
             flat._per_chunk_arrays["fit"][self._structures.prev_chunk_index] = fit
         except (IndexError, ValueError):
             for v in self.fit_properties.values():
-                v._resize_chunks(self._structures._num_elements_alloc)
+                v._resize_chunks(self._structures._num_chunks_alloc)
             flat._per_chunk_arrays["fit"][self._structures.prev_chunk_index] = fit
 
         if target_val is not None:
@@ -235,7 +235,7 @@ class ARStructureContainer:
             return self.fit_properties[prop]._per_element_arrays["target_val"][slc]
 
     def _shrink(self):
-        self._resize_all(num_chunks=self._structures.current_chunk_index, num_elements=self._structures.num_elements)
+        self._resize_all(num_chunks=self._structures.num_chunks, num_elements=self._structures.num_elements)
 
     def _resize_all(self, num_chunks, num_elements):
         self._structures.num_elements = num_elements
@@ -243,10 +243,10 @@ class ARStructureContainer:
         self._structures._resize_elements(self._structures.num_elements)
         self._structures._resize_chunks(self._structures.num_chunks)
         for flat in self.fit_properties.values():
-            flat.num_elements = self._structures.num_elements
-            flat.num_chunks = self._structures.num_chunks
-            flat._resize_elements(self._structures.num_elements)
-            flat._resize_chunks(self._structures.num_chunks)
+            flat.num_elements = num_elements
+            flat.num_chunks = num_chunks
+            flat._resize_elements(num_elements)
+            flat._resize_chunks(num_chunks)
 
     def _type_to_hdf(self, hdf):
         """

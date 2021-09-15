@@ -629,7 +629,8 @@ class EAMPotential(AbstractPotential, EAMlikeMixin):
         """        
         if filename is None:
             filename = f"{job.working_directory}/{self.export_file}"
-        elements = read_eam_fs_file(filename=filename)
+
+        elements, r_values, rho_values = read_eam_fs_file(filename=filename)
         
         # TODO: figure out how to index ax for multiple elements
         fig, ax = plt.subplots(nrows=3*len(elements), ncols=len(elements), figsize=(len(elements)*8, len(elements)*3*6), squeeze=False)
@@ -656,8 +657,7 @@ class EAMPotential(AbstractPotential, EAMlikeMixin):
     def count_local_extrema(self, job, filename=None, count_minima=True, count_maxima=False):
         if filename is None:
             filename = f"{job.working_directory}/{self.export_file}"
-        elements = read_eam_fs_file(filename=filename)
-
+        elements, _r_values, _rho_values = read_eam_fs_file(filename=filename)
         extrema_dict = {}
         for el, func in elements.items():
             extrema_dict[el] = {}
@@ -927,4 +927,4 @@ def read_eam_fs_file(filename):
                     # with exception of the first value to prevent division by 0.
                     elements[element]["V_{}".format(elementV_element)][1:] = elements[element]["V_{}".format(elementV_element)][1:] / r_values[1:]
                     V_written.append(elementV_element)
-    return elements
+    return elements, r_values, rho_values

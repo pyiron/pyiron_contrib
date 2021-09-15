@@ -55,6 +55,10 @@ class FunctionFactory(PyironFactory):
         return GaussianFunc(identifier, prefactor, eta, mu, species, cutoff)
 
     @staticmethod
+    def x_pow_n_cutoff(identifier, cutoff, h=1, N=4, species=["*"], is_screening_function=True):
+        return XpowNCutoff(identifier=identifier, cutoff=cutoff, h=h, N=N, species=species, is_screening_function=is_screening_function)
+
+    @staticmethod
     def sum(identifier, species=["*", "*"]):
         return Sum(identifier=identifier, species=species)
     
@@ -436,9 +440,47 @@ class ExpGaussian(SpecialFunction):
         return lambda r: np.exp(-np.sign(exponent)*
         alpha/(1-(r/cutoff)**exponent)) * np.exp(-r**2/(2*stddev**2))/(stddev*np.sqrt(2*np.pi))
 
-
     def _to_xml_element(self):
         return super()._to_xml_element(name="exp-gaussian")
+
+
+class XpowNCutoff(SpecialFunction):
+    def __init__(
+        self,
+        identifier=None,
+        cutoff=None,
+        h=1,
+        N=4,
+        species=["*", "*"],
+        is_screening_function=True
+        ):
+        super().__init__(identifier, species=species, is_screening_function=is_screening_function)
+        self.parameters.add_parameter(
+            "cutoff",
+            start_val=cutoff,
+            enabled=False,
+            fitable=False,
+        )
+        self.parameters.add_parameter(
+            "h",
+            start_val=h,
+            enabled=False,
+        )
+        self.parameters.add_parameter(
+            "N",
+            start_val=N,
+            enabled=False,
+        )
+
+        @property
+        def func(self):
+            rc = self.parameters.cutoff.start_val
+            h = self.parameters.h.start_val
+            N = self.parameters.N.start_val
+            return lambda r: ((r-rc)/h)**N / (1 + ((r-rc)/h)**N)
+
+        def _to_xml_element(self):
+            return super()._to_xml_element(name="XpowN-cutoff")
 
 
 class MorseA(SpecialFunction):

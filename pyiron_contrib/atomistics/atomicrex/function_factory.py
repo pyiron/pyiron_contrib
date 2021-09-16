@@ -59,6 +59,33 @@ class FunctionFactory(PyironFactory):
         return XpowNCutoff(identifier=identifier, cutoff=cutoff, h=h, N=N, species=species, is_screening_function=is_screening_function)
 
     @staticmethod
+    def constant(identifier, constant, species=["*", "*"]):
+        return Constant(constant=constant, identifier=identifier, species=species)
+
+    @staticmethod
+    def MishinCuV(identifier, E1, E2, alpha1, alpha2, r01, r02, delta, cutoff, h, species=["*", "*"]):
+        product_func = FunctionFactory.product(identifier, species)
+        sum_func = FunctionFactory.sum(identifier="MorseSum", species=species)
+        morse1 = FunctionFactory.morse_A(identifier="Morse1", D0=E1, r0=r01, alpha=alpha1, species=species)
+        morse2 = FunctionFactory.morse_A(identifier="Morse2", D0=E2, r0=r02, alpha=alpha2, species=species)
+        c = FunctionFactory.constant(identifier="delta", constant=delta, species=species)
+        sum_func.functions[morse1.identifier] = morse1
+        sum_func.functions[morse2.identifier] = morse2
+        sum_func.functions[c.identifier] = c
+        screening = FunctionFactory.x_pow_n_cutoff(identifier="screening", cutoff=cutoff, h=h, N=4, species=species)
+        product_func[sum_func.identifier] = sum_func
+        product_func[screening.identifier] = screening
+        return
+
+    @staticmethod
+    def MishinCuRho(identifier, a, r1, r2, beta1, beta2, species=["*", "*"]):
+        return MishinCuRho(identifier, a, r1, r2, beta1, beta2, species)
+
+    @staticmethod
+    def MishinCuF(identifier, F0, F2, q1, q2, q3, q4, Q1, Q2, species=["*", "*"]):
+        return MishinCuF(identifier, F0, F2, q1, q2, q3, q4, Q1, Q2, species)
+
+    @staticmethod
     def sum(identifier, species=["*", "*"]):
         return Sum(identifier=identifier, species=species)
     
@@ -512,7 +539,6 @@ class MorseA(SpecialFunction):
     def _to_xml_element(self):
         return super()._to_xml_element(name="morse-A")
 
-
 class MorseB(SpecialFunction):
     def __init__(self, identifier=None, D0=None, r0=None, beta=None, S=None, delta=None, species=["*", "*"]):
         super().__init__(identifier, species=species, is_screening_function=False)
@@ -601,6 +627,18 @@ class MorseC(SpecialFunction):
     def _to_xml_element(self):
         return super()._to_xml_element(name="morse-C")
 
+class Constant(SpecialFunction):
+    def __init__(self, constant=None, identifier=None, species=["*", "*"]):
+        super().__init__(identifier, species=species, is_screening_function=False)
+        self.parameters.add_parameter(
+            "const",
+            start_val=constant,
+            enabled=True,
+        )
+
+    def _to_xml_element(self):
+        return super()._to_xml_element(name="constant")
+
 
 ## Renamed GaussianFunc to not mess with the gaussian code when loading from hdf5
 class GaussianFunc(SpecialFunction):
@@ -640,6 +678,86 @@ class GaussianFunc(SpecialFunction):
             cutoff = ET.SubElement(xml, "cutoff")
             cutoff.text = f"{self.cutoff}"
         return xml
+
+class MishinCuRho(SpecialFunction):
+    def __init__(self, identifier=None, a=None, r1=None, r2=None, beta1=None, beta2=None, species=["*", "*"]):
+        super().__init__(identifier, species=species, is_screening_function=False)
+        self.parameters.add_parameter(
+            "a",
+            start_val=a,
+            enabled=True,
+        )
+        self.parameters.add_parameter(
+            "r1",
+            start_val=r1,
+            enabled=True,
+        )
+        self.parameters.add_parameter(
+            "r2",
+            start_val=r2,
+            enabled=True,
+        )
+        self.parameters.add_parameter(
+            "beta1",
+            start_val=beta1,
+            enabled=True,
+        )
+        self.parameters.add_parameter(
+            "beta2",
+            start_val=beta2,
+            enabled=True,
+        )
+
+    def _to_xml_element(self):
+        return super()._to_xml_element(name="Mishin-Cu-rho")
+
+class MishinCuF(SpecialFunction):
+    def __init__(self, identifier=None, F0=None, F2=None, q1=None, q2=None, q3=None, q4=None, Q1=None, Q2=None, species=["*", "*"]):
+        super().__init__(identifier, species=species, is_screening_function=False)
+        self.parameters.add_parameter(
+            "F0",
+            start_val=F0,
+            enabled=True,
+        )
+        self.parameters.add_parameter(
+            "F2",
+            start_val=F2,
+            enabled=True,
+        )
+        self.parameters.add_parameter(
+            "q1",
+            start_val=q1,
+            enabled=True,
+        )
+        self.parameters.add_parameter(
+            "q2",
+            start_val=q2,
+            enabled=True,
+        )
+        self.parameters.add_parameter(
+            "q3",
+            start_val=q3,
+            enabled=True,
+        )
+        self.parameters.add_parameter(
+            "q4",
+            start_val=q4,
+            enabled=True,
+        )
+        self.parameters.add_parameter(
+            "Q1",
+            start_val=Q1,
+            enabled=True,
+        )
+        self.parameters.add_parameter(
+            "Q2",
+            start_val=Q2,
+            enabled=True,
+        )
+
+    def _to_xml_element(self):
+        return super()._to_xml_element(name="Mishin-Cu-F")
+
 
 class UserFunction(DataContainer, BaseFunctionMixin):
     """

@@ -73,9 +73,11 @@ class FunctionFactory(PyironFactory):
         sum_func.functions[morse2.identifier] = morse2
         sum_func.functions[c.identifier] = c
         screening = FunctionFactory.x_pow_n_cutoff(identifier="screening", cutoff=cutoff, h=h, N=4, species=species)
-        product_func[sum_func.identifier] = sum_func
-        product_func[screening.identifier] = screening
-        return
+        screening.is_screening_function = False
+        screening.screening = None
+        product_func.functions[sum_func.identifier] = sum_func
+        product_func.functions[screening.identifier] = screening
+        return product_func
 
     @staticmethod
     def MishinCuRho(identifier, a, r1, r2, beta1, beta2, species=["*", "*"]):
@@ -499,15 +501,15 @@ class XpowNCutoff(SpecialFunction):
             enabled=False,
         )
 
-        @property
-        def func(self):
-            rc = self.parameters.cutoff.start_val
-            h = self.parameters.h.start_val
-            N = self.parameters.N.start_val
-            return lambda r: ((r-rc)/h)**N / (1 + ((r-rc)/h)**N)
+    @property
+    def func(self):
+        rc = self.parameters.cutoff.start_val
+        h = self.parameters.h.start_val
+        N = self.parameters.N.start_val
+        return lambda r: ((r-rc)/h)**N / (1 + ((r-rc)/h)**N)
 
-        def _to_xml_element(self):
-            return super()._to_xml_element(name="XpowN-cutoff")
+    def _to_xml_element(self):
+        return super()._to_xml_element(name="XpowN-cutoff")
 
 
 class MorseA(SpecialFunction):

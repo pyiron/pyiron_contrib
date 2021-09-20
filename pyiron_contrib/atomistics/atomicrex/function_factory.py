@@ -247,9 +247,7 @@ class SpecialFunction(DataContainer, BaseFunctionMixin):
             p.text = f"{param.start_val}"
         
         # This if condition is to prevent an error with the expA screening function
-        # It is a bit hacky and if another function with only 1 parameter is added
-        # it probably has to be rewritten 
-        if len(self.parameters.values()) > 1:
+        if name != "exp-A":
             root.append(self.parameters.fit_dofs_to_xml_element())
 
         if not self.is_screening_function:

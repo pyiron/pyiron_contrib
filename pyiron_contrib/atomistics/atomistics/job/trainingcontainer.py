@@ -50,11 +50,12 @@ class TrainingContainer(GenericJob, HasStructure):
         self._container = StructureStorage()
         self._container.add_array("energy", dtype=np.float64, per="chunk")
         self._container.add_array("forces", shape=(3,), dtype=np.float64, per="element")
+        self._container.add_array("stress", shape=(3,3), dtype=np.float64, per="chunk")
         self._table_cache = None
 
     @property
     def _table(self):
-        if self._table_cache is None:
+        if self._table_cache is None or len(self._table_cache) != len(self._container):
             self._table_cache = pd.DataFrame({
                 "name":             [self._container.get_array("identifier", i)
                                         for i in range(len(self._container))],
@@ -63,6 +64,8 @@ class TrainingContainer(GenericJob, HasStructure):
                 "energy":           [self._container.get_array("energy", i)
                                         for i in range(len(self._container))],
                 "forces":           [self._container.get_array("forces", i)
+                                        for i in range(len(self._container))],
+                "stress":           [self._container.get_array("stress", i)
                                         for i in range(len(self._container))],
             })
             self._table_cache["number_of_atoms"] = [len(s) for s in self._table_cache.atoms]
@@ -76,12 +79,22 @@ class TrainingContainer(GenericJob, HasStructure):
             job (:class:`.AtomisticGenericJob`): job to take structure from
             iteration_step (int, optional): if job has multiple steps, this selects which to add
         """
+        energy = job.output.energy_pot[iteration_step]
+        ff = job.output.forces
+        if ff is not None:
+            forces = ff[iteration_step]
+        else:
+            forces = None
+        pp = job.output.pressures
+        if pp is not None:
+            stress = pp[iteration_step]
+        else:
+            stress = None
         self.include_structure(job.get_structure(iteration_step=iteration_step),
-                               energy=job.output.energy_pot[iteration_step],
-                               forces=job.output.forces[iteration_step],
+                               energy=energy, forces=forces, stress=stress,
                                name=job.name)
 
-    def include_structure(self, structure, energy, forces=None, name=None):
+    def include_structure(self, structure, energy, forces=None, stress=None, name=None):
         """
         Add new structure to structure list and save energy and forces with it.
 
@@ -92,15 +105,18 @@ class TrainingContainer(GenericJob, HasStructure):
             structure_or_job (:class:`~.Atoms`): structure to add
             energy (float): energy of the whole structure
             forces (Nx3 array of float, optional): per atom forces, where N is the number of atoms in the structure
+            stress (3x3 array of float, optional): per structure stresses
             name (str, optional): name describing the structure
         """
+        data = {"energy": energy}
         if forces is not None:
-            self._container.add_structure(structure, name, energy=energy, forces=forces)
-        else:
-            self._container.add_structure(structure, name, energy=energy)
+            data["forces"] = forces
+        if stress is not None:
+            data["stress"] = stress
+        self._container.add_structure(structure, name, **data)
         if self._table_cache:
             self._table = self._table.append(
-                    {"name": name, "atoms": structure, "energy": energy, "forces": forces,
+                    {"name": name, "atoms": structure, "energy": energy, "forces": forces, "stress": stress,
                      "number_of_atoms": len(structure)},
                     ignore_index=True)
 

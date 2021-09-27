@@ -7,7 +7,7 @@ from __future__ import print_function
 import os
 import posixpath
 
-from pyiron_contrib.atomistics.atomistics.job.structurestorage import StructureStorage
+from pyiron_atomistics.atomistics.structure.structurestorage import StructureStorage
 from pyiron_atomistics.atomistics.structure.atoms import Atoms
 from pyiron_atomistics.atomistics.structure.has_structure import HasStructure
 from pyiron_base import GenericParameters, GenericJob, deprecate

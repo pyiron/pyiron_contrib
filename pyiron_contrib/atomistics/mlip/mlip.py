@@ -10,7 +10,7 @@ import os
 import pandas as pd
 import posixpath
 import scipy.constants
-from pyiron_base import Settings, GenericParameters, GenericJob, Executable
+from pyiron_base import Settings, GenericParameters, GenericJob, Executable, FlattenedStorage
 from pyiron_atomistics import ase_to_pyiron
 from pyiron_contrib.atomistics.mlip.cfgs import savecfgs, loadcfgs, Cfg
 from pyiron_contrib.atomistics.mlip.potential import MtpPotential
@@ -163,6 +163,27 @@ class Mlip(GenericJob):
         else:
             grades_lst, job_id_grades_lst, timestep_grades_lst = [], [], []
         self._potential.load(os.path.join(self.working_directory, "Trained.mtp_"))
+
+        training_store = FlattenedStorage()
+        training_store.add_array('energy', dtype=np.float64, shape=(1,), per='chunk')
+        training_store.add_array('forces', dtype=np.float64, shape=(3,), per='element')
+        training_store.add_array('stress', dtype=np.float64, shape=(6,), per='chunk')
+        training_store.add_array('grade',  dtype=np.float64, shape=(1,), per='chunk')
+        for cfg in loadcfgs(os.path.join(self.working_directory, "training_efs.cfg")):
+            training_store.add_chunk(len(cfg.pos), identifier=cfg.desc,
+                    energy=cfg.energy, forces=cfg.forces, stress=cfg.stresses, grade=cfg.grade
+            )
+
+        testing_store = FlattenedStorage()
+        testing_store.add_array('energy', dtype=np.float64, shape=(1,), per='chunk')
+        testing_store.add_array('forces', dtype=np.float64, shape=(3,), per='element')
+        testing_store.add_array('stress', dtype=np.float64, shape=(6,), per='chunk')
+        testing_store.add_array('grade',  dtype=np.float64, shape=(1,), per='chunk')
+        for cfg in loadcfgs(os.path.join(self.working_directory, "testing_efs.cfg")):
+            testing_store.add_chunk(len(cfg.pos), identifier=cfg.desc,
+                    energy=cfg.energy, forces=cfg.forces, stress=cfg.stresses, grade=cfg.grade
+            )
+
         with self.project_hdf5.open('output') as hdf5_output:
             hdf5_output['grades'] = grades_lst
             hdf5_output['job_id'] = job_id_grades_lst
@@ -172,6 +193,10 @@ class Mlip(GenericJob):
             hdf5_output['job_id_new'] = job_id_new_training_lst
             hdf5_output['timestep_new'] = timestep_new_training_lst
             self._potential.to_hdf(hdf=hdf5_output)
+            hdf5_output['training_energies'] = training_energies
+            hdf5_output['testing_energies'] = testing_energies
+            training_store.to_hdf(hdf=hdf5_output, group_name="training_efs")
+            testing_store.to_hdf(hdf=hdf5_output, group_name="testing_efs")
 
     def get_structure(self, iteration_step=-1):
         job = self.project.load(self['output/job_id_diff'][iteration_step])
@@ -455,6 +480,10 @@ $MLP_COMMAND_PARALLEL train --energy-weight=energy_auto --force-weight=force_aut
             file_content = '''\
 $MLP_COMMAND_PARALLEL train --energy-weight=energy_auto --force-weight=force_auto --stress-weight=stress_auto --max-iter=iteration_auto start.mtp training.cfg > training.log
 $MLP_COMMAND_SERIAL calc-grade Trained.mtp_ training.cfg testing.cfg grades.cfg --mvs-filename=state.mvs > grading.log
+$MLP_COMMAND_SERIAL calc-errors Trained.mtp_ training.cfg > training.errors
+$MLP_COMMAND_SERIAL calc-errors Trained.mtp_ testing.cfg > testing.errors
+$MLP_COMMAND_SERIAL calc-efs Trained.mtp_ training.cfg training_efs.cfg
+$MLP_COMMAND_SERIAL calc-efs Trained.mtp_ testing.cfg testing_efs.cfg
 $MLP_COMMAND_SERIAL select-add Trained.mtp_ training.cfg testing.cfg diff.cfg > select.log
 cp training.cfg training_new.cfg 
 cat diff.cfg >> training_new.cfg

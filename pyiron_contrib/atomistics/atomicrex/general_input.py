@@ -9,6 +9,7 @@ from pyiron_base import DataContainer, PyironFactory
 from pyiron_contrib.atomistics.atomicrex.utility_functions import write_pretty_xml
 from pyiron_contrib.atomistics.atomicrex.potential_factory import ARPotFactory
 from pyiron_contrib.atomistics.atomicrex.function_factory import FunctionFactory
+from pyiron_contrib.atomistics.atomicrex.parameter_constraints import ParameterConstraints
 
 class GeneralARInput(DataContainer):
     """
@@ -42,6 +43,7 @@ class GeneralARInput(DataContainer):
         self.enable_fitting = enable_fitting
         # version "0.1.0"
         self.output_file = "atomicrex.out"
+        self.parameter_constraints = ParameterConstraints()
 
     def _write_xml_file(self, directory):
         """Internal function.
@@ -98,6 +100,9 @@ class GeneralARInput(DataContainer):
         include = ET.SubElement(structures, "xi:include")
         include.set("href", "structures.xml")
         include.set("xmlns:xi", "http://www.w3.org/2003/XInclude")
+
+        if len(self.parameter_constraints)>0:
+            job.append(self.parameter_constraints._to_xml_element())
 
         file_name = posixpath.join(directory, "main.xml")
         write_pretty_xml(job, file_name)

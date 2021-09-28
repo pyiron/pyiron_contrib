@@ -101,6 +101,9 @@ class GeneralARInput(DataContainer):
         include.set("href", "structures.xml")
         include.set("xmlns:xi", "http://www.w3.org/2003/XInclude")
 
+        if len(self.parameter_constraints._storage)>0:
+            job.append(self.parameter_constraints._to_xml_element())
+
         file_name = posixpath.join(directory, "main.xml")
         write_pretty_xml(job, file_name)
 

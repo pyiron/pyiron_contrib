@@ -93,6 +93,7 @@ class AtomicrexBase(PotentialFittingBase):
         
         finished_triggered = False
         params_triggered = False
+        dependent_dofs_triggered = False
         structures_triggered = False
 
         # Allocate numpy arrays for iterations and residual
@@ -111,6 +112,7 @@ class AtomicrexBase(PotentialFittingBase):
         with open(filepath, "r") as f:
             final_parameter_lines = []
             final_property_lines = []
+            depdendent_dof_lines = []
 
             for l in f:
                 if l.startswith("ERROR"):
@@ -133,22 +135,14 @@ class AtomicrexBase(PotentialFittingBase):
                             continue
                 
                 else: # if finished_triggered
-                    if l.startswith("Potential parameters"):
-                        # Get the number of dofs
-                        n_fit_dofs = int(l.split("=")[1][:-3])
-                        params_triggered = True
-                
-                    elif params_triggered:
+                    if params_triggered:
                         if not l.startswith("---"):
                             final_parameter_lines.append(l)
                         else:
                             # Collecting lines with final parameters finished, hand over to the potential class
                             self.potential._parse_final_parameters(final_parameter_lines)
                             params_triggered = False
-                
-                    elif l.startswith("Computing"):
-                        structures_triggered = True
-                     
+                    
                     elif structures_triggered:
                         if not l.startswith("---"):
                             final_property_lines.append(l)
@@ -156,6 +150,24 @@ class AtomicrexBase(PotentialFittingBase):
                             # Collecting structure information finished, hand over structures class
                             self.structures._parse_final_properties(final_property_lines)
                             structures_triggered = False
+
+                    elif dependent_dofs_triggered:
+                        if not l.startswith("---"):
+                            depdendent_dof_lines.append(l)
+                        else:
+                            self.potential._parse_final_parameters(depdendent_dof_lines)
+                            dependent_dofs_triggered = False
+
+                    elif l.startswith("Potential parameters"):
+                        # Get the number of dofs
+                        n_fit_dofs = int(l.split("=")[1][:-3])
+                        params_triggered = True
+                
+                    elif l.startswith("Computing"):
+                        structures_triggered = True
+
+                    elif l.startswith("Dependent DOFs:"):
+                        dependent_dofs_triggered = True
         self.to_hdf()
 
     def convergence_check(self):

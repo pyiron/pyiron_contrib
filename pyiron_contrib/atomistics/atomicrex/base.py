@@ -1,5 +1,4 @@
 """Pyiron interface to atomicrex"""
-from pyiron_contrib.atomistics.atomicrex.parameter_constraints import ParameterConstraints
 import numpy as np
 
 from pyiron_base import GenericJob, Settings, Executable

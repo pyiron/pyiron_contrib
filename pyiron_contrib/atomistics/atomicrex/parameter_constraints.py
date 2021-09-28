@@ -8,7 +8,7 @@ class Constraint(DataContainer):
         self.identifier = identifier
         self.dependent_dof = dependent_dof
         self.expression = expression
-    
+
     def _to_xml_element(self):
         root = ET.Element("constraint")
         root.set("id", self.identifier)

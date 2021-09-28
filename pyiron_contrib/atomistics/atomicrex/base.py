@@ -1,4 +1,5 @@
 """Pyiron interface to atomicrex"""
+from pyiron_contrib.atomistics.atomicrex.parameter_constraints import ParameterConstraints
 import numpy as np
 
 from pyiron_base import GenericJob, Settings, Executable
@@ -18,14 +19,11 @@ class PotentialFittingBase(GenericJob):
         super().__init__(project, job_name)
 
 class AtomicrexBase(PotentialFittingBase):
+    __version__ = "0.1.0"
+    __hdf_version__ = "0.1.0"
     """Class to set up and run atomicrex jobs"""
     def __init__(self, project, job_name):
         super().__init__(project, job_name)
-
-        self.__name__ = "atomicrex"
-        self.__version__ = (
-            None
-        )
         #self._executable_activate(enforce=True)
         s.publication_add(self.publication)
         self.input = GeneralARInput()
@@ -45,9 +43,8 @@ class AtomicrexBase(PotentialFittingBase):
         """
         return self.potential.plot_final_potential(self)
 
-
     def to_hdf(self, hdf=None, group_name=None):
-        """Internal function to store the job in hdf5 format"""        
+        """Internal function to store the job in hdf5 format"""
         super().to_hdf(hdf=hdf, group_name=group_name)
         self.input.to_hdf(hdf=self.project_hdf5)
         self.potential.to_hdf(hdf=self.project_hdf5)
@@ -55,7 +52,7 @@ class AtomicrexBase(PotentialFittingBase):
         self.output.to_hdf(hdf=self.project_hdf5)
 
     def from_hdf(self, hdf=None, group_name=None):
-        """Internal function to reload the job object from hdf5"""        
+        """Internal function to reload the job object from hdf5"""
         super().from_hdf(hdf=hdf, group_name=group_name)
         self.input.from_hdf(hdf=self.project_hdf5)
         self.potential = self.project_hdf5["potential"].to_object()

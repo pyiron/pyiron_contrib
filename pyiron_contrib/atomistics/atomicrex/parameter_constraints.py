@@ -3,6 +3,8 @@ import xml.etree.ElementTree as ET
 from pyiron_base import DataContainer
 
 class Constraint:
+    __version__ = "0.1.0"
+    __hdf_version__ = "0.1.0"
     def __init__(self, identifier=None, dependent_dof=None, expression=None) -> None:
         self._storage = DataContainer(table_name="_storage")
         self.identifier = identifier
@@ -37,14 +39,29 @@ class Constraint:
     def expression(self, expression):
         self._storage["expression"] = expression
 
-    def to_hdf(self, hdf, group):
-        self._storage.to_hdf(hdf=hdf)
+    def to_hdf(self, hdf, group_name=None):
+        with hdf.open(group_name) as h:
+            self._type_to_hdf(hdf=h)
+            self._storage.to_hdf(hdf=h)
 
-    def from_hdf(self, hdf, group):
+    def from_hdf(self, hdf, group_name=None):
         self._storage.from_hdf(hdf=hdf)
 
     def _repr_json_(self):
         return self._storage._repr_json_()
+    
+    def _type_to_hdf(self, hdf):
+        """
+        Internal helper function to save type and version in hdf root
+
+        Args:
+            hdf (ProjectHDFio): HDF5 group object
+        """
+        hdf["NAME"] = self.__class__.__name__
+        hdf["TYPE"] = str(type(self))
+        hdf["VERSION"] = self.__version__
+        hdf["HDF_VERSION"] = self.__hdf_version__
+
     
     def _to_xml_element(self):
         root = ET.Element("constraint")
@@ -55,17 +72,34 @@ class Constraint:
         return root
 
 class ParameterConstraints:
+    __version__ = "0.1.0"
+    __hdf_version__ = "0.1.0"
     def __init__(self) -> None:
         self._storage = DataContainer(table_name="_storage")
 
     def add_constraint(self, identifier, dependent_dof, expression):
         self._storage[identifier] = Constraint(identifier=identifier, dependent_dof=dependent_dof, expression=expression)
 
-    def to_hdf(self, hdf, group="parameter_constraints"):
-        self._storage.to_hdf(hdf=hdf)
+    def to_hdf(self, hdf, group_name="parameter_constraints"):
+        with hdf.open(group_name) as h:
+            self._type_to_hdf(hdf=h)
+            self._storage.to_hdf(hdf=h)
 
-    def from_hdf(self, hdf, group="parameter_constraints"):
-        self._storage.from_hdf(hdf=hdf)
+    def _type_to_hdf(self, hdf):
+        """
+        Internal helper function to save type and version in hdf root
+
+        Args:
+            hdf (ProjectHDFio): HDF5 group object
+        """
+        hdf["NAME"] = self.__class__.__name__
+        hdf["TYPE"] = str(type(self))
+        hdf["VERSION"] = self.__version__
+        hdf["HDF_VERSION"] = self.__hdf_version__
+
+    def from_hdf(self, hdf, group_name="parameter_constraints"):
+        with hdf.open(group_name) as h:
+            self._storage.from_hdf(hdf=h)
 
     def _repr_json_(self):
         return self._storage._repr_json_()

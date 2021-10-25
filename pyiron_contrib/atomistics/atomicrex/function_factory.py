@@ -86,6 +86,10 @@ class FunctionFactory(PyironFactory):
     @staticmethod
     def MishinCuF(identifier, F0, F2, q1, q2, q3, q4, Q1, Q2, species=["*", "*"]):
         return MishinCuF(identifier, F0, F2, q1, q2, q3, q4, Q1, Q2, species)
+    
+    @staticmethod
+    def RsMinusRPowN(identifier, S, rs, N, species=["*", "*"]):
+        return RsMinusRPowN(identifier, S, rs, N, species)
 
     @staticmethod
     def sum(identifier, species=["*", "*"]):
@@ -626,6 +630,45 @@ class MorseC(SpecialFunction):
 
     def _to_xml_element(self):
         return super()._to_xml_element(name="morse-C")
+
+class RsMinusRPowN(SpecialFunction):
+    def __init__(
+        self,
+        identifier = None,
+        S=None,
+        rs=None,
+        N=None,
+        species = None,
+        is_screening_function = False
+        ):
+        super().__init__(identifier, species=species, is_screening_function=is_screening_function)
+        self.parameters.add_parameter(
+            "S",
+            start_val=S,
+            enabled=False,
+        )
+        self.parameters.add_parameter(
+            "rs",
+            start_val=rs,
+            enabled=False,
+        )
+        self.parameters.add_parameter(
+            "N",
+            start_val=N,
+            enabled=False,
+        )
+
+    @property
+    def func(self):
+        def func(r):
+            if r < self.parameters.rs.start_val:
+                return self.parameters.S.start_val * (self.parameters.rs.start_val - r)**self.parameters.N.start_val
+            return 0
+        return func
+
+    def _to_xml_element(self):
+        return super()._to_xml_element(name="RsMinusRPowN")
+
 
 class Constant(SpecialFunction):
     def __init__(self, constant=None, identifier=None, species=["*", "*"]):

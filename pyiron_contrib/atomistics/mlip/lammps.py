@@ -37,33 +37,22 @@ class LammpsMlip(LammpsInteractive):
 
     def write_input(self):
         super(LammpsMlip, self).write_input()
-        if self.input.mlip['mlip:load-from'] == 'auto':
-            self.input.mlip['mlip:load-from'] = os.path.basename(self.potential['Filename'][0][0])
+        if self.input.mlip['mtp-filename'] == 'auto':
+            self.input.mlip['mtp-filename'] = os.path.basename(self.potential['Filename'][0][0])
         self.input.mlip.write_file(file_name="mlip.ini", cwd=self.working_directory)
 
     def enable_active_learning(self):
         self.input.mlip.load_string("""\
-abinitio void
-mlip mtpr
-mlip:load-from Trained.mtp_
+mtp-filename auto
 calculate-efs TRUE
-fit FALSE
 select TRUE
-select:site-en-weight 0.0
-select:energy-weight 1.0
-select:force-weight 0.0
-select:stress-weight 0.0
-select:threshold-init 1e-5
 select:threshold 2.0
-select:threshold-swap 1.000001
 select:threshold-break 5.0
 select:save-selected selected.cfg
-select:save-state selection.mvs
 select:load-state state.mvs
-select:efs-ignored FALSE
 select:log selection.log
 write-cfgs:skip 0
-log lotf.log""")
+""")
 
     def collect_output(self):
         super(LammpsMlip, self).collect_output()
@@ -115,11 +104,7 @@ class MlipParameter(GenericParameters):
     def load_default(self, file_content=None):
         if file_content is None:
             file_content = '''\
-abinitio void
-mlip mtpr
-mlip:load-from auto
-calculate-efs TRUE
-fit FALSE
+mtp-filename auto
 select FALSE
 '''
         self.load_string(file_content)

@@ -36,6 +36,7 @@ import matplotlib.pyplot as plt
 from pyiron_contrib.atomistics.atomistics.job.structurestorage import StructureStorage
 from pyiron_atomistics.atomistics.structure.atoms import Atoms
 from pyiron_atomistics.atomistics.structure.has_structure import HasStructure
+from pyiron_atomistics.atomistics.structure.neighbors import NeighborsTrajectory
 from pyiron_base import GenericJob
 
 
@@ -146,6 +147,23 @@ class TrainingContainer(GenericJob, HasStructure):
         # in case given dataset has more columns than the necessary ones, swallow/ignore them in *_
         for name, atoms, energy, forces, stress, *_ in dataset.itertuples(index=False):
             self._container.add_structure(atoms, name, energy=energy, forces=forces, stress=stress)
+
+    def get_neighbors(self, num_neighbors=12):
+        """
+        Calculate and add neighbor information in each structure.
+
+        The data is automatically added to the internal storage and will be saved together with the normal structure
+        data.
+
+        Args:
+            num_neighbors (int, optional): Number of neighbors to collect
+
+        Returns:
+            NeighborsTrajectory: neighbor information
+        """
+        n = NeighborsTrajectory(has_structure=self, store=self._container)
+        n.compute_neighbors()
+        return n
 
     def _get_structure(self, frame=-1, wrap_atoms=True):
         return self._container.get_structure(frame=frame, wrap_atoms=wrap_atoms)

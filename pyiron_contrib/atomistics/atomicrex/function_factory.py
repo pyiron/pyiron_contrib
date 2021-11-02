@@ -69,9 +69,9 @@ class FunctionFactory(PyironFactory):
         morse1 = FunctionFactory.morse_A(identifier="Morse1", D0=E1, r0=r01, alpha=alpha1, species=species)
         morse2 = FunctionFactory.morse_A(identifier="Morse2", D0=E2, r0=r02, alpha=alpha2, species=species)
         c = FunctionFactory.constant(identifier="delta", constant=delta, species=species)
-        rep1 = FunctionFactory.RsMinusRPowN(identifier="repulse1", S=S1, rs=rs1, N=4, species=species)
-        rep2 = FunctionFactory.RsMinusRPowN(identifier="repulse2", S=S2, rs=rs2, N=4, species=species)
-        rep3 = FunctionFactory.RsMinusRPowN(identifier="repulse3", S=S3, rs=rs3, N=4, species=species)
+        rep1 = FunctionFactory.RsMinusRPowN(identifier="rep1", S=S1, rs=rs1, N=4, species=species)
+        rep2 = FunctionFactory.RsMinusRPowN(identifier="rep2", S=S2, rs=rs2, N=4, species=species)
+        rep3 = FunctionFactory.RsMinusRPowN(identifier="rep3", S=S3, rs=rs3, N=4, species=species)
         rep1.parameters.N.enabled = False
         rep2.parameters.N.enabled = False
         rep3.parameters.N.enabled = False

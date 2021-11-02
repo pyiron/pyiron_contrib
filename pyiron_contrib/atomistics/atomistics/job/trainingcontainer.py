@@ -85,7 +85,11 @@ class TrainingContainer(GenericJob, HasStructure):
             forces = ff[iteration_step]
         else:
             forces = None
-        pp = job.output.pressures
+        # HACK: VASP work-around, current contents of pressures are meaningless, correct values are in
+        # output/generic/stresses
+        pp = job["output/generic/stresses"]
+        if pp is None:
+            pp = job.output.pressures
         if pp is not None:
             stress = pp[iteration_step]
         else:

@@ -193,8 +193,6 @@ class Mlip(GenericJob):
             hdf5_output['job_id_new'] = job_id_new_training_lst
             hdf5_output['timestep_new'] = timestep_new_training_lst
             self._potential.to_hdf(hdf=hdf5_output)
-            hdf5_output['training_energies'] = training_energies
-            hdf5_output['testing_energies'] = testing_energies
             training_store.to_hdf(hdf=hdf5_output, group_name="training_efs")
             testing_store.to_hdf(hdf=hdf5_output, group_name="testing_efs")
 

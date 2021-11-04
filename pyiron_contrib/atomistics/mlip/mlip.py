@@ -328,17 +328,20 @@ class Mlip(GenericJob):
             if ham.__name__ == "TrainingContainer":
                 job = ham.to_object()
                 all_species.update(job.get_elements())
-                pd = job.to_pandas()
-                for time_step, (name, atoms, energy, forces, _) in islice(enumerate(pd.itertuples(index=False)),
-                                                                          start, end, delta):
-                    atoms = ase_to_pyiron(atoms)
-                    index_map = np.argsort(np.argsort([s.Abbreviation for s in atoms.species]))
-                    indices_lst.append(index_map[atoms.indices])
-                    position_lst.append(atoms.positions)
-                    forces_lst.append(forces)
-                    cell_lst.append(atoms.cell)
-                    energy_lst.append(energy)
-                    track_lst.append(str(ham.job_id) + "_" + str(time_step))
+                symbol_map = {s: i for i, s in enumerate(sorted(set(all_species)))}
+                if end is None:
+                    end = job.number_of_structures
+                for time_step in range(start, end, delta):
+                    symbols = job._container.get_array("symbols", time_step)
+                    indices_lst.append([symbol_map[s] for s in symbols])
+                    position_lst.append(job._container.get_array("positions", time_step))
+                    forces_lst.append(job._container.get_array("forces", time_step))
+                    cell_lst.append(job._container.get_array("cell", time_step))
+                    energy_lst.append(job._container.get_array("energy", time_step))
+                    if job._container.has_array("stress"):
+                        volume = np.abs(np.linalg.det(cell_lst[-1]))
+                        stress_lst.append(job._container.get_array("stress", time_step) * volume)
+                    track_lst.append(str(ham.job_id) + '_' + str(time_step))
                 continue
             original_dict = {el: ind for ind, el in enumerate(sorted(ham['input/structure/species']))}
             species_dict = {ind: original_dict[el] for ind, el in enumerate(ham['input/structure/species'])}

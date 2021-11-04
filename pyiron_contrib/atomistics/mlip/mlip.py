@@ -332,7 +332,8 @@ class Mlip(GenericJob):
                 for time_step, (name, atoms, energy, forces, _) in islice(enumerate(pd.itertuples(index=False)),
                                                                           start, end, delta):
                     atoms = ase_to_pyiron(atoms)
-                    indices_lst.append(atoms.indices)
+                    index_map = np.argsort(np.argsort([s.Abbreviation for s in atoms.species]))
+                    indices_lst.append(index_map[atoms.indices])
                     position_lst.append(atoms.positions)
                     forces_lst.append(forces)
                     cell_lst.append(atoms.cell)

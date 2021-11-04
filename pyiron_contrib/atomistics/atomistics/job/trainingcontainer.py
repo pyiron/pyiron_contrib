@@ -50,7 +50,8 @@ class TrainingContainer(GenericJob, HasStructure):
         self._container = StructureStorage()
         self._container.add_array("energy", dtype=np.float64, per="chunk")
         self._container.add_array("forces", shape=(3,), dtype=np.float64, per="element")
-        self._container.add_array("stress", shape=(3,3), dtype=np.float64, per="chunk")
+        # save stress in voigt notation
+        self._container.add_array("stress", shape=(6,), dtype=np.float64, per="chunk")
         self._table_cache = None
 
     @property
@@ -94,6 +95,11 @@ class TrainingContainer(GenericJob, HasStructure):
             stress = pp[iteration_step]
         else:
             stress = None
+        if stress is not None:
+            stress = np.asarray(stress)
+            if stress.shape == (3, 3):
+                stress = np.array([stress[0, 0], stress[1 ,1], stress[2, 2],
+                                   stress[1, 2], stress[0, 2], stress[0, 1]])
         self.include_structure(job.get_structure(iteration_step=iteration_step),
                                energy=energy, forces=forces, stress=stress,
                                name=job.name)

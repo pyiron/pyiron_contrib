@@ -14,7 +14,7 @@ __status__ = "development"
 __date__ = "Jun 14, 2021"
 
 
-from pyiron_atomistics.structure.structurestorage import StructureStorage
+from pyiron_atomistics.atomistics.structure.structurestorage import StructureStorage
 from pyiron_base import GenericMaster, DataContainer
 
 class StructureMasterInt(GenericMaster):

@@ -654,12 +654,12 @@ class RsMinusRPowN(SpecialFunction):
         self.parameters.add_parameter(
             "S",
             start_val=S,
-            enabled=False,
+            enabled=True,
         )
         self.parameters.add_parameter(
             "rs",
             start_val=rs,
-            enabled=False,
+            enabled=True,
         )
         self.parameters.add_parameter(
             "N",

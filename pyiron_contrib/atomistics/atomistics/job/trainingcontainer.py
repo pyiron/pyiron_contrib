@@ -161,7 +161,7 @@ class TrainingContainer(GenericJob, HasStructure):
         Returns:
             NeighborsTrajectory: neighbor information
         """
-        n = NeighborsTrajectory(has_structure=self, store=self._container)
+        n = NeighborsTrajectory(has_structure=self, store=self._container, num_neighbors=num_neighbors)
         n.compute_neighbors()
         return n
 

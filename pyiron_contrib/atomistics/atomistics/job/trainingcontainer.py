@@ -115,7 +115,7 @@ class TrainingContainer(GenericJob, HasStructure):
             structure_or_job (:class:`~.Atoms`): structure to add
             energy (float): energy of the whole structure
             forces (Nx3 array of float, optional): per atom forces, where N is the number of atoms in the structure
-            stress (3x3 array of float, optional): per structure stresses
+            stress (6 array of float, optional): per structure stresses in voigt notation
             name (str, optional): name describing the structure
         """
         data = {"energy": energy}
@@ -139,11 +139,12 @@ class TrainingContainer(GenericJob, HasStructure):
             - atoms(:class:`ase.Atoms`): the atomic structure
             - energy(float): energy of the whole structure
             - forces (Nx3 array of float): per atom forces, where N is the number of atoms in the structure
+            - stress (6 array of float): per structure stress in voigt notation
         """
         self._table_cache = self._table.append(dataset, ignore_index=True)
         # in case given dataset has more columns than the necessary ones, swallow/ignore them in *_
-        for name, atoms, energy, forces, *_ in dataset.itertuples(index=False):
-            self._container.add_structure(atoms, name, energy=energy, forces=forces)
+        for name, atoms, energy, forces, stress, *_ in dataset.itertuples(index=False):
+            self._container.add_structure(atoms, name, energy=energy, forces=forces, stress=stress)
 
     def _get_structure(self, frame=-1, wrap_atoms=True):
         return self._container.get_structure(frame=frame, wrap_atoms=wrap_atoms)
@@ -169,6 +170,7 @@ class TrainingContainer(GenericJob, HasStructure):
             - 'ase_atoms': the structure as a :class:`.Atoms` object
             - 'energy': the energy of the full structure
             - 'forces': the per atom forces as a :class:`numpy.ndarray`, shape Nx3
+            - 'stress': the per structure stress as a :class:`numpy.ndarray`, shape 6
             - 'number_of_atoms': the number of atoms in the structure, N
 
         Returns:

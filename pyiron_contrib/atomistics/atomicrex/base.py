@@ -1,7 +1,11 @@
+# coding: utf-8
+# Copyright (c) Max-Planck-Institut für Eisenforschung GmbH - Computational Materials Design (CM) Department
+# Distributed under the terms of "New BSD License", see the LICENSE file.
+
 """Pyiron interface to atomicrex"""
 import numpy as np
 
-from pyiron_base import GenericJob, Settings, Executable
+from pyiron_base import state, GenericJob, Executable
 
 from pyiron_contrib.atomistics.atomicrex.general_input import GeneralARInput, AlgorithmFactory
 from pyiron_contrib.atomistics.atomicrex.structure_list import ARStructureContainer
@@ -9,7 +13,6 @@ from pyiron_contrib.atomistics.atomicrex.potential_factory import ARPotFactory
 from pyiron_contrib.atomistics.atomicrex.output import Output
 from pyiron_contrib.atomistics.atomicrex.function_factory import FunctionFactory
 
-s = Settings()
 
 ## Class defined for future addition of other codes
 ## Not sure which functionality (if any) can be extracted yet, but a similar pattern is followed in other pyiron modules
@@ -24,7 +27,7 @@ class AtomicrexBase(PotentialFittingBase):
     def __init__(self, project, job_name):
         super().__init__(project, job_name)
         #self._executable_activate(enforce=True)
-        s.publication_add(self.publication)
+        state.publications.add(self.publication)
         self.input = GeneralARInput()
         self.potential = None
         self.structures = ARStructureContainer()
@@ -198,11 +201,11 @@ class AtomicrexBase(PotentialFittingBase):
                 self._executable = Executable(
                     codename=self.__name__,
                     module=self.__module__.split(".")[-2],
-                    path_binary_codes=s.resource_paths,
+                    path_binary_codes=state.settings.resource_paths,
                 )
             else:
                 self._executable = Executable(
-                    codename=self.__name__, path_binary_codes=s.resource_paths
+                    codename=self.__name__, path_binary_codes=state.settings.resource_paths
                 )
 
     # Leftover of the potentials workshop.

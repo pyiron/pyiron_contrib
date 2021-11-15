@@ -1,3 +1,4 @@
+# coding: utf-8
 # Copyright (c) Max-Planck-Institut für Eisenforschung GmbH - Computational Materials Design (CM) Department
 # Distributed under the terms of "New BSD License", see the LICENSE file.
 
@@ -8,7 +9,7 @@ Demonstrator job for the RuNNer Neural Network Potential.
 import os.path
 from glob import glob
 
-from pyiron_base import GenericJob, Executable, Settings, DataContainer
+from pyiron_base import state, GenericJob, Executable, DataContainer
 
 import numpy as np
 import pandas as pd
@@ -22,8 +23,6 @@ __email__ = "poul@mpie.de"
 __status__ = "development"
 __date__ = "March 3, 2021"
 
-s = Settings()
-
 AngstromToBohr = 1.88972612
 ElectronVoltToHartree = 0.03674932218
 
@@ -36,7 +35,7 @@ class RunnerFit(GenericJob):
         self.input = DataContainer(table_name="input")
         self.input.element = "Cu"
 
-        s.publication_add(self.publication)
+        state.publications.add(self.publication)
 
     @property
     def publication(self):
@@ -135,7 +134,7 @@ class RunnerFit(GenericJob):
     def _executable_activate(self, enforce=False):     
         if self._executable is None or enforce:
             self._executable = Executable(
-                codename="runner", module="runner", path_binary_codes=s.resource_paths
+                codename="runner", module="runner", path_binary_codes=state.settings.resource_paths
             )
 
 input_template = """### ####################################################################################################################

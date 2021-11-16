@@ -6,15 +6,20 @@ from pyiron_base.job.interactive import InteractiveBase
 from pyiron_contrib.atomistics.atomicrex.general_input import ScipyAlgorithm
 from pyiron_contrib.atomistics.atomicrex.base import AtomicrexBase
 
+import_success = False
 try:
     import atomicrex
+    import_success = True
 except ImportError:
     pass
 
 class AtomicrexInteractive(AtomicrexBase, InteractiveBase):
     def __init__(self, project, job_name):
         super().__init__(project, job_name)
-        self._interactive_library = atomicrex.Job()
+        if import_success:
+            self._interactive_library = atomicrex.Job()
+        else:
+            self._interactive_library = None
         self._read_input_files = False
 
     @property

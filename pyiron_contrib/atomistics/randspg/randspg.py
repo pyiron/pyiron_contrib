@@ -132,8 +132,9 @@ class RandSpg(GenericJob, HasStructure):
         super(RandSpg, self).from_hdf(hdf=hdf, group_name=group_name)
         with self.project_hdf5.open("input") as hdf5_input:
             self.input.from_hdf(hdf5_input)
-        with self.project_hdf5.open("output") as hdf5_output:
-            self._structure_storage.from_hdf(hdf5_output)
+        if self.status.finished:
+            with self.project_hdf5.open("output") as hdf5_output:
+                self._structure_storage.from_hdf(hdf5_output)
 
 
 class ExampleInput(GenericParameters):

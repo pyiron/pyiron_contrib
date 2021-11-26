@@ -1,3 +1,7 @@
+# coding: utf-8
+# Copyright (c) Max-Planck-Institut für Eisenforschung GmbH - Computational Materials Design (CM) Department
+# Distributed under the terms of "New BSD License", see the LICENSE file.
+
 import fnmatch
 import io
 import json
@@ -9,7 +13,7 @@ import boto3
 from botocore.client import Config
 
 from pyiron_base.interfaces.has_groups import HasGroups
-from pyiron_base.generic.filedata import load_file, FileDataTemplate
+from pyiron_contrib.generic.filedata import load_file, FileDataTemplate
 
 
 class S3FileData(FileDataTemplate):
@@ -29,11 +33,7 @@ class S3FileData(FileDataTemplate):
         else:
             self.filename = filename
         if filetype is None:
-            filetype = os.path.splitext(self.filename)[1]
-            if filetype == '' or filetype == '.':
-                self.filetype = None
-            else:
-                self.filetype = filetype[1:]
+            self.filetype = self._get_filetype_from_filename(self.filename)
         else:
             self.filetype = filetype
         self._data = None

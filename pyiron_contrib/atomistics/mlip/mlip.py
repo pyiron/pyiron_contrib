@@ -11,7 +11,8 @@ import pandas as pd
 import posixpath
 import scipy.constants
 from pyiron_base import Settings, GenericParameters, GenericJob, Executable, FlattenedStorage
-from pyiron_atomistics import ase_to_pyiron
+from pyiron_atomistics import ase_to_pyiron, Atoms
+from pyiron_atomistics.atomistics.structure.structurestorage import StructureStorage
 from pyiron_contrib.atomistics.mlip.cfgs import savecfgs, loadcfgs, Cfg
 from pyiron_contrib.atomistics.mlip.potential import MtpPotential
 
@@ -142,6 +143,21 @@ class Mlip(GenericJob):
         self._command_line[0] = self._command_line[0].replace('stress_auto', str(self.input['stress-weight']))
         self._command_line[0] = self._command_line[0].replace('iteration_auto', str(int(self.input['iteration'])))
         self._command_line.write_file(file_name='mlip.sh', cwd=self.working_directory)
+
+        species = np.array(species)
+        input_store = StructureStorage()
+        input_store.add_array('energy', dtype=np.float64, shape=(1,), per='chunk')
+        input_store.add_array('forces', dtype=np.float64, shape=(3,), per='element')
+        input_store.add_array('stress', dtype=np.float64, shape=(6,), per='chunk')
+        input_store.add_array('grade',  dtype=np.float64, shape=(1,), per='chunk')
+        for cfg in loadcfgs(os.path.join(self.working_directory, "training.cfg")):
+            struct = Atoms(symbols=species[np.cast[np.int64](cfg.types)], positions=cfg.pos, cell=cfg.lat, pbc=[True]*3) # HACK for pbc
+            input_store.add_structure(struct, identifier=cfg.desc,
+                                      energy=cfg.energy, forces=cfg.forces, stress=cfg.stresses
+            )
+
+        with self.project_hdf5.open('input') as hdf5_input:
+            input_store.to_hdf(hdf=hdf5_input, group_name="training_data")
 
     def collect_logfiles(self):
         pass

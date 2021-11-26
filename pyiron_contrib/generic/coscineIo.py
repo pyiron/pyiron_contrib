@@ -6,6 +6,7 @@ import io
 
 from pyiron_base import ImportAlarm
 from pyiron_base.interfaces.has_groups import HasGroups
+from pyiron_contrib.generic.filedata import StorageInterface
 from pyiron_contrib.generic.filedata import FileDataTemplate, load_file
 from typing import Union, List
 
@@ -52,7 +53,7 @@ class CoscineFileData(FileDataTemplate):
         return CoscineMetadata(self._coscine_object.MetadataForm())
 
 
-class CoscineResource(HasGroups):
+class CoscineResource(StorageInterface):
     def __init__(self, resource: coscine.Resource):
         self._resource = resource
 
@@ -68,7 +69,10 @@ class CoscineResource(HasGroups):
         if file_obj is not None:
             file_obj.delete()
 
-    def upload(self, file, metadata: coscine.resource.MetadataForm, filename=None):
+    def upload_file(self, file, metadata: coscine.resource.MetadataForm = None, filename=None):
+        if metadata is None:
+            raise ValueError("Coscine resources require meta data to upload a file! Use get_metadata_form() to "
+                             "get the correct meta data form and provide a completed form here.")
         filename = filename or os.path.basename(file)
         _meta_data = metadata.generate()
         self._resource.upload(filename, file, _meta_data)
@@ -115,6 +119,21 @@ class CoscineResource(HasGroups):
 
         kwargs['Name'] = name or _name
         return [CoscineFileData(obj) for obj in self._resource.objects(**kwargs)]
+
+    def get_metadata_form(self):
+        return self._resource.MetadataForm()
+
+    @property
+    def requires_metadata(self):
+        return True
+
+    def _validate_metadata(self, metadata):
+        try:
+            metadata.generate()
+        except coscine.RequirementError as e:
+            return False
+        else:
+            return True
 
 
 class CoscineProject(HasGroups):

@@ -184,7 +184,7 @@ class StorageJob(GenericJob):
             if self._storage_type.local:
                 shutil.copy(file, self.working_directory)
             elif self._storage_type.s3:
-                self._external_storage.upload(file, metadata)
+                self._external_storage.upload_file(file, metadata)
         except Exception as e:
             raise IOError(f"Storing {file} failed") from e
         else:
@@ -317,6 +317,7 @@ class StorageJob(GenericJob):
         except ValueError:
             pass
 
+        super().__getitem__()
         name_lst = item.split("/")
         item_obj = name_lst[0]
 

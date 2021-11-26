@@ -12,7 +12,7 @@ from functools import lru_cache
 import boto3
 from botocore.client import Config
 
-from pyiron_base.interfaces.has_groups import HasGroups
+from pyiron_contrib.generic.filedata import StorageInterface
 from pyiron_contrib.generic.filedata import load_file, FileDataTemplate
 
 
@@ -134,7 +134,7 @@ class S3ioConnect:
         return self.s3resource.meta.client.meta.endpoint_url
 
 
-class FileS3IO(HasGroups):
+class FileS3IO(StorageInterface):
     """Provides access to a specific bucket of a S3 object store similar to a regular storage system.
 
     Implements :class:`.HasGroups`. Groups are 'Folders' in the S3 storage, nodes are file like objects.
@@ -328,13 +328,14 @@ class FileS3IO(HasGroups):
             self.history[0] = "/"
         self._s3_path = self.history[-1]
 
-    def upload(self, files, metadata=None):
+    def upload_file(self, files, metadata=None, filenames=None):
         """
         Uploads files into the current group of the S3 object store.
 
         Arguments:
-            files (list/str) : List of filenames/ filename to upload
+            files (list/str) : file / List of files to upload
             metadata (dictionary): metadata of the files (Not nested, only "str" type)
+            filenames (list/str/None): Names the files should get
         """
         if metadata is None:
             metadata = {}
@@ -342,8 +343,15 @@ class FileS3IO(HasGroups):
         if isinstance(files, str):
             files = [files]
 
-        for file in files:
-            [_, filename] = os.path.split(file)
+        if filenames is None:
+            filenames = [os.path.basename(file) for file in files]
+        elif isinstance(filenames, str):
+            filenames = [filenames]
+
+        if len(filenames) != len(files):
+            raise ValueError("length of files and of filenames have to match!")
+
+        for file, filename in zip(files, filenames):
 
             self._bucket.upload_file(
                 file,
@@ -351,7 +359,7 @@ class FileS3IO(HasGroups):
                 {"Metadata": metadata}
             )
 
-    def download(self, files, targetpath="."):
+    def download_file(self, files, targetpath="."):
         """
         Download files from current group to local file system (current directory is default)
 

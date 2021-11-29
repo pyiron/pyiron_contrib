@@ -31,12 +31,12 @@ setup(
     keywords='pyiron',
     packages=find_packages(exclude=["*tests*"]),
     install_requires=[        
-        'matplotlib==3.4.3',
+        'matplotlib==3.5.0',
         'numpy==1.21.4',
-        'pyiron_base==0.3.10',
-        'scipy==1.7.1',
+        'pyiron_base==0.4.2',
+        'scipy==1.7.2',
         'seaborn==0.11.2',
-        'pyparsing==3.0.5'
+        'pyparsing==3.0.6'
     ],
     extras_require={
         'atomistic': [

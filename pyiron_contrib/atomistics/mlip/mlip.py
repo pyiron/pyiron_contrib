@@ -11,7 +11,8 @@ import pandas as pd
 import posixpath
 import scipy.constants
 from pyiron_base import state, GenericParameters, GenericJob, Executable, FlattenedStorage
-from pyiron_atomistics import ase_to_pyiron
+from pyiron_atomistics import ase_to_pyiron, Atoms
+from pyiron_atomistics.atomistics.structure.structurestorage import StructureStorage
 from pyiron_contrib.atomistics.mlip.cfgs import savecfgs, loadcfgs, Cfg
 from pyiron_contrib.atomistics.mlip.potential import MtpPotential
 
@@ -91,7 +92,7 @@ class Mlip(GenericJob):
                         "Filename": [[self.potential_files[0]]],
                         "Model": ["Custom"],
                         "Species": [elements],
-                        "Config": [["pair_style mlip mlip.ini\n",
+                        "Config": [["pair_style MLIP mlip.ini\n",
                                     "pair_coeff * *\n"
                         ]]
             })
@@ -141,6 +142,21 @@ class Mlip(GenericJob):
         self._command_line[0] = self._command_line[0].replace('stress_auto', str(self.input['stress-weight']))
         self._command_line[0] = self._command_line[0].replace('iteration_auto', str(int(self.input['iteration'])))
         self._command_line.write_file(file_name='mlip.sh', cwd=self.working_directory)
+
+        species = np.array(species)
+        input_store = StructureStorage()
+        input_store.add_array('energy', dtype=np.float64, shape=(1,), per='chunk')
+        input_store.add_array('forces', dtype=np.float64, shape=(3,), per='element')
+        input_store.add_array('stress', dtype=np.float64, shape=(6,), per='chunk')
+        input_store.add_array('grade',  dtype=np.float64, shape=(1,), per='chunk')
+        for cfg in loadcfgs(os.path.join(self.working_directory, "training.cfg")):
+            struct = Atoms(symbols=species[np.cast[np.int64](cfg.types)], positions=cfg.pos, cell=cfg.lat, pbc=[True]*3) # HACK for pbc
+            input_store.add_structure(struct, identifier=cfg.desc,
+                                      energy=cfg.energy, forces=cfg.forces, stress=cfg.stresses
+            )
+
+        with self.project_hdf5.open('input') as hdf5_input:
+            input_store.to_hdf(hdf=hdf5_input, group_name="training_data")
 
     def collect_logfiles(self):
         pass
@@ -327,17 +343,20 @@ class Mlip(GenericJob):
             if ham.__name__ == "TrainingContainer":
                 job = ham.to_object()
                 all_species.update(job.get_elements())
-                pd = job.to_pandas()
-                for time_step, (name, atoms, energy, forces, _) in islice(enumerate(pd.itertuples(index=False)),
-                                                                          start, end, delta):
-                    atoms = ase_to_pyiron(atoms)
-                    index_map = np.argsort(np.argsort([s.Abbreviation for s in atoms.species]))
-                    indices_lst.append(index_map[atoms.indices])
-                    position_lst.append(atoms.positions)
-                    forces_lst.append(forces)
-                    cell_lst.append(atoms.cell)
-                    energy_lst.append(energy)
-                    track_lst.append(str(ham.job_id) + "_" + str(time_step))
+                symbol_map = {s: i for i, s in enumerate(sorted(set(all_species)))}
+                if end is None:
+                    end = job.number_of_structures
+                for time_step in range(start, end, delta):
+                    symbols = job._container.get_array("symbols", time_step)
+                    indices_lst.append([symbol_map[s] for s in symbols])
+                    position_lst.append(job._container.get_array("positions", time_step))
+                    forces_lst.append(job._container.get_array("forces", time_step))
+                    cell_lst.append(job._container.get_array("cell", time_step))
+                    energy_lst.append(job._container.get_array("energy", time_step))
+                    if job._container.has_array("stress"):
+                        volume = np.abs(np.linalg.det(cell_lst[-1]))
+                        stress_lst.append(job._container.get_array("stress", time_step) * volume)
+                    track_lst.append(str(ham.job_id) + '_' + str(time_step))
                 continue
             original_dict = {el: ind for ind, el in enumerate(sorted(ham['input/structure/species']))}
             species_dict = {ind: original_dict[el] for ind, el in enumerate(ham['input/structure/species'])}

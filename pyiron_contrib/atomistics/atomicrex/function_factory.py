@@ -63,15 +63,24 @@ class FunctionFactory(PyironFactory):
         return Constant(constant=constant, identifier=identifier, species=species)
 
     @staticmethod
-    def MishinCuV(identifier, E1, E2, alpha1, alpha2, r01, r02, delta, cutoff, h, species=["*", "*"]):
+    def MishinCuV(identifier, E1, E2, alpha1, alpha2, r01, r02, delta, cutoff, h, S1, rs1, S2, rs2, S3, rs3, species=["*", "*"]):
         product_func = FunctionFactory.product(identifier, species)
         sum_func = FunctionFactory.sum(identifier="MorseSum", species=species)
         morse1 = FunctionFactory.morse_A(identifier="Morse1", D0=E1, r0=r01, alpha=alpha1, species=species)
         morse2 = FunctionFactory.morse_A(identifier="Morse2", D0=E2, r0=r02, alpha=alpha2, species=species)
         c = FunctionFactory.constant(identifier="delta", constant=delta, species=species)
+        rep1 = FunctionFactory.RsMinusRPowN(identifier="rep1", S=S1, rs=rs1, N=4, species=species)
+        rep2 = FunctionFactory.RsMinusRPowN(identifier="rep2", S=S2, rs=rs2, N=4, species=species)
+        rep3 = FunctionFactory.RsMinusRPowN(identifier="rep3", S=S3, rs=rs3, N=4, species=species)
+        rep1.parameters.N.enabled = False
+        rep2.parameters.N.enabled = False
+        rep3.parameters.N.enabled = False
         sum_func.functions[morse1.identifier] = morse1
         sum_func.functions[morse2.identifier] = morse2
         sum_func.functions[c.identifier] = c
+        sum_func.functions[rep1.identifier] = rep1
+        sum_func.functions[rep2.identifier] = rep2
+        sum_func.functions[rep3.identifier] = rep3
         screening = FunctionFactory.x_pow_n_cutoff(identifier="screening", cutoff=cutoff, h=h, N=4, species=species)
         screening.is_screening_function = False
         screening.screening = None
@@ -86,6 +95,10 @@ class FunctionFactory(PyironFactory):
     @staticmethod
     def MishinCuF(identifier, F0, F2, q1, q2, q3, q4, Q1, Q2, species=["*", "*"]):
         return MishinCuF(identifier, F0, F2, q1, q2, q3, q4, Q1, Q2, species)
+    
+    @staticmethod
+    def RsMinusRPowN(identifier, S, rs, N, species=["*", "*"]):
+        return RsMinusRPowN(identifier, S, rs, N, species)
 
     @staticmethod
     def sum(identifier, species=["*", "*"]):
@@ -626,6 +639,45 @@ class MorseC(SpecialFunction):
 
     def _to_xml_element(self):
         return super()._to_xml_element(name="morse-C")
+
+class RsMinusRPowN(SpecialFunction):
+    def __init__(
+        self,
+        identifier = None,
+        S=None,
+        rs=None,
+        N=None,
+        species = None,
+        is_screening_function = False
+        ):
+        super().__init__(identifier, species=species, is_screening_function=is_screening_function)
+        self.parameters.add_parameter(
+            "S",
+            start_val=S,
+            enabled=True,
+        )
+        self.parameters.add_parameter(
+            "rs",
+            start_val=rs,
+            enabled=True,
+        )
+        self.parameters.add_parameter(
+            "N",
+            start_val=N,
+            enabled=False,
+        )
+
+    @property
+    def func(self):
+        def func(r):
+            if r < self.parameters.rs.start_val:
+                return self.parameters.S.start_val * (self.parameters.rs.start_val - r)**self.parameters.N.start_val
+            return 0
+        return func
+
+    def _to_xml_element(self):
+        return super()._to_xml_element(name="RsMinusRPowN")
+
 
 class Constant(SpecialFunction):
     def __init__(self, constant=None, identifier=None, species=["*", "*"]):

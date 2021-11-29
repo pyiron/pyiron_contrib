@@ -640,18 +640,20 @@ class EAMPotential(AbstractPotential, EAMlikeMixin):
                     xdata = rho_values
                     xlabel = "$\\rho $ [a.u.]"
                     k = 0
+                    ylim = (-5,5)
                 elif "rho" in pot:
                     xdata = r_values
                     xlabel = "r [$\AA$]"
                     k = 1
+                    ylim=(-0.2,1)
                 elif "V" in pot:
                     xdata = r_values[1:]
                     y = y[1:]
                     xlabel = "r [$\AA$]"
                     k = 2
-
+                    ylim=(-2,2)
                 ax[i+k, 0].plot(xdata, y)
-                ax[i+k, 0].set(ylim=(-5,5), title=f"{el} {pot}", xlabel=xlabel)
+                ax[i+k, 0].set(ylim=ylim, title=f"{el} {pot}", xlabel=xlabel)
         return fig, ax
 
     def count_local_extrema(self, job, filename=None, count_minima=True, count_maxima=False):

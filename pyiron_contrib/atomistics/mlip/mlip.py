@@ -10,9 +10,10 @@ import os
 import pandas as pd
 import posixpath
 import scipy.constants
+from pyiron_atomistics.atomistics.structure.structurestorage import StructureStorage
 from pyiron_base import state, GenericParameters, GenericJob, Executable, FlattenedStorage
 from pyiron_atomistics import ase_to_pyiron, Atoms
-from pyiron_atomistics.atomistics.structure.structurestorage import StructureStorage
+from pyiron_contrib.atomistics.ml.potentialfit import PotentialFit
 from pyiron_contrib.atomistics.mlip.cfgs import savecfgs, loadcfgs, Cfg
 from pyiron_contrib.atomistics.mlip.potential import MtpPotential
 
@@ -28,8 +29,7 @@ __date__ = "Sep 1, 2017"
 
 gpa_to_ev_ang = 1e22 / scipy.constants.physical_constants['joule-electron volt relationship'][0]
 
-
-class Mlip(GenericJob):
+class Mlip(GenericJob, PotentialFit):
     def __init__(self, project, job_name):
         super(Mlip, self).__init__(project, job_name)
         self.__version__ = '0.1.0'
@@ -68,6 +68,22 @@ class Mlip(GenericJob):
         if os.path.exists(pot) and os.path.exists(states):
             return [pot, states]
 
+    def _get_elements(self):
+        """
+        Return elements in training in insertion order, i.e. elements seen earlier get lower indices.
+        """
+        elements = []
+        for job_id in self._job_dict:
+            j = self.project.inspect(job_id)
+            if j["NAME"] == "TrainingContainer":
+                candidates = j.to_object().get_elements()
+            else:
+                candidates = j["input/structure/species"]
+            for e in candidates:
+                if e not in elements:
+                    elements.append(e)
+        return elements
+
     def potential_dataframe(self, elements=None):
         """
         :class:`pandas.DataFrame`: potential dataframe for lammps jobs
@@ -84,7 +100,7 @@ class Mlip(GenericJob):
         if elements is None:
             elements = self.input["species"]
             if elements is None:
-                raise ValueError("elements not defined in input, elements must be explicitely passed!")
+                elements = self._get_elements() # AAAH
 
         if self.status.finished:
             return pd.DataFrame({
@@ -457,6 +473,21 @@ class Mlip(GenericJob):
                     os.path.exists(os.path.join(resource_path, potential_name)):
                 return os.path.join(resource_path, potential_name)
         raise ValueError('Potential not found!')
+
+
+    # PotentialFit Implementation
+    def _add_training_data(self, container):
+        self.add_job_to_fitting(container.id, 0, container.number_of_structures, 1)
+
+    def _get_training_data(self):
+        # TODO/BUG: only works after input is written for now, instead this should go over _job_
+        return self["input/training_data"].to_object()
+
+    def _get_predicted_data(self):
+        return self["output/training_efs"].to_object()
+
+    def get_lammps_potential(self):
+        return self.potential_dataframe()
 
 
 class MlipParameter(GenericParameters):

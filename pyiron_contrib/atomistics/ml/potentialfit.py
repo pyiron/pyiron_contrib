@@ -61,6 +61,10 @@ class PotentialFit(abc.ABC):
         """
         Predicted properties of the training data after the fit.
 
+        In contrast to :property:`~.training_data` this may not contain the original atomic structures, but must be in
+        the same order.  Certain properties in the training data may be omitted from this data set, if the inconvenient
+        or impossible to predict.  This should be documented on the subclass for each specific code.
+
         Returns:
             :class:`pyiron_base.FlattenedStorage`: container holding all predictions of the fitted potential on the
                                                    training data

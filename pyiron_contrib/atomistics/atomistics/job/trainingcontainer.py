@@ -48,13 +48,18 @@ class TrainingContainer(GenericJob, HasStructure):
     def __init__(self, project, job_name):
         super().__init__(project=project, job_name=job_name)
         self.__name__ = "TrainingContainer"
-        self.__hdf_version__ = "0.2.0"
+        self.__hdf_version__ = "0.3.0"
         self._container = StructureStorage()
         self._container.add_array("energy", dtype=np.float64, per="chunk")
         self._container.add_array("forces", shape=(3,), dtype=np.float64, per="element")
         # save stress in voigt notation
         self._container.add_array("stress", shape=(6,), dtype=np.float64, per="chunk")
         self._table_cache = None
+
+        self.input = DataContainer({
+                "save_neighbors": True,
+                "num_neighbors": 12
+            }, table_name="parameters")
 
     @property
     def _table(self):
@@ -148,20 +153,23 @@ class TrainingContainer(GenericJob, HasStructure):
         for name, atoms, energy, forces, stress, *_ in dataset.itertuples(index=False):
             self._container.add_structure(atoms, name, energy=energy, forces=forces, stress=stress)
 
-    def get_neighbors(self, num_neighbors=12):
+    def get_neighbors(self, num_neighbors=None):
         """
         Calculate and add neighbor information in each structure.
 
-        The data is automatically added to the internal storage and will be saved together with the normal structure
-        data.
+        If input.save_neighbors is True the data is automatically added to the internal storage and will be saved
+        together with the normal structure data.
 
         Args:
-            num_neighbors (int, optional): Number of neighbors to collect
+            num_neighbors (int, optional): Number of neighbors to collect, if not given use value from input
 
         Returns:
             NeighborsTrajectory: neighbor information
         """
-        n = NeighborsTrajectory(has_structure=self, store=self._container, num_neighbors=num_neighbors)
+        if num_neighbors is None:
+            num_neighbors = self.input.num_neighbors
+        n = NeighborsTrajectory(has_structure=self, store=self._container if self.input.save_neighbors else None,
+                                num_neighbors=num_neighbors)
         n.compute_neighbors()
         return n
 
@@ -224,6 +232,8 @@ class TrainingContainer(GenericJob, HasStructure):
         pass
 
     def run_static(self):
+        if self.input.save_neighbors:
+            self.get_neighbors()
         self.status.finished = True
 
     def run_if_interactive(self):
@@ -232,6 +242,7 @@ class TrainingContainer(GenericJob, HasStructure):
 
     def to_hdf(self, hdf=None, group_name=None):
         super().to_hdf(hdf=hdf, group_name=group_name)
+        self.input.to_hdf(self.project_hdf5)
         self._container.to_hdf(self.project_hdf5, "structures")
 
     def from_hdf(self, hdf=None, group_name=None):
@@ -243,6 +254,8 @@ class TrainingContainer(GenericJob, HasStructure):
         else:
             self._container = StructureStorage()
             self._container.from_hdf(self.project_hdf5, "structures")
+            if hdf_version == "0.3.0":
+                self.input.from_hdf(self.project_hdf5, "parameters")
 
     @property
     def plot(self):

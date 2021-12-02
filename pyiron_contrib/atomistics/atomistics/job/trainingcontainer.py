@@ -37,7 +37,7 @@ from pyiron_contrib.atomistics.atomistics.job.structurestorage import StructureS
 from pyiron_atomistics.atomistics.structure.atoms import Atoms
 from pyiron_atomistics.atomistics.structure.has_structure import HasStructure
 from pyiron_atomistics.atomistics.structure.neighbors import NeighborsTrajectory
-from pyiron_base import GenericJob
+from pyiron_base import GenericJob, DataContainer
 
 
 class TrainingContainer(GenericJob, HasStructure):

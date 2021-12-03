@@ -10,7 +10,7 @@ from abc import ABC
 import os
 from os import path
 
-from pyiron_base import GenericJob
+from pyiron_base import GenericJob, state
 from pyiron_base.generic.filedata import FileDataTemplate as BaseFileDataTemplate, load_file, FileData
 
 __author__ = "Niklas Siemer"
@@ -42,7 +42,7 @@ class StorageInterface(HasGroups, abc.ABC):
     """File handling in different storage interfaces"""
 
     @abc.abstractmethod
-    def upload_file(self, file):
+    def upload_file(self, file, metadata=None, filename=None):
         """Upload the provided files to the storage"""
 
     @abc.abstractmethod
@@ -60,24 +60,34 @@ class StorageInterface(HasGroups, abc.ABC):
     def setup_storage(self):
         pass
 
-    def _validate_metadata(self, metadata):
-        return True
+    def parse_metadata(self, metadata):
+        return metadata
 
-    def validate_metadata(self, metadata):
-        if metadata is None and self.requires_metadata:
-            return False
-        elif metadata is not None:
-            return self._validate_metadata(metadata)
-        else:
-            return True
+    @abc.abstractmethod
+    def validate_metadata(self, metadata, raise_error=True):
+        """Check metadata for validity and provide valid metadata back.
+
+        Args:
+            metadata: the meta data object to check
+            raise_error: if raise_error is True, errors are raised. Otherwise, silently returning None.
+        Raises:
+            ValueError: if the metadata is not valid and raise_error.
+        Returns:
+            object: valid meta data or None if metadata is not valid and not raise_error.
+        """
 
 
 class LocalStorage(StorageInterface):
     """The local storage operates on the usual working directory of the job"""
+
     def __init__(self, job: GenericJob):
         self._job = job
 
-    def upload_file(self, file, filename=None):
+    def validate_metadata(self, metadata, raise_error=True):
+        state.logger("Storing metadata for LocalStorage is currently handled only on the job level.")
+        return metadata
+
+    def upload_file(self, file, _metadata=None, filename=None):
         filename = filename or os.path.basename(file)
         shutil.copy(file, os.path.join(self._job.working_directory, filename))
 

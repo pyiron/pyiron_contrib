@@ -78,13 +78,13 @@ class TestStorageJob(TestWithCleanProject):
         with self.subTest("Warning only: Occupied storage"):
             with self.assertLogs(job._logger) as log_watcher:
                 job.use_s3_storage(config=aws_credentials, bucket_name=full_bucket, _only_warn=True)
-                self.assertIsInstance(job._external_storage, FileS3IO)
+                self.assertIsInstance(job._storage, FileS3IO)
                 self.assertEqual(len(log_watcher.records), 1)
                 self.assertEqual(log_watcher.records[-1].message, "Storage NOT empty - Danger of data loss!")
 
         with self.subTest("Empty storage, normal case"):
             job.use_s3_storage(config=aws_credentials, bucket_name=io_bucket)
-            self.assertIsInstance(job._external_storage, FileS3IO)
+            self.assertIsInstance(job._storage, FileS3IO)
 
         with self.subTest("RuntimeError: Change running StorageJob"):
             job2.run()
@@ -96,9 +96,9 @@ class TestStorageJob(TestWithCleanProject):
 
         with self.subTest("switch from s3 to local storage"):
             job.use_s3_storage(config=aws_credentials, bucket_name=io_bucket)
-            self.assertIsInstance(job._external_storage, FileS3IO)
+            self.assertIsInstance(job._storage, FileS3IO)
             job.use_local_storage()
-            self.assertIs(job._external_storage, None)
+            self.assertIs(job._storage, None)
 
         with self.subTest("RuntimeError: switch running StorageJob"):
             job.run()
@@ -147,7 +147,7 @@ class TestStorageJob(TestWithCleanProject):
         job.add_files(self.file1)
         self.assertEqual(job.files_stored, ["test_file.txt"])
 
-        self.assertEqual(['test_file.txt'], job._external_storage.list_nodes())
+        self.assertEqual(['test_file.txt'], job._storage.list_nodes())
 
         with self.subTest(msg="Test copy present file"):
             with self.assertLogs(logger=job._logger, level="WARN") as w:
@@ -164,9 +164,9 @@ class TestStorageJob(TestWithCleanProject):
         with self.subTest(msg="Test copy list of files"):
             job.add_files([self.file1, self.file2])
             self.assertIn("test_file.txt", job.files_stored)
-            self.assertIn("test_file.txt", job._external_storage.list_nodes())
+            self.assertIn("test_file.txt", job._storage.list_nodes())
             self.assertIn("test_file2.txt", job.files_stored)
-            self.assertIn("test_file2.txt", job._external_storage.list_nodes())
+            self.assertIn("test_file2.txt", job._storage.list_nodes())
 
         rmtree('tmp_dir')
 
@@ -185,7 +185,7 @@ class TestStorageJob(TestWithCleanProject):
         with self.subTest('s3'):
             reload_s3 = self.project['s3']
             self.assertEqual(reload_s3.files_stored, ["test_file.txt"])
-            self.assertEqual(reload_s3._external_storage.list_nodes(), ["test_file.txt"])
+            self.assertEqual(reload_s3._storage.list_nodes(), ["test_file.txt"])
 
     def test_remove_files_local(self):
         job = self.project.create.job.StorageJob('test')
@@ -229,32 +229,32 @@ class TestStorageJob(TestWithCleanProject):
             job.remove_files("test_file.txt")
             self.assertTrue("test_file.txt" in job.files_stored)
             self.assertTrue("test_file2.txt" in job.files_stored)
-            self.assertIn('test_file.txt', job._external_storage.list_nodes())
-            self.assertIn('test_file2.txt', job._external_storage.list_nodes())
+            self.assertIn('test_file.txt', job._storage.list_nodes())
+            self.assertIn('test_file2.txt', job._storage.list_nodes())
         with self.subTest("FileNotFoundError"):
             self.assertRaises(FileNotFoundError, job.remove_files, ["test_file.txt", "test_file2.txt" "no_file.txt"])
             self.assertTrue("test_file.txt" in job.files_stored)
             self.assertTrue("test_file2.txt" in job.files_stored)
-            self.assertIn('test_file.txt', job._external_storage.list_nodes())
-            self.assertIn('test_file2.txt', job._external_storage.list_nodes())
+            self.assertIn('test_file.txt', job._storage.list_nodes())
+            self.assertIn('test_file2.txt', job._storage.list_nodes())
         with self.subTest("No FileNotFoundError"):
             job.remove_files("no_file.txt", raise_error=False)
             self.assertTrue("test_file.txt" in job.files_stored)
             self.assertTrue("test_file2.txt" in job.files_stored)
-            self.assertIn('test_file.txt', job._external_storage.list_nodes())
-            self.assertIn('test_file2.txt', job._external_storage.list_nodes())
+            self.assertIn('test_file.txt', job._storage.list_nodes())
+            self.assertIn('test_file2.txt', job._storage.list_nodes())
         with self.subTest("Remove nothing"):
             job.remove_files("no_file.txt", dryrun=False, raise_error=False)
             self.assertTrue("test_file.txt" in job.files_stored)
             self.assertTrue("test_file2.txt" in job.files_stored)
-            self.assertIn('test_file.txt', job._external_storage.list_nodes())
-            self.assertIn('test_file2.txt', job._external_storage.list_nodes())
+            self.assertIn('test_file.txt', job._storage.list_nodes())
+            self.assertIn('test_file2.txt', job._storage.list_nodes())
         with self.subTest("Remove files"):
             job.remove_files(["test_file.txt", "test_file2.txt", "no_file.txt"], dryrun=False, raise_error=False)
             self.assertFalse("test_file.txt" in job.files_stored)
             self.assertFalse("test_file2.txt" in job.files_stored)
-            self.assertNotIn('test_file.txt', job._external_storage.list_nodes())
-            self.assertNotIn('test_file2.txt', job._external_storage.list_nodes())
+            self.assertNotIn('test_file.txt', job._storage.list_nodes())
+            self.assertNotIn('test_file2.txt', job._storage.list_nodes())
 
     def test___getitem__(self):
         job_local = self.project.create.job.StorageJob('local')

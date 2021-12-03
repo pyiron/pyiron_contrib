@@ -153,6 +153,7 @@ class FileS3IO(StorageInterface):
         s3_path: absolute path (starting with '/') inside the bucket, interpreting '/' as the directory separator.
         bucket_info: dict with name and endpoint of the bucket.
     """
+
     def __init__(self, config=None, path='/', *, bucket_name=None):
         """
         Establishes connection to a specific 'bucket' of a S3 type object store.
@@ -328,6 +329,16 @@ class FileS3IO(StorageInterface):
             self.history[0] = "/"
         self._s3_path = self.history[-1]
 
+    def validate_metadata(self, metadata, raise_error=True):
+        if metadata is None:
+            return {}
+        elif not isinstance(metadata, dict) and raise_error:
+            raise ValueError(f"Meta data needs to be a dict containing only strings but got type {type(metadata)}.")
+        elif not isinstance(metadata, dict):
+            return None
+        elif not all([isinstance(i, str) for i in metadata]):
+            raise ValueError(f"Meta data only allows keywords of type 'str'.")
+
     def upload_file(self, files, metadata=None, filenames=None):
         """
         Uploads files into the current group of the S3 object store.
@@ -337,8 +348,6 @@ class FileS3IO(StorageInterface):
             metadata (dictionary): metadata of the files (Not nested, only "str" type)
             filenames (list/str/None): Names the files should get
         """
-        if metadata is None:
-            metadata = {}
 
         if isinstance(files, str):
             files = [files]
@@ -348,15 +357,23 @@ class FileS3IO(StorageInterface):
         elif isinstance(filenames, str):
             filenames = [filenames]
 
+        if isinstance(metadata, list) and len(metadata) != len(files):
+            raise ValueError("length of files and meta data have to match!")
+        elif isinstance(metadata, list):
+            metadata = [self.validate_metadata(data) for data in metadata]
+        else:
+            tmp_metadata = self.validate_metadata(metadata)
+            metadata = [tmp_metadata for _ in filenames]
+
         if len(filenames) != len(files):
             raise ValueError("length of files and of filenames have to match!")
 
-        for file, filename in zip(files, filenames):
+        for file, filename, _metadata in zip(files, filenames, metadata):
 
             self._bucket.upload_file(
                 file,
                 self._bucket_path + filename,
-                {"Metadata": metadata}
+                {"Metadata": _metadata}
             )
 
     def download_file(self, files, targetpath="."):

@@ -20,7 +20,7 @@ except ImportError:
 
 class CoscineMetadata(coscine.resource.MetadataForm):
     """Add a proper representation to the coscine version"""
-    def __init__(self, meta_data_form:coscine.resource.MetadataForm):
+    def __init__(self, meta_data_form: coscine.resource.MetadataForm):
         super().__init__(
             profile=meta_data_form.profile,
             lang=meta_data_form._lang,
@@ -54,8 +54,19 @@ class CoscineFileData(FileDataTemplate):
 
 
 class CoscineResource(StorageInterface):
-    def __init__(self, resource: coscine.Resource):
-        self._resource = resource
+    def __init__(self, resource: Union[coscine.Resource, dict]):
+        """Giving access to a CoScInE Resource to receive or upload files
+
+        Args:
+            resource (coscine.Resource/dict): Either directly provide a coscine.Resource or a dictionary with
+                token, project_id, and resource_id to directly connect to the respective resource.
+        """
+        if isinstance(resource, coscine.Resource):
+            self._resource = resource
+        else:
+            client = coscine.Client(resource['token'], verbose=False)
+            pr = client.projects(toplevel=False, id=resource['project_id'])[0]
+            self._resource = pr.resources(id=resource['resource_id'])[0]
 
     def _list_nodes(self):
         return [obj.name for obj in self._resource.objects()]
@@ -70,11 +81,8 @@ class CoscineResource(StorageInterface):
             file_obj.delete()
 
     def upload_file(self, file, metadata: coscine.resource.MetadataForm = None, filename=None):
-        if metadata is None:
-            raise ValueError("Coscine resources require meta data to upload a file! Use get_metadata_form() to "
-                             "get the correct meta data form and provide a completed form here.")
+        _meta_data = self.validate_metadata(metadata)
         filename = filename or os.path.basename(file)
-        _meta_data = metadata.generate()
         self._resource.upload(filename, file, _meta_data)
 
     def _get_one_file_obj(self, item, error_msg) -> Union[coscine.Object, None]:
@@ -120,20 +128,65 @@ class CoscineResource(StorageInterface):
         kwargs['Name'] = name or _name
         return [CoscineFileData(obj) for obj in self._resource.objects(**kwargs)]
 
-    def get_metadata_form(self):
-        return self._resource.MetadataForm()
+    @property
+    def metadata_template(self) -> CoscineMetadata:
+        return CoscineMetadata(self._resource.MetadataForm())
 
     @property
     def requires_metadata(self):
         return True
 
-    def _validate_metadata(self, metadata):
+    def _get_form_from_dict(self, metadata_dict):
+        form = self.metadata_template
+        form.clear()
+
+        # Try to update form by the dictionary:
         try:
-            metadata.generate()
-        except coscine.RequirementError as e:
-            return False
+            form.update(metadata_dict)
+        except KeyError as e:
+            store_err = KeyError(f"Meta data template has no key '{e.args[0]}'")
         else:
-            return True
+            return form, None
+
+        # Assume we already got a dictionary from form.generate()
+        # A form has the method parse(data) which is intended to be used on a coscine.Object.metadata which is the same
+        # as {'file_handle_with_file_name': from.generate()} of the form used to upload; thus:
+        form.parse({'dummy_file_name': metadata_dict})
+        return form, store_err
+
+    def parse_metadata(self, metadata):
+        generated_metadata = self.validate_metadata(metadata, raise_error=False)
+        if generated_metadata is None:
+            raise ValueError("metadata is not valid")
+        form, _ = self._get_form_from_dict(generated_metadata)
+        return {key: val for key, val in form.items()}
+
+    def validate_metadata(self, metadata, raise_error=True):
+        encountered_error = None
+        if metadata is None and raise_error:
+            raise ValueError("Coscine resources require meta data to upload a file! Use metadata_template to "
+                             "get the correct meta data form and provide a completed form here.")
+        elif metadata is None:
+            return None
+        elif isinstance(metadata, coscine.resource.MetadataForm):
+            metadata_form = self.metadata_template
+            metadata_form.clear()
+            metadata_form.update(metadata)
+        else:
+            metadata_form, encountered_error = self._get_form_from_dict(metadata)
+
+        try:
+            result_meta_data = metadata_form.generate()
+        except coscine.RequirementError as e:
+            if raise_error and encountered_error is not None:
+                raise ValueError(f"The provided meta data is not valid; might be related to previous error "
+                                 f"{encountered_error}") from e
+            elif raise_error:
+                raise ValueError(f"The provided meta data is not valid") from e
+            else:
+                return None
+        else:
+            return result_meta_data
 
 
 class CoscineProject(HasGroups):

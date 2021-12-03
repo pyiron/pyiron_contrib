@@ -1,11 +1,14 @@
+# coding: utf-8
+# Copyright (c) Max-Planck-Institut für Eisenforschung GmbH - Computational Materials Design (CM) Department
+# Distributed under the terms of "New BSD License", see the LICENSE file.
+
 import os, posixpath
 import xml.etree.ElementTree as ET
 
 import numpy as np
 from numpy import ndarray
-from pyiron import ase_to_pyiron
-from pyiron_base import DataContainer, Settings
-from pyiron_atomistics import Atoms
+from pyiron_base import state, DataContainer
+from pyiron_atomistics import Atoms, ase_to_pyiron
 
 from pyiron_atomistics.atomistics.structure.structurestorage import StructureStorage
 from pyiron_contrib.atomistics.atomicrex.fit_properties import ARFitPropertyList, ARFitProperty
@@ -17,7 +20,6 @@ try:
 except ImportError:
     pass
 
-s  = Settings()
 
 class ARStructureContainer:
     __version__ = "0.3.0"
@@ -33,8 +35,8 @@ class ARStructureContainer:
         self.structure_file_path = None
         try:
             self._interactive_library = atomicrex.Job()
-            for path in s.resource_paths:
-                path = posixpath.join(s.resource_paths[0], "atomicrex/util/main.xml")
+            for path in state.settings.resource_paths:
+                path = posixpath.join(state.settings.resource_paths[0], "atomicrex/util/main.xml")
                 if os.path.isfile(path):
                     self._interactive_library.parse_input_file(path)
                     break

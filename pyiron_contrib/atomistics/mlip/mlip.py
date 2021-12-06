@@ -10,7 +10,7 @@ import os
 import pandas as pd
 import posixpath
 import scipy.constants
-from pyiron_base import Settings, GenericParameters, GenericJob, Executable, FlattenedStorage
+from pyiron_base import state, GenericParameters, GenericJob, Executable, FlattenedStorage
 from pyiron_atomistics import ase_to_pyiron, Atoms
 from pyiron_atomistics.atomistics.structure.structurestorage import StructureStorage
 from pyiron_contrib.atomistics.mlip.cfgs import savecfgs, loadcfgs, Cfg
@@ -25,10 +25,9 @@ __email__ = "janssen@mpie.de"
 __status__ = "development"
 __date__ = "Sep 1, 2017"
 
-s = Settings()
-
 
 gpa_to_ev_ang = 1e22 / scipy.constants.physical_constants['joule-electron volt relationship'][0]
+
 
 class Mlip(GenericJob):
     def __init__(self, project, job_name):
@@ -47,11 +46,11 @@ class Mlip(GenericJob):
                 self._executable = Executable(
                     codename=self.__name__,
                     module=self.__module__.split(".")[-2],
-                    path_binary_codes=s.resource_paths,
+                    path_binary_codes=state.settings.resource_paths,
                 )
             else:
                 self._executable = Executable(
-                    codename=self.__name__, path_binary_codes=s.resource_paths
+                    codename=self.__name__, path_binary_codes=state.settings.resource_paths
                 )
 
     @property
@@ -451,7 +450,7 @@ class Mlip(GenericJob):
 
     @staticmethod
     def _find_potential(potential_name):
-        for resource_path in s.resource_paths:
+        for resource_path in state.settings.resource_paths:
             if os.path.exists(os.path.join(resource_path, 'mlip', 'potentials', 'templates')):
                 resource_path = os.path.join(resource_path, 'mlip', 'potentials', 'templates')
             if 'potentials' in resource_path and \

@@ -47,7 +47,7 @@ setup(
             'fenics==2019.1.0',
             'mshr==2019.1.0',
         ],
-        'image': ['scikit-image==0.18.3'],
+        'image': ['scikit-image==0.19.0'],
     },
     cmdclass=versioneer.get_cmdclass(),
     

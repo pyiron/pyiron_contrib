@@ -98,9 +98,6 @@ def _make_potential_parser():
 
     return parser
 
-# function exist just to keep namespace clean
-_potential_parser = _make_potential_parser()
-
 def potential(potential_string):
     """
     Parse an MTP potential for mlip.
@@ -112,7 +109,7 @@ def potential(potential_string):
         ValueError: failed to parse potential
     """
     try:
-        result = _potential_parser.parse_string(potential_string).as_dict()
+        result = _make_potential_parser().parse_string(potential_string).as_dict()
         result["radial"]["basis_type"] = result["radial"]["basis_type"][2:] # strip RB prefix
         # Convert to numpy arrays
         for pair, func in result["radial"]["funcs"].items():

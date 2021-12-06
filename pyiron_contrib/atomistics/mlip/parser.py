@@ -30,17 +30,19 @@ def _make_potential_parser():
         return pp.Suppress(pp.Keyword(name))
 
     def make_field(name, expr, key=None, ungroup=True):
-        return pp.ungroup(make_keyword(name) + EQ + expr + NL[0,1]).setResultsName(name if key is None else key)
+        key = name if key is None else key
+        field_expr = make_keyword(name) + EQ + expr + NL[0,1]
+        if ungroup:
+            field_expr = pp.ungroup(field_expr)
+        field_expr = field_expr.set_results_name(key)
+        field_expr.set_name(key)
+        return field_expr
 
-    def make_list(field_expr, grouped=True):
-        list = LB + pp.delimitedList(field_expr) + RB
+    def make_list(field_expr, grouped=False):
+        list_expr = LB + pp.delimited_list(field_expr) + RB
         if grouped:
-            list = pp.Group(list)
-        list.setName("list")
-        return wrap_numpy(list)
-
-    def wrap_numpy(list_expr):
-        list_expr.setParseAction(lambda tokens: np.array(tokens.asList()))
+            list_expr = pp.Group(list_expr)
+        list_expr = list_expr.setName("list")
         return list_expr
 
     indentStack = [1]
@@ -60,7 +62,7 @@ def _make_potential_parser():
                     radial_func_types + pp.indentedBlock(radial_func_coeffs, indentStack)[1, ...],
                 indentStack)[1, ...]
     radial_funcs = pp.ungroup(radial_funcs).setResultsName("funcs")
-    radial_funcs.setParseAction(lambda tokens: {k: np.array(v) for k, v in tokens.asList()[0]})
+    radial_funcs.setParseAction(lambda tokens: {k: v for k, v in tokens.asList()[0]})
 
     MTP = make_keyword("MTP") + NL
 
@@ -73,13 +75,13 @@ def _make_potential_parser():
         pp.Group(radial_basis_type + radial_info + radial_funcs).setResultsName("radial"),
         make_field( "alpha_moments_count", pp.pyparsing_common.integer ),
         make_field( "alpha_index_basic_count", pp.pyparsing_common.integer ),
-        make_field( "alpha_index_basic", make_list(make_list(pp.pyparsing_common.integer, grouped=False)) ),
+        make_field( "alpha_index_basic", make_list(make_list(pp.pyparsing_common.integer, grouped=True)), ungroup=False ),
         make_field( "alpha_index_times_count", pp.pyparsing_common.integer ),
-        make_field( "alpha_index_times", make_list(make_list(pp.pyparsing_common.integer, grouped=False)) ),
+        make_field( "alpha_index_times", make_list(make_list(pp.pyparsing_common.integer, grouped=True)), ungroup=False ),
         make_field( "alpha_scalar_moments", pp.pyparsing_common.integer ),
-        make_field( "alpha_moment_mapping", make_list(pp.pyparsing_common.integer) ),
-        make_field( "species_coeffs", make_list(pp.pyparsing_common.fnumber) ),
-        make_field( "moment_coeffs", make_list(pp.pyparsing_common.fnumber) ),
+        make_field( "alpha_moment_mapping", make_list(pp.pyparsing_common.integer), ungroup=False),
+        make_field( "species_coeffs", make_list(pp.pyparsing_common.fnumber), ungroup=False ),
+        make_field( "moment_coeffs", make_list(pp.pyparsing_common.fnumber), ungroup=False ),
     ])
 
     return parser
@@ -99,10 +101,18 @@ def potential(potential_string):
     """
     try:
         result = _potential_parser.parseString(potential_string).asDict()
-        result['radial']['basis_type'] = result['radial']['basis_type'][2:] # strip RB prefix
-        basis_size = result['radial']['info']['basis_size']
-        funcs_size = result['radial']['info']['funcs_count']
-        for pair, func in result['radial']['funcs'].items():
+        result["radial"]["basis_type"] = result["radial"]["basis_type"][2:] # strip RB prefix
+        # Convert to numpy arrays
+        for pair, func in result["radial"]["funcs"].items():
+            result["radial"]["funcs"][pair] = np.array(result["radial"]["funcs"][pair])
+        result["alpha_index_basic"] = np.array(result["alpha_index_basic"])
+        result["alpha_index_times"] = np.array(result["alpha_index_times"])
+        result["alpha_moment_mapping"] = np.array(result["alpha_moment_mapping"])
+        result["species_coeffs"] = np.array(result["species_coeffs"])
+        result["moment_coeffs"] = np.array(result["moment_coeffs"])
+        basis_size = result["radial"]["info"]["basis_size"]
+        funcs_size = result["radial"]["info"]["funcs_count"]
+        for pair, func in result["radial"]["funcs"].items():
             if func.shape != (funcs_size, basis_size):
                 raise ValueError(f"Invalid radial basis for pair {pair}, should be {funcs_count}x{ basis_size} not {result['radial']['funcs'].shape}")
         if result['alpha_index_basic'].shape != (result['alpha_index_basic_count'], 4):

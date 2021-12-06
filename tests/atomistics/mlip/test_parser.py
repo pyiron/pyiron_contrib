@@ -1,5 +1,7 @@
 import unittest
 
+import numpy as np
+
 from pyiron_contrib.atomistics.mlip.parser import potential
 
 mtp08 = """
@@ -60,6 +62,19 @@ class TestMlipParser(unittest.TestCase):
     def test_parse(self):
         try:
             result = potential(mtp08)
+            for pair in result["radial"]["funcs"]:
+                self.assertTrue(isinstance(result["radial"]["funcs"][pair], np.ndarray),
+                                "Entry list not parsed as numpy array!")
+            self.assertTrue(isinstance(result["alpha_index_basic"], np.ndarray),
+                            "Entry list not parsed as numpy array!")
+            self.assertTrue(isinstance(result["alpha_index_times"], np.ndarray),
+                            "Entry list not parsed as numpy array!")
+            self.assertTrue(isinstance(result["alpha_moment_mapping"], np.ndarray),
+                            "Entry list not parsed as numpy array!")
+            self.assertTrue(isinstance(result["species_coeffs"], np.ndarray),
+                            "Entry list not parsed as numpy array!")
+            self.assertTrue(isinstance(result["moment_coeffs"], np.ndarray),
+                            "Entry list not parsed as numpy array!")
         except ValueError:
             self.fail("Well-formated potential should not raise an error.")
 

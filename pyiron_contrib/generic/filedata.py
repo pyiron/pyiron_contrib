@@ -12,6 +12,7 @@ from os import path
 
 from pyiron_base import GenericJob, state
 from pyiron_base.generic.filedata import FileDataTemplate as BaseFileDataTemplate, load_file, FileData
+from pyiron_base.interfaces.has_groups import HasGroups
 
 __author__ = "Niklas Siemer"
 __copyright__ = (
@@ -23,8 +24,6 @@ __maintainer__ = "Niklas Siemer"
 __email__ = "siemer@mpie.de"
 __status__ = "development"
 __date__ = "Feb 02, 2021"
-
-from pyiron_base.interfaces.has_groups import HasGroups
 
 
 class FileDataTemplate(BaseFileDataTemplate, ABC):

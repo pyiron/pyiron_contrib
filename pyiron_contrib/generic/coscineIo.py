@@ -28,6 +28,9 @@ class CoscineMetadata(coscine.resource.MetadataForm):
             entries=meta_data_form._entries
         )
 
+    def to_dict(self):
+        return self.store
+
     def __repr__(self):
         return self.__str__()
 
@@ -50,11 +53,13 @@ class CoscineFileData(FileDataTemplate):
 
     @property
     def metadata(self):
-        return CoscineMetadata(self._coscine_object.MetadataForm())
+        form = CoscineMetadata(self._coscine_object.MetadataForm())
+        form.parse(self._coscine_object.metadata)
+        return form
 
 
 class CoscineResource(StorageInterface):
-    def __init__(self, resource: Union[coscine.Resource, dict]):
+    def __init__(self, resource: Union[coscine.Resource, dict, 'CoscineResource']):
         """Giving access to a CoScInE Resource to receive or upload files
 
         Args:
@@ -63,10 +68,14 @@ class CoscineResource(StorageInterface):
         """
         if isinstance(resource, coscine.Resource):
             self._resource = resource
-        else:
+        elif isinstance(resource, dict):
             client = coscine.Client(resource['token'], verbose=False)
             pr = client.projects(toplevel=False, id=resource['project_id'])[0]
             self._resource = pr.resources(id=resource['resource_id'])[0]
+        elif isinstance(resource, self.__class__):
+            self._resource = resource._resource
+        else:
+            raise ValueError(f"Unknown resource type {type(resource)}, supported types !")
 
     def _list_nodes(self):
         return [obj.name for obj in self._resource.objects()]

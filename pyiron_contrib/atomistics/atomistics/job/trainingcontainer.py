@@ -224,3 +224,64 @@ class TrainingContainer(GenericJob, HasStructure):
         else:
             self._container = StructureStorage()
             self._container.from_hdf(self.project_hdf5, "structures")
+
+
+    def plot_cell(self):
+        """
+        Plot histograms of cell parameters.
+
+        Plotted are atomic volume, density, cell vector lengths and cell vector angles in separate subplots all on a
+        log-scale.
+
+        Returns:
+            `DataFrame`: contains the plotted information in the columns:
+                            - a: length of first vector
+                            - b: length of second vector
+                            - c: length of third vector
+                            - alpha: angle between first and second vector
+                            - beta: angle between second and third vector
+                            - gamma: angle between third and first vector
+                            - V: volume of the cell
+                            - N: number of atoms in the cell
+        """
+        N = self._container.get_array("length")
+        C = self._container.get_array("cell")
+
+        def get_angle(cell, idx=0):
+            return np.arccos(np.dot(cell[idx], cell[(idx+1)%3]) \
+                    / np.linalg.norm(cell[idx]) / np.linalg.norm(cell[(idx+1)%3]))
+
+        def extract(n, c):
+            return {
+                    'a': np.linalg.norm(c[0]),
+                    'b': np.linalg.norm(c[1]),
+                    'c': np.linalg.norm(c[2]),
+                    'alpha': get_angle(c, 0),
+                    'beta': get_angle(c, 1),
+                    'gamma': get_angle(c, 2),
+            }
+        df = pd.DataFrame([extract(n, c) for n, c in zip(N, C)])
+        df['V'] = np.linalg.det(C)
+        df['N'] = N
+
+        plt.subplot(1, 4, 1)
+        plt.title("Atomic Volume")
+        plt.hist(df.V/df.N, bins=20, log=True)
+        plt.xlabel(r"$V$ [$\AA^3$]")
+
+        plt.subplot(1, 4, 2)
+        plt.title("Density")
+        plt.hist(df.N/df.V, bins=20, log=True)
+        plt.xlabel(r"$\rho$ [$\AA^{-3}$]")
+
+        plt.subplot(1, 4, 3)
+        plt.title("Lattice Vector Lengths")
+        plt.hist([df.a, df.b, df.c], log=True);
+        plt.xlabel(r"$a,b,c$ [$\AA$]")
+
+        plt.subplot(1, 4, 4)
+        plt.title("Lattice Vector Angles")
+        plt.hist([df.alpha, df.beta, df.gamma], log=True);
+        plt.xlabel(r"$\alpha,\beta,\gamma$")
+
+        return df

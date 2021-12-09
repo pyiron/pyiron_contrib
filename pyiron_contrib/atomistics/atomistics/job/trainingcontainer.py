@@ -32,6 +32,7 @@ from warnings import catch_warnings
 
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 from pyiron_contrib.atomistics.atomistics.job.structurestorage import StructureStorage
 from pyiron_atomistics.atomistics.structure.atoms import Atoms
 from pyiron_atomistics.atomistics.structure.has_structure import HasStructure
@@ -253,16 +254,16 @@ class TrainingContainer(GenericJob, HasStructure):
 
         def extract(n, c):
             return {
-                    'a': np.linalg.norm(c[0]),
-                    'b': np.linalg.norm(c[1]),
-                    'c': np.linalg.norm(c[2]),
-                    'alpha': get_angle(c, 0),
-                    'beta': get_angle(c, 1),
-                    'gamma': get_angle(c, 2),
+                    "a": np.linalg.norm(c[0]),
+                    "b": np.linalg.norm(c[1]),
+                    "c": np.linalg.norm(c[2]),
+                    "alpha": get_angle(c, 0),
+                    "beta": get_angle(c, 1),
+                    "gamma": get_angle(c, 2),
             }
         df = pd.DataFrame([extract(n, c) for n, c in zip(N, C)])
-        df['V'] = np.linalg.det(C)
-        df['N'] = N
+        df["V"] = np.linalg.det(C)
+        df["N"] = N
 
         plt.subplot(1, 4, 1)
         plt.title("Atomic Volume")
@@ -288,7 +289,7 @@ class TrainingContainer(GenericJob, HasStructure):
 
     def plot_spacegroups(self, symprec=1e-3):
         """
-        Plot histograms of space groups and crystal systems present in data.
+        Plot histograms of space groups and crystal systems.
 
         Spacegroups and crystal systems are plotted in separate subplots.
 
@@ -317,7 +318,7 @@ class TrainingContainer(GenericJob, HasStructure):
                 return "cubic"
 
         def extract(s):
-            spg = s.get_symmetry(symprec=symprec).spacegroup['Number']
+            spg = s.get_symmetry(symprec=symprec).spacegroup["Number"]
             return {'space_group': spg, 'crystal_system': get_crystal_system(spg)}
 
         df = pd.DataFrame(map(extract, train.iter_structures()))
@@ -341,3 +342,24 @@ class TrainingContainer(GenericJob, HasStructure):
         plt.xlabel("Crystal System")
         plt.xticks(rotation=35)
         return df
+
+    def plot_energy_volume(self):
+        """
+        Plot volume vs. energy.
+
+        Volume and energy are normalized per atom before plotting.
+
+        Returns:
+            DataFrame: contains atomic energy and volumes in the columns 'E' and 'V'
+        """
+
+        N = self._container.get_array("length")
+        E = self._container.get_array("energy") / N
+        C = self._container.get_array("cell")
+        V = np.linalg.det(C) / N
+
+        plt.scatter(V, E)
+        plt.xlabel(r"Atomic Volume [$\AA^3$]")
+        plt.ylabel(r"Atomic Energy [eV]")
+
+        return pd.DataFrame({"V": V, "E": E})

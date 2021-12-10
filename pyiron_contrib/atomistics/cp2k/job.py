@@ -1,5 +1,5 @@
 import os
-from pyiron_base import DataContainer
+from pyiron_base import DataContainer, state
 from pyiron_atomistics.atomistics.structure.atoms import pyiron_to_ase, ase_to_pyiron
 from pyiron_atomistics.atomistics.job.atomistic import AtomisticGenericJob
 from pycp2k import CP2K
@@ -91,8 +91,8 @@ class Cp2kJob(AtomisticGenericJob):
         GLOBAL.Run_type = self.input["global"]["run_type"]
         FORCE_EVAL.Method = self.input["force_eval"]["method"]
         FORCE_EVAL.PRINT.FORCES.Section_parameters = self.input["force_eval"]["print_forces_section"]
-        DFT.Basis_set_file_name = os.path.join(s.resource_paths[0], "cp2k", "potentials", "BASIS_SET")
-        DFT.Potential_file_name = os.path.join(s.resource_paths[0], "cp2k", "potentials", "GTH_POTENTIALS")
+        DFT.Basis_set_file_name = os.path.join(state.settings.resource_paths[0], "cp2k", "potentials", "BASIS_SET")
+        DFT.Potential_file_name = os.path.join(state.settings.resource_paths[0], "cp2k", "potentials", "GTH_POTENTIALS")
         DFT.QS.Eps_default = self.input["dft"]["qs"]["eps"]
         DFT.MGRID.Ngrids = self.input["dft"]["mgrid"]["ngrids"]
         DFT.MGRID.Cutoff = self.input["dft"]["mgrid"]["cutoff"]

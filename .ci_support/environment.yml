@@ -17,3 +17,4 @@ dependencies:
 - boto3
 - moto
 - more-itertools
+- pycp2k =0.2.2

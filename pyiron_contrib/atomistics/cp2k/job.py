@@ -50,7 +50,7 @@ class Cp2kJob(AtomisticGenericJob):
     def __init__(self, project, job_name):
         super(Cp2kJob, self).__init__(project, job_name)
         self.__name__ = "cp2k"
-        self.input = DataContainer(pyiron_dict)
+        self.input = DataContainer(pyiron_dict, table_name="control_dict")
 
     def to_hdf(self, hdf=None, group_name=None):
         """

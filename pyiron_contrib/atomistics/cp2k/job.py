@@ -1,7 +1,7 @@
 import os
 from pyiron_base import InputList
 from pyiron_atomistics.atomistics.atoms import pyiron_to_ase, ase_to_pyiron
-from pyiron.atomistics.job.atomistic import AtomisticGenericJob
+from pyiron_atomistics.atomistics.job.atomistic import AtomisticGenericJob
 from pycp2k import CP2K
 
 

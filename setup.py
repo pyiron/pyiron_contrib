@@ -36,7 +36,8 @@ setup(
         'pyiron_base==0.4.3',
         'scipy==1.7.3',
         'seaborn==0.11.2',
-        'pyparsing==3.0.6'
+        'pyparsing==3.0.6',
+        'more-itertools==8.12.0',
     ],
     extras_require={
         'atomistic': [
@@ -48,6 +49,10 @@ setup(
             'mshr==2019.1.0',
         ],
         'image': ['scikit-image==0.19.0'],
+        'generic': [
+            'boto3==1.20.23', 
+            'moto==2.2.16'
+        ],
     },
     cmdclass=versioneer.get_cmdclass(),
     

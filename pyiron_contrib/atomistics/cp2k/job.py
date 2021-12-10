@@ -1,5 +1,5 @@
 import os
-from pyiron_base import InputList
+from pyiron_base import DataContainer
 from pyiron_atomistics.atomistics.structure.atoms import pyiron_to_ase, ase_to_pyiron
 from pyiron_atomistics.atomistics.job.atomistic import AtomisticGenericJob
 from pycp2k import CP2K
@@ -50,7 +50,7 @@ class Cp2kJob(AtomisticGenericJob):
     def __init__(self, project, job_name):
         super(Cp2kJob, self).__init__(project, job_name)
         self.__name__ = "cp2k"
-        self.input = InputList(pyiron_dict)
+        self.input = DataContainer(pyiron_dict)
 
     def to_hdf(self, hdf=None, group_name=None):
         """

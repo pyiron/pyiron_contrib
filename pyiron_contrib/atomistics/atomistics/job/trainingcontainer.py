@@ -321,7 +321,7 @@ class TrainingContainer(GenericJob, HasStructure):
             spg = s.get_symmetry(symprec=symprec).spacegroup["Number"]
             return {'space_group': spg, 'crystal_system': get_crystal_system(spg)}
 
-        df = pd.DataFrame(map(extract, train.iter_structures()))
+        df = pd.DataFrame(map(extract, self._container.iter_structures()))
         plt.subplot(1, 2, 1)
         plt.hist(df.space_group, bins=230)
         plt.xlabel("Space Group")

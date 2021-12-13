@@ -48,6 +48,10 @@ setup(
             'mshr==2019.1.0',
         ],
         'image': ['scikit-image==0.19.0'],
+        'generic': [
+            'boto3==1.20.23', 
+            'moto==2.2.16'
+        ],
     },
     cmdclass=versioneer.get_cmdclass(),
     

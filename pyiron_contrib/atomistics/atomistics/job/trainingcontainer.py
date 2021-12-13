@@ -244,7 +244,7 @@ class TrainingPlots:
         self._train = train
 
 
-    def plot_cell(self):
+    def cell(self):
         """
         Plot histograms of cell parameters.
 
@@ -304,7 +304,7 @@ class TrainingPlots:
 
         return df
 
-    def plot_spacegroups(self, symprec=1e-3):
+    def spacegroups(self, symprec=1e-3):
         """
         Plot histograms of space groups and crystal systems.
 
@@ -360,7 +360,7 @@ class TrainingPlots:
         plt.xticks(rotation=35)
         return df
 
-    def plot_energy_volume(self):
+    def energy_volume(self):
         """
         Plot volume vs. energy.
 

@@ -226,6 +226,23 @@ class TrainingContainer(GenericJob, HasStructure):
             self._container = StructureStorage()
             self._container.from_hdf(self.project_hdf5, "structures")
 
+    @property
+    def plot(self):
+        """
+        :class:`.TrainingPlots`: plotting interface
+        """
+        return TrainingPlots(self)
+
+class TrainingPlots:
+    """
+    Simple interface to plot various properties of the structures inside the given :class:`.TrainingContainer`.
+    """
+
+    __slots__ = "_train"
+
+    def __init__(self, train):
+        self._train = train
+
 
     def plot_cell(self):
         """
@@ -245,8 +262,8 @@ class TrainingContainer(GenericJob, HasStructure):
                             - V: volume of the cell
                             - N: number of atoms in the cell
         """
-        N = self._container.get_array("length")
-        C = self._container.get_array("cell")
+        N = self._train._container.get_array("length")
+        C = self._train._container.get_array("cell")
 
         def get_angle(cell, idx=0):
             return np.arccos(np.dot(cell[idx], cell[(idx+1)%3]) \
@@ -321,7 +338,7 @@ class TrainingContainer(GenericJob, HasStructure):
             spg = s.get_symmetry(symprec=symprec).spacegroup["Number"]
             return {'space_group': spg, 'crystal_system': get_crystal_system(spg)}
 
-        df = pd.DataFrame(map(extract, self._container.iter_structures()))
+        df = pd.DataFrame(map(extract, self._train._container.iter_structures()))
         plt.subplot(1, 2, 1)
         plt.hist(df.space_group, bins=230)
         plt.xlabel("Space Group")
@@ -353,9 +370,9 @@ class TrainingContainer(GenericJob, HasStructure):
             DataFrame: contains atomic energy and volumes in the columns 'E' and 'V'
         """
 
-        N = self._container.get_array("length")
-        E = self._container.get_array("energy") / N
-        C = self._container.get_array("cell")
+        N = self._train._container.get_array("length")
+        E = self._train._container.get_array("energy") / N
+        C = self._train._container.get_array("cell")
         V = np.linalg.det(C) / N
 
         plt.scatter(V, E)

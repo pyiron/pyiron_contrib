@@ -31,7 +31,7 @@ setup(
     keywords='pyiron',
     packages=find_packages(exclude=["*tests*"]),
     install_requires=[        
-        'matplotlib==3.5.0',
+        'matplotlib==3.5.1',
         'numpy==1.21.4',
         'pyiron_base==0.4.3',
         'scipy==1.7.3',
@@ -42,7 +42,7 @@ setup(
     extras_require={
         'atomistic': [
             'ase==3.22.1',
-            'pyiron_atomistics==0.2.31',
+            'pyiron_atomistics==0.2.32',
         ],
         'fenics': [
             'fenics==2019.1.0',

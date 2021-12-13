@@ -32,6 +32,7 @@ from warnings import catch_warnings
 
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 from pyiron_contrib.atomistics.atomistics.job.structurestorage import StructureStorage
 from pyiron_atomistics.atomistics.structure.atoms import Atoms
 from pyiron_atomistics.atomistics.structure.has_structure import HasStructure
@@ -224,3 +225,158 @@ class TrainingContainer(GenericJob, HasStructure):
         else:
             self._container = StructureStorage()
             self._container.from_hdf(self.project_hdf5, "structures")
+
+    @property
+    def plot(self):
+        """
+        :class:`.TrainingPlots`: plotting interface
+        """
+        return TrainingPlots(self)
+
+class TrainingPlots:
+    """
+    Simple interface to plot various properties of the structures inside the given :class:`.TrainingContainer`.
+    """
+
+    __slots__ = "_train"
+
+    def __init__(self, train):
+        self._train = train
+
+
+    def cell(self):
+        """
+        Plot histograms of cell parameters.
+
+        Plotted are atomic volume, density, cell vector lengths and cell vector angles in separate subplots all on a
+        log-scale.
+
+        Returns:
+            `DataFrame`: contains the plotted information in the columns:
+                            - a: length of first vector
+                            - b: length of second vector
+                            - c: length of third vector
+                            - alpha: angle between first and second vector
+                            - beta: angle between second and third vector
+                            - gamma: angle between third and first vector
+                            - V: volume of the cell
+                            - N: number of atoms in the cell
+        """
+        N = self._train._container.get_array("length")
+        C = self._train._container.get_array("cell")
+
+        def get_angle(cell, idx=0):
+            return np.arccos(np.dot(cell[idx], cell[(idx+1)%3]) \
+                    / np.linalg.norm(cell[idx]) / np.linalg.norm(cell[(idx+1)%3]))
+
+        def extract(n, c):
+            return {
+                    "a": np.linalg.norm(c[0]),
+                    "b": np.linalg.norm(c[1]),
+                    "c": np.linalg.norm(c[2]),
+                    "alpha": get_angle(c, 0),
+                    "beta": get_angle(c, 1),
+                    "gamma": get_angle(c, 2),
+            }
+        df = pd.DataFrame([extract(n, c) for n, c in zip(N, C)])
+        df["V"] = np.linalg.det(C)
+        df["N"] = N
+
+        plt.subplot(1, 4, 1)
+        plt.title("Atomic Volume")
+        plt.hist(df.V/df.N, bins=20, log=True)
+        plt.xlabel(r"$V$ [$\AA^3$]")
+
+        plt.subplot(1, 4, 2)
+        plt.title("Density")
+        plt.hist(df.N/df.V, bins=20, log=True)
+        plt.xlabel(r"$\rho$ [$\AA^{-3}$]")
+
+        plt.subplot(1, 4, 3)
+        plt.title("Lattice Vector Lengths")
+        plt.hist([df.a, df.b, df.c], log=True);
+        plt.xlabel(r"$a,b,c$ [$\AA$]")
+
+        plt.subplot(1, 4, 4)
+        plt.title("Lattice Vector Angles")
+        plt.hist([df.alpha, df.beta, df.gamma], log=True);
+        plt.xlabel(r"$\alpha,\beta,\gamma$")
+
+        return df
+
+    def spacegroups(self, symprec=1e-3):
+        """
+        Plot histograms of space groups and crystal systems.
+
+        Spacegroups and crystal systems are plotted in separate subplots.
+
+        Args:
+            symprec (float): precision of the symmetry search (passed to spglib)
+
+        Returns:
+            DataFrame: contains two columns "space_group", "crystal_system"
+                       for each structure in `train`
+        """
+
+        def get_crystal_system(num):
+            if num in range(1,3):
+                return "triclinic"
+            elif num in range(3, 16):
+                return "monoclinic"
+            elif num in range(16, 75):
+                return "orthorombic"
+            elif num in range(75, 143):
+                return "trigonal"
+            elif num in range(143, 168):
+                return "tetragonal"
+            elif num in range(168, 195):
+                return "hexagonal"
+            elif num in range(195, 230):
+                return "cubic"
+
+        def extract(s):
+            spg = s.get_symmetry(symprec=symprec).spacegroup["Number"]
+            return {'space_group': spg, 'crystal_system': get_crystal_system(spg)}
+
+        df = pd.DataFrame(map(extract, self._train._container.iter_structures()))
+        plt.subplot(1, 2, 1)
+        plt.hist(df.space_group, bins=230)
+        plt.xlabel("Space Group")
+
+        plt.subplot(1, 2, 2)
+        l, h = np.unique(df.crystal_system, return_counts=True)
+        sort_key = {
+            "triclinic": 1,
+            "monoclinic": 3,
+            "orthorombic": 16,
+            "trigonal": 75,
+            "tetragonal": 143,
+            "hexagonal": 168,
+            "cubic": 195,
+        }
+        I = np.argsort([sort_key[ll] for ll in l])
+        plt.bar(l[I], h[I])
+        plt.xlabel("Crystal System")
+        plt.xticks(rotation=35)
+        return df
+
+    def energy_volume(self):
+        """
+        Plot volume vs. energy.
+
+        Volume and energy are normalized per atom before plotting.
+
+        Returns:
+            DataFrame: contains atomic energy and volumes in the columns 'E' and 'V'
+        """
+
+        N = self._train._container.get_array("length")
+        E = self._train._container.get_array("energy") / N
+        C = self._train._container.get_array("cell")
+        V = np.linalg.det(C) / N
+
+        plt.scatter(V, E)
+        plt.xlabel(r"Atomic Volume [$\AA^3$]")
+        plt.ylabel(r"Atomic Energy [eV]")
+
+        return pd.DataFrame({"V": V, "E": E})

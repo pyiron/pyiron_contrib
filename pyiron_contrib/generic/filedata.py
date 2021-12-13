@@ -2,11 +2,10 @@
 
 # Copyright (c) Max-Planck-Institut für Eisenforschung GmbH - Computational Materials Design (CM) Department
 # Distributed under the terms of "New BSD License", see the LICENSE file.
-import abc
 import posixpath
 import shutil
 
-from abc import ABC
+from abc import ABC, abstractmethod
 import os
 from os import path
 
@@ -27,6 +26,9 @@ __date__ = "Feb 02, 2021"
 
 
 class FileDataTemplate(BaseFileDataTemplate, ABC):
+    def __init__(self):
+        self._metadata = None
+
     @staticmethod
     def _get_filetype_from_filename(filename):
         filetype = os.path.splitext(filename)[1]
@@ -36,19 +38,33 @@ class FileDataTemplate(BaseFileDataTemplate, ABC):
             filetype = filetype[1:]
         return filetype
 
+    def _get_metadata(self):
+        return self._metadata
 
-class StorageInterface(HasGroups, abc.ABC):
+    def _set_metadata(self, metadata):
+        self._metadata = metadata
+
+    @property
+    def metadata(self):
+        return self._get_metadata()
+
+    @metadata.setter
+    def metadata(self, metadata):
+        self._set_metadata(metadata)
+
+
+class StorageInterface(HasGroups, ABC):
     """File handling in different storage interfaces"""
 
-    @abc.abstractmethod
+    @abstractmethod
     def upload_file(self, file, metadata=None, filename=None):
         """Upload the provided files to the storage"""
 
-    @abc.abstractmethod
+    @abstractmethod
     def remove_file(self, file):
         """Removes specified files from the storage"""
 
-    @abc.abstractmethod
+    @abstractmethod
     def __getitem__(self, item):
         """Return stored file as Subclass of FileDataTemplate"""
 
@@ -62,7 +78,7 @@ class StorageInterface(HasGroups, abc.ABC):
     def parse_metadata(self, metadata):
         return metadata
 
-    @abc.abstractmethod
+    @abstractmethod
     def validate_metadata(self, metadata, raise_error=True):
         """Check metadata for validity and provide valid metadata back.
 

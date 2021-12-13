@@ -4,6 +4,8 @@
 import os.path
 import io
 
+import pandas as pd
+
 from pyiron_base import ImportAlarm
 from pyiron_base.interfaces.has_groups import HasGroups
 from pyiron_contrib.generic.filedata import StorageInterface
@@ -21,15 +23,26 @@ except ImportError:
 class CoscineMetadata(coscine.resource.MetadataForm):
     """Add a proper representation to the coscine version"""
     def __init__(self, meta_data_form: coscine.resource.MetadataForm):
-        super().__init__(
-            profile=meta_data_form.profile,
-            lang=meta_data_form._lang,
-            vocabulary=meta_data_form._vocabulary,
-            entries=meta_data_form._entries
-        )
+        self._name = meta_data_form._name
+        self._lang = meta_data_form._lang
+        self._entries = meta_data_form._entries
+        self._keys = {}
+        for entry in meta_data_form._entries:
+            self._keys[entry["name"][self._lang]] = entry
+        self._vocabulary = meta_data_form._vocabulary
+        self.store = meta_data_form.store
+        self.profile = meta_data_form.profile
 
     def to_dict(self):
-        return self.store
+        result = {key: None for key in self.keys()}
+        result.update(self.store)
+        return result
+
+    def _repr_html_(self):
+        df = pd.DataFrame({" ": list(self.to_dict().keys()), "  ": list(self.to_dict().values())})
+        df.set_index(" ", inplace=True)
+        df[df.isnull()] = ""
+        return df._repr_html_()
 
     def __repr__(self):
         return self.__str__()
@@ -37,6 +50,7 @@ class CoscineMetadata(coscine.resource.MetadataForm):
 
 class CoscineFileData(FileDataTemplate):
     def __init__(self, coscine_object: coscine.Object):
+        super().__init__()
         self._coscine_object = coscine_object
         self._data = None
         self._filename = coscine_object.name
@@ -51,11 +65,16 @@ class CoscineFileData(FileDataTemplate):
     def download(self, path="./"):
         self._coscine_object.download(path=path)
 
-    @property
-    def metadata(self):
-        form = CoscineMetadata(self._coscine_object.MetadataForm())
-        form.parse(self._coscine_object.metadata)
+    def _get_metadata(self):
+        form = CoscineMetadata(self._coscine_object.form())
         return form
+
+    def _set_metadata(self, metadata):
+        raise AttributeError("can't set attribute")
+
+    def _repr_html_(self):
+        from IPython.display import display
+        display(self.data, self.metadata)
 
 
 class CoscineResource(StorageInterface):

@@ -16,4 +16,3 @@ dependencies:
 - randspg =0.0.1
 - boto3
 - moto
-- more-itertools

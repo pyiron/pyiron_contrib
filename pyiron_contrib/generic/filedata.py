@@ -7,11 +7,16 @@ import shutil
 
 from abc import ABC, abstractmethod
 import os
+from functools import lru_cache
 from os import path
+import pandas as pd
 
 from pyiron_base import GenericJob, state
-from pyiron_base.generic.filedata import FileDataTemplate as BaseFileDataTemplate, load_file, FileData
+from pyiron_base.generic.filedata import FileDataTemplate as BaseFileDataTemplate, load_file, FileData as FileDataBase
 from pyiron_base.interfaces.has_groups import HasGroups
+
+import ipywidgets as widgets
+from IPython.display import display
 
 __author__ = "Niklas Siemer"
 __copyright__ = (
@@ -25,9 +30,36 @@ __status__ = "development"
 __date__ = "Feb 02, 2021"
 
 
+class MetaDataTemplate(ABC):
+    @abstractmethod
+    def to_dict(self):
+        """Provide a dict representation of the meta data."""
+
+    def _repr_html_(self):
+        df = pd.DataFrame({"Metadata": list(self.to_dict().keys()), "  ": list(self.to_dict().values())})
+        df.set_index("Metadata", inplace=True)
+        df[df.isnull()] = ""
+        return df._repr_html_()
+
+
+class MetaData(MetaDataTemplate):
+    def __init__(self, meta_data_dict=None):
+        if meta_data_dict is None:
+            meta_data_dict = {}
+        self._metadata = {key: val for key, val in meta_data_dict.items()}
+
+    def to_dict(self):
+        return self._metadata.copy()
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self._metadata})"
+
+
 class FileDataTemplate(BaseFileDataTemplate, ABC):
     def __init__(self):
         self._metadata = None
+        self._output = widgets.Output()
+        self._box = widgets.VBox([self._output])
 
     @staticmethod
     def _get_filetype_from_filename(filename):
@@ -42,7 +74,10 @@ class FileDataTemplate(BaseFileDataTemplate, ABC):
         return self._metadata
 
     def _set_metadata(self, metadata):
-        self._metadata = metadata
+        if not isinstance(metadata, MetaDataTemplate):
+            self._metadata = MetaData(metadata)
+        else:
+            self._metadata = metadata
 
     @property
     def metadata(self):
@@ -51,6 +86,59 @@ class FileDataTemplate(BaseFileDataTemplate, ABC):
     @metadata.setter
     def metadata(self, metadata):
         self._set_metadata(metadata)
+
+    @property
+    def gui(self):
+        self._output.clear_output()
+        with self._output:
+            display(self.data, self.metadata)
+        return self._box
+
+    def _ipython_display_(self):
+        display(self.gui)
+
+
+class FileData(FileDataTemplate):
+    """FileData stores an instance of a data file, e.g. a single Image from a measurement."""
+    def __init__(self, file, data=None, metadata=None, filetype=None):
+        """FileData class to store data and associated metadata.
+
+            Args:
+                file (str): path to the data file (if data is None) or filename associated with the data.
+                data (object/None): object containing data
+                metadata (dict/DataContainer): Dictionary of metadata associated with the data
+                filetype (str): File extension associated with the type data,
+                                If provided this overwrites the assumption based on the extension of the filename.
+        """
+        super().__init__()
+        if data is None:
+            self.filename = os.path.split(file)[1]
+            self.source = file
+            self._data = None
+        else:
+            self.filename = file
+            self.source = None
+            self._data = data
+        if filetype is None:
+            self.filetype = self._get_filetype_from_filename(self.filename)
+        else:
+            self.filetype = filetype
+        if metadata is None:
+            self.metadata = MetaData()
+        elif isinstance(metadata, MetaDataTemplate):
+            self.metadata = metadata
+        else:
+            self.metadata = MetaData(metadata)
+        self._hasdata = True if self._data is not None else False
+
+    @property
+    @lru_cache()
+    def data(self):
+        """Return the associated data."""
+        if self._hasdata:
+            return self._data
+        else:
+            return load_file(self.source, filetype=self.filetype)
 
 
 class StorageInterface(HasGroups, ABC):
@@ -99,7 +187,7 @@ class LocalStorage(StorageInterface):
         self._job = job
 
     def validate_metadata(self, metadata, raise_error=True):
-        state.logger("Storing metadata for LocalStorage is currently handled only on the job level.")
+        state.logger.warn("Storing metadata for LocalStorage is currently handled only on the job level.")
         return metadata
 
     def upload_file(self, file, _metadata=None, filename=None):

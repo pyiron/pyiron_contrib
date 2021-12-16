@@ -9,7 +9,7 @@ import pandas as pd
 from pyiron_base import ImportAlarm
 from pyiron_base.interfaces.has_groups import HasGroups
 from pyiron_contrib.generic.filedata import StorageInterface
-from pyiron_contrib.generic.filedata import FileDataTemplate, load_file
+from pyiron_contrib.generic.filedata import FileDataTemplate, load_file, MetaDataTemplate
 from typing import Union, List
 
 try:
@@ -20,7 +20,7 @@ except ImportError:
     import_alarm.warn_if_failed()
 
 
-class CoscineMetadata(coscine.resource.MetadataForm):
+class CoscineMetadata(coscine.resource.MetadataForm, MetaDataTemplate):
     """Add a proper representation to the coscine version"""
     def __init__(self, meta_data_form: coscine.resource.MetadataForm):
         self._name = meta_data_form._name
@@ -37,12 +37,6 @@ class CoscineMetadata(coscine.resource.MetadataForm):
         result = {key: None for key in self.keys()}
         result.update(self.store)
         return result
-
-    def _repr_html_(self):
-        df = pd.DataFrame({" ": list(self.to_dict().keys()), "  ": list(self.to_dict().values())})
-        df.set_index(" ", inplace=True)
-        df[df.isnull()] = ""
-        return df._repr_html_()
 
     def __repr__(self):
         return self.__str__()
@@ -71,10 +65,6 @@ class CoscineFileData(FileDataTemplate):
 
     def _set_metadata(self, metadata):
         raise AttributeError("can't set attribute")
-
-    def _repr_html_(self):
-        from IPython.display import display
-        display(self.data, self.metadata)
 
 
 class CoscineResource(StorageInterface):

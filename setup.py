@@ -41,16 +41,16 @@ setup(
     extras_require={
         'atomistic': [
             'ase==3.22.1',
-            'pyiron_atomistics==0.2.32',
+            'pyiron_atomistics==0.2.33',
         ],
         'fenics': [
             'fenics==2019.1.0',
             'mshr==2019.1.0',
         ],
-        'image': ['scikit-image==0.19.0'],
+        'image': ['scikit-image==0.19.1'],
         'generic': [
             'boto3==1.20.23', 
-            'moto==2.2.16'
+            'moto==2.2.19'
         ],
     },
     cmdclass=versioneer.get_cmdclass(),

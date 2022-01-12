@@ -20,6 +20,11 @@ class FunctionFactory(PyironFactory):
 
     @staticmethod
     def poly(identifier, cutoff, species=["*", "*"]):
+        """
+        TAKE CARE !!!
+        The polynomial function implemented in atomicrex does not handle derivatives at the cutoff right now,
+        i.e. when using this as a pair function or similar there will be massive jumps in forces.
+        """
         return Poly(identifier, cutoff=cutoff, species=species)
 
     @staticmethod
@@ -294,12 +299,17 @@ class Poly(DataContainer, BaseFunctionMixin):
         self.cutoff = cutoff
         self.species = species
         self.parameters = PolyCoeffList()
+        # preparation if poly gets screening function ability
+        #self.screening = None
 
     def _to_xml_element(self):
         poly = ET.Element("poly")
+        poly.set("id", self.identifier)
         cutoff = ET.SubElement(poly, "cutoff")
         cutoff.text = f"{self.cutoff}"
         poly.append(self.parameters._to_xml_element())
+        #if self.screening is not None:
+        #        poly.append(self.screening._to_xml_element())
         return poly
 
 
@@ -978,7 +988,7 @@ class PolyCoeff(FunctionParameter):
     """
     Function parameter, but for polynomial interpolation.
     """    
-    def __init__(self, n=None, start_val=None, enabled=True, reset=False, min_val=None, max_val=None):
+    def __init__(self, n: int=None, start_val: float=None, enabled=True, reset=False, min_val=None, max_val=None):
         super().__init__(
             param="coeff",
             start_val=start_val,
@@ -992,7 +1002,9 @@ class PolyCoeff(FunctionParameter):
 
     def _to_xml_element(self):
         root = super()._to_xml_element()
-        root.set("n", self.n)
+        root.set("value", f"{self.start_val:.6g}" )
+        root.set("n", f"{self.n:.6g}")
+        return root
 
 
 class PolyCoeffList(DataContainer):

@@ -211,6 +211,37 @@ class TrainingPlots:
     def __init__(self, train):
         self._train = train
 
+    def _calc_spacegroups(self, symprec=1e-3):
+        """
+        Calculate space groups of all structures.
+
+        Args:
+            symprec (float): symmetry precision given to spglib
+
+        Returns:
+            DataFrame: contains columns 'crystal_system' (str) and 'space_group' (int) for each structure
+        """
+        def get_crystal_system(num):
+            if num in range(1,3):
+                return "triclinic"
+            elif num in range(3, 16):
+                return "monoclinic"
+            elif num in range(16, 75):
+                return "orthorombic"
+            elif num in range(75, 143):
+                return "trigonal"
+            elif num in range(143, 168):
+                return "tetragonal"
+            elif num in range(168, 195):
+                return "hexagonal"
+            elif num in range(195, 230):
+                return "cubic"
+
+        def extract(s):
+            spg = s.get_symmetry(symprec=symprec).spacegroup["Number"]
+            return {'space_group': spg, 'crystal_system': get_crystal_system(spg)}
+
+        return pd.DataFrame(map(extract, self._train.iter_structures()))
 
     def cell(self):
         """
@@ -286,27 +317,7 @@ class TrainingPlots:
                        for each structure in `train`
         """
 
-        def get_crystal_system(num):
-            if num in range(1,3):
-                return "triclinic"
-            elif num in range(3, 16):
-                return "monoclinic"
-            elif num in range(16, 75):
-                return "orthorombic"
-            elif num in range(75, 143):
-                return "trigonal"
-            elif num in range(143, 168):
-                return "tetragonal"
-            elif num in range(168, 195):
-                return "hexagonal"
-            elif num in range(195, 230):
-                return "cubic"
-
-        def extract(s):
-            spg = s.get_symmetry(symprec=symprec).spacegroup["Number"]
-            return {'space_group': spg, 'crystal_system': get_crystal_system(spg)}
-
-        df = pd.DataFrame(map(extract, self._train.iter_structures()))
+        df = self._calc_spacegroups(symprec=symprec)
         plt.subplot(1, 2, 1)
         plt.hist(df.space_group, bins=230)
         plt.xlabel("Space Group")
@@ -328,14 +339,18 @@ class TrainingPlots:
         plt.xticks(rotation=35)
         return df
 
-    def energy_volume(self):
+    def energy_volume(self, crystal_systems=False):
         """
         Plot volume vs. energy.
 
         Volume and energy are normalized per atom before plotting.
 
+        Args:
+            crystal_systems (bool): if True, plot & label structures of different crystal systems separately.
+
         Returns:
-            DataFrame: contains atomic energy and volumes in the columns 'E' and 'V'
+            DataFrame: contains atomic energy and volumes in the columns 'E' and 'V'; if `crystal_systems` is given,
+                       also contain space groups and crystal systems of each structure
         """
 
         N = self._train.get_array("length")
@@ -343,11 +358,20 @@ class TrainingPlots:
         C = self._train.get_array("cell")
         V = np.linalg.det(C) / N
 
-        plt.scatter(V, E)
+        df = pd.DataFrame({"V": V, "E": E})
+
+        if crystal_systems:
+            spg = self._calc_spacegroups()
+            df = df.join(spg)
+            for cs, dd in df.groupby("crystal_system"):
+                plt.scatter(dd.V, dd.E, label=cs)
+            plt.legend()
+        else:
+            plt.scatter(df.V, df.E)
         plt.xlabel(r"Atomic Volume [$\AA^3$]")
         plt.ylabel(r"Atomic Energy [eV]")
 
-        return pd.DataFrame({"V": V, "E": E})
+        return df
 
 class TrainingStorage(StructureStorage):
     def __init__(self):

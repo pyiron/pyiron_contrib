@@ -32,6 +32,7 @@ from warnings import catch_warnings
 
 import numpy as np
 import pandas as pd
+import seaborn as sns
 import matplotlib.pyplot as plt
 from pyiron_contrib.atomistics.atomistics.job.structurestorage import StructureStorage
 from pyiron_atomistics.atomistics.structure.atoms import Atoms
@@ -373,27 +374,43 @@ class TrainingPlots:
 
         return df
 
-    def coordination(self, max_shells=4, log=True):
+    def coordination(self, num_shells=4, log=True):
         """
         Plot histogram of coordination in neighbor shells.
 
-        Computes one histogram of the number of neighbors in each neighbor shell up to `max_shells` and then plots them
+        Computes one histogram of the number of neighbors in each neighbor shell up to `num_shells` and then plots them
         together.
 
         Args:
-            max_shells (int): maximum shell to plot
+            num_shells (int): maximum shell to plot
             log (float): plot histogram values on a log scale
         """
         shells = self._train.get_array('shells')
-        shell_index = shells[np.newaxis, :, :] == np.arange(1,max_shells)[:, np.newaxis, np.newaxis]
+        shell_index = shells[np.newaxis, :, :] == np.arange(1, num_shells+1)[:, np.newaxis, np.newaxis]
         neigh_count = shell_index.sum(axis=-1)
         ticks = np.arange(neigh_count.min(), neigh_count.max()+1)
         plt.hist(neigh_count.T, bins=ticks-0.5,
-                 log=True, label=[f"{i}." for i in range(1, max_shells+1)])
+                 log=True, label=[f"{i}." for i in range(1, num_shells+1)])
         plt.xticks(ticks)
         plt.xlabel("Number of Neighbors")
         plt.legend(title="Shell")
         plt.title("Neighbor Coordination in Shells")
+
+    def shell_distances(self, num_shells=4):
+        """
+        Plot a violin plot of the neighbor distances in shells up to `num_shells`.
+
+        Args:
+            num_shells (int): maximum shell to plot
+        """
+        dists = self._train.get_array('distances')
+        R = dists.flatten()
+        shells = self._train.get_array('shells')
+        S = shells.ravel()
+        d = pd.DataFrame({"distance": R[S < num_shells + 1], "shells": S[S < num_shells + 1]})
+        sns.violinplot(y=d.shells, x=d.distance, scale='width', orient='h')
+        plt.xlabel(r"Distance [$\AA$]")
+        plt.ylabel("Shell")
 
 class TrainingStorage(StructureStorage):
     def __init__(self):

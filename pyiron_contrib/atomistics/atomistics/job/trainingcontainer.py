@@ -373,6 +373,28 @@ class TrainingPlots:
 
         return df
 
+    def coordination(self, max_shells=4, log=True):
+        """
+        Plot histogram of coordination in neighbor shells.
+
+        Computes one histogram of the number of neighbors in each neighbor shell up to `max_shells` and then plots them
+        together.
+
+        Args:
+            max_shells (int): maximum shell to plot
+            log (float): plot histogram values on a log scale
+        """
+        shells = self._train.get_array('shells')
+        shell_index = shells[np.newaxis, :, :] == np.arange(1,max_shells)[:, np.newaxis, np.newaxis]
+        neigh_count = shell_index.sum(axis=-1)
+        ticks = np.arange(neigh_count.min(), neigh_count.max()+1)
+        plt.hist(neigh_count.T, bins=ticks-0.5,
+                 log=True, label=[f"{i}." for i in range(1, max_shells+1)])
+        plt.xticks(ticks)
+        plt.xlabel("Number of Neighbors")
+        plt.legend(title="Shell")
+        plt.title("Neighbor Coordination in Shells")
+
 class TrainingStorage(StructureStorage):
     def __init__(self):
         super().__init__()

@@ -89,7 +89,7 @@ class Mlip(GenericJob):
         if self.status.finished:
             return pd.DataFrame({
                         "Name": ["".join(elements)],
-                        "Filename": [[self.potential_files[0]]],
+                        "Filename": [self.potential_files],
                         "Model": ["Custom"],
                         "Species": [elements],
                         "Config": [["pair_style mlip mlip.ini\n",

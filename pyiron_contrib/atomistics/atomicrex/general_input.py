@@ -24,7 +24,7 @@ class GeneralARInput(DataContainer):
         name="Atomicrex Job",
         verbosity="medium",
         real_precision = 16,
-        valdiate_potentials = False,
+        validate_potentials = False,
         atom_types = None,
         fit_algorithm = None,
         output_interval = 10000,
@@ -36,7 +36,7 @@ class GeneralARInput(DataContainer):
         self.name = name
         self.verbosity = verbosity
         self.real_precision = real_precision
-        self.validate_potentials = valdiate_potentials
+        self.validate_potentials = validate_potentials
         self.atom_types = AtomTypes()      
         self.fit_algorithm = fit_algorithm
         self.output_interval = output_interval
@@ -64,7 +64,7 @@ class GeneralARInput(DataContainer):
         verbosity.text = self.verbosity
 
         if self.validate_potentials:
-            validate_potentials = ET.SubElement(job, "validate_potentials")
+            validate_potentials = ET.SubElement(job, "validate-potentials")
 
         real_precision = ET.SubElement(job, "real-precision")
         real_precision.text = f"{self.real_precision}"

@@ -10,9 +10,17 @@ construction of high-dimensional neural network potentials developed in the
 group of Prof. Dr. Jörg Behler at Georg-August-Universität Göttingen.
 
 Provides:
-    - PotentialFittingBase (GenericJob):
-    - RunnerInput (DataContainer):
-    - RunnerStructureContainer (StructureStorage):
+    - PotentialFittingBase (GenericJob): Future base class for all fitting
+                                         codes in pyiron. Originally provided
+                                         in the AtomicRex module of
+                                         pyiron_contrib.
+    - RunnerInput (DataContainer):       Storage container for RuNNer settings.
+    - RunnerStructureContainer (StructureStorage): Storage container for
+                                                   RuNNer training datasets.
+
+FIXME:
+At this point, RunnerFit heavily relies on an unpublished version of an ASE
+calculator for RuNNer.
 
 Reference:
     - RuNNer online documentation](https://theochem.gitlab.io/runner)

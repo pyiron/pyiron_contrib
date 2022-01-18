@@ -1,235 +1,436 @@
 # coding: utf-8
-# Copyright (c) Max-Planck-Institut für Eisenforschung GmbH - Computational Materials Design (CM) Department
+# Copyright (c) Max-Planck-Institut für Eisenforschung GmbH - Computational
+# Materials Design (CM) Department
 # Distributed under the terms of "New BSD License", see the LICENSE file.
 
-"""
-Demonstrator job for the RuNNer Neural Network Potential.
-"""
+"""Pyiron Hamiltonian for machine-learning with RuNNer.
 
-import os.path
-from glob import glob
+The RuNNer Neural Network Energy Representation is a framework for the
+construction of high-dimensional neural network potentials developed in the
+group of Prof. Dr. Jörg Behler at Georg-August-Universität Göttingen.
 
-from pyiron_base import state, GenericJob, Executable, DataContainer
+Provides:
+    - PotentialFittingBase (GenericJob):
+    - RunnerInput (DataContainer):
+    - RunnerStructureContainer (StructureStorage):
+
+Reference:
+    - RuNNer online documentation](https://theochem.gitlab.io/runner)
+"""
 
 import numpy as np
-import pandas as pd
 
-__author__ = "Marvin Poul"
-__copyright__ = "Copyright 2020, Max-Planck-Institut für Eisenforschung GmbH - " \
-                "Computational Materials Design (CM) Department"
-__version__ = "0.1"
-__maintainer__ = "Marvin Poul"
-__email__ = "poul@mpie.de"
-__status__ = "development"
-__date__ = "March 3, 2021"
+from ase import Atoms
+import ase.io.runner.runner as io
+from ase.calculators.runner.runner import Runner, DEFAULT_PARAMETERS
+from ase.calculators.runner.runnersinglepoint import RunnerSinglePointCalculator
 
-AngstromToBohr = 1.88972612
-ElectronVoltToHartree = 0.03674932218
+from pyiron_base import state, GenericJob, Executable, DataContainer
+from pyiron_atomistics.atomistics.structure.structurestorage import StructureStorage
+from pyiron_atomistics.atomistics.structure.atoms import pyiron_to_ase, ase_to_pyiron
+
+__author__ = 'Alexander Knoll'
+__copyright__ = 'Copyright 2021, Georg-August-Universität Göttingen - Behler '\
+                'Group'
+__version__ = '0.1'
+__maintainer__ = 'Alexander Knoll'
+__email__ = 'alexander.knoll@chemie.uni-goettingen.de'
+__status__ = 'development'
+__date__ = 'January 7, 2022'
 
 
-class RunnerFit(GenericJob):
+class PotentialFittingBase(GenericJob):
+    """FIXME: Class copied from AtomicRex in pyiron_contrib."""
+
     def __init__(self, project, job_name):
-        super().__init__(project, job_name) 
-        self._training_ids = []
+        """Initialize the class.
 
-        self.input = DataContainer(table_name="input")
-        self.input.element = "Cu"
+        Args:
+            project (FIXME): The project container in which the job is created.
+            job_name (str):  The label of the job (used for all directories).
+        """
+        super().__init__(project, job_name)
+
+
+class RunnerInput(DataContainer):
+    """Extend the DataContainer class for future customization."""
+
+    __version__ = '0.3.0'
+    __hdf_version__ = '0.3.0'
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the class."""
+        super(RunnerInput, self).__init__(*args, **kwargs)
+
+
+class RunnerStructureContainer(StructureStorage):
+    """Store chemical structures as a Runner training dataset."""
+
+    __version__ = '0.3.0'
+    __hdf_version__ = '0.3.0'
+
+    def __init__(self, project, job_name):
+        """Initialize the class.
+
+        Args:
+            project (FIXME): The project container in which the job is created.
+            job_name (str):  The label of the job (used for all directories).
+        """
+        super(RunnerStructureContainer, self).__init__()
+
+    def append(self, structure):
+        """Append `structure` to the class storage."""
+        # If the user appends an ASE Atoms object, try to obtain energies,
+        # forces, etc. and store them.
+        if isinstance(structure, Atoms):
+            struct = ase_to_pyiron(structure)
+            dft_charges = structure.get_initial_charges()
+
+            if structure.calc:
+                dft_energy = structure.calc.get_potential_energy()
+                dft_forces = structure.calc.get_forces()
+
+                # Only RunnerSinglePointCalculator object's store a separate
+                # total charge property. For all other calculators, sum up
+                # the atomic charges.
+                if isinstance(structure.calc, RunnerSinglePointCalculator):
+                    totalcharge = structure.calc.results['totalcharge']
+                else:
+                    totalcharge = np.sum(dft_charges)
+        else:
+            struct = structure
+
+        self.add_structure(
+            struct,
+            dft_energy=dft_energy,
+            dft_forces=dft_forces,
+            dft_charges=dft_charges,
+            totalcharge=totalcharge
+        )
+        return struct
+
+    def to_ase(self):
+        """Convert all attached structures to a list of ASE Atoms objects."""
+        structure_lst = []
+        for idx, structure in enumerate(self.iter_structures()):
+            # Retrieve all properties, i.e. energy, forces, etc.
+            dft_energy = self.get_array('dft_energy', idx)
+            dft_forces = self.get_array('dft_forces', idx)
+            dft_charges = self.get_array('dft_charges', idx)
+            totalcharge = self.get_array('totalcharge', idx)
+
+            # Retrieve atomic positions, cell vectors, etc.
+            atoms = pyiron_to_ase(structure)
+
+            # Attach properties to the Atoms object.
+            atoms.set_initial_charges(dft_charges)
+            atoms.calc = RunnerSinglePointCalculator(
+                atoms=atoms,
+                energy=dft_energy,
+                forces=dft_forces,
+                totalcharge=totalcharge
+            )
+            structure_lst.append(atoms)
+
+        return structure_lst
+
+
+class RunnerFit(PotentialFittingBase):
+    """Generate a potential energy surface using RuNNer.
+
+    The RuNNer Neural Network Energy Representation (RuNNer) is a Fortran code
+    for the generation of high-dimensional neural network potentials actively
+    developed in the group of Prof. Dr. Jörg Behler at Georg-August-Universität
+    Göttingen.
+
+    RuNNer operates in three different modes:
+        - Mode 1: Calculation of symmetry function values. Symmetry functions
+                  are many-body descriptors for the chemical environment of an
+                  atom.
+        - Mode 2: Fitting of the potential energy surface.
+        - Mode 3: Prediction. Use the previously generated high-dimensional
+                  potential energy surface to predict the energy and force
+                  of an unknown chemical configuration.
+
+    The different modes generate a lot of output:
+        - Mode 1:
+            - sfvalues:       The values of the symmetry functions for each
+                              atom.
+            - splittraintest: which structures belong to the training and which
+                              to the testing set. ASE needs this
+                              information to generate the relevant input files
+                              for RuNNer Mode 2.
+        - Mode 2:
+            - weights:        The neural network weights.
+            - scaling:        The symmetry function scaling factors.
+
+        - Mode 3: predict the total energy and atomic forces for a structure.
+
+    Examples:
+    Starting a new calculation (Mode 1):
+
+    ```python
+        from pyiron import Project
+        from job import RunnerFit
+        import ase.io.runner.runner as io
+
+        # Create an empty sample project and a new job.
+        pr = Project(path='example')
+        job = pr.create_job(RunnerFit, 'mode1')
+
+        # Import training dataset and RuNNer settings from RuNNer input.data
+        # and input.nn files using ASE's I/O routines.
+        structures, options = io.read_runnerase('./')
+
+        # Attach the information to the job.
+        job.structures = structures
+        job.input.update(options)
+
+        # Set the RuNNer Mode to 1.
+        job.input.runner_mode = 1
+
+        job.run()
+
+    Restarting Mode 1 and running Mode 2:
+
+    ```python
+        job = Project('example')['mode1'].restart('mode2')
+        job.input.runner_mode = 2
+        job.run()
+    ```
+
+    Restarting Mode 2 and running Mode 3:
+
+    ```python
+        job = Project('runnertest')['mode2'].restart('mode3')
+        job.input.runner_mode = 3
+        job.run()
+    ```
+    """
+
+    __name__ = 'RuNNer'
+    # These properties are needed by RuNNer as input data (depending on the
+    # chosen RuNNer mode).
+    input_properties = ['scaling', 'weights', 'sfvalues', 'splittraintest']
+
+    def __init__(self, project, job_name, **kwargs):
+        """Initialize the class.
+
+        Args:
+            project (FIXME): The project container in which the job is created.
+            job_name (str):  The label of the job (used for all directories).
+        """
+        # Initialize the base class.
+        super(RunnerFit, self).__init__(project, job_name)
+
+        # Prepare data containers for all input and output properties.
+        # The input data container stores all input parameters / settings of
+        # RuNNer and is initially filled with sensible default values
+        # (imported from ASE).
+        self.input = RunnerInput(
+            DEFAULT_PARAMETERS,
+            table_name='input_parameters'
+        )
+        self._structures = RunnerStructureContainer(project, job_name)
+        self.output = DataContainer(table_name='output')
+
+        for prop in self.input_properties:
+            val = kwargs.pop(prop, None)
+            self.__dict__[prop] = DataContainer(val, table_name=prop)
 
         state.publications.add(self.publication)
 
     @property
     def publication(self):
+        """Define relevant publications."""
         return {
-            "runner": [
+            'runner': [
                 {
-                    "title": "First Principles Neural Network Potentials for Reactive Simulations of Large Molecular and Condensed Systems",
-                    "journal": "Angewandte Chemie International Edition",
-                    "volume": "56",
-                    "number": "42",
-                    "year": "2017",
-                    "issn": "1521-3773",
-                    "doi": "10.1002/anie.201703114",
-                    "url": "https://doi.org/10.1002/anie.201703114",
-                    "author": ["Jörg Behler"],
+                    'title': 'First Principles Neural Network Potentials for '
+                             'Reactive Simulations of Large Molecular and '
+                             'Condensed Systems',
+                    'journal': 'Angewandte Chemie International Edition',
+                    'volume': '56',
+                    'number': '42',
+                    'year': '2017',
+                    'issn': '1521-3773',
+                    'doi': '10.1002/anie.201703114',
+                    'url': 'https://doi.org/10.1002/anie.201703114',
+                    'author': ['Jörg Behler'],
                 },
                 {
-                    "title": "Constructing high‐dimensional neural network potentials: A tutorial review",
-                    "journal": "International Journal of Quantum Chemistry",
-                    "volume": "115",
-                    "number": "16",
-                    "year": "2015",
-                    "issn": "1097-461X",
-                    "doi": "10.1002/qua.24890",
-                    "url": "https://doi.org/10.1002/qua.24890",
-                    "author": ["Jörg Behler"],
+                    'title': 'Constructing high‐dimensional neural network'
+                             'potentials: A tutorial review',
+                    'journal': 'International Journal of Quantum Chemistry',
+                    'volume': '115',
+                    'number': '16',
+                    'year': '2015',
+                    'issn': '1097-461X',
+                    'doi': '10.1002/qua.24890',
+                    'url': 'https://doi.org/10.1002/qua.24890',
+                    'author': ['Jörg Behler'],
                 },
                 {
-                    "title": "Generalized Neural-Network Representation of High-Dimensional Potential-Energy Surfaces",
-                    "journal": "Physical Review Letters",
-                    "volume": "98",
-                    "number": "14",
-                    "year": "2007",
-                    "issn": "1079-7114",
-                    "doi": "10.1103/PhysRevLett.98.146401",
-                    "url": "https://doi.org/10.1103/PhysRevLett.98.146401",
-                    "author": ["Jörg Behler", "Michelle Parrinello"],
+                    'title': 'Generalized Neural-Network Representation of '
+                             'High-Dimensional Potential-Energy Surfaces',
+                    'journal': 'Physical Review Letters',
+                    'volume': '98',
+                    'number': '14',
+                    'year': '2007',
+                    'issn': '1079-7114',
+                    'doi': '10.1103/PhysRevLett.98.146401',
+                    'url': 'https://doi.org/10.1103/PhysRevLett.98.146401',
+                    'author': ['Jörg Behler', 'Michelle Parrinello'],
                 },
             ]
         }
 
-    def add_job_to_fitting(self, job):
-        """
-        Add a job to the training database.  Currently only :class:`.TrainingContainer` are supported.
+    @property
+    def structures(self):
+        """Store a dataset consisting of many chemical structures."""
+        return self._structures
+
+    @structures.setter
+    def structures(self, structures):
+        """Store a dataset consisting of many chemical structures.
 
         Args:
-            job (:class:`.TrainingContainer`): job to add to database
+            structures (list): A list of ASE Atoms objects or Pyiron Atoms
+                               objects which are to be stored.
         """
-        self._training_ids.append(job.id)
+        for structure in structures:
+            self._structures.append(structure)
 
     def write_input(self):
-        with open(os.path.join(self.working_directory, "input.data"), "w") as f:
-            for id in self._training_ids:
-                container = self.project.load(id)
-                for atoms, energy, forces, _ in zip(*container.to_list()):
-                    f.write("begin\n")
-                    c = np.array(atoms.cell) * AngstromToBohr
-                    f.write(f"lattice {c[0][0]:13.08f} {c[0][1]:13.08f} {c[0][2]:13.08f}\n")
-                    f.write(f"lattice {c[1][0]:13.08f} {c[1][1]:13.08f} {c[1][2]:13.08f}\n")
-                    f.write(f"lattice {c[2][0]:13.08f} {c[2][1]:13.08f} {c[2][2]:13.08f}\n")
-                    p = atoms.positions * AngstromToBohr
-                    ff = forces * ElectronVoltToHartree / AngstromToBohr
-                    for i in range(len(atoms)):
-                        f.write(f"atom {p[i, 0]:13.08f} {p[i, 1]:13.08f} {p[i, 2]:13.08f}")
-                        f.write(f" {atoms.elements[i].Abbreviation} 0.0 0.0")
-                        f.write(f" {ff[i, 0]:13.08f} {ff[i, 1]:13.08f} {ff[i, 2]:13.08f}\n")
-                    f.write(f"energy {energy * ElectronVoltToHartree}\n")
-                    f.write("charge 0.0\nend\n")
+        """Write the relevant job input files.
 
-        with open(os.path.join(self.working_directory, "input.nn"), "w") as f:
-            f.write(input_template.format(element=self.input.element))
-
-    @property
-    def lammps_potential(self):
+        This routine writes the input files for the job using the ASE Runner
+        calculator.
         """
-        :class:`pandas.DataFrame`: dataframe compatible with :attribute:`.LammpsInteractive.potential`
-        """
-        if not self.status.finished:
-            raise RuntimeError("Job must have successfully finished before potential files can be copied!")
-        weight_file = glob(f'{self.working_directory}/weights.*.data')[0]
-        return pd.DataFrame({
-                    'Name': ['RuNNer-Cu'],
-                    'Filename': [[f'{self.working_directory}/input.nn',
-                                  weight_file,
-                                  f'{self.working_directory}/scaling.data']],
-                    'Model': ['RuNNer'],
-                    'Species': [['Cu']],
-                    'Config': [['pair_style nnp dir "./" showew no showewsum 0 resetew no maxew 100 cflength 1.8897261328 cfenergy 0.0367493254 emap "1:Cu"\n',
-                                'pair_coeff * * 12\n']]
-                  })
+        # Create an ASE Runner calculator object.
+        # Pay attention to the different name: `structures` --> `dataset`.
+        calc = Runner(
+            label='pyiron',
+            dataset=self.structures.to_ase(),
+            scaling=self.scaling.to_builtin(),
+            weights=self.weights.to_builtin(),
+            sfvalues=self.sfvalues.to_builtin(),
+            splittraintest=self.splittraintest.to_builtin(),
+            **self.input.to_builtin()
+        )
 
-    def collect_output(self):
-        pass
+        # If no dataset were attached to the calculator, the single structure
+        # stored as the atoms property would be written instead.
+        atoms = calc.dataset or calc.atoms
+        calc.directory = self.working_directory
 
-    # To link to the executable from the notebook
-    def _executable_activate(self, enforce=False):     
+        # Set the 'flags' which ASE uses to see which input files are written.
+        targets = {1: 'sfvalues', 2: 'fit', 3: 'energy'}
+        system_changes = None  # Always perform a new calculation.
+
+        calc.write_input(
+            atoms,
+            targets[self.input.runner_mode],
+            system_changes
+        )
+
+    def _executable_activate(self, enforce=False):
+        """Link to the Runner executable."""
         if self._executable is None or enforce:
             self._executable = Executable(
-                codename="runner", module="runner", path_binary_codes=state.settings.resource_paths
+                codename='runner',
+                module='runner',
+                path_binary_codes=state.settings.resource_paths
             )
 
-input_template = """### ####################################################################################################################
-### This is the input file for the RuNNer tutorial (POTENTIALS WORKSHOP 2021-03-10) 
-### This input file is intended for release version 1.2
-### RuNNer is hosted at www.gitlab.com. The most recent version can only be found in this repository.
-### For access please contact Prof. Jörg Behler, joerg.behler@uni-goettingen.de
-###
-### ####################################################################################################################
-### General remarks: 
-### - commands can be switched off by using the # character at the BEGINNING of the line
-### - the input file can be structured by blank lines and comment lines
-### - the order of the keywords is arbitrary
-### - if keywords are missing, default values will be used and written to runner.out
-### - if mandatory keywords or keyword options are missing, RuNNer will stop with an error message 
-###
-########################################################################################################################
-########################################################################################################################
-### The following keywords just represent a subset of the keywords offered by RuNNer
-########################################################################################################################
-########################################################################################################################
+    def collect_output(self):
+        """Read and store the job results."""
+        # Compose job label (needed by the ASE I/O routines) and store dir.
+        label = f'{self.working_directory}/mode{self.input.runner_mode}'
+        directory = self.working_directory
 
-########################################################################################################################
-### general keywords
-########################################################################################################################
-nn_type_short 1                           # 1=Behler-Parrinello
-runner_mode 1                             # 1=calculate symmetry functions, 2=fitting mode, 3=predicition mode
-number_of_elements 1                      # number of elements
-elements {element}                               # specification of elements
-random_seed 10                            # integer seed for random number generator                         
-random_number_type 6                      # 6 recommended       
+        # If successful, RuNNer Mode 1 returns symmetry function values for
+        # each structure and the information, which structure belongs to the
+        # training and which to the testing set.
+        if self.input.runner_mode == 1:
+            sfvalues, splittraintest = io.read_results_mode1(label, directory)
+            self.output.sfvalues = sfvalues
+            self.output.splittraintest = splittraintest
 
-########################################################################################################################
-### NN structure of the short-range NN  
-########################################################################################################################
-use_short_nn                              # use NN for short range interactions    
-global_hidden_layers_short 2              # number of hidden layers               
-global_nodes_short 15 15                  # number of nodes in hidden layers     
-global_activation_short t t l             # activation functions  (t = hyperbolic tangent, l = linear)              
+        # If successful, RuNNer Mode 2 returns the weights of the atomic neural
+        # networks, the symmetry function scaling data, and the results of the
+        # fitting process.
+        if self.input.runner_mode == 2:
+            fitresults, weights, scaling = io.read_results_mode2(
+                label,
+                directory
+            )
+            self.output.fitresults = fitresults
+            self.output.weights = weights
+            self.output.scaling = scaling
 
-########################################################################################################################
-### symmetry function generation ( mode 1): 
-########################################################################################################################
-test_fraction 0.10000                     # threshold for splitting between fitting and test set 
+        # If successful, RuNNer Mode 3 returns the energy and forces of the
+        # structure for which it was executed.
+        if self.input.runner_mode == 3:
+            atoms, energy, forces = io.read_results_mode3(label, directory)
+            self.output.energy = energy
+            self.output.forces = forces
 
-########################################################################################################################
-### symmetry function definitions (all modes): 
-########################################################################################################################
-cutoff_type 1
-symfunction_short {element}  2 {element}     0.000000      0.000000     12.000000
-symfunction_short {element}  2 {element}     0.006000      0.000000     12.000000
-symfunction_short {element}  2 {element}     0.016000      0.000000     12.000000
-symfunction_short {element}  2 {element}     0.040000      0.000000     12.000000
-symfunction_short {element}  2 {element}     0.109000      0.000000     12.000000
+        # Store all calculation rsults in the project's HDF5 file.
+        self.to_hdf()
 
-symfunction_short {element}  3 {element} {element}     0.00000       1.000000      1.000000     12.000000
-symfunction_short {element}  3 {element} {element}     0.00000       1.000000      2.000000     12.000000
-symfunction_short {element}  3 {element} {element}     0.00000       1.000000      4.000000     12.000000
-symfunction_short {element}  3 {element} {element}     0.00000       1.000000     16.000000     12.000000
-symfunction_short {element}  3 {element} {element}     0.00000      -1.000000      1.000000     12.000000
-symfunction_short {element}  3 {element} {element}     0.00000      -1.000000      2.000000     12.000000
-symfunction_short {element}  3 {element} {element}     0.00000      -1.000000      4.000000     12.000000
-symfunction_short {element}  3 {element} {element}     0.00000      -1.000000     16.000000     12.000000
+    def to_hdf(self, hdf=None, group_name=None):
+        """
+        Store all job information in HDF5 format.
 
-########################################################################################################################
-### fitting (mode 2):general inputs for short range AND electrostatic part:
-########################################################################################################################
-epochs 20                                 # number of epochs                                     
-fitting_unit eV                           # unit for error output in mode 2 (eV or Ha)
-precondition_weights                      # optional precondition initial weights 
+        Args:
+            hdf (ProjectHDFio, optional): HDF5-object which contains the
+                                          project data.
+            group_name (str, optional):   Subcontainer name.
+        """
+        super().to_hdf(hdf=hdf, group_name=group_name)
 
-########################################################################################################################
-### fitting options ( mode 2): short range part only:
-########################################################################################################################
-short_energy_error_threshold 0.10000      # threshold of adaptive Kalman filter short E         
-short_force_error_threshold 1.00000       # threshold of adaptive Kalman filter short F        
-kalman_lambda_short 0.98000               # Kalman parameter short E/F, do not change                        
-kalman_nue_short 0.99870                  # Kalman parameter short E/F, do not change                      
-use_short_forces                          # use forces for fitting                         
-repeated_energy_update                    # optional: repeat energy update for each force update   
-mix_all_points                            # do not change                    
-scale_symmetry_functions                  # optional
-center_symmetry_functions                 # optional 
-short_force_fraction 0.01                 #
-force_update_scaling -1.0                 #  
+        self.input.to_hdf(hdf=self.project_hdf5)
+        self.structures.to_hdf(hdf=self.project_hdf5)
+        self.output.to_hdf(hdf=self.project_hdf5)
 
-########################################################################################################################
-### output options for mode 2 (fitting):  
-########################################################################################################################
-write_trainpoints                         # write trainpoints.out and testpoints.out files      
-write_trainforces                         # write trainforces.out and testforces.out files    
+    def from_hdf(self, hdf=None, group_name=None):
+        """
+        Reload all job information from HDF5 format.
 
-########################################################################################################################
-### output options for mode 3 (prediction):  
-########################################################################################################################
-calculate_forces                          # calculate forces    
-calculate_stress                          # calculate stress tensor 
-"""
+        Args:
+            hdf (ProjectHDFio, optional): HDF5-object which contains the
+                                          project data.
+            group_name (str, optional):   Subcontainer name.
+        """
+        super().from_hdf(hdf=hdf, group_name=group_name)
+
+        self.input.from_hdf(hdf=self.project_hdf5)
+        self.structures.from_hdf(hdf=self.project_hdf5)
+        self.output.from_hdf(hdf=self.project_hdf5)
+
+    def restart(self, *args, **kwargs):
+        """
+        Reload all calculation details.
+
+        This procedure extends the base class `restart()` by setting results
+        from previous calculations as input parameters to the new calculation.
+        The recognized properties depend on the class variable
+        self.input_properties (see class docstring for further details).
+
+        Returns:
+            new_ham (RunnerFit): the newly created RunnerFit object.
+        """
+        # Call the base class routine to generate the new Hamiltonian, which is
+        # a RunnerFit class instance.
+        # At this point, the Hamiltonian holds the input parameters,
+        # structures, and outputs of the previous calculation. However, it
+        # cannot access the relevant properties as input values which is
+        # necessary for starting a new calculation.
+        new_ham = super(RunnerFit, self).restart(*args, **kwargs)
+
+        for prop in self.input_properties:
+            if prop in self.output.keys():
+                new_ham.__dict__[prop] = DataContainer(self.output[prop])
+
+        return new_ham

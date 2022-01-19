@@ -17,7 +17,8 @@ class PotentialFit(abc.ABC):
     (at least) corresponding energies and forces, but additional (per structure or atom) maybe added.  Subclasses of
     :class:`~.TrainingContainer` that define and handle such data are explicitly allowed.
 
-    :property:`~.training_data` and :property:`~.predicted_data` can be used to access 
+    :property:`~.training_data` and :property:`~.predicted_data` can be used to access the initial training data and the
+    predicted data on them after the fit.
     """
 
     @abc.abstractmethod

@@ -385,6 +385,10 @@ class TrainingPlots:
             num_shells (int): maximum shell to plot
             log (float): plot histogram values on a log scale
         """
+        if not self._train.has_array("shells"):
+            raise ValueError(
+                    "TrainingContainer contains no neighbor information, call TrainingContainer.get_neighbors first!"
+            )
         shells = self._train.get_array('shells')
         shell_index = shells[np.newaxis, :, :] == np.arange(1, num_shells+1)[:, np.newaxis, np.newaxis]
         neigh_count = shell_index.sum(axis=-1)
@@ -403,6 +407,10 @@ class TrainingPlots:
         Args:
             num_shells (int): maximum shell to plot
         """
+        if not self._train.has_array("shells") or not self._train.has_array("distances"):
+            raise ValueError(
+                    "TrainingContainer contains no neighbor information, call TrainingContainer.get_neighbors first!"
+            )
         dists = self._train.get_array('distances')
         R = dists.flatten()
         shells = self._train.get_array('shells')

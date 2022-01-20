@@ -41,14 +41,23 @@ class LammpsMlip(LammpsInteractive):
             self.input.mlip['mtp-filename'] = os.path.basename(self.potential['Filename'][0][0])
         self.input.mlip.write_file(file_name="mlip.ini", cwd=self.working_directory)
 
-    def enable_active_learning(self, threshold=2.0, threshold_break=5.0, filename='selected.cfg'):
+    def enable_active_learning(self, threshold=2.0, threshold_break=5.0):
+        """
+        Enable active learning during MD run.
+
+        Automatically collect structures on which the potential is extrapolating.
+
+        Args:
+            threshold (float): select structures with extrapolation grade larger than this
+            threshold_break (float): stop the MD run after seeing a structure with extrapolation grade larger than this
+        """
         self.input.mlip.load_string(f"""\
 mtp-filename auto
 calculate-efs TRUE
 select TRUE
 select:threshold {threshold}
 select:threshold-break {threshold_break}
-select:save-selected {filename}
+select:save-selected selected.cfg
 select:load-state state.mvs
 select:log selection.log
 write-cfgs:skip 0

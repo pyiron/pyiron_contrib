@@ -42,6 +42,11 @@ class LammpsMlip(LammpsInteractive):
             self.input.mlip['mtp-filename'] = os.path.basename(self.potential['Filename'][0][0])
         self.input.mlip.write_file(file_name="mlip.ini", cwd=self.working_directory)
 
+    def convergence_check(self):
+        for line in self["error.msg"]:
+            if line.startswith("MLIP: Breaking threshold exceeded"): return False
+        return True
+
     def enable_active_learning(self, threshold=2.0, threshold_break=5.0):
         """
         Enable active learning during MD run.
@@ -52,6 +57,7 @@ class LammpsMlip(LammpsInteractive):
             threshold (float): select structures with extrapolation grade larger than this
             threshold_break (float): stop the MD run after seeing a structure with extrapolation grade larger than this
         """
+        self.executable.accepted_return_codes += [8]
         self.input.mlip.load_string(f"""\
 mtp-filename auto
 calculate-efs TRUE

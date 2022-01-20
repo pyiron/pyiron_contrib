@@ -45,7 +45,7 @@ class LammpsMlip(LammpsInteractive):
         self.input.mlip.write_file(file_name="mlip.ini", cwd=self.working_directory)
 
     def convergence_check(self):
-        for line in self["error.msg"]:
+        for line in self["error.out"]:
             if line.startswith("MLIP: Breaking threshold exceeded"): return False
         return True
 

@@ -80,7 +80,8 @@ write-cfgs:skip 0
                 selected = StructureStorage()
                 for cfg in loadcfgs(file_name):
                     selected.add_structure(
-                            Atoms(species=self.structure.species, indices=cfg.types, positions=cfg.pos, cell=cfg.lat)
+                            Atoms(species=self.structure.species, indices=cfg.types, positions=cfg.pos, cell=cfg.lat,
+                                  pbc=[True, True, True])
                     )
                 selected.to_hdf(self.project_hdf5.open("output"), "selected")
                 cell, positions, forces, stress, energy, indicies, grades, jobids, timesteps = read_cgfs(file_name=file_name)

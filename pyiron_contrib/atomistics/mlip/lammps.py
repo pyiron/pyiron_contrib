@@ -6,6 +6,7 @@ import os
 from pyiron.lammps.base import Input
 from pyiron.lammps.interactive import LammpsInteractive
 from pyiron_contrib.atomistics.mlip.mlip import read_cgfs
+from pyiron_contrib.atomistics.mlip.cfgs import loadcfgs
 from pyiron_base import GenericParameters
 
 __author__ = "Jan Janssen"
@@ -68,6 +69,12 @@ write-cfgs:skip 0
         if 'select:save-selected' in self.input.mlip._dataset['Parameter']:
             file_name = os.path.join(self.working_directory, self.input.mlip['select:save-selected'])
             if os.path.exists(file_name):
+                selected = StructureStorage()
+                for cfg in loadcfgs(file_name):
+                    selected.add_structure(
+                            Atoms(species=self.structure.species, indices=cfg.types, positions=cfg.pos, cell=cfg.lat)
+                    )
+                selected.to_hdf(self.project_hdf5.open("output"), "selected")
                 cell, positions, forces, stress, energy, indicies, grades, jobids, timesteps = read_cgfs(file_name=file_name)
                 with self.project_hdf5.open("output/mlip") as hdf5_output:
                     hdf5_output['forces'] = forces

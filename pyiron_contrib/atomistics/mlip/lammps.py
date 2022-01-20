@@ -3,8 +3,10 @@
 # Distributed under the terms of "New BSD License", see the LICENSE file.
 
 import os
-from pyiron.lammps.base import Input
-from pyiron.lammps.interactive import LammpsInteractive
+from pyiron_atomistics.lammps.base import Input
+from pyiron_atomistics.lammps.interactive import LammpsInteractive
+from pyiron_atomistics.atomistics.structure.atoms import Atoms
+from pyiron_atomistics.atomistics.structure.structurestorage import StructureStorage
 from pyiron_contrib.atomistics.mlip.mlip import read_cgfs
 from pyiron_contrib.atomistics.mlip.cfgs import loadcfgs
 from pyiron_base import GenericParameters

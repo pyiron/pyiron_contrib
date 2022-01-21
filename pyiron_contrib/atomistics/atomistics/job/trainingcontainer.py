@@ -231,7 +231,7 @@ class TrainingContainer(GenericJob, HasStructure):
         """
         :class:`.TrainingPlots`: plotting interface
         """
-        return TrainingPlots(self)
+        return TrainingPlots(self._container)
 
 class TrainingPlots:
     """
@@ -262,8 +262,8 @@ class TrainingPlots:
                             - V: volume of the cell
                             - N: number of atoms in the cell
         """
-        N = self._train._container.get_array("length")
-        C = self._train._container.get_array("cell")
+        N = self._train.get_array("length")
+        C = self._train.get_array("cell")
 
         def get_angle(cell, idx=0):
             return np.arccos(np.dot(cell[idx], cell[(idx+1)%3]) \
@@ -294,12 +294,12 @@ class TrainingPlots:
 
         plt.subplot(1, 4, 3)
         plt.title("Lattice Vector Lengths")
-        plt.hist([df.a, df.b, df.c], log=True);
+        plt.hist([df.a, df.b, df.c], log=True)
         plt.xlabel(r"$a,b,c$ [$\AA$]")
 
         plt.subplot(1, 4, 4)
         plt.title("Lattice Vector Angles")
-        plt.hist([df.alpha, df.beta, df.gamma], log=True);
+        plt.hist([df.alpha, df.beta, df.gamma], log=True)
         plt.xlabel(r"$\alpha,\beta,\gamma$")
 
         return df
@@ -338,7 +338,7 @@ class TrainingPlots:
             spg = s.get_symmetry(symprec=symprec).spacegroup["Number"]
             return {'space_group': spg, 'crystal_system': get_crystal_system(spg)}
 
-        df = pd.DataFrame(map(extract, self._train._container.iter_structures()))
+        df = pd.DataFrame(map(extract, self._train.iter_structures()))
         plt.subplot(1, 2, 1)
         plt.hist(df.space_group, bins=230)
         plt.xlabel("Space Group")
@@ -370,9 +370,9 @@ class TrainingPlots:
             DataFrame: contains atomic energy and volumes in the columns 'E' and 'V'
         """
 
-        N = self._train._container.get_array("length")
-        E = self._train._container.get_array("energy") / N
-        C = self._train._container.get_array("cell")
+        N = self._train.get_array("length")
+        E = self._train.get_array("energy") / N
+        C = self._train.get_array("cell")
         V = np.linalg.det(C) / N
 
         plt.scatter(V, E)

@@ -10,7 +10,8 @@ from numpy import ndarray
 from pyiron_base import state, DataContainer
 from pyiron_atomistics import Atoms, ase_to_pyiron
 
-from pyiron_atomistics.atomistics.structure.structurestorage import StructureStorage
+from pyiron_atomistics.atomistics.structure.structurestorage import StructureStorage 
+from pyiron_contrib.atomistics.atomistics.job.trainingcontainer import TrainingPlots
 from pyiron_contrib.atomistics.atomicrex.fit_properties import ARFitPropertyList, ARFitProperty
 from pyiron_contrib.atomistics.atomicrex.utility_functions import write_pretty_xml
 from pyiron_contrib.atomistics.atomicrex.fit_properties import FlattenedARScalarProperty, FlattenedARVectorProperty
@@ -42,6 +43,7 @@ class ARStructureContainer:
                     break
         except:
             pass
+        self._prepared_plotting = False
 
     def add_structure(
         self,
@@ -418,6 +420,19 @@ class ARStructureContainer:
                         len_struct = self._structures._per_chunk_arrays["length"][s_index]
                         final_forces = np.empty((len_struct, 3))
     
+    @property
+    def plot(self):
+        """
+        :class:`.TrainingPlots`: plotting interface
+        """
+        return TrainingPlots(self._structures)
+
+    def prepare_plotting(self, final_values=False):
+        val_str = "target_val"
+        if final_values:
+            val_str = "final_val"
+        self._structures._per_chunk_arrays["energy"] = self.fit_properties["atomic-energy"]._per_chunk_arrays[val_str] * self._structures.length
+        
 
 ### This is probably useless like this in most cases because forces can't be passed.
 def user_structure_to_xml_element(structure):

@@ -29,6 +29,7 @@ class LammpsMlip(LammpsInteractive):
         self.__version__ = None  # Reset the version number to the executable is set automatically
         self._executable = None
         self._executable_activate()
+        self._selected_structures = None
 
     def set_input_to_read_only(self):
         """
@@ -72,18 +73,35 @@ select:log selection.log
 write-cfgs:skip 0
 """)
 
+    def _get_selection_file(self):
+        return os.path.join(self.working_directory, self.input.mlip['select:save-selected'])
+
+    @property
+    def selected_structures(self):
+        """
+        :class:`.StructureStorage`: structures that the potential extrapolated on during the run.
+
+        Only available if :method:`.enable_active_learning` was called and once the job has been collected.
+        """
+        if not (self.status.finished or self.status.not_converged):
+            raise ValueError("Selected structures are only available once the job has finished!")
+        if not os.path.exists(self._get_selection_file()):
+            raise ValueError("Selected structures are only available after calling enable_active_learning()!")
+        if self._selected_structures is None:
+            self._selected_structures = StructureStorage()
+        return self._selected_structures
+
     def collect_output(self):
         super(LammpsMlip, self).collect_output()
         if 'select:save-selected' in self.input.mlip._dataset['Parameter']:
-            file_name = os.path.join(self.working_directory, self.input.mlip['select:save-selected'])
+            file_name = self._get_selection_file()
             if os.path.exists(file_name):
-                selected = StructureStorage()
                 for cfg in loadcfgs(file_name):
-                    selected.add_structure(
+                    self.selected_structures.add_structure(
                             Atoms(species=self.structure.species, indices=cfg.types, positions=cfg.pos, cell=cfg.lat,
                                   pbc=[True, True, True])
                     )
-                selected.to_hdf(self.project_hdf5.open("output"), "selected")
+                selected_structures.to_hdf(self.project_hdf5.open("output"), "selected")
                 cell, positions, forces, stress, energy, indicies, grades, jobids, timesteps = read_cgfs(file_name=file_name)
                 with self.project_hdf5.open("output/mlip") as hdf5_output:
                     hdf5_output['forces'] = forces

@@ -77,6 +77,10 @@ write-cfgs:skip 0
         return os.path.join(self.working_directory, self.input.mlip['select:save-selected'])
 
     @property
+    def _selection_enabled(self):
+        return self.input.mlip["select"] == "TRUE"
+
+    @property
     def selected_structures(self):
         """
         :class:`.StructureStorage`: structures that the potential extrapolated on during the run.
@@ -85,7 +89,7 @@ write-cfgs:skip 0
         """
         if not (self.status.finished or self.status.not_converged):
             raise ValueError("Selected structures are only available once the job has finished!")
-        if not os.path.exists(self._get_selection_file()):
+        if self._selection_enabled:
             raise ValueError("Selected structures are only available after calling enable_active_learning()!")
         if self._selected_structures is None:
             self._selected_structures = StructureStorage()
@@ -101,7 +105,6 @@ write-cfgs:skip 0
                             Atoms(species=self.structure.species, indices=cfg.types, positions=cfg.pos, cell=cfg.lat,
                                   pbc=[True, True, True])
                     )
-                selected_structures.to_hdf(self.project_hdf5.open("output"), "selected")
                 cell, positions, forces, stress, energy, indicies, grades, jobids, timesteps = read_cgfs(file_name=file_name)
                 with self.project_hdf5.open("output/mlip") as hdf5_output:
                     hdf5_output['forces'] = forces
@@ -110,6 +113,7 @@ write-cfgs:skip 0
                     hdf5_output['cells'] = cell
                     hdf5_output['positions'] = positions
                     hdf5_output['indicies'] = indicies
+            self.selected_structures.to_hdf(self.project_hdf5.open("output"), "selected")
 
 
 class MlipInput(Input):

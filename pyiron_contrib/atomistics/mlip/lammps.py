@@ -87,9 +87,9 @@ write-cfgs:skip 0
 
         Only available if :method:`.enable_active_learning` was called and once the job has been collected.
         """
-        if not (self.status.finished or self.status.not_converged):
+        if not (self.status.collect or self.status.finished or self.status.not_converged):
             raise ValueError("Selected structures are only available once the job has finished!")
-        if self._selection_enabled:
+        if not self._selection_enabled:
             raise ValueError("Selected structures are only available after calling enable_active_learning()!")
         if self._selected_structures is None:
             self._selected_structures = StructureStorage()

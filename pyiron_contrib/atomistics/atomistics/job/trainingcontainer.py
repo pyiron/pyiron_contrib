@@ -48,7 +48,7 @@ class TrainingContainer(GenericJob, HasStructure):
     def __init__(self, project, job_name):
         super().__init__(project=project, job_name=job_name)
         self.__name__ = "TrainingContainer"
-        self.__hdf_version__ = "0.2.0"
+        self.__hdf_version__ = "0.3.0"
         self._container = TrainingStorage()
 
         self.input = DataContainer({
@@ -58,7 +58,7 @@ class TrainingContainer(GenericJob, HasStructure):
 
     @property
     def _table(self):
-        return self._container._table_cache
+        return self._container._table
 
     def include_job(self, job, iteration_step=-1):
         """

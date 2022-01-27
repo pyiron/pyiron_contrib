@@ -37,7 +37,7 @@ from pyiron_contrib.atomistics.atomistics.job.structurestorage import StructureS
 from pyiron_atomistics.atomistics.structure.atoms import Atoms
 from pyiron_atomistics.atomistics.structure.has_structure import HasStructure
 from pyiron_atomistics.atomistics.structure.neighbors import NeighborsTrajectory
-from pyiron_base import GenericJob, DataContainer
+from pyiron_base import GenericJob, DataContainer, deprecate
 
 
 class TrainingContainer(GenericJob, HasStructure):
@@ -66,6 +66,7 @@ class TrainingContainer(GenericJob, HasStructure):
         """
         self._container.include_job(job, iteration_step)
 
+    @deprecate("Use add_structure instead")
     def include_structure(self, structure, energy, forces=None, stress=None, name=None):
         """
         Add new structure to structure list and save energy and forces with it.
@@ -80,7 +81,7 @@ class TrainingContainer(GenericJob, HasStructure):
             stress (6 array of float, optional): per structure stresses in voigt notation
             name (str, optional): name describing the structure
         """
-        self._container.include_structure(structure, energy, forces, stress, name)
+        self._container.add_structure(structure, energy, forces, stress, name)
 
     def include_dataset(self, dataset):
         """
@@ -424,6 +425,7 @@ class TrainingStorage(StructureStorage):
                                energy=energy, forces=forces, stress=stress,
                                name=job.name)
 
+    @deprecate("Use add_structure instead")
     def include_structure(self, structure, energy, forces=None, stress=None, name=None):
         """
         Add new structure to structure list and save energy and forces with it.
@@ -438,18 +440,23 @@ class TrainingStorage(StructureStorage):
             stress (6 array of float, optional): per structure stresses in voigt notation
             name (str, optional): name describing the structure
         """
+        self.add_structure(structure, energy, identifier=name, forces=forces, stress=stress)
+
+
+    def add_structure(self, structure, energy, identifier=None, forces=None, stress=None, **arrays):
         data = {"energy": energy}
         if forces is not None:
             data["forces"] = forces
         if stress is not None:
             data["stress"] = stress
-        self.add_structure(structure, name, **data)
+        super.add_structure(structure, identifier, **data)
         if self._table_cache:
             self._table = self._table.append(
-                    {"name": name, "atoms": structure, "energy": energy, "forces": forces, "stress": stress,
+                    {"name": identifier, "atoms": structure, "energy": energy, "forces": forces, "stress": stress,
                      "number_of_atoms": len(structure)},
                     ignore_index=True)
 
+        
     def include_dataset(self, dataset):
         """
         Add a pandas DataFrame to the saved structures.

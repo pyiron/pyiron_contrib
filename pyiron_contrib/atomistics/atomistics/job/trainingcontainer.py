@@ -449,7 +449,7 @@ class TrainingStorage(StructureStorage):
             data["forces"] = forces
         if stress is not None:
             data["stress"] = stress
-        super.add_structure(structure, identifier, **data)
+        super().add_structure(structure, identifier, **data)
         if self._table_cache:
             self._table = self._table.append(
                     {"name": identifier, "atoms": structure, "energy": energy, "forces": forces, "stress": stress,

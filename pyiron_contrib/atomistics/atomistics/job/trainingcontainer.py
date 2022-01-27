@@ -56,10 +56,6 @@ class TrainingContainer(GenericJob, HasStructure):
                 "num_neighbors": 12
             }, table_name="parameters")
 
-    @property
-    def _table(self):
-        return self._container._table
-
     def include_job(self, job, iteration_step=-1):
         """
         Add structure, energy and forces from job.
@@ -149,7 +145,7 @@ class TrainingContainer(GenericJob, HasStructure):
         Returns:
             :class:`pandas.DataFrame`: collected structures
         """
-        return self._table
+        return self._container.to_pandas()
 
     def to_list(self, filter_function=None):
         """
@@ -378,6 +374,23 @@ class TrainingStorage(StructureStorage):
             })
             self._table_cache["number_of_atoms"] = [len(s) for s in self._table_cache.atoms]
         return self._table_cache
+
+    def to_pandas(self):
+        """
+        Export list of structure to pandas table for external fitting codes.
+
+        The table contains the following columns:
+            - 'name': human-readable name of the structure
+            - 'ase_atoms': the structure as a :class:`.Atoms` object
+            - 'energy': the energy of the full structure
+            - 'forces': the per atom forces as a :class:`numpy.ndarray`, shape Nx3
+            - 'stress': the per structure stress as a :class:`numpy.ndarray`, shape 6
+            - 'number_of_atoms': the number of atoms in the structure, N
+
+        Returns:
+            :class:`pandas.DataFrame`: collected structures
+        """
+        return self._table
 
     def include_job(self, job, iteration_step=-1):
         """

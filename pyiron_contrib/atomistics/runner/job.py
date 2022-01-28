@@ -58,20 +58,9 @@ class PotentialFittingBase(GenericJob):
         """
         super().__init__(project, job_name)
 
+
 class RunnerStructureContainer(StructureStorage):
     """Store chemical structures as a Runner training dataset."""
-
-    __version__ = '0.3.0'
-    __hdf_version__ = '0.3.0'
-
-    def __init__(self, project, job_name):
-        """Initialize the class.
-
-        Args:
-            project (FIXME): The project container in which the job is created.
-            job_name (str):  The label of the job (used for all directories).
-        """
-        super(RunnerStructureContainer, self).__init__()
 
     def append(self, structure):
         """Append `structure` to the class storage."""

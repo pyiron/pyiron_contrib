@@ -14,7 +14,6 @@ Provides:
                                          codes in pyiron. Originally provided
                                          in the AtomicRex module of
                                          pyiron_contrib.
-    - RunnerInput (DataContainer):       Storage container for RuNNer settings.
     - RunnerStructureContainer (StructureStorage): Storage container for
                                                    RuNNer training datasets.
 
@@ -58,18 +57,6 @@ class PotentialFittingBase(GenericJob):
             job_name (str):  The label of the job (used for all directories).
         """
         super().__init__(project, job_name)
-
-
-class RunnerInput(DataContainer):
-    """Extend the DataContainer class for future customization."""
-
-    __version__ = '0.3.0'
-    __hdf_version__ = '0.3.0'
-
-    def __init__(self, *args, **kwargs):
-        """Initialize the class."""
-        super(RunnerInput, self).__init__(*args, **kwargs)
-
 
 class RunnerStructureContainer(StructureStorage):
     """Store chemical structures as a Runner training dataset."""
@@ -235,7 +222,7 @@ class RunnerFit(PotentialFittingBase):
         # The input data container stores all input parameters / settings of
         # RuNNer and is initially filled with sensible default values
         # (imported from ASE).
-        self.input = RunnerInput(
+        self.input = DataContainer(
             DEFAULT_PARAMETERS,
             table_name='input_parameters'
         )

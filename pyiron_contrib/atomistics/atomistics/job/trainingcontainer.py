@@ -54,6 +54,10 @@ class TrainingContainer(GenericJob, HasStructure):
         self._container.add_array("forces", shape=(3,), dtype=np.float64, per="element")
         # save stress in voigt notation
         self._container.add_array("stress", shape=(6,), dtype=np.float64, per="chunk")
+        # Store total (per-structure) and atomic charge information.
+        self._container.add_array('totalcharge', dtype=np.float64, per='chunk')
+        self._container.add_array("charges", dtype=np.float64, per="element")
+
         self._table_cache = None
 
         self.input = DataContainer({
@@ -71,7 +75,11 @@ class TrainingContainer(GenericJob, HasStructure):
                                         for i in range(len(self._container))],
                 "energy":           [self._container.get_array("energy", i)
                                         for i in range(len(self._container))],
+                "totalcharge":      [self._container.get_array("totalcharge", i)
+                                        for i in range(len(self._container))],
                 "forces":           [self._container.get_array("forces", i)
+                                        for i in range(len(self._container))],
+                "charges":           [self._container.get_array("charges", i)
                                         for i in range(len(self._container))],
                 "stress":           [self._container.get_array("stress", i)
                                         for i in range(len(self._container))],
@@ -93,6 +101,21 @@ class TrainingContainer(GenericJob, HasStructure):
             forces = ff[iteration_step]
         else:
             forces = None
+
+        # Retrieve total charge.
+        tc = job.output.totalcharge
+        if tc is not None:
+            totalcharge = tc[iteration_step]
+        else:
+            totalcharge = None
+
+        # Retrieve atomic charges.
+        cc = job.output.charges
+        if cc is not None:
+            charges = cc[iteration_step]
+        else:
+            charges = None
+
         # HACK: VASP work-around, current contents of pressures are meaningless, correct values are in
         # output/generic/stresses
         pp = job["output/generic/stresses"]
@@ -108,10 +131,11 @@ class TrainingContainer(GenericJob, HasStructure):
                 stress = np.array([stress[0, 0], stress[1 ,1], stress[2, 2],
                                    stress[1, 2], stress[0, 2], stress[0, 1]])
         self.include_structure(job.get_structure(iteration_step=iteration_step),
-                               energy=energy, forces=forces, stress=stress,
+                               energy=energy, totalcharge=totalcharge,
+                               forces=forces, charges=charges, stress=stress,
                                name=job.name)
 
-    def include_structure(self, structure, energy, forces=None, stress=None, name=None):
+    def include_structure(self, structure, energy, totalcharge=None, forces=None, charges=None, stress=None, name=None):
         """
         Add new structure to structure list and save energy and forces with it.
 
@@ -130,10 +154,17 @@ class TrainingContainer(GenericJob, HasStructure):
             data["forces"] = forces
         if stress is not None:
             data["stress"] = stress
+        if totalcharge is not None:
+            data["totalcharge"] = totalcharge
+        if charges is not None:
+            data["charges"] = charges
         self._container.add_structure(structure, name, **data)
         if self._table_cache:
             self._table = self._table.append(
-                    {"name": name, "atoms": structure, "energy": energy, "forces": forces, "stress": stress,
+                    {"name": name, "atoms": structure, "energy": energy,
+                     "totalcharge": totalcharge,
+                     "forces": forces, "charges": charges,
+                     "stress": stress,
                      "number_of_atoms": len(structure)},
                     ignore_index=True)
 
@@ -145,13 +176,18 @@ class TrainingContainer(GenericJob, HasStructure):
             - name: human readable name of the structure
             - atoms(:class:`ase.Atoms`): the atomic structure
             - energy(float): energy of the whole structure
+            - totalcharge(float): charge of the whole structure
             - forces (Nx3 array of float): per atom forces, where N is the number of atoms in the structure
+            - charges (Nx3 array of floats):
             - stress (6 array of float): per structure stress in voigt notation
         """
         self._table_cache = self._table.append(dataset, ignore_index=True)
         # in case given dataset has more columns than the necessary ones, swallow/ignore them in *_
-        for name, atoms, energy, forces, stress, *_ in dataset.itertuples(index=False):
-            self._container.add_structure(atoms, name, energy=energy, forces=forces, stress=stress)
+        for name, atoms, energy, totalcharge, forces, charges, stress, *_ in dataset.itertuples(index=False):
+            self._container.add_structure(atoms, name, energy=energy,
+                                          totalcharge=totalcharge,
+                                          forces=forces, charges=charges,
+                                          stress=stress)
 
     def get_neighbors(self, num_neighbors=None):
         """
@@ -221,9 +257,11 @@ class TrainingContainer(GenericJob, HasStructure):
             data_table = filter_function(self._table)
         structure_list = data_table.atoms.to_list()
         energy_list = data_table.energy.to_list()
+        totalcharge_list = data_table.totalcharge.to_list()
         force_list = data_table.forces.to_list()
+        charges_list = data_table.charges.to_list()
         num_atoms_list = data_table.number_of_atoms.to_list()
-        return structure_list, energy_list, force_list, num_atoms_list
+        return structure_list, energy_list, totalcharge_list, force_list, charges_list, num_atoms_list
 
     def write_input(self):
         pass

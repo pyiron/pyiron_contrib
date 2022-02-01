@@ -158,7 +158,7 @@ class RunnerFit(GenericJob, HasStorage):
         """Initialize the class.
 
         Args:
-            project (FIXME): The project container in which the job is created.
+            project (Project): The project container where the job is created.
             job_name (str):  The label of the job (used for all directories).
         """
         # Initialize the base class.

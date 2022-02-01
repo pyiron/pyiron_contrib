@@ -33,8 +33,9 @@ from ase.calculators.runner.runner import Runner, DEFAULT_PARAMETERS
 from ase.calculators.runner.runnersinglepoint import RunnerSinglePointCalculator
 
 from pyiron_base import state, GenericJob, Executable, DataContainer
-from pyiron_atomistics.atomistics.structure.structurestorage import StructureStorage
-from pyiron_atomistics.atomistics.structure.atoms import pyiron_to_ase, ase_to_pyiron
+from pyiron_atomistics.atomistics.structure.atoms import pyiron_to_ase
+
+from pyiron_contrib.atomistics.atomistics.job.trainingcontainer import TrainingContainer
 
 __author__ = 'Alexander Knoll'
 __copyright__ = 'Copyright 2021, Georg-August-Universität Göttingen - Behler '\
@@ -46,59 +47,28 @@ __status__ = 'development'
 __date__ = 'January 7, 2022'
 
 
-class RunnerStructureContainer(StructureStorage):
+class RunnerTrainingContainer(TrainingContainer):
     """Store chemical structures as a Runner training dataset."""
-
-    def append(self, structure):
-        """Append `structure` to the class storage."""
-        # If the user appends an ASE Atoms object, try to obtain energies,
-        # forces, etc. and store them.
-        if isinstance(structure, Atoms):
-            struct = ase_to_pyiron(structure)
-            dft_charges = structure.get_initial_charges()
-
-            if structure.calc:
-                dft_energy = structure.calc.get_potential_energy()
-                dft_forces = structure.calc.get_forces()
-
-                # Only RunnerSinglePointCalculator object's store a separate
-                # total charge property. For all other calculators, sum up
-                # the atomic charges.
-                if isinstance(structure.calc, RunnerSinglePointCalculator):
-                    totalcharge = structure.calc.results['totalcharge']
-                else:
-                    totalcharge = np.sum(dft_charges)
-        else:
-            struct = structure
-
-        self.add_structure(
-            struct,
-            dft_energy=dft_energy,
-            dft_forces=dft_forces,
-            dft_charges=dft_charges,
-            totalcharge=totalcharge
-        )
-        return struct
 
     def to_ase(self):
         """Convert all attached structures to a list of ASE Atoms objects."""
         structure_lst = []
         for idx, structure in enumerate(self.iter_structures()):
             # Retrieve all properties, i.e. energy, forces, etc.
-            dft_energy = self.get_array('dft_energy', idx)
-            dft_forces = self.get_array('dft_forces', idx)
-            dft_charges = self.get_array('dft_charges', idx)
-            totalcharge = self.get_array('totalcharge', idx)
+            energy = self._container.get_array('energy', idx)
+            forces = self._container.get_array('forces', idx)
+            charges = self._container.get_array('charges', idx)
+            totalcharge = self._container.get_array('totalcharge', idx)
 
             # Retrieve atomic positions, cell vectors, etc.
             atoms = pyiron_to_ase(structure)
 
             # Attach properties to the Atoms object.
-            atoms.set_initial_charges(dft_charges)
+            atoms.set_initial_charges(charges)
             atoms.calc = RunnerSinglePointCalculator(
                 atoms=atoms,
-                energy=dft_energy,
-                forces=dft_forces,
+                energy=energy,
+                forces=forces,
                 totalcharge=totalcharge
             )
             structure_lst.append(atoms)

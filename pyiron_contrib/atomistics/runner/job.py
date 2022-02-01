@@ -27,12 +27,12 @@ Reference:
 
 import numpy as np
 
-from ase import Atoms
 import ase.io.runner.runner as io
 from ase.calculators.runner.runner import Runner, DEFAULT_PARAMETERS
 from ase.calculators.runner.runnersinglepoint import RunnerSinglePointCalculator
 
-from pyiron_base import state, GenericJob, Executable, DataContainer
+from pyiron_base import state, Executable, DataContainer, GenericJob
+from pyiron_base.generic.object import HasStorage
 from pyiron_atomistics.atomistics.structure.atoms import pyiron_to_ase
 
 from pyiron_contrib.atomistics.atomistics.job.trainingcontainer import TrainingContainer
@@ -76,7 +76,7 @@ class RunnerTrainingContainer(TrainingContainer):
         return structure_lst
 
 
-class RunnerFit(PotentialFittingBase):
+class RunnerFit(GenericJob, HasStorage):
     """Generate a potential energy surface using RuNNer.
 
     The RuNNer Neural Network Energy Representation (RuNNer) is a Fortran code
@@ -162,23 +162,21 @@ class RunnerFit(PotentialFittingBase):
             job_name (str):  The label of the job (used for all directories).
         """
         # Initialize the base class.
-        super(RunnerFit, self).__init__(project, job_name)
+        GenericJob.__init__(self, project=project, job_name=job_name)
+        HasStorage.__init__(self)
 
-        # Prepare data containers for all input and output properties.
-        # The input data container stores all input parameters / settings of
-        # RuNNer and is initially filled with sensible default values
-        # (imported from ASE).
-        self.input = DataContainer(
-            DEFAULT_PARAMETERS,
-            table_name='input_parameters'
-        )
-        self._structures = RunnerStructureContainer(project, job_name)
-        self.output = DataContainer(table_name='output')
+        self.storage.create_group('input')
+        self.storage.create_group('output')
+        self.storage.structures = RunnerTrainingContainer(project, job_name)
+
+        self.storage.input.update(DEFAULT_PARAMETERS)
+
         for prop in self._input_properties:
+            self.storage.create_group(prop)
 
-        for prop in self.input_properties:
             val = kwargs.pop(prop, None)
-            self.__dict__[prop] = DataContainer(val, table_name=prop)
+            if val is not None:
+                self.storage[prop] = DataContainer(val)
 
         state.publications.add(self.publication)
 
@@ -228,9 +226,33 @@ class RunnerFit(PotentialFittingBase):
         }
 
     @property
+    def scaling(self):
+        return self.storage.scaling
+
+    @property
+    def weights(self):
+        return self.storage.weights
+
+    @property
+    def sfvalues(self):
+        return self.storage.sfvalues
+
+    @property
+    def splittraintest(self):
+        return self.storage.splittraintest
+
+    @property
+    def input(self):
+        return self.storage.input
+
+    @property
+    def output(self):
+        return self.storage.output
+
+    @property
     def structures(self):
         """Store a dataset consisting of many chemical structures."""
-        return self._structures
+        return self.storage.structures
 
     @structures.setter
     def structures(self, structures):
@@ -240,8 +262,17 @@ class RunnerFit(PotentialFittingBase):
             structures (list): A list of ASE Atoms objects or Pyiron Atoms
                                objects which are to be stored.
         """
+
         for structure in structures:
-            self._structures.append(structure)
+            energy = structure.get_potential_energy()
+
+            if isinstance(structure.calc, RunnerSinglePointCalculator):
+                totalcharge = structure.calc.get_property('totalcharge')
+            else:
+                totalcharge = np.sum(structure.get_initial_charges())
+
+            self.storage.structures.include_structure(structure, energy,
+                                                      totalcharge=totalcharge)
 
     def write_input(self):
         """Write the relevant job input files.
@@ -330,11 +361,8 @@ class RunnerFit(PotentialFittingBase):
                                           project data.
             group_name (str, optional):   Subcontainer name.
         """
-        super().to_hdf(hdf=hdf, group_name=group_name)
-
-        self.input.to_hdf(hdf=self.project_hdf5)
-        self.structures.to_hdf(hdf=self.project_hdf5)
-        self.output.to_hdf(hdf=self.project_hdf5)
+        GenericJob.to_hdf(self, hdf=hdf, group_name=group_name)
+        HasStorage.to_hdf(self, hdf=self.project_hdf5, group_name="")
 
     def from_hdf(self, hdf=None, group_name=None):
         """
@@ -345,11 +373,8 @@ class RunnerFit(PotentialFittingBase):
                                           project data.
             group_name (str, optional):   Subcontainer name.
         """
-        super().from_hdf(hdf=hdf, group_name=group_name)
-
-        self.input.from_hdf(hdf=self.project_hdf5)
-        self.structures.from_hdf(hdf=self.project_hdf5)
-        self.output.from_hdf(hdf=self.project_hdf5)
+        GenericJob.from_hdf(self, hdf=hdf, group_name=group_name)
+        HasStorage.from_hdf(self, hdf=self.project_hdf5, group_name="")
 
     def restart(self, *args, **kwargs):
         """
@@ -373,6 +398,6 @@ class RunnerFit(PotentialFittingBase):
 
         for prop in self._input_properties:
             if prop in self.output.keys():
-                new_ham.__dict__[prop] = DataContainer(self.output[prop])
+                new_ham.storage[prop] = DataContainer(self.output[prop])
 
         return new_ham

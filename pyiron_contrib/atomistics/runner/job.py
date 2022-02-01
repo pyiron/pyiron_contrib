@@ -195,7 +195,7 @@ class RunnerFit(PotentialFittingBase):
     __name__ = 'RuNNer'
     # These properties are needed by RuNNer as input data (depending on the
     # chosen RuNNer mode).
-    input_properties = ['scaling', 'weights', 'sfvalues', 'splittraintest']
+    _input_properties = ['scaling', 'weights', 'sfvalues', 'splittraintest']
 
     def __init__(self, project, job_name, **kwargs):
         """Initialize the class.
@@ -217,6 +217,7 @@ class RunnerFit(PotentialFittingBase):
         )
         self._structures = RunnerStructureContainer(project, job_name)
         self.output = DataContainer(table_name='output')
+        for prop in self._input_properties:
 
         for prop in self.input_properties:
             val = kwargs.pop(prop, None)
@@ -400,7 +401,7 @@ class RunnerFit(PotentialFittingBase):
         This procedure extends the base class `restart()` by setting results
         from previous calculations as input parameters to the new calculation.
         The recognized properties depend on the class variable
-        self.input_properties (see class docstring for further details).
+        self._input_properties (see class docstring for further details).
 
         Returns:
             new_ham (RunnerFit): the newly created RunnerFit object.
@@ -413,7 +414,7 @@ class RunnerFit(PotentialFittingBase):
         # necessary for starting a new calculation.
         new_ham = super(RunnerFit, self).restart(*args, **kwargs)
 
-        for prop in self.input_properties:
+        for prop in self._input_properties:
             if prop in self.output.keys():
                 new_ham.__dict__[prop] = DataContainer(self.output[prop])
 

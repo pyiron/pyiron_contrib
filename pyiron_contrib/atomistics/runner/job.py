@@ -46,19 +46,6 @@ __status__ = 'development'
 __date__ = 'January 7, 2022'
 
 
-class PotentialFittingBase(GenericJob):
-    """FIXME: Class copied from AtomicRex in pyiron_contrib."""
-
-    def __init__(self, project, job_name):
-        """Initialize the class.
-
-        Args:
-            project (FIXME): The project container in which the job is created.
-            job_name (str):  The label of the job (used for all directories).
-        """
-        super().__init__(project, job_name)
-
-
 class RunnerStructureContainer(StructureStorage):
     """Store chemical structures as a Runner training dataset."""
 

@@ -32,6 +32,36 @@ class FunctionFactory(PyironFactory):
         return Spline(identifier, cutoff, derivative_left, derivative_right, species)
 
     @staticmethod
+    def equidistant_spline(
+        identifier,
+        n_nodes,
+        cutoff,
+        initial_value_func,
+        derivative_left=0,
+        d_left_enabled=True,
+        derivative_right=0,
+        d_right_enabled=False,
+        endpoint_val=0,
+        species=["*", "*"],
+        ):
+        s = Spline(identifier, cutoff, derivative_left, derivative_right, species)
+        if endpoint_val is False:
+            x = np.linspace(start=cutoff/n_nodes, stop=cutoff, num=n_nodes, endpoint=False)
+        else:
+            x = np.linspace(start=cutoff/n_nodes, stop=cutoff, num=n_nodes, endpoint=True)
+        y = initial_value_func(x)
+        s.parameters.create_from_arrays(x, y)
+        if endpoint_val is not False and endpoint_val is not None:
+            s.parameters[f"node_{cutoff}"].enabled = False
+            s.parameters[f"node_{cutoff}"].start_val = endpoint_val
+
+        s.derivative_left.enabled = d_left_enabled
+        s.derivative_right.enabled = d_right_enabled
+        s.derivative_left.start_val = derivative_left
+        s.derivative_right.start_val = derivative_right
+        return s
+
+    @staticmethod
     def exp_A_screening(identifier, cutoff, species=["*", "*"], is_screening_function=True):
         return ExpA(identifier, cutoff, species=species, is_screening_function=is_screening_function)
 

@@ -37,13 +37,31 @@ class FunctionFactory(PyironFactory):
         n_nodes,
         cutoff,
         initial_value_func,
-        derivative_left=0,
+        derivative_left=0.,
         d_left_enabled=True,
-        derivative_right=0,
+        derivative_right=0.,
         d_right_enabled=False,
-        endpoint_val=0,
+        endpoint_val=0.,
         species=["*", "*"],
         ):
+        """
+        Convenience function to create a spline function with equidistant node points.
+
+        Args:
+            identifier (str): function identifier. Should be unique within the job
+            n_nodes (int): number of node points
+            cutoff (float): values after are 0
+            initial_value_func (function(x)): function to calculate start values for nodes.
+            derivative_left (int, optional): . Defaults to 0.
+            d_left_enabled (bool, optional): Whether to fit. Defaults to True.
+            derivative_right (int, optional): [description]. Defaults to 0.
+            d_right_enabled (bool, optional): Whether to fit. Should be False for most functions, beside Embedding terms. Defaults to False.
+            endpoint_val (float, None, bool, optional): Start val for endpoint, enabled=False if float, if False endpoint is not included. If None endpoint is included, enabled and start_val is calculated like other points. Defaults to 0.0, which should be used in most cases.
+            species (list of str, optional): Only needs to be changed for multi element fits. Defaults to ["*", "*"].
+
+        Returns:
+            [type]: [description]
+        """        
         s = Spline(identifier, cutoff, derivative_left, derivative_right, species)
         if endpoint_val is False:
             x = np.linspace(start=cutoff/n_nodes, stop=cutoff, num=n_nodes, endpoint=False)

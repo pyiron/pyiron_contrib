@@ -51,6 +51,7 @@ class FunctionFactory(PyironFactory):
         n_nodes,
         cutoff,
         initial_value_func,
+        min_distance=0.0,
         derivative_left=0.0,
         d_left_enabled=True,
         derivative_right=0.0,
@@ -66,6 +67,7 @@ class FunctionFactory(PyironFactory):
             n_nodes (int): number of node points
             cutoff (float): values after are 0
             initial_value_func (function(x)): function to calculate start values for nodes.
+            min_distance (float, optional): x coordinate of first node point. Defaults to 0.
             derivative_left (int, optional): . Defaults to 0.
             d_left_enabled (bool, optional): Whether to fit. Defaults to True.
             derivative_right (int, optional): [description]. Defaults to 0.
@@ -79,12 +81,10 @@ class FunctionFactory(PyironFactory):
         s = Spline(identifier, cutoff, derivative_left, derivative_right, species)
         if endpoint_val is False:
             x = np.linspace(
-                start=cutoff / n_nodes, stop=cutoff, num=n_nodes, endpoint=False
+                start=min_distance, stop=cutoff, num=n_nodes, endpoint=False
             )
         else:
-            x = np.linspace(
-                start=cutoff / n_nodes, stop=cutoff, num=n_nodes, endpoint=True
-            )
+            x = np.linspace(start=min_distance, stop=cutoff, num=n_nodes, endpoint=True)
         y = initial_value_func(x)
         s.parameters.create_from_arrays(x, y)
         if endpoint_val is not False and endpoint_val is not None:
@@ -323,6 +323,52 @@ class BaseFunctionMixin:
         for param in self.parameters.values():
             param.enabled = False
 
+    def set_max_values(self, constant=None, factor=None, filter_func=None):
+        """
+        Convenience function so set max values for all parameters at once.
+        Can either use a constant value or a factor. If both are given factor is used.
+
+        Args:
+            constant ([type], optional): param.max_val = constant. Defaults to None.
+            factor ([type], optional): param.max_val = abs(start_val)*factor. Defaults to None.
+            filter_func ([type], optional): Optional function to filter params. Should take param as argument and return True or False. Defaults to None.
+
+        Raises:
+            ValueError: Raises when constant and factor are None.
+        """
+        if constant is None and factor is None:
+            raise ValueError("constant or factor must be set")
+
+        for param in self.parameters.values():
+            param.set_max_val(
+                constant=constant,
+                factor=factor,
+                filter_func=filter_func,
+            )
+
+    def set_min_values(self, constant=None, factor=None, filter_func=None):
+        """
+        Convenience function so set min values for all parameters at once.
+        Can either use a constant value or a factor. If both are given factor is used.
+
+        Args:
+            constant ([type], optional): param.min_val = constant. Defaults to None.
+            factor ([type], optional): param.min_val = -abs(start_val)*factor. Defaults to None.
+            filter_func ([type], optional): Optional function to filter params. Should take param as argument and return True or False. Defaults to None.
+
+        Raises:
+            ValueError: Raises when constant and factor are None.
+        """
+        if constant is None and factor is None:
+            raise ValueError("constant or factor must be set")
+
+        for param in self.parameters.values():
+            param.set_min_val(
+                constant=constant,
+                factor=factor,
+                filter_func=filter_func,
+            )
+
     def count_parameters(self, enabled_only=True):
         parameters = 0
         if enabled_only:
@@ -343,6 +389,38 @@ class MetaFunctionMixin:
     def lock_parameters(self):
         for f in self.functions.values():
             f.lock_parameters()
+
+    def set_max_values(self, constant=None, factor=None, filter_func=None):
+        """
+        Convenience function so set max values for all parameters at once.
+        Can either use a constant value or a factor. If both are given factor is used.
+
+        Args:
+            constant ([type], optional): param.max_val = constant. Defaults to None.
+            factor ([type], optional): param.max_val = abs(start_val)*factor. Defaults to None.
+            filter_func ([type], optional): Optional function to filter params. Should take param as argument and return True or False. Defaults to None.
+
+        Raises:
+            ValueError: Raises when constant and factor are None.
+        """
+        for f in self.functions.values():
+            f.set_max_values(constant=constant, factor=factor, filter_func=filter_func)
+
+    def set_min_values(self, constant=None, factor=None, filter_func=None):
+        """
+        Convenience function so set min values for all parameters at once.
+        Can either use a constant value or a factor. If both are given factor is used.
+
+        Args:
+            constant ([type], optional): param.min_val = constant. Defaults to None.
+            factor ([type], optional): param.min_val = -abs(start_val)*factor. Defaults to None.
+            filter_func ([type], optional): Optional function to filter params. Should take param as argument and return True or False. Defaults to None.
+
+        Raises:
+            ValueError: Raises when constant and factor are None.
+        """
+        for f in self.functions.values():
+            f.set_min_values(constant=constant, factor=factor, filter_func=filter_func)
 
     def count_parameters(self, enabled_only=True):
         parameters = 0
@@ -539,6 +617,24 @@ class Spline(DataContainer, BaseFunctionMixin):
         super().lock_parameters()
         self.derivative_left.enabled = False
         self.derivative_right.enabled = False
+
+    def set_max_values(self, constant=None, factor=None, filter_func=None):
+        super().set_max_values(constant, factor, filter_func)
+        self.derivative_left.set_max_val(
+            constant=constant, factor=factor, filter_func=filter_func
+        )
+        self.derivative_right.set_max_val(
+            constant=constant, factor=factor, filter_func=filter_func
+        )
+
+    def set_min_values(self, constant=None, factor=None, filter_func=None):
+        super().set_min_values(constant, factor, filter_func)
+        self.derivative_left.set_min_val(
+            constant=constant, factor=factor, filter_func=filter_func
+        )
+        self.derivative_right.set_min_val(
+            constant=constant, factor=factor, filter_func=filter_func
+        )
 
     def count_parameters(self, enabled_only=True):
         parameters = super().count_parameters(enabled_only=enabled_only)
@@ -1216,6 +1312,30 @@ class FunctionParameter(DataContainer):
                 )
             else:
                 self.start_val = copy.copy(self.final_value)
+
+    def set_max_val(self, constant=None, factor=None, filter_func=None):
+        if self.enabled:
+            if filter_func is not None:
+                if filter_func(self):
+                    pass
+                else:
+                    return
+
+                self.max_val = constant
+                if factor is not None:
+                    self.max_val = abs(self.start_val) * factor
+
+    def set_min_val(self, constant=None, factor=None, filter_func=None):
+        if self.enabled:
+            if filter_func is not None:
+                if filter_func(self):
+                    pass
+                else:
+                    return
+
+                self.min_val = constant
+                if factor is not None:
+                    self.min_val = -abs(self.start_val) * factor
 
 
 class FunctionParameterList(DataContainer):

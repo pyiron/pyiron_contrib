@@ -85,9 +85,7 @@ class FunctionFactory(PyironFactory):
                 start=min_distance, stop=cutoff, num=n_nodes, endpoint=False
             )
         else:
-            x = np.linspace(
-                start=min_distance, stop=cutoff, num=n_nodes, endpoint=True
-            )
+            x = np.linspace(start=min_distance, stop=cutoff, num=n_nodes, endpoint=True)
         y = initial_value_func(x)
         s.parameters.create_from_arrays(x, y)
         if endpoint_val is not False and endpoint_val is not None:
@@ -325,7 +323,7 @@ class BaseFunctionMixin:
     def lock_parameters(self):
         for param in self.parameters.values():
             param.enabled = False
-    
+
     def set_max_values(self, constant=None, factor=None, filter_func=None):
         """
         Convenience function so set max values for all parameters at once.
@@ -338,7 +336,7 @@ class BaseFunctionMixin:
 
         Raises:
             ValueError: Raises when constant and factor are None.
-        """        
+        """
         if constant is None and factor is None:
             raise ValueError("constant or factor must be set")
 
@@ -348,7 +346,6 @@ class BaseFunctionMixin:
                 factor=factor,
                 filter_func=filter_func,
             )
-
 
     def set_min_values(self, constant=None, factor=None, filter_func=None):
         """
@@ -362,7 +359,7 @@ class BaseFunctionMixin:
 
         Raises:
             ValueError: Raises when constant and factor are None.
-        """        
+        """
         if constant is None and factor is None:
             raise ValueError("constant or factor must be set")
 
@@ -409,7 +406,7 @@ class MetaFunctionMixin:
         """
         for f in self.functions.values():
             f.set_max_values(constant=constant, factor=factor, filter_func=filter_func)
-        
+
     def set_min_values(self, constant=None, factor=None, filter_func=None):
         """
         Convenience function so set min values for all parameters at once.
@@ -424,7 +421,7 @@ class MetaFunctionMixin:
             ValueError: Raises when constant and factor are None.
         """
         for f in self.functions.values():
-            f.set_min_values(constant=constant, factor=factor, filter_func=filter_func)    
+            f.set_min_values(constant=constant, factor=factor, filter_func=filter_func)
 
     def count_parameters(self, enabled_only=True):
         parameters = 0
@@ -625,30 +622,20 @@ class Spline(DataContainer, BaseFunctionMixin):
     def set_max_values(self, constant=None, factor=None, filter_func=None):
         super().set_max_values(constant, factor, filter_func)
         self.derivative_left.set_max_val(
-            constant=constant,
-            factor=factor,
-            filter_func=filter_func
+            constant=constant, factor=factor, filter_func=filter_func
         )
         self.derivative_right.set_max_val(
-            constant=constant,
-            factor=factor,
-            filter_func=filter_func
+            constant=constant, factor=factor, filter_func=filter_func
         )
 
     def set_min_values(self, constant=None, factor=None, filter_func=None):
         super().set_min_values(constant, factor, filter_func)
         self.derivative_left.set_min_val(
-            constant=constant,
-            factor=factor,
-            filter_func=filter_func
+            constant=constant, factor=factor, filter_func=filter_func
         )
         self.derivative_right.set_min_val(
-            constant=constant,
-            factor=factor,
-            filter_func=filter_func
+            constant=constant, factor=factor, filter_func=filter_func
         )
-
-
 
     def count_parameters(self, enabled_only=True):
         parameters = super().count_parameters(enabled_only=enabled_only)
@@ -1334,7 +1321,7 @@ class FunctionParameter(DataContainer):
                     pass
                 else:
                     return
-                
+
                 self.max_val = constant
                 if factor is not None:
                     self.max_val = abs(self.start_val) * factor
@@ -1346,11 +1333,11 @@ class FunctionParameter(DataContainer):
                     pass
                 else:
                     return
-                
+
                 self.min_val = constant
                 if factor is not None:
                     self.min_val = -abs(self.start_val) * factor
- 
+
 
 class FunctionParameterList(DataContainer):
     def __init__(self):

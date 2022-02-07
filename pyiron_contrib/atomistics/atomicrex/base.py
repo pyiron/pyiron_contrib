@@ -3,7 +3,6 @@
 # Distributed under the terms of "New BSD License", see the LICENSE file.
 
 """Pyiron interface to atomicrex"""
-import os
 import numpy as np
 
 from pyiron_base import state, GenericJob, Executable

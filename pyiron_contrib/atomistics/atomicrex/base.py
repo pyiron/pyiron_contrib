@@ -7,7 +7,10 @@ import numpy as np
 
 from pyiron_base import state, GenericJob, Executable
 
-from pyiron_contrib.atomistics.atomicrex.general_input import GeneralARInput, AlgorithmFactory
+from pyiron_contrib.atomistics.atomicrex.general_input import (
+    GeneralARInput,
+    AlgorithmFactory,
+)
 from pyiron_contrib.atomistics.atomicrex.structure_list import ARStructureContainer
 from pyiron_contrib.atomistics.atomicrex.potential_factory import ARPotFactory
 from pyiron_contrib.atomistics.atomicrex.output import Output
@@ -20,20 +23,22 @@ class PotentialFittingBase(GenericJob):
     def __init__(self, project, job_name):
         super().__init__(project, job_name)
 
+
 class AtomicrexBase(PotentialFittingBase):
     __version__ = "0.1.0"
     __hdf_version__ = "0.1.0"
     """Class to set up and run atomicrex jobs"""
+
     def __init__(self, project, job_name):
         super().__init__(project, job_name)
-        #self._executable_activate(enforce=True)
+        # self._executable_activate(enforce=True)
         state.publications.add(self.publication)
         self.input = GeneralARInput()
         self.potential = None
         self.structures = ARStructureContainer()
         self.output = Output()
         self.factories = Factories()
-
+        self._compress_by_default = True
 
     def plot_final_potential(self):
         """
@@ -74,7 +79,12 @@ class AtomicrexBase(PotentialFittingBase):
                     "issn": "0965-0393",
                     "doi": "10.1088/1361-651X/aa6ecf",
                     "url": "https://doi.org/10.1088%2F1361-651x%2Faa6ecf",
-                    "author": ["Alexander Stukowski", "Erik Fransson", "Markus Mock", "Paul Erhart"],
+                    "author": [
+                        "Alexander Stukowski",
+                        "Erik Fransson",
+                        "Markus Mock",
+                        "Paul Erhart",
+                    ],
                 }
             }
         }
@@ -84,15 +94,15 @@ class AtomicrexBase(PotentialFittingBase):
 
         Args:
             cwd (str, optional): Working directory. Defaults to None.
-        """        
-        #self.input.from_hdf(self._hdf5)
+        """
+        # self.input.from_hdf(self._hdf5)
         if cwd is None:
             cwd = self.working_directory
         if self.input.__version__ == "0.1.0":
             filepath = f"{cwd}/atomicrex.out"
         else:
             filepath = f"{cwd}/error.out"
-        
+
         finished_triggered = False
         params_triggered = False
         dependent_dofs_triggered = False
@@ -104,11 +114,11 @@ class AtomicrexBase(PotentialFittingBase):
             residuals = np.zeros(self.input.fit_algorithm.max_iter + 1)
         else:
             residuals = np.zeros(self.input.fit_algorithm.max_iter)
-       
+
         # Since every step is written out in atomicrex arange can be used.
         # Needs to be adapted when atomicrex output is changed to write only every xth step.
         # Unsinged 32 bit int should be enough or this will overflow anyway in most cases.
-        iterations = np.arange(start=1, stop=len(residuals)+1, dtype=np.uintc)
+        iterations = np.arange(start=1, stop=len(residuals) + 1, dtype=np.uintc)
         iter_index = 0
 
         with open(filepath, "r") as f:
@@ -118,9 +128,9 @@ class AtomicrexBase(PotentialFittingBase):
 
             for l in f:
                 if l.startswith("ERROR"):
-                    self.status.aborted=True
+                    self.status.aborted = True
                     self.output.error = l
-                
+
                 elif not finished_triggered:
                     if l.startswith("Iterations"):
                         l = l.split()
@@ -132,25 +142,29 @@ class AtomicrexBase(PotentialFittingBase):
                         try:
                             if l[1] == "iter=":
                                 residuals[iter_index] = float(l[-1])
-                                iter_index  += 1
+                                iter_index += 1
                         except IndexError:
                             continue
-                
-                else: # if finished_triggered
+
+                else:  # if finished_triggered
                     if params_triggered:
                         if not l.startswith("---"):
                             final_parameter_lines.append(l)
                         else:
                             # Collecting lines with final parameters finished, hand over to the potential class
-                            self.potential._parse_final_parameters(final_parameter_lines)
+                            self.potential._parse_final_parameters(
+                                final_parameter_lines
+                            )
                             params_triggered = False
-                    
+
                     elif structures_triggered:
                         if not l.startswith("---"):
                             final_property_lines.append(l)
                         else:
                             # Collecting structure information finished, hand over structures class
-                            self.structures._parse_final_properties(final_property_lines)
+                            self.structures._parse_final_properties(
+                                final_property_lines
+                            )
                             structures_triggered = False
 
                     elif dependent_dofs_triggered:
@@ -164,7 +178,7 @@ class AtomicrexBase(PotentialFittingBase):
                         # Get the number of dofs
                         n_fit_dofs = int(l.split("=")[1][:-3])
                         params_triggered = True
-                
+
                     elif l.startswith("Computing"):
                         structures_triggered = True
 
@@ -173,29 +187,32 @@ class AtomicrexBase(PotentialFittingBase):
         self.to_hdf()
 
     def convergence_check(self):
-        """Internal function, TODO"""        
-        return
+        """
+        Internal function, TODO
+        find something to reasonably judge convegence
+        """
+        return True
 
     def write_input(self, directory=None):
         """Internal function that writes input files
 
         Args:
             directory ([string], optional): Working directory. Defaults to None.
-        """        
+        """
         if directory is None:
             directory = self.working_directory
-        self.input._write_xml_file(directory = directory)
-        self.potential.write_xml_file(directory = directory)
-        self.structures.write_xml_file(directory = directory)
+        self.input._write_xml_file(directory=directory)
+        self.potential.write_xml_file(directory=directory)
+        self.structures.write_xml_file(directory=directory)
 
     def _executable_activate(self, enforce=False):
         """
-        Internal function that sets up and Executable() object 
+        Internal function that sets up and Executable() object
         and finds executables available in pyiron resources/atomicrex/bin
 
         Args:
             enforce (bool, optional): [description]. Defaults to False.
-        """        
+        """
         if self._executable is None or enforce:
             if len(self.__module__.split(".")) > 1:
                 self._executable = Executable(
@@ -205,7 +222,8 @@ class AtomicrexBase(PotentialFittingBase):
                 )
             else:
                 self._executable = Executable(
-                    codename=self.__name__, path_binary_codes=state.settings.resource_paths
+                    codename=self.__name__,
+                    path_binary_codes=state.settings.resource_paths,
                 )
 
     # Leftover of the potentials workshop.
@@ -217,12 +235,11 @@ class AtomicrexBase(PotentialFittingBase):
         pot = self.potential_as_pd_df()
         return pot
 
-
     def potential_as_pd_df(self):
         """
         Return the fitted potential as a pandas dataframe,
         which can be used for lammps calculations.
-        """        
+        """
         return self.potential._potential_as_pd_df(job=self)
 
 
@@ -230,7 +247,8 @@ class Factories:
     """
     Provides conventient acces to other factory classes.
     Functionality to set up an atomicrex job can be found here.
-    """    
+    """
+
     def __init__(self):
         self.potentials = ARPotFactory()
         self.functions = FunctionFactory()

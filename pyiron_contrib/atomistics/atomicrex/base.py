@@ -89,6 +89,26 @@ class AtomicrexBase(PotentialFittingBase):
             }
         }
 
+    def compress(self, files_to_compress=None):
+        """
+        Compress the output files of a job object.
+
+        Args:
+            files_to_compress (list): A list of files to compress (optional)
+        """
+        if files_to_compress is None:
+            files_to_compress = [
+                "atomicrex.out",
+                "error.out",
+                "main.xml",
+                "potential.xml",
+                "structures.xml",
+            ]
+        # delete empty files
+        POSCARs = [f for f in self.list_files() if "POSCAR" in f]
+        files_to_compress = files_to_compress + POSCARs
+        super().compress(files_to_compress=files_to_compress)
+
     def collect_output(self, cwd=None):
         """Internal function that parses the output of an atomicrex job
 

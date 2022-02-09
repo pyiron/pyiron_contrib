@@ -54,12 +54,12 @@ class ARPotFactory(PyironFactory):
         )
 
     @staticmethod
-    def tersoff_potential(elements, param_file=None):
-        return TersoffPotential(elements=elements, param_file=param_file)
+    def tersoff_potential(elements, export_file=None):
+        return TersoffPotential(elements=elements, export_file=export_file)
 
     @staticmethod
-    def abop_potential(elements, param_file=None):
-        return ABOPPotential(elements=elements, param_file=param_file)
+    def abop_potential(elements, export_file=None):
+        return ABOPPotential(elements=elements, export_file=export_file)
 
 
 class AbstractPotential(DataContainer):
@@ -100,15 +100,15 @@ class AbstractPotential(DataContainer):
 
 
 class BOPAbstract(AbstractPotential):
-    def __init__(self, init=None, elements=None, param_file=None, identifier=None):
+    def __init__(self, init=None, elements=None, export_file=None, identifier=None):
         super().__init__(init=init)
         if init is None:
             self.identifier = identifier
             if elements is not None:
-                if param_file is None:
-                    self.param_file = f"{''.join(elem for elem in elements)}.tersoff"
+                if export_file is None:
+                    self.export = f"{''.join(elem for elem in elements)}.tersoff"
                 else:
-                    self.param_file = param_file
+                    self.export_file = export_file
 
                 self._tag_dict = _get_tag_dict(elements)
                 self.elements = elements
@@ -116,6 +116,10 @@ class BOPAbstract(AbstractPotential):
                     self.parameters = TersoffParameters(self._tag_dict)
                 elif self.identifier == "abop":
                     self.parameters = ABOPParameters(self._tag_dict)
+
+    @property
+    def param_file(self):
+        return self.export_file
 
     def write_xml_file(self, directory):
         self.parameters._write_tersoff_file(directory)
@@ -126,7 +130,7 @@ class BOPAbstract(AbstractPotential):
         tersoff.set("species-b", "*")
 
         output = ET.SubElement(tersoff, "export-potential")
-        output.text = f"{self.param_file}"
+        output.text = f"{self.export_file}"
 
         params = ET.SubElement(tersoff, "param-file")
         params.text = "input.tersoff"
@@ -146,7 +150,7 @@ class BOPAbstract(AbstractPotential):
         Makes the tabulated eam potential written by atomicrex usable
         for pyiron lammps jobs.
         """
-        if self.param_file is None:
+        if self.export_file is None:
             raise ValueError("export_file must be set to use the potential with lammps")
 
         species = [el for el in job.input.atom_types.keys()]
@@ -157,13 +161,13 @@ class BOPAbstract(AbstractPotential):
         pot = pd.DataFrame(
             {
                 "Name": f"{self.identifier}",
-                "Filename": [[f"{job.working_directory}/{self.param_file}"]],
+                "Filename": [[f"{job.working_directory}/{self.export_file}"]],
                 "Model": ["Custom"],
                 "Species": [species],
                 "Config": [
                     [
                         "pair_style tersoff\n",
-                        f"pair_coeff * * {job.working_directory}/{self.param_file} {species_str}\n",
+                        f"pair_coeff * * {job.working_directory}/{self.export_file} {species_str}\n",
                     ]
                 ],
             }
@@ -172,16 +176,16 @@ class BOPAbstract(AbstractPotential):
 
 
 class TersoffPotential(BOPAbstract):
-    def __init__(self, init=None, elements=None, param_file=None):
+    def __init__(self, init=None, elements=None, export_file=None):
         super().__init__(
-            init=init, elements=elements, param_file=param_file, identifier="tersoff"
+            init=init, elements=elements, export_file=export_file, identifier="tersoff"
         )
 
 
 class ABOPPotential(BOPAbstract):
-    def __init__(self, init=None, elements=None, param_file=None):
+    def __init__(self, init=None, elements=None, export_file=None):
         super().__init__(
-            init=init, elements=elements, param_file=param_file, identifier="abop"
+            init=init, elements=elements, export_file=export_file, identifier="abop"
         )
 
 

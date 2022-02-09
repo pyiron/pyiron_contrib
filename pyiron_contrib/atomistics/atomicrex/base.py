@@ -97,16 +97,12 @@ class AtomicrexBase(PotentialFittingBase):
             files_to_compress (list): A list of files to compress (optional)
         """
         if files_to_compress is None:
-            files_to_compress = [
-                "atomicrex.out",
-                "error.out",
-                "main.xml",
-                "potential.xml",
-                "structures.xml",
-            ]
-        # delete empty files
-        POSCARs = [f for f in self.list_files() if "POSCAR" in f]
-        files_to_compress = files_to_compress + POSCARs
+            if self.potential.export_file is None:
+                files_to_compress = self.list_files()
+            else:
+                files_to_compress = [
+                    f for f in self.list_files() if f != self.potential.export_file
+                ]
         super().compress(files_to_compress=files_to_compress)
 
     def collect_output(self, cwd=None):

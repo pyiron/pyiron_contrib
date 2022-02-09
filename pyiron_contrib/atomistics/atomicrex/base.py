@@ -100,7 +100,9 @@ class AtomicrexBase(PotentialFittingBase):
             if self.potential.export_file is None:
                 files_to_compress = self.list_files()
             else:
-                files_to_compress = [f for f in self.list_files() if f != self.potential.export_file]
+                files_to_compress = [
+                    f for f in self.list_files() if f != self.potential.export_file
+                ]
         super().compress(files_to_compress=files_to_compress)
 
     def collect_output(self, cwd=None):

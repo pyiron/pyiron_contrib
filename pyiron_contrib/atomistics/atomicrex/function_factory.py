@@ -321,7 +321,7 @@ class BaseFunctionMixin:
 
     def lock_parameters(self, filter_func=None):
         for param in self.parameters.values():
-            param.lock(filter_func=None)
+            param.lock(filter_func=filter_func)
 
     def set_max_values(self, constant=None, factor=None, filter_func=None):
         """
@@ -1306,9 +1306,7 @@ class FunctionParameter(DataContainer):
                         if the job aborted or was not run yet.
         """
         if filter_func is not None:
-            if filter_func(self):
-                pass
-            else:
+            if not filter_func(self):
                 return
 
         if self.final_value is None:
@@ -1321,31 +1319,25 @@ class FunctionParameter(DataContainer):
 
     def set_max_val(self, constant=None, factor=None, filter_func=None):
         if filter_func is not None:
-            if filter_func(self):
-                pass
-            else:
+            if not filter_func(self):
                 return
 
-            self.max_val = constant
-            if factor is not None:
-                self.max_val = abs(self.start_val) * factor
+        self.max_val = constant
+        if factor is not None:
+            self.max_val = abs(self.start_val) * factor
 
     def set_min_val(self, constant=None, factor=None, filter_func=None):
         if filter_func is not None:
-            if filter_func(self):
-                pass
-            else:
+            if not filter_func(self):
                 return
 
-            self.min_val = constant
-            if factor is not None:
-                self.min_val = -abs(self.start_val) * factor
+        self.min_val = constant
+        if factor is not None:
+            self.min_val = -abs(self.start_val) * factor
 
     def lock(self, filter_func=None):
         if filter_func is not None:
-            if filter_func(self):
-                pass
-            else:
+            if not filter_func(self):
                 return
         self.enabled = False
 

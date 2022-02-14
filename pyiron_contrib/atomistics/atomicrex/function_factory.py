@@ -1315,28 +1315,26 @@ class FunctionParameter(DataContainer):
             self.start_val = copy.copy(self.final_value)
 
     def set_max_val(self, constant=None, factor=None, filter_func=None):
-        if self.enabled:
-            if filter_func is not None:
-                if filter_func(self):
-                    pass
-                else:
-                    return
+        if filter_func is not None:
+            if filter_func(self):
+                pass
+            else:
+                return
 
-                self.max_val = constant
-                if factor is not None:
-                    self.max_val = abs(self.start_val) * factor
+            self.max_val = constant
+            if factor is not None:
+                self.max_val = abs(self.start_val) * factor
 
     def set_min_val(self, constant=None, factor=None, filter_func=None):
-        if self.enabled:
-            if filter_func is not None:
-                if filter_func(self):
-                    pass
-                else:
-                    return
+        if filter_func is not None:
+            if filter_func(self):
+                pass
+            else:
+                return
 
-                self.min_val = constant
-                if factor is not None:
-                    self.min_val = -abs(self.start_val) * factor
+            self.min_val = constant
+            if factor is not None:
+                self.min_val = -abs(self.start_val) * factor
 
 
 class FunctionParameterList(DataContainer):

@@ -1305,13 +1305,14 @@ class FunctionParameter(DataContainer):
                         but the final value is None. This should only be the case
                         if the job aborted or was not run yet.
         """
-        if self.enabled:
-            if self.final_value is None:
+
+        if self.final_value is None:
+            if self.enabled:
                 raise ValueError(
                     f"Fitting is enabled for {self.param}, but final value is None."
                 )
-            else:
-                self.start_val = copy.copy(self.final_value)
+        else:
+            self.start_val = copy.copy(self.final_value)
 
     def set_max_val(self, constant=None, factor=None, filter_func=None):
         if self.enabled:

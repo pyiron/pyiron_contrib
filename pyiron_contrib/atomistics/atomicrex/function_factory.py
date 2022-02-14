@@ -315,13 +315,13 @@ class FunctionFactory(PyironFactory):
 class BaseFunctionMixin:
     # Mixin class to implement functionality common in all types of functions
     # Be careful with Spline class because it has params, but also derivatives, requiring some special additions to implementations
-    def copy_final_to_initial_params(self):
+    def copy_final_to_initial_params(self, filter_func=None):
         for param in self.parameters.values():
-            param.copy_final_to_start_value()
+            param.copy_final_to_start_value(filter_func=filter_func)
 
-    def lock_parameters(self):
+    def lock_parameters(self, filter_func=None):
         for param in self.parameters.values():
-            param.enabled = False
+            param.lock(filter_func=None)
 
     def set_max_values(self, constant=None, factor=None, filter_func=None):
         """
@@ -382,13 +382,13 @@ class BaseFunctionMixin:
 
 
 class MetaFunctionMixin:
-    def copy_final_to_initial_params(self):
+    def copy_final_to_initial_params(self, filter_func=None):
         for f in self.functions.values():
-            f.copy_final_to_initial_params()
+            f.copy_final_to_initial_params(filter_func=filter_func)
 
-    def lock_parameters(self):
+    def lock_parameters(self, filter_func=None):
         for f in self.functions.values():
-            f.lock_parameters()
+            f.lock_parameters(filter_func=filter_func)
 
     def set_max_values(self, constant=None, factor=None, filter_func=None):
         """
@@ -608,15 +608,15 @@ class Spline(DataContainer, BaseFunctionMixin):
             param = f"node_{param:.6g}"
             self.parameters[param].final_value = value
 
-    def copy_final_to_initial_params(self):
-        super().copy_final_to_initial_params()
-        self.derivative_left.copy_final_to_start_value()
-        self.derivative_right.copy_final_to_start_value()
+    def copy_final_to_initial_params(self, filter_func=None):
+        super().copy_final_to_initial_params(filter_func=filter_func)
+        self.derivative_left.copy_final_to_start_value(filter_func=filter_func)
+        self.derivative_right.copy_final_to_start_value(filter_func=filter_func)
 
-    def lock_parameters(self):
-        super().lock_parameters()
-        self.derivative_left.enabled = False
-        self.derivative_right.enabled = False
+    def lock_parameters(self, filter_func=None):
+        super().lock_parameters(filter_func=filter_func)
+        self.derivative_left.lock(filter_func=filter_func)
+        self.derivative_right.lock(filter_func=filter_func)
 
     def set_max_values(self, constant=None, factor=None, filter_func=None):
         super().set_max_values(constant, factor, filter_func)
@@ -1296,7 +1296,7 @@ class FunctionParameter(DataContainer):
             root.set("tag", f"{self.tag}")
         return root
 
-    def copy_final_to_start_value(self):
+    def copy_final_to_start_value(self, filter_func=None):
         """
         Copies the final value to start_val.
 
@@ -1305,6 +1305,11 @@ class FunctionParameter(DataContainer):
                         but the final value is None. This should only be the case
                         if the job aborted or was not run yet.
         """
+        if filter_func is not None:
+            if filter_func(self):
+                pass
+            else:
+                return
 
         if self.final_value is None:
             if self.enabled:
@@ -1335,6 +1340,14 @@ class FunctionParameter(DataContainer):
             self.min_val = constant
             if factor is not None:
                 self.min_val = -abs(self.start_val) * factor
+
+    def lock(self, filter_func=None):
+        if filter_func is not None:
+            if filter_func(self):
+                pass
+            else:
+                return
+        self.enabled = False
 
 
 class FunctionParameterList(DataContainer):

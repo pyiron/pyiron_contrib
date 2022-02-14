@@ -535,19 +535,19 @@ class LJPotential(AbstractPotential):
 
 
 class EAMlikeMixin:
-    def copy_final_to_initial_params(self):
+    def copy_final_to_initial_params(self, filter_func=None):
         """
         Copies final values of function paramters to start values.
         This f.e. allows to continue global with local minimization.
         """
         for functions in self._function_tuple:
             for f in functions.values():
-                f.copy_final_to_initial_params()
+                f.copy_final_to_initial_params(filter_func=filter_func)
 
-    def lock_parameters(self):
+    def lock_parameters(self, filter_func=None):
         for functions in self._function_tuple:
             for f in functions.values():
-                f.lock_parameters()
+                f.lock_parameters(filter_func=filter_func)
 
     def count_parameters(self, enabled_only=True):
         parameters = 0

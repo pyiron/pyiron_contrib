@@ -11,9 +11,16 @@ from pyiron_base import state, DataContainer
 from pyiron_atomistics import Atoms, ase_to_pyiron
 
 from pyiron_atomistics.atomistics.structure.structurestorage import StructureStorage
-from pyiron_contrib.atomistics.atomicrex.fit_properties import ARFitPropertyList, ARFitProperty
+from pyiron_contrib.atomistics.atomistics.job.trainingcontainer import TrainingPlots
+from pyiron_contrib.atomistics.atomicrex.fit_properties import (
+    ARFitPropertyList,
+    ARFitProperty,
+)
 from pyiron_contrib.atomistics.atomicrex.utility_functions import write_pretty_xml
-from pyiron_contrib.atomistics.atomicrex.fit_properties import FlattenedARScalarProperty, FlattenedARVectorProperty
+from pyiron_contrib.atomistics.atomicrex.fit_properties import (
+    FlattenedARScalarProperty,
+    FlattenedARVectorProperty,
+)
 
 try:
     import atomicrex
@@ -24,9 +31,12 @@ except ImportError:
 class ARStructureContainer:
     __version__ = "0.3.0"
     __hdf_version__ = "0.3.0"
+
     def __init__(self, num_atoms=1, num_structures=1):
         self.fit_properties = DataContainer(table_name="fit_properties")
-        self._structures = StructureStorage(num_atoms=num_atoms, num_structures=num_structures)
+        self._structures = StructureStorage(
+            num_atoms=num_atoms, num_structures=num_structures
+        )
         self._predefined_storage = DataContainer(table_name="predefined_structures")
         self._structures.add_array("fit", dtype=bool, per="chunk")
         self._structures.add_array("clamp", dtype=bool, per="chunk")
@@ -36,12 +46,15 @@ class ARStructureContainer:
         try:
             self._interactive_library = atomicrex.Job()
             for path in state.settings.resource_paths:
-                path = posixpath.join(state.settings.resource_paths[0], "atomicrex/util/main.xml")
+                path = posixpath.join(
+                    state.settings.resource_paths[0], "atomicrex/util/main.xml"
+                )
                 if os.path.isfile(path):
                     self._interactive_library.parse_input_file(path)
                     break
         except:
             pass
+        self._prepared_plotting = False
 
     def add_structure(
         self,
@@ -50,12 +63,20 @@ class ARStructureContainer:
         fit=True,
         relative_weight=1,
         clamp=True,
-        ):
+    ):
         self._structures.add_structure(structure, identifier)
-        self._structures._per_chunk_arrays["fit"][self._structures.prev_chunk_index] = fit
-        self._structures._per_chunk_arrays["relative_weight"][self._structures.prev_chunk_index] = relative_weight
-        self._structures._per_chunk_arrays["clamp"][self._structures.prev_chunk_index] = clamp
-        self._structures._per_chunk_arrays["predefined"][self._structures.prev_chunk_index] = False
+        self._structures._per_chunk_arrays["fit"][
+            self._structures.prev_chunk_index
+        ] = fit
+        self._structures._per_chunk_arrays["relative_weight"][
+            self._structures.prev_chunk_index
+        ] = relative_weight
+        self._structures._per_chunk_arrays["clamp"][
+            self._structures.prev_chunk_index
+        ] = clamp
+        self._structures._per_chunk_arrays["predefined"][
+            self._structures.prev_chunk_index
+        ] = False
 
     def add_predefined_structure(
         self,
@@ -79,15 +100,25 @@ class ARStructureContainer:
             data["type_B"] = atom_type_B
         if ca_ratio is not None:
             data["ca_ratio"] = ca_ratio
-        struct = self._interactive_library.add_library_structure(identifier, lattice, data)
+        struct = self._interactive_library.add_library_structure(
+            identifier, lattice, data
+        )
         struct = ase_to_pyiron(struct.get_atoms(self._interactive_library))
 
         self._structures.add_structure(struct, identifier)
-        self._structures._per_chunk_arrays["fit"][self._structures.prev_chunk_index] = fit
-        self._structures._per_chunk_arrays["relative_weight"][self._structures.prev_chunk_index] = relative_weight
-        self._structures._per_chunk_arrays["clamp"][self._structures.prev_chunk_index] = clamp
-        self._structures._per_chunk_arrays["predefined"][self._structures.prev_chunk_index] = True
-        
+        self._structures._per_chunk_arrays["fit"][
+            self._structures.prev_chunk_index
+        ] = fit
+        self._structures._per_chunk_arrays["relative_weight"][
+            self._structures.prev_chunk_index
+        ] = relative_weight
+        self._structures._per_chunk_arrays["clamp"][
+            self._structures.prev_chunk_index
+        ] = clamp
+        self._structures._per_chunk_arrays["predefined"][
+            self._structures.prev_chunk_index
+        ] = True
+
         storage = DataContainer(table_name=identifier)
         storage["lattice"] = lattice
         storage["lattice_parameter"] = lattice_parameter
@@ -95,7 +126,6 @@ class ARStructureContainer:
         storage["atom_type_A"] = atom_type_A
         storage["atom_type_B"] = atom_type_B
         self._predefined_storage[identifier] = storage
-
 
     def add_scalar_fit_property(
         self,
@@ -109,31 +139,48 @@ class ARStructureContainer:
         tolerance=np.nan,
         min_val=np.nan,
         max_val=np.nan,
-        ):
+    ):
         try:
             flat = self.fit_properties[prop]
         except KeyError:
-            self.fit_properties[prop] = FlattenedARScalarProperty(num_chunks=self._structures.num_chunks, num_elements=self._structures.num_elements)
+            self.fit_properties[prop] = FlattenedARScalarProperty(
+                num_chunks=self._structures.num_chunks,
+                num_elements=self._structures.num_elements,
+            )
             flat = self.fit_properties[prop]
             if prop in ["lattice-parameter", "ca-ratio"]:
                 flat.add_array("min_val", per="chunk")
                 flat.add_array("max_val", per="chunk")
         try:
-            flat._per_chunk_arrays["target_val"][self._structures.prev_chunk_index] = target_val
+            flat._per_chunk_arrays["target_val"][
+                self._structures.prev_chunk_index
+            ] = target_val
         except (IndexError, ValueError):
             for v in self.fit_properties.values():
                 v._resize_chunks(self._structures._num_chunks_alloc)
                 v._resize_elements(self._structures._num_elements_alloc)
-            flat._per_chunk_arrays["target_val"][self._structures.prev_chunk_index] = target_val
+            flat._per_chunk_arrays["target_val"][
+                self._structures.prev_chunk_index
+            ] = target_val
         flat._per_chunk_arrays["fit"][self._structures.prev_chunk_index] = fit
         flat._per_chunk_arrays["relax"][self._structures.prev_chunk_index] = relax
-        flat._per_chunk_arrays["relative_weight"][self._structures.prev_chunk_index] = relative_weight
-        flat._per_chunk_arrays["residual_style"][self._structures.prev_chunk_index] = residual_style
+        flat._per_chunk_arrays["relative_weight"][
+            self._structures.prev_chunk_index
+        ] = relative_weight
+        flat._per_chunk_arrays["residual_style"][
+            self._structures.prev_chunk_index
+        ] = residual_style
         flat._per_chunk_arrays["output"][self._structures.prev_chunk_index] = output
-        flat._per_chunk_arrays["tolerance"][self._structures.prev_chunk_index] = tolerance
+        flat._per_chunk_arrays["tolerance"][
+            self._structures.prev_chunk_index
+        ] = tolerance
         if prop in ["lattice-parameter", "ca-ratio"]:
-            flat._per_chunk_arrays["min_val"][self._structures.prev_chunk_index] = min_val
-            flat._per_chunk_arrays["max_val"][self._structures.prev_chunk_index] = max_val
+            flat._per_chunk_arrays["min_val"][
+                self._structures.prev_chunk_index
+            ] = min_val
+            flat._per_chunk_arrays["max_val"][
+                self._structures.prev_chunk_index
+            ] = max_val
 
     def add_vector_fit_property(
         self,
@@ -145,11 +192,14 @@ class ARStructureContainer:
         residual_style=0,
         tolerance=np.nan,
         output=True,
-        ):
+    ):
         try:
             flat = self.fit_properties[prop]
         except KeyError:
-            self.fit_properties[prop] = FlattenedARVectorProperty(num_chunks=self._structures.num_chunks, num_elements=self._structures.num_elements)
+            self.fit_properties[prop] = FlattenedARVectorProperty(
+                num_chunks=self._structures.num_chunks,
+                num_elements=self._structures.num_elements,
+            )
             flat = self.fit_properties[prop]
         try:
             flat._per_chunk_arrays["fit"][self._structures.prev_chunk_index] = fit
@@ -160,18 +210,27 @@ class ARStructureContainer:
 
         if target_val is not None:
             try:
-                flat._per_element_arrays["target_val"][self._structures.prev_element_index:self._structures.current_element_index] = target_val
+                flat._per_element_arrays["target_val"][
+                    self._structures.prev_element_index : self._structures.current_element_index
+                ] = target_val
             except (IndexError, ValueError):
                 for v in self.fit_properties.values():
                     v._resize_elements(self._structures._num_elements_alloc)
-                flat._per_element_arrays["target_val"][self._structures.prev_element_index:self._structures.current_element_index] = target_val
+                flat._per_element_arrays["target_val"][
+                    self._structures.prev_element_index : self._structures.current_element_index
+                ] = target_val
         flat._per_chunk_arrays["relax"][self._structures.prev_chunk_index] = relax
-        flat._per_chunk_arrays["relative_weight"][self._structures.prev_chunk_index] = relative_weight
-        flat._per_chunk_arrays["residual_style"][self._structures.prev_chunk_index] = residual_style
+        flat._per_chunk_arrays["relative_weight"][
+            self._structures.prev_chunk_index
+        ] = relative_weight
+        flat._per_chunk_arrays["residual_style"][
+            self._structures.prev_chunk_index
+        ] = residual_style
         flat._per_chunk_arrays["output"][self._structures.prev_chunk_index] = output
-        flat._per_chunk_arrays["tolerance"][self._structures.prev_chunk_index] = tolerance
+        flat._per_chunk_arrays["tolerance"][
+            self._structures.prev_chunk_index
+        ] = tolerance
 
-    
     def _get_per_structure_index(self, identifier):
         """
         Takes an identifier or an ndarray of indentifiers and returns the corresponding indices in the structure/scalar_fit_properties arrays.
@@ -185,15 +244,17 @@ class ARStructureContainer:
             identifier = np.array(identifier)
         indices = np.flatnonzero(
             np.isin(
-                self._structures._per_chunk_arrays["identifier"], identifier, assume_unique=True
-                )
+                self._structures._per_chunk_arrays["identifier"],
+                identifier,
+                assume_unique=True,
             )
+        )
         # This is some sorting magic that could lead to strange errors
         # Look here if something goes wrong with the ordering
         ids_stored = np.array(self._structures._per_chunk_arrays["identifier"][indices])
         sorter = ids_stored.argsort()[identifier.argsort()]
         return indices[sorter]
- 
+
     def get_scalar_property(self, prop, identifier, final=True):
         """
         Returns final or target value of a scalar property based on the identifier used when adding a structure
@@ -228,16 +289,21 @@ class ARStructureContainer:
             [type]: [description]
         """
         if not isinstance(identifier, str):
-            raise NotImplementedError("Can only look up properties for single identifiers currently")
+            raise NotImplementedError(
+                "Can only look up properties for single identifiers currently"
+            )
         index = self._get_per_structure_index(identifier)[0]
-        slc  = self._structures._get_per_element_slice(index)
+        slc = self._structures._get_per_element_slice(index)
         if final:
             return self.fit_properties[prop]._per_element_arrays["final_val"][slc]
         else:
             return self.fit_properties[prop]._per_element_arrays["target_val"][slc]
 
     def _shrink(self):
-        self._resize_all(num_chunks=self._structures.num_chunks, num_elements=self._structures.num_elements)
+        self._resize_all(
+            num_chunks=self._structures.num_chunks,
+            num_elements=self._structures.num_elements,
+        )
 
     def _resize_all(self, num_chunks, num_elements):
         self._structures.num_elements = num_elements
@@ -267,10 +333,11 @@ class ARStructureContainer:
         with hdf.open(group_name) as h:
             self._type_to_hdf(h)
             self._structures.to_hdf(hdf=h)
-            self.fit_properties.to_hdf(hdf=h,)
+            self.fit_properties.to_hdf(
+                hdf=h,
+            )
             self._predefined_storage.to_hdf(hdf=h)
             h["structure_file_path"] = self.structure_file_path
-
 
     def from_hdf(self, hdf, group_name="structures"):
         with hdf.open(group_name) as h:
@@ -300,16 +367,21 @@ class ARStructureContainer:
                 with h.open("fit_properties") as g:
                     for k in g.list_groups():
                         if k == "atomic-forces":
-                            self.fit_properties[k] = FlattenedARVectorProperty(num_chunks=num_structures, num_elements=num_atoms)
+                            self.fit_properties[k] = FlattenedARVectorProperty(
+                                num_chunks=num_structures, num_elements=num_atoms
+                            )
                         else:
-                            self.fit_properties[k] = FlattenedARScalarProperty(num_chunks=num_structures, num_elements=num_atoms)
+                            self.fit_properties[k] = FlattenedARScalarProperty(
+                                num_chunks=num_structures, num_elements=num_atoms
+                            )
                         self.fit_properties[k].from_hdf(hdf=g, group_name=k)
 
             if version < "0.3.0":
                 self._structures._per_chunk_arrays["clamp"] = h["clamp"]
                 self._structures._per_chunk_arrays["fit"] = h["fit"]
-                self._structures._per_chunk_arrays["relative_weight"] = h["relative_weight"]
-           
+                self._structures._per_chunk_arrays["relative_weight"] = h[
+                    "relative_weight"
+                ]
 
     def write_xml_file(self, directory, name="structures.xml"):
         """
@@ -326,8 +398,10 @@ class ARStructureContainer:
             # write POSCARs
             for i in range(self._structures.num_chunks):
                 vec_start = self._structures.start_index[i]
-                vec_end = self._structures.start_index[i]+self._structures.length[i]
-                forces = self.fit_properties["atomic-forces"]._per_element_arrays["target_val"][vec_start:vec_end]
+                vec_end = self._structures.start_index[i] + self._structures.length[i]
+                forces = self.fit_properties["atomic-forces"]._per_element_arrays[
+                    "target_val"
+                ][vec_start:vec_end]
                 if not self._structures._per_chunk_arrays["predefined"][i]:
                     write_modified_poscar(
                         identifier=self._structures.identifier[i],
@@ -335,12 +409,12 @@ class ARStructureContainer:
                         positions=self._structures.positions[vec_start:vec_end],
                         symbols=self._structures.symbols[vec_start:vec_end],
                         cell=self._structures.cell[i],
-                        directory=directory
+                        directory=directory,
                     )
-                #Maybe implement a check for forces when setting up a predefined structure?
-                #else:
+                # Maybe implement a check for forces when setting up a predefined structure?
+                # else:
                 #    if not np.all(np.isnan(forces)):
-                
+
         # write xml
         for i in range(self._structures.num_chunks):
             fit_properties_xml = ET.Element("properties")
@@ -350,11 +424,13 @@ class ARStructureContainer:
                         fit_properties_xml.append(flat_prop.to_xml_element(i, prop))
                 struct_xml = structure_meta_xml(
                     identifier=self._structures.identifier[i],
-                    relative_weight=self._structures._per_chunk_arrays["relative_weight"][i],
+                    relative_weight=self._structures._per_chunk_arrays[
+                        "relative_weight"
+                    ][i],
                     clamp=self._structures._per_chunk_arrays["clamp"][i],
                     fit_properties=fit_properties_xml,
                     struct_file_path=self.structure_file_path,
-                    fit = self._structures._per_chunk_arrays["fit"][i],
+                    fit=self._structures._per_chunk_arrays["fit"][i],
                 )
             else:
                 for prop, flat_prop in self.fit_properties.items():
@@ -367,15 +443,16 @@ class ARStructureContainer:
                     ca_ratio=data["ca_ratio"],
                     atom_type_A=data["atom_type_A"],
                     atom_type_B=data["atom_type_B"],
-                    relative_weight=self._structures._per_chunk_arrays["relative_weight"][i],
+                    relative_weight=self._structures._per_chunk_arrays[
+                        "relative_weight"
+                    ][i],
                     clamp=self._structures._per_chunk_arrays["clamp"][i],
                     fit_properties=fit_properties_xml,
-                    fit = self._structures._per_chunk_arrays["fit"][i],
+                    fit=self._structures._per_chunk_arrays["fit"][i],
                 )
             root.append(struct_xml)
         filename = posixpath.join(directory, name)
         write_pretty_xml(root, filename)
-
 
     def _parse_final_properties(self, struct_lines):
         """
@@ -384,11 +461,11 @@ class ARStructureContainer:
 
         Args:
             struct_lines (list[str]): lines from atomicrex output that contain structure information.
-        """ 
+        """
         force_vec_triggered = False
         for l in struct_lines:
             l = l.strip()
-            
+
             if force_vec_triggered:
                 if l.startswith("atomic-forces:"):
                     l = l.split()
@@ -399,25 +476,47 @@ class ARStructureContainer:
                 else:
                     force_vec_triggered = False
                     start_index = self._structures.start_index[s_index]
-                    self.fit_properties["atomic-forces"]._per_element_arrays["final_val"][start_index:start_index+len_struct] = final_forces
+                    self.fit_properties["atomic-forces"]._per_element_arrays[
+                        "final_val"
+                    ][start_index : start_index + len_struct] = final_forces
 
             # This has to be if and not else because it has to run in the same iteration. Empty lines get skipped.
             if not force_vec_triggered and l:
                 if l.startswith("Structure"):
                     s_id = l.split("'")[1]
-                    s_index = np.nonzero(self._structures.identifier==s_id)[0][0]
+                    s_index = np.nonzero(self._structures.identifier == s_id)[0][0]
 
                 else:
                     if not l.startswith("atomic-forces avg/max:"):
                         l = l.split()
-                        prop, f_val =l[0].rstrip(":"), float(l[1])
+                        prop, f_val = l[0].rstrip(":"), float(l[1])
                         if prop in self.fit_properties.keys():
-                            self.fit_properties[prop]._per_chunk_arrays["final_val"][s_index] = f_val
+                            self.fit_properties[prop]._per_chunk_arrays["final_val"][
+                                s_index
+                            ] = f_val
                     else:
                         force_vec_triggered = True
-                        len_struct = self._structures._per_chunk_arrays["length"][s_index]
+                        len_struct = self._structures._per_chunk_arrays["length"][
+                            s_index
+                        ]
                         final_forces = np.empty((len_struct, 3))
-    
+
+    @property
+    def plot(self):
+        """
+        :class:`.TrainingPlots`: plotting interface
+        """
+        return TrainingPlots(self._structures)
+
+    def prepare_plotting(self, final_values=False):
+        val_str = "target_val"
+        if final_values:
+            val_str = "final_val"
+        self._structures._per_chunk_arrays["energy"] = (
+            self.fit_properties["atomic-energy"]._per_chunk_arrays[val_str]
+            * self._structures.length
+        )
+
 
 ### This is probably useless like this in most cases because forces can't be passed.
 def user_structure_to_xml_element(structure):
@@ -429,7 +528,7 @@ def user_structure_to_xml_element(structure):
 
     Returns:
         (ET.Element, ET.Element): atomicrex structure xml
-    """    
+    """
     pbc = ET.Element("pbc")
     pbc.set("x", f"{structure.pbc[0]}".lower())
     pbc.set("y", f"{structure.pbc[1]}".lower())
@@ -455,257 +554,29 @@ def user_structure_to_xml_element(structure):
     return pbc, cell
 
 
-class ARStructure(object):
-    """
-    Class that contains a pyiron structure, an ARFitPropertyList
-    and some attributes that define the fitting procedure.
-    Provides internal helper methods.
-    """
-
-    def __init__(self, structure=None, fit_properties=None, identifier=None, relative_weight=1, clamp=True, fit=True):
-        self._structure = None
-        self._fit_properties = None
-        if structure is not None:
-            self.structure = structure
-        if fit_properties is not None:
-            self.fit_properties = fit_properties
-        self.identifier = identifier
-        self.relative_weight = relative_weight
-        self.clamp = clamp
-        self.fit = fit
-
-    @property
-    def structure(self):
-        return self._structure
-
-    @structure.setter
-    def structure(self, structure):
-        if not isinstance(structure, Atoms):
-            raise ValueError("structure has to be a pyiron atoms instance")
-        self._structure = structure
-
-    @property
-    def fit_properties(self):
-        return self._fit_properties
-
-    @fit_properties.setter
-    def fit_properties(self, fit_properties=ARFitPropertyList()):
-        if not isinstance(fit_properties, ARFitPropertyList):
-            raise ValueError("fit_properties have to be an ARFitPropertyList")
-        self._fit_properties = fit_properties
-
-    def _write_poscar_return_xml(self, directory, struct_file_path):
-        """
-        Internal function that writes the structure in an extended POSCAR
-        format that contains forces. Returns an atomicrex xml
-        element that references the POSCAR file and contains additional
-        information like the fit properties.
-
-        Args:
-            directory (string): Working directory
-            struct_file_path (string): path to a directory containing structure files. If None structure files are written in working directory
-        Returns:
-            [ElementTree xml element]: xml element referencing POSCAR, contains additional information
-        """        
-        if struct_file_path is None:
-            forces = self.fit_properties["atomic-forces"].target_value
-            write_modified_poscar(
-                identifier = self.identifier,
-                structure = self.structure,
-                forces=forces,
-                directory=directory
-                )
-
-        return structure_meta_xml(
-            identifier = self.identifier,
-            relative_weight = self.relative_weight,
-            clamp = self.clamp,
-            fit_properties = self.fit_properties,
-            fit = self.fit,
-            struct_file_path = struct_file_path,
-        )
-
-    def to_hdf(self, hdf=None, group_name="arstructure", full_hdf=True):
-        """
-        Internal function
-        """        
-        with hdf.open(group_name) as hdf_s_lst:
-            if full_hdf:
-                self.structure.to_hdf(hdf=hdf_s_lst, group_name="structure")
-            self.fit_properties.to_hdf(hdf=hdf_s_lst, group_name="fit_properties")
-            hdf_s_lst["relative_weight"] = self.relative_weight
-            hdf_s_lst["identifier"] = self.identifier
-            hdf_s_lst["clamp"] = self.clamp
-
-    def from_hdf(self, hdf=None, group_name="arstructure", full_hdf=True):
-        """
-        Internal function 
-        """    
-        with hdf.open(group_name) as hdf_s_lst:
-            if full_hdf:
-                structure = Atoms()
-                structure.from_hdf(hdf_s_lst, group_name="structure")
-                self.structure = structure
-            self.fit_properties = ARFitPropertyList()
-            self.fit_properties.from_hdf(hdf=hdf_s_lst, group_name="fit_properties")
-            self.relative_weight = hdf_s_lst["relative_weight"]
-            self.identifier = hdf_s_lst["identifier"]
-            self.clamp = hdf_s_lst["clamp"]
-
-
-class ARStructureList(object):
-    """
-    Container class for AR structures. structures attribute
-    of the atomicrex job class.
-    Provides functions for internal use and a convenient way
-    to add additional structures to the atomicrex job.
-
-    Will be replaced with FlattenedStructureContainer or used only for representation of the data
-    """    
-    def __init__(self):
-        self._structure_dict = {}
-
-        # This allows to give a path where structures are stored in atomicrex POSCAR format
-        # It modifies the write input function to prevent a lot of file io and slow down performance
-        # If it is not given a file is written for every structure of the job.
-        self.struct_file_path = None
-        self.full_structure_to_hdf = True
-        self.num_structures = 0
-        self.num_atoms = 0
-
-    def add_structure(self, structure, identifier, fit_properties=None, relative_weight=1, clamp=True, fit=True):
-        """
-        Provides a convenient way to add additional
-        structures to the job.
-        
-        Args:
-            structure (Pyiron Atoms): structure that should be added.
-            identifier (string): ID string. Must be unique or overwrites the old structure.
-            fit_properties ([ARFitPropertyList], optional): Fit Properties can be conveniently added after appending the structure. Defaults to None.
-            relative_weight (int, optional): Assigns a weight for the objective function. Defaults to 1.
-            clamp (bool, optional): Clamp the structure (Do not relax it). Defaults to True.
-
-        Raises:
-            ValueError: Raises if structure is not a pyiron atoms instance.
-
-        Returns:
-            [ARStructure]: Acces to the atomicrex structure in the structure list.
-        """        
-        if isinstance(structure, Atoms):
-            if fit_properties is None:
-                fit_properties = ARFitPropertyList()
-            ar_struct = ARStructure(structure, fit_properties, identifier, relative_weight=relative_weight, clamp=clamp)
-            self.num_structures += 1
-            self.num_atoms += len(structure)
-            return self._add_ARstructure(ar_struct)
-        else:
-            raise ValueError("Structure has to be a Pyiron Atoms instance")
-
-
-    def _add_ARstructure(self, structure):
-        """Internal helper function to be able to implement some more checks later on
-        """        
-        identifier = f"{structure.identifier}"
-        self._structure_dict[identifier] = structure
-        return self._structure_dict[identifier]
-
-    def write_xml_file(self, directory, name="structures.xml"):
-        """
-        Internal helper function that write an atomicrex style
-        xml file containg all structures.
-
-        Args:
-            directory (string): Working directory.
-            name (str, optional): . Defaults to "structures.xml".
-        """        
-        root = ET.Element("group")
-        for s in self._structure_dict.values():
-            root.append(s._write_poscar_return_xml(directory, self.struct_file_path))
-        filename = posixpath.join(directory, name)
-        write_pretty_xml(root, filename)
-    
-    def to_hdf(self, hdf=None, group_name="arstructurelist"):
-        """
-        Internal function 
-        """    
-        with hdf.open(group_name) as hdf_s_lst:
-            hdf_s_lst["struct_file_path"] = self.struct_file_path
-            hdf_s_lst["full_structure_to_hdf"] = self.full_structure_to_hdf
-            for k, v in self._structure_dict.items():
-                v.to_hdf(hdf=hdf_s_lst, group_name=k, full_hdf=self.full_structure_to_hdf)
-
-    def from_hdf(self, hdf=None, group_name="arstructurelist"):
-        """
-        Internal function 
-        """        
-        with hdf.open(group_name) as hdf_s_lst:
-            # compatibility with my old jobs. find a way to write this to hdf for them and delete try except block
-            try:
-                self.struct_file_path = hdf_s_lst["struct_file_path"]
-                self.full_structure_to_hdf = hdf_s_lst["full_structure_to_hdf"]
-            except ValueError:
-                pass
-
-            for g in sorted(hdf_s_lst.list_groups()):
-                s = ARStructure()
-                s.from_hdf(hdf=hdf_s_lst, group_name=g, full_hdf=self.full_structure_to_hdf)
-                self._structure_dict[g] = s
-
-
-    def _parse_final_properties(self, struct_lines):
-        """
-        Internal function that parses the values of fitted properties
-        calculated with the final iteration of the fitted potential.
-
-        Args:
-            struct_lines (list[str]): lines from atomicrex output that contain structure information.
-        """ 
-        force_vec_triggered = False   
-        for l in struct_lines:
-            l = l.strip()
-            
-            if force_vec_triggered:
-                if l.startswith("atomic-forces:"):
-                    l = l.split()
-                    index = int(l[1])
-                    final_forces[index, 0] = float(l[2].lstrip("(").rstrip(","))
-                    final_forces[index, 1] = float(l[3].rstrip(","))
-                    final_forces[index, 2] = float(l[4].rstrip(")"))
-                else:
-                    force_vec_triggered = False
-                    s.fit_properties["atomic-forces"].final_value = final_forces
-            
-            # This has to be if and not else because it has to run in the same iteration. Empty lines get skipped.
-            if not force_vec_triggered and l:
-                if l.startswith("Structure"):
-                    s_id = l.split("'")[1]
-                    s = self._structure_dict[s_id]
-            
-                else:
-                    if not l.startswith("atomic-forces avg/max:"):
-                        prop, f_val = ARFitProperty._parse_final_value(line=l)
-                        if prop in s.fit_properties:
-                            s.fit_properties[prop].final_value = f_val
-                    else:
-                        force_vec_triggered = True
-                        final_forces = np.empty((len(s.structure), 3))
-
-
-def write_modified_poscar(identifier, forces, directory, structure=None, positions=None, cell=None, symbols=None):
+def write_modified_poscar(
+    identifier,
+    forces,
+    directory,
+    structure=None,
+    positions=None,
+    cell=None,
+    symbols=None,
+):
     """
     Internal function. Writes a pyiron structure
     and corresponding forces in a modified POSCAR file.
     Either provide a structure instance or positions and symbols.
     Args:
         identifier (str): Unique identifier used for the filename.
-        structure (Atoms): ase or pyiron atoms object. 
+        structure (Atoms): ase or pyiron atoms object.
         positions (np.array): atomic positions
         symbols (np.array): chemical symbols
         forces (array or list[list]): atomic forces. Must be in same order as positions.
         directory (str): Working directory.
-    """    
+    """
     filename = posixpath.join(directory, f"POSCAR_{identifier}")
-    with open(filename, 'w') as f:
+    with open(filename, "w") as f:
         # Elements as system name
         # Also check if the symbols are disordered
         # to prevent errors resulting from poscar format
@@ -730,47 +601,48 @@ def write_modified_poscar(identifier, forces, directory, structure=None, positio
         f.write(f"{elements}\n")
 
         # Cell metric
-        f.write('1.0\n')
+        f.write("1.0\n")
         if cell is None:
             cell = structure.cell
         for vec in cell:
             for v in vec:
-                f.write(f'{v} ')
-            f.write('\n')
+                f.write(f"{v} ")
+            f.write("\n")
 
         # Element names
         for elem in elements:
-            f.write(f'{elem} ')
-        f.write('\n')
+            f.write(f"{elem} ")
+        f.write("\n")
 
         # Number of elements per type
         for elem in elements:
-            n = len(symbols[symbols==elem])
-            f.write(f'{n}    ')
-        f.write('\n')
+            n = len(symbols[symbols == elem])
+            f.write(f"{n}    ")
+        f.write("\n")
 
         # Scaled coordinates
         if positions is None:
             positions = structure.positions
-        f.write('Cartesian\n')
+        f.write("Cartesian\n")
 
         # Coordinates and forces
         for pos, force in zip(positions, forces):
-            for r in pos: f.write((f'{r} '))
-            f.write('   ')
-            for r in force: f.write((f'{r} '))
-            f.write('\n')
+            for r in pos:
+                f.write((f"{r} "))
+            f.write("   ")
+            for r in force:
+                f.write((f"{r} "))
+            f.write("\n")
 
 
 def structure_meta_xml(
-        identifier,
-        relative_weight,
-        clamp, ## Not sure if and how this combines with relax in the ARFitParameter sets
-        fit_properties,
-        struct_file_path,
-        fit,
-        mod_poscar = True,
-        
+    identifier,
+    relative_weight,
+    clamp,  ## Not sure if and how this combines with relax in the ARFitParameter sets
+    fit_properties,
+    struct_file_path,
+    fit,
+    mod_poscar=True,
 ):
     """
     Internal function. Creates xml element with
@@ -780,7 +652,7 @@ def structure_meta_xml(
     Args:
         identifier (str): Unique identifier.
         relative_weight (float): weight in objective function
-        clamp (bool): clamp the structure (no relaxation) 
+        clamp (bool): clamp the structure (no relaxation)
         mod_poscar (bool, optional): Combine with poscar file. Defaults to True.
         struct_file_path (string): path to POSCAR file
     Raises:
@@ -794,7 +666,7 @@ def structure_meta_xml(
     struct_xml = ET.Element("user-structure")
     struct_xml.set("id", f"{identifier}")
     struct_xml.set("relative-weight", f"{relative_weight}")
-    if fit: 
+    if fit:
         struct_xml.set("fit", "true")
     else:
         struct_xml.set("fit", "false")
@@ -815,7 +687,7 @@ def structure_meta_xml(
     if not clamp:
         relax_dof = ET.SubElement(struct_xml, "relax-dof")
         atom_coordinates = ET.SubElement(relax_dof, "atom-coordinates")
-    
+
     if isinstance(fit_properties, ARFitPropertyList):
         properties = ET.SubElement(struct_xml, "properties")
         for prop in fit_properties.values():
@@ -824,17 +696,18 @@ def structure_meta_xml(
         struct_xml.append(fit_properties)
     return struct_xml
 
+
 def predefined_structure_xml(
-        identifier,
-        lattice,
-        lattice_param,
-        ca_ratio,
-        atom_type_A,
-        atom_type_B,
-        relative_weight,
-        clamp, ## Not sure if and how this combines with relax in the ARFitParameter sets
-        fit_properties,
-        fit,
+    identifier,
+    lattice,
+    lattice_param,
+    ca_ratio,
+    atom_type_A,
+    atom_type_B,
+    relative_weight,
+    clamp,  ## Not sure if and how this combines with relax in the ARFitParameter sets
+    fit_properties,
+    fit,
 ):
     """
     Internal function. Creates xml element for predefined structure.
@@ -851,11 +724,11 @@ def predefined_structure_xml(
     struct_xml = ET.Element(f"{lattice}-lattice")
     struct_xml.set("id", f"{identifier}")
     struct_xml.set("relative-weight", f"{relative_weight}")
-    if fit: 
+    if fit:
         struct_xml.set("fit", "true")
     else:
         struct_xml.set("fit", "false")
-    
+
     if atom_type_A is None:
         raise ValueError("atom type A has to be given for predefined structures")
     else:
@@ -872,7 +745,7 @@ def predefined_structure_xml(
     else:
         a = ET.SubElement(struct_xml, "lattice-parameter")
         a.text = f"{lattice_param}"
-    
+
     if ca_ratio is not None:
         ca = ET.SubElement(struct_xml, "ca-ratio")
         ca.text = f"{ca_ratio}"
@@ -880,7 +753,7 @@ def predefined_structure_xml(
     if not clamp:
         relax_dof = ET.SubElement(struct_xml, "relax-dof")
         ET.SubElement(relax_dof, "atom-coordinates")
-     
+
     if isinstance(fit_properties, ARFitPropertyList):
         properties = ET.SubElement(struct_xml, "properties")
         for prop in fit_properties.values():

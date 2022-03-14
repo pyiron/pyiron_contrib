@@ -92,7 +92,10 @@ write-cfgs:skip 0
         if not self._selection_enabled:
             raise ValueError("Selected structures are only available after calling enable_active_learning()!")
         if self._selected_structures is None:
-            self._selected_structures = StructureStorage()
+            if "selected" in self["output"].list_groups():
+                self._selected_structures = self["output/selected"].to_object()
+            else:
+                self._selected_structures = StructureStorage()
         return self._selected_structures
 
     def collect_output(self):

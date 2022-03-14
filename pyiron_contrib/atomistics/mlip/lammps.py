@@ -106,7 +106,8 @@ write-cfgs:skip 0
                 for cfg in loadcfgs(file_name):
                     self.selected_structures.add_structure(
                             Atoms(species=self.structure.species, indices=cfg.types, positions=cfg.pos, cell=cfg.lat,
-                                  pbc=[True, True, True])
+                                  pbc=[True, True, True]),
+                            mv_grade=cfg.grade
                     )
                 cell, positions, forces, stress, energy, indicies, grades, jobids, timesteps = read_cgfs(file_name=file_name)
                 with self.project_hdf5.open("output/mlip") as hdf5_output:

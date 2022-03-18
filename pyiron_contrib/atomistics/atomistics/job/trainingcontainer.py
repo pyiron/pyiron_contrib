@@ -269,7 +269,7 @@ class TrainingPlots:
         C = self._train.get_array("cell")
 
         def get_angle(cell, idx=0):
-            angle_in_rad = np.arccos(np.dot(cell[idx], cell[(idx+1)%3]) \
+            return np.arccos(np.dot(cell[idx], cell[(idx+1)%3]) \
                     / np.linalg.norm(cell[idx]) / np.linalg.norm(cell[(idx+1)%3]))
 
 
@@ -286,7 +286,7 @@ class TrainingPlots:
         df["V"] = np.linalg.det(C)
         df["N"] = N
         if angle_in_degrees:
-            df["alpha"] = np.rad2deg(df["alpha"])
+            df["alpha"] = np.rad2deg(df.alpha.)
             df["beta"] = np.rad2deg(df["beta"])
             df["gamma"] = np.rad2deg(df["gamma"])
 

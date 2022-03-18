@@ -244,12 +244,15 @@ class TrainingPlots:
 
         return pd.DataFrame(map(extract, self._train.iter_structures()))
 
-    def cell(self):
+    def cell(self, angle_in_degrees=True):
         """
         Plot histograms of cell parameters.
 
         Plotted are atomic volume, density, cell vector lengths and cell vector angles in separate subplots all on a
         log-scale.
+
+        Args:
+            angle_in_degrees (bool): whether unit for angles is degree or radians
 
         Returns:
             `DataFrame`: contains the plotted information in the columns:
@@ -266,8 +269,9 @@ class TrainingPlots:
         C = self._train.get_array("cell")
 
         def get_angle(cell, idx=0):
-            return np.arccos(np.dot(cell[idx], cell[(idx+1)%3]) \
+            angle_in_rad = np.arccos(np.dot(cell[idx], cell[(idx+1)%3]) \
                     / np.linalg.norm(cell[idx]) / np.linalg.norm(cell[(idx+1)%3]))
+
 
         def extract(n, c):
             return {
@@ -281,6 +285,10 @@ class TrainingPlots:
         df = pd.DataFrame([extract(n, c) for n, c in zip(N, C)])
         df["V"] = np.linalg.det(C)
         df["N"] = N
+        if angle_in_degrees:
+            df["alpha"] = np.rad2deg(df["alpha"])
+            df["beta"] = np.rad2deg(df["beta"])
+            df["gamma"] = np.rad2deg(df["gamma"])
 
         plt.subplot(1, 4, 1)
         plt.title("Atomic Volume")
@@ -300,7 +308,11 @@ class TrainingPlots:
         plt.subplot(1, 4, 4)
         plt.title("Lattice Vector Angles")
         plt.hist([df.alpha, df.beta, df.gamma], log=True)
-        plt.xlabel(r"$\alpha,\beta,\gamma$ [rad]")
+        if angle_in_degrees:
+            label = r"$\alpha,\beta,\gamma$ [°]"
+        else:
+            label = r"$\alpha,\beta,\gamma$ [rad]"
+        plt.xlabel(label)
 
         return df
 

@@ -52,10 +52,9 @@ class TrainingContainer(GenericJob, HasStructure):
         self.__hdf_version__ = "0.3.0"
         self._container = TrainingStorage()
 
-        self.input = DataContainer({
-                "save_neighbors": True,
-                "num_neighbors": 12
-            }, table_name="parameters")
+        self.input = DataContainer(
+            {"save_neighbors": True, "num_neighbors": 12}, table_name="parameters"
+        )
 
     def include_job(self, job, iteration_step=-1):
         """
@@ -118,8 +117,11 @@ class TrainingContainer(GenericJob, HasStructure):
         """
         if num_neighbors is None:
             num_neighbors = self.input.num_neighbors
-        n = NeighborsTrajectory(has_structure=self, store=self._container if self.input.save_neighbors else None,
-                                num_neighbors=num_neighbors)
+        n = NeighborsTrajectory(
+            has_structure=self,
+            store=self._container if self.input.save_neighbors else None,
+            num_neighbors=num_neighbors,
+        )
         n.compute_neighbors()
         return n
 
@@ -187,7 +189,9 @@ class TrainingContainer(GenericJob, HasStructure):
         super().from_hdf(hdf=hdf, group_name=group_name)
         hdf_version = self.project_hdf5.get("HDF_VERSION", "0.1.0")
         if hdf_version == "0.1.0":
-            table = pd.read_hdf(self.project_hdf5.file_name, self.name + "/output/structure_table")
+            table = pd.read_hdf(
+                self.project_hdf5.file_name, self.name + "/output/structure_table"
+            )
             self.include_dataset(table)
         else:
             self._container = TrainingStorage()
@@ -201,6 +205,7 @@ class TrainingContainer(GenericJob, HasStructure):
         :class:`.TrainingPlots`: plotting interface
         """
         return TrainingPlots(self._container)
+
 
 class TrainingPlots:
     """
@@ -222,8 +227,9 @@ class TrainingPlots:
         Returns:
             DataFrame: contains columns 'crystal_system' (str) and 'space_group' (int) for each structure
         """
+
         def get_crystal_system(num):
-            if num in range(1,3):
+            if num in range(1, 3):
                 return "triclinic"
             elif num in range(3, 16):
                 return "monoclinic"
@@ -240,16 +246,19 @@ class TrainingPlots:
 
         def extract(s):
             spg = s.get_symmetry(symprec=symprec).spacegroup["Number"]
-            return {'space_group': spg, 'crystal_system': get_crystal_system(spg)}
+            return {"space_group": spg, "crystal_system": get_crystal_system(spg)}
 
         return pd.DataFrame(map(extract, self._train.iter_structures()))
 
-    def cell(self):
+    def cell(self, angle_in_degrees=True):
         """
         Plot histograms of cell parameters.
 
         Plotted are atomic volume, density, cell vector lengths and cell vector angles in separate subplots all on a
         log-scale.
+
+        Args:
+            angle_in_degrees (bool): whether unit for angles is degree or radians
 
         Returns:
             `DataFrame`: contains the plotted information in the columns:
@@ -266,30 +275,38 @@ class TrainingPlots:
         C = self._train.get_array("cell")
 
         def get_angle(cell, idx=0):
-            return np.arccos(np.dot(cell[idx], cell[(idx+1)%3]) \
-                    / np.linalg.norm(cell[idx]) / np.linalg.norm(cell[(idx+1)%3]))
+            return np.arccos(
+                np.dot(cell[idx], cell[(idx + 1) % 3])
+                / np.linalg.norm(cell[idx])
+                / np.linalg.norm(cell[(idx + 1) % 3])
+            )
 
         def extract(n, c):
             return {
-                    "a": np.linalg.norm(c[0]),
-                    "b": np.linalg.norm(c[1]),
-                    "c": np.linalg.norm(c[2]),
-                    "alpha": get_angle(c, 0),
-                    "beta": get_angle(c, 1),
-                    "gamma": get_angle(c, 2),
+                "a": np.linalg.norm(c[0]),
+                "b": np.linalg.norm(c[1]),
+                "c": np.linalg.norm(c[2]),
+                "alpha": get_angle(c, 0),
+                "beta": get_angle(c, 1),
+                "gamma": get_angle(c, 2),
             }
+
         df = pd.DataFrame([extract(n, c) for n, c in zip(N, C)])
         df["V"] = np.linalg.det(C)
         df["N"] = N
+        if angle_in_degrees:
+            df["alpha"] = np.rad2deg(df["alpha"])
+            df["beta"] = np.rad2deg(df["beta"])
+            df["gamma"] = np.rad2deg(df["gamma"])
 
         plt.subplot(1, 4, 1)
         plt.title("Atomic Volume")
-        plt.hist(df.V/df.N, bins=20, log=True)
+        plt.hist(df.V / df.N, bins=20, log=True)
         plt.xlabel(r"$V$ [$\AA^3$]")
 
         plt.subplot(1, 4, 2)
         plt.title("Density")
-        plt.hist(df.N/df.V, bins=20, log=True)
+        plt.hist(df.N / df.V, bins=20, log=True)
         plt.xlabel(r"$\rho$ [$\AA^{-3}$]")
 
         plt.subplot(1, 4, 3)
@@ -300,7 +317,11 @@ class TrainingPlots:
         plt.subplot(1, 4, 4)
         plt.title("Lattice Vector Angles")
         plt.hist([df.alpha, df.beta, df.gamma], log=True)
-        plt.xlabel(r"$\alpha,\beta,\gamma$")
+        if angle_in_degrees:
+            label = r"$\alpha,\beta,\gamma$ [°]"
+        else:
+            label = r"$\alpha,\beta,\gamma$ [rad]"
+        plt.xlabel(label)
 
         return df
 
@@ -387,14 +408,21 @@ class TrainingPlots:
         """
         if not self._train.has_array("shells"):
             raise ValueError(
-                    "TrainingContainer contains no neighbor information, call TrainingContainer.get_neighbors first!"
+                "TrainingContainer contains no neighbor information, call TrainingContainer.get_neighbors first!"
             )
-        shells = self._train.get_array('shells')
-        shell_index = shells[np.newaxis, :, :] == np.arange(1, num_shells+1)[:, np.newaxis, np.newaxis]
+        shells = self._train.get_array("shells")
+        shell_index = (
+            shells[np.newaxis, :, :]
+            == np.arange(1, num_shells + 1)[:, np.newaxis, np.newaxis]
+        )
         neigh_count = shell_index.sum(axis=-1)
-        ticks = np.arange(neigh_count.min(), neigh_count.max()+1)
-        plt.hist(neigh_count.T, bins=ticks-0.5,
-                 log=True, label=[f"{i}." for i in range(1, num_shells+1)])
+        ticks = np.arange(neigh_count.min(), neigh_count.max() + 1)
+        plt.hist(
+            neigh_count.T,
+            bins=ticks - 0.5,
+            log=True,
+            label=[f"{i}." for i in range(1, num_shells + 1)],
+        )
         plt.xticks(ticks)
         plt.xlabel("Number of Neighbors")
         plt.legend(title="Shell")
@@ -407,24 +435,31 @@ class TrainingPlots:
         Args:
             num_shells (int): maximum shell to plot
         """
-        if not self._train.has_array("shells") or not self._train.has_array("distances"):
+        if not self._train.has_array("shells") or not self._train.has_array(
+            "distances"
+        ):
             raise ValueError(
-                    "TrainingContainer contains no neighbor information, call TrainingContainer.get_neighbors first!"
+                "TrainingContainer contains no neighbor information, call TrainingContainer.get_neighbors first!"
             )
-        dists = self._train.get_array('distances')
+        dists = self._train.get_array("distances")
         R = dists.flatten()
-        shells = self._train.get_array('shells')
+        shells = self._train.get_array("shells")
         S = shells.ravel()
-        d = pd.DataFrame({"distance": R[S < num_shells + 1], "shells": S[S < num_shells + 1]})
-        sns.violinplot(y=d.shells, x=d.distance, scale='width', orient='h')
+        d = pd.DataFrame(
+            {"distance": R[S < num_shells + 1], "shells": S[S < num_shells + 1]}
+        )
+        sns.violinplot(y=d.shells, x=d.distance, scale="width", orient="h")
         plt.xlabel(r"Distance [$\AA$]")
         plt.ylabel("Shell")
+
 
 class TrainingStorage(StructureStorage):
     def __init__(self):
         super().__init__()
         self.add_array("energy", dtype=np.float64, per="chunk", fill=np.nan)
-        self.add_array("forces", shape=(3,), dtype=np.float64, per="element", fill=np.nan)
+        self.add_array(
+            "forces", shape=(3,), dtype=np.float64, per="element", fill=np.nan
+        )
         # save stress in voigt notation
         self.add_array("stress", shape=(6,), dtype=np.float64, per="chunk", fill=np.nan)
         self._table_cache = None
@@ -432,19 +467,18 @@ class TrainingStorage(StructureStorage):
     @property
     def _table(self):
         if self._table_cache is None or len(self._table_cache) != len(self):
-            self._table_cache = pd.DataFrame({
-                "name":             [self.get_array("identifier", i)
-                                        for i in range(len(self))],
-                "atoms":            [self.get_structure(i)
-                                        for i in range(len(self))],
-                "energy":           [self.get_array("energy", i)
-                                        for i in range(len(self))],
-                "forces":           [self.get_array("forces", i)
-                                        for i in range(len(self))],
-                "stress":           [self.get_array("stress", i)
-                                        for i in range(len(self))],
-            })
-            self._table_cache["number_of_atoms"] = [len(s) for s in self._table_cache.atoms]
+            self._table_cache = pd.DataFrame(
+                {
+                    "name": [self.get_array("identifier", i) for i in range(len(self))],
+                    "atoms": [self.get_structure(i) for i in range(len(self))],
+                    "energy": [self.get_array("energy", i) for i in range(len(self))],
+                    "forces": [self.get_array("forces", i) for i in range(len(self))],
+                    "stress": [self.get_array("stress", i) for i in range(len(self))],
+                }
+            )
+            self._table_cache["number_of_atoms"] = [
+                len(s) for s in self._table_cache.atoms
+            ]
         return self._table_cache
 
     def to_pandas(self):
@@ -490,11 +524,23 @@ class TrainingStorage(StructureStorage):
         if stress is not None:
             stress = np.asarray(stress)
             if stress.shape == (3, 3):
-                stress = np.array([stress[0, 0], stress[1 ,1], stress[2, 2],
-                                   stress[1, 2], stress[0, 2], stress[0, 1]])
-        self.include_structure(job.get_structure(iteration_step=iteration_step),
-                               energy=energy, forces=forces, stress=stress,
-                               name=job.name)
+                stress = np.array(
+                    [
+                        stress[0, 0],
+                        stress[1, 1],
+                        stress[2, 2],
+                        stress[1, 2],
+                        stress[0, 2],
+                        stress[0, 1],
+                    ]
+                )
+        self.include_structure(
+            job.get_structure(iteration_step=iteration_step),
+            energy=energy,
+            forces=forces,
+            stress=stress,
+            name=job.name,
+        )
 
     @deprecate("Use add_structure instead")
     def include_structure(self, structure, energy, forces=None, stress=None, name=None):
@@ -511,10 +557,13 @@ class TrainingStorage(StructureStorage):
             stress (6 array of float, optional): per structure stresses in voigt notation
             name (str, optional): name describing the structure
         """
-        self.add_structure(structure, energy, identifier=name, forces=forces, stress=stress)
+        self.add_structure(
+            structure, energy, identifier=name, forces=forces, stress=stress
+        )
 
-
-    def add_structure(self, structure, energy, identifier=None, forces=None, stress=None, **arrays):
+    def add_structure(
+        self, structure, energy, identifier=None, forces=None, stress=None, **arrays
+    ):
         data = {"energy": energy}
         if forces is not None:
             data["forces"] = forces
@@ -523,11 +572,17 @@ class TrainingStorage(StructureStorage):
         super().add_structure(structure, identifier, **data)
         if self._table_cache:
             self._table = self._table.append(
-                    {"name": identifier, "atoms": structure, "energy": energy, "forces": forces, "stress": stress,
-                     "number_of_atoms": len(structure)},
-                    ignore_index=True)
+                {
+                    "name": identifier,
+                    "atoms": structure,
+                    "energy": energy,
+                    "forces": forces,
+                    "stress": stress,
+                    "number_of_atoms": len(structure),
+                },
+                ignore_index=True,
+            )
 
-        
     def include_dataset(self, dataset):
         """
         Add a pandas DataFrame to the saved structures.

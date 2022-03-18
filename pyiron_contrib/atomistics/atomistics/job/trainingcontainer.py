@@ -300,7 +300,7 @@ class TrainingPlots:
         plt.subplot(1, 4, 4)
         plt.title("Lattice Vector Angles")
         plt.hist([df.alpha, df.beta, df.gamma], log=True)
-        plt.xlabel(r"$\alpha,\beta,\gamma$")
+        plt.xlabel(r"$\alpha,\beta,\gamma$ [rad]")
 
         return df
 

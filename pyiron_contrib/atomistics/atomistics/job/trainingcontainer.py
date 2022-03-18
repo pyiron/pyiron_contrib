@@ -286,7 +286,7 @@ class TrainingPlots:
         df["V"] = np.linalg.det(C)
         df["N"] = N
         if angle_in_degrees:
-            df["alpha"] = np.rad2deg(df.alpha.)
+            df["alpha"] = np.rad2deg(df["alpha"])
             df["beta"] = np.rad2deg(df["beta"])
             df["gamma"] = np.rad2deg(df["gamma"])
 

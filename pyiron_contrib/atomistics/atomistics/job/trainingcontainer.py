@@ -28,6 +28,7 @@ name    atoms   energy  forces  number_of_atoms
 Fe_bcc  ...
 """
 
+from typing import Callable
 from warnings import catch_warnings
 
 import numpy as np
@@ -198,6 +199,31 @@ class TrainingContainer(GenericJob, HasStructure):
             self._container.from_hdf(self.project_hdf5, "structures")
             if hdf_version == "0.3.0":
                 self.input.from_hdf(self.project_hdf5, "parameters")
+
+    def sample(self, name: str, selector: Callable[[StructureStorage, int], bool]) -> "TrainingContainer":
+        """
+        Create a new TrainingContainer with structures filtered by selector.
+
+        `self` must have status `finished`.  `selector` is passed the underlying :class:`StructureStorage` of this
+        container and the index of the structure and return a boolean whether to include the structure in the new
+        container or not.  The new container is saved and run.
+
+        Args:
+            name (str): name of the new TrainingContainer
+            selector (Callable[[StructureStorage, int], bool]): callable that selects structure to include
+
+        Returns:
+            :class:`.TrainingContainer`: new container with selected structures
+
+        Raises:
+            ValueError: if a job with the given `name` already exists.
+        """
+        cont = self.project.create.job.TrainingContainer(name)
+        if not cont.status.initialized:
+            raise ValueError(f"Job '{name}' already exists with status: {cont.status}!")
+        cont._container = self._container.sample(selector)
+        cont.run()
+        return cont
 
     @property
     def plot(self):

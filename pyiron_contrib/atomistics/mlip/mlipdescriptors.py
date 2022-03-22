@@ -118,5 +118,6 @@ class MlipDescriptors(GenericJob):
     def from_hdf(self, hdf=None, group_name=None):
         super().from_hdf(hdf=hdf, group_name=group_name)
         self.input.from_hdf(hdf=self.project_hdf5)
-        with self.project_hdf5.open("output") as hdf:
-            self._descriptors.from_hdf(hdf=hdf, group_name="descriptors")
+        if self.status.finished:
+            with self.project_hdf5.open("output") as hdf:
+                self._descriptors.from_hdf(hdf=hdf, group_name="descriptors")

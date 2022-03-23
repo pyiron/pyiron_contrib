@@ -711,7 +711,7 @@ class ScipyAlgorithm:
 
     def from_hdf(self, hdf, group_name):
         with hdf.open(group_name) as h:
-            self._type_to_hdf(h)
+            #self._type_from_hdf(h)
             self.global_minimizer = h["global_minimizer"]
 
     def _type_to_hdf(self, hdf):

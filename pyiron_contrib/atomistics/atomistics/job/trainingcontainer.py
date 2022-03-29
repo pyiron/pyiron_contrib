@@ -489,6 +489,7 @@ class TrainingStorage(StructureStorage):
         # save stress in voigt notation
         self.add_array("stress", shape=(6,), dtype=np.float64, per="chunk", fill=np.nan)
         self._table_cache = None
+        self.to_pandas()
 
     def to_pandas(self):
         """

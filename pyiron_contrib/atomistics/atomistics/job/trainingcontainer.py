@@ -623,7 +623,7 @@ class TrainingStorage(StructureStorage):
         self._table_cache = self._table.append(dataset, ignore_index=True)
         # in case given dataset has more columns than the necessary ones, swallow/ignore them in *_
         for name, atoms, energy, forces, stress, *_ in dataset.itertuples(index=False):
-            self.add_structure(atoms, name, energy=energy, forces=forces, stress=stress)
+            self.add_structure(atoms, energy=energy, identifier=name, forces=forces, stress=stress)
 
     def to_list(self, filter_function=None):
         """

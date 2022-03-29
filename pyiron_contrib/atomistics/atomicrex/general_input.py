@@ -637,6 +637,8 @@ class NloptAlgorithm(DataContainer):
             nlopt.set("ftol_abs", f"{self.ftol_abs}")
         if self.xtol_rel is not None:
             nlopt.set("xtol_rel", f"{self.xtol_rel}")
+        if self.seed is not None:
+            nlopt.set("seed", f"{self.seed}")
         return nlopt
 
 

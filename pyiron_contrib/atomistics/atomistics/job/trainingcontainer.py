@@ -490,23 +490,6 @@ class TrainingStorage(StructureStorage):
         self.add_array("stress", shape=(6,), dtype=np.float64, per="chunk", fill=np.nan)
         self._table_cache = None
 
-    @property
-    def _table(self):
-        if self._table_cache is None or len(self._table_cache) != len(self):
-            self._table_cache = pd.DataFrame(
-                {
-                    "name": [self.get_array("identifier", i) for i in range(len(self))],
-                    "atoms": [self.get_structure(i) for i in range(len(self))],
-                    "energy": [self.get_array("energy", i) for i in range(len(self))],
-                    "forces": [self.get_array("forces", i) for i in range(len(self))],
-                    "stress": [self.get_array("stress", i) for i in range(len(self))],
-                }
-            )
-            self._table_cache["number_of_atoms"] = [
-                len(s) for s in self._table_cache.atoms
-            ]
-        return self._table_cache
-
     def to_pandas(self):
         """
         Export list of structure to pandas table for external fitting codes.
@@ -522,7 +505,20 @@ class TrainingStorage(StructureStorage):
         Returns:
             :class:`pandas.DataFrame`: collected structures
         """
-        return self._table
+        if self._table_cache is None or len(self._table_cache) != len(self):
+            self._table_cache = pd.DataFrame(
+                {
+                    "name": [self.get_array("identifier", i) for i in range(len(self))],
+                    "atoms": [self.get_structure(i) for i in range(len(self))],
+                    "energy": [self.get_array("energy", i) for i in range(len(self))],
+                    "forces": [self.get_array("forces", i) for i in range(len(self))],
+                    "stress": [self.get_array("stress", i) for i in range(len(self))],
+                }
+            )
+            self._table_cache["number_of_atoms"] = [
+                len(s) for s in self._table_cache.atoms
+            ]
+        return self._table_cache
 
     def include_job(self, job, iteration_step=-1):
         """
@@ -597,7 +593,7 @@ class TrainingStorage(StructureStorage):
             data["stress"] = stress
         super().add_structure(structure, identifier, **data)
         if self._table_cache is not None:
-            self._table = self._table.append(
+            self._table_cache = self._table_cache.append(
                 {
                     "name": identifier,
                     "atoms": structure,
@@ -620,7 +616,7 @@ class TrainingStorage(StructureStorage):
             - forces (Nx3 array of float): per atom forces, where N is the number of atoms in the structure
             - stress (6 array of float): per structure stress in voigt notation
         """
-        self._table_cache = self._table.append(dataset, ignore_index=True)
+        self._table_cache = self._table_cache.append(dataset, ignore_index=True)
         # in case given dataset has more columns than the necessary ones, swallow/ignore them in *_
         for name, atoms, energy, forces, stress, *_ in dataset.itertuples(index=False):
             self.add_structure(atoms, energy=energy, identifier=name, forces=forces, stress=stress)
@@ -636,9 +632,9 @@ class TrainingStorage(StructureStorage):
             tuple: list of structures, energies, forces, and the number of atoms
         """
         if filter_function is None:
-            data_table = self._table
+            data_table = self._table_cache
         else:
-            data_table = filter_function(self._table)
+            data_table = filter_function(self._table_cache)
         structure_list = data_table.atoms.to_list()
         energy_list = data_table.energy.to_list()
         force_list = data_table.forces.to_list()

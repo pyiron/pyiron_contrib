@@ -596,7 +596,7 @@ class TrainingStorage(StructureStorage):
         if stress is not None:
             data["stress"] = stress
         super().add_structure(structure, identifier, **data)
-        if self._table_cache:
+        if self._table_cache is not None:
             self._table = self._table.append(
                 {
                     "name": identifier,

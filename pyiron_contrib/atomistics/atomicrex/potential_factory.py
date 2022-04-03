@@ -599,7 +599,7 @@ class EAMlikeMixin:
                 fxml.set("function", f"{f.identifier}")
                 functionsxml.append(f._to_xml_element())
 
-    def _parse_final_parameters(self, lines):
+    def _eam_parse_final_parameters(self, lines):
         """
         Internal Function.
         Parse function parameters from atomicrex output.
@@ -938,6 +938,8 @@ class ADPotential(AbstractPotential, EAMlikeMixin):
         filename = posixpath.join(directory, "potential.xml")
         write_pretty_xml(adp, filename)
 
+    def _parse_final_parameters(self, lines):
+        return super()._eam_parse_final_parameters(lines)
 
 class MEAMPotential(AbstractPotential, EAMlikeMixin):
     def __init__(self, init=None, identifier=None, export_file=None, species=None):

@@ -584,7 +584,7 @@ class EAMlikeMixin:
         mappingxml = ET.SubElement(pot, "mapping")
         functionsxml = ET.SubElement(pot, "functions")
 
-        for k, functions in self._function_dict():
+        for k, functions in self._function_dict.items():
             for f in functions.values():
                 fxml = ET.SubElement(mappingxml, k)
                 if len(f.species) == 1:
@@ -913,7 +913,6 @@ class ADPotential(AbstractPotential, EAMlikeMixin):
 
         filename = posixpath.join(directory, "potential.xml")
         write_pretty_xml(adp, filename)
-
 
     def _parse_final_parameters(self, lines):
         """

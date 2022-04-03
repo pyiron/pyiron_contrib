@@ -612,15 +612,16 @@ class EAMlikeMixin:
         """
         for l in lines:
             identifier, leftover, value = _parse_parameter_line(l)
+            found = False
             for functions in self._function_tuple:
                 if identifier in functions:
                     functions[identifier]._parse_final_parameter(leftover, value)
-                    continue
-                else:
-                    raise KeyError(
-                        f"Can't find {identifier} in potential, probably something went wrong during parsing.\n"
-                        "Fitting parameters of screening functions probably doesn't work right now"
-                    )
+                    found = True
+            if not found:
+                raise KeyError(
+                    f"Can't find {identifier} in potential, probably something went wrong during parsing.\n"
+                    "Fitting parameters of screening functions probably doesn't work right now"
+                )
 
 
 class EAMPotential(AbstractPotential, EAMlikeMixin):
@@ -940,29 +941,6 @@ class ADPotential(AbstractPotential, EAMlikeMixin):
 
     def _parse_final_parameters(self, lines):
         return self._eam_parse_final_parameters(lines)
-
-    def _eam_parse_final_parameters(self, lines):
-        """
-        Internal Function.
-        Parse function parameters from atomicrex output.
-
-        Args:
-            lines (list[str]): atomicrex output lines
-
-        Raises:
-            KeyError: Raises if a parsed parameter can't be matched to a function.
-        """
-        for l in lines:
-            identifier, leftover, value = _parse_parameter_line(l)
-            for functions in self._function_tuple:
-                if identifier in functions:
-                    functions[identifier]._parse_final_parameter(leftover, value)
-                    continue
-                else:
-                    raise KeyError(
-                        f"Can't find {identifier} in potential, probably something went wrong during parsing.\n"
-                        "Fitting parameters of screening functions probably doesn't work right now"
-                    )
 
 class MEAMPotential(AbstractPotential, EAMlikeMixin):
     def __init__(self, init=None, identifier=None, export_file=None, species=None):

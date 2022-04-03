@@ -939,7 +939,7 @@ class ADPotential(AbstractPotential, EAMlikeMixin):
         write_pretty_xml(adp, filename)
 
     def _parse_final_parameters(self, lines):
-        return super()._eam_parse_final_parameters(lines)
+        return self._eam_parse_final_parameters(lines)
 
 class MEAMPotential(AbstractPotential, EAMlikeMixin):
     def __init__(self, init=None, identifier=None, export_file=None, species=None):

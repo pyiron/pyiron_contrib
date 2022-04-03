@@ -571,7 +571,33 @@ class EAMlikeMixin:
             for f in functions.values():
                 parameters += f.count_parameters(enabled_only=enabled_only)
         return parameters
+    
+    @property
+    def _function_tuple(self):
+        raise NotImplementedError("Implement a tuple with functions in subclass")
+    
+    @property
+    def _function_dict(self):
+        raise NotImplementedError("Implement a tuple with functions in subclass")
 
+    def _mapping_functions_xml(self, pot):
+        mappingxml = ET.SubElement(pot, "mapping")
+        functionsxml = ET.SubElement(pot, "functions")
+
+        for k, functions in self._function_dict():
+            for f in functions.values():
+                fxml = ET.SubElement(mappingxml, k)
+                if len(f.species) == 1:
+                    fxml.set("species", f"{f.species[0]}")
+                elif len(f.species) == 2:
+                    fxml.set("species-a", f"{f.species[0]}")
+                    fxml.set("species-b", f"{f.species[1]}")
+                elif len(f.species) == 2:
+                    fxml.set("species-a", f"{f.species[0]}")
+                    fxml.set("species-b", f"{f.species[1]}")
+                    fxml.set("species-c", f"{f.species[2]}")
+                fxml.set("function", f"{f.identifier}")
+                functionsxml.append(f._to_xml_element())
 
 class EAMPotential(AbstractPotential, EAMlikeMixin):
     """
@@ -828,6 +854,16 @@ class ADPotential(AbstractPotential, EAMlikeMixin):
             self.u_functions,
             self.w_functions,
         )
+    
+    @property
+    def _function_dict(self):
+        return {
+            "pair-interaction": self.pair_interactions,
+            "electron-density": self.electron_densities,
+            "embedding-energy": self.embedding_energies,
+            "u-function": self.u_functions,
+            "w-function": self.w_functions,
+        }
 
     def _potential_as_pd_df(self, job):
         """
@@ -873,45 +909,11 @@ class ADPotential(AbstractPotential, EAMlikeMixin):
             export.set("rho-range-factor", f"{self.rho_range_factor}")
             export.text = f"{self.export_file}"
 
-        mapping = ET.SubElement(adp, "mapping")
-        functions = ET.SubElement(adp, "functions")
-
-        for pot in self.pair_interactions.values():
-            pair_interaction = ET.SubElement(mapping, "pair-interaction")
-            pair_interaction.set("species-a", f"{pot.species[0]}")
-            pair_interaction.set("species-b", f"{pot.species[1]}")
-            pair_interaction.set("function", f"{pot.identifier}")
-            functions.append(pot._to_xml_element())
-
-        for pot in self.electron_densities.values():
-            electron_density = ET.SubElement(mapping, "electron-density")
-            electron_density.set("species-a", f"{pot.species[0]}")
-            electron_density.set("species-b", f"{pot.species[1]}")
-            electron_density.set("function", f"{pot.identifier}")
-            functions.append(pot._to_xml_element())
-
-        for pot in self.embedding_energies.values():
-            embedding_energy = ET.SubElement(mapping, "embedding-energy")
-            embedding_energy.set("species", f"{pot.species[0]}")
-            embedding_energy.set("function", f"{pot.identifier}")
-            functions.append(pot._to_xml_element())
-
-        for pot in self.u_functions.values():
-            u = ET.SubElement(mapping, "u-function")
-            u.set("species-a", f"{pot.species[0]}")
-            u.set("species-b", f"{pot.species[1]}")
-            u.set("function", f"{pot.identifier}")
-            functions.append(pot._to_xml_element())
-
-        for pot in self.w_functions.values():
-            w = ET.SubElement(mapping, "w-function")
-            w.set("species-a", f"{pot.species[0]}")
-            w.set("species-b", f"{pot.species[1]}")
-            w.set("function", f"{pot.identifier}")
-            functions.append(pot._to_xml_element())
+        self._mapping_functions_xml(adp)
 
         filename = posixpath.join(directory, "potential.xml")
         write_pretty_xml(adp, filename)
+
 
     def _parse_final_parameters(self, lines):
         """

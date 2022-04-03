@@ -599,6 +599,30 @@ class EAMlikeMixin:
                 fxml.set("function", f"{f.identifier}")
                 functionsxml.append(f._to_xml_element())
 
+    def _parse_final_parameters(self, lines):
+        """
+        Internal Function.
+        Parse function parameters from atomicrex output.
+
+        Args:
+            lines (list[str]): atomicrex output lines
+
+        Raises:
+            KeyError: Raises if a parsed parameter can't be matched to a function.
+        """
+        for l in lines:
+            identifier, leftover, value = _parse_parameter_line(l)
+            for functions in self._function_tuple:
+                if identifier in functions:
+                    functions[identifier]._parse_final_parameter(leftover, value)
+                    continue
+                else:
+                    raise KeyError(
+                        f"Can't find {identifier} in potential, probably something went wrong during parsing.\n"
+                        "Fitting parameters of screening functions probably doesn't work right now"
+                    )
+
+
 class EAMPotential(AbstractPotential, EAMlikeMixin):
     """
     Embedded-Atom-Method potential.
@@ -913,29 +937,6 @@ class ADPotential(AbstractPotential, EAMlikeMixin):
 
         filename = posixpath.join(directory, "potential.xml")
         write_pretty_xml(adp, filename)
-
-    def _parse_final_parameters(self, lines):
-        """
-        Internal Function.
-        Parse function parameters from atomicrex output.
-
-        Args:
-            lines (list[str]): atomicrex output lines
-
-        Raises:
-            KeyError: Raises if a parsed parameter can't be matched to a function.
-        """
-        for l in lines:
-            identifier, leftover, value = _parse_parameter_line(l)
-            for functions in self._function_tuple:
-                if identifier in functions:
-                    functions._parse_final_parameter(leftover, value)
-                    continue
-                else:
-                    raise KeyError(
-                        f"Can't find {identifier} in potential, probably something went wrong during parsing.\n"
-                        "Fitting parameters of screening functions probably doesn't work right now"
-                    )
 
 
 class MEAMPotential(AbstractPotential, EAMlikeMixin):

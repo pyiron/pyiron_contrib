@@ -244,7 +244,7 @@ class FunctionFactory(PyironFactory):
         return MishinCuRho(identifier, a, r1, r2, beta1, beta2, species)
 
     @staticmethod
-    def MishinCuF(identifier, F0, F2, q1, q2, q3, q4, Q1, Q2, species=["*", "*"]):
+    def MishinCuF(identifier, F0, F2, q1, q2, q3, q4, Q1, Q2, species=["*"]):
         return MishinCuF(identifier, F0, F2, q1, q2, q3, q4, Q1, Q2, species)
 
     @staticmethod
@@ -1134,7 +1134,7 @@ class MishinCuF(SpecialFunction):
         q4=None,
         Q1=None,
         Q2=None,
-        species=["*", "*"],
+        species=["*"],
     ):
         super().__init__(identifier, species=species, is_screening_function=False)
         self.parameters.add_parameter(

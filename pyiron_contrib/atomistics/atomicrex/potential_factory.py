@@ -38,6 +38,22 @@ class ARPotFactory(PyironFactory):
         )
 
     @staticmethod
+    def adp_potential(
+        identifier="ADP",
+        export_file="output.adp.fs",
+        rho_range_factor=2.0,
+        resolution=10000,
+        species=["*", "*"],
+    ):
+        return ADPotential(
+            identifier=identifier,
+            export_file=export_file,
+            rho_range_factor=rho_range_factor,
+            resolution=resolution,
+            species=species,
+        )
+
+    @staticmethod
     def meam_potential(identifier="MEAM", export_file="meam.out", species=["*", "*"]):
         return MEAMPotential(
             identifier=identifier,
@@ -764,6 +780,161 @@ class EAMPotential(AbstractPotential, EAMlikeMixin):
                     extrema += len(max_arr[max_arr])
                 extrema_dict[el][func_name] = extrema
         return extrema_dict
+
+
+class ADPotential(AbstractPotential, EAMlikeMixin):
+    """
+    Angular dependent potential.
+    Usage: Create using the potential factory class.
+    Add functions defined using the function_factory
+    to self.pair_interactions, self.electron_densities
+    and self.embedding_energies, self.u_functions and
+    self.w_functions in dictionary style,
+    using the identifier of the function as key.
+    Example:
+    eam.pair_interactions["V"] = morse_function
+
+    """
+
+    def __init__(
+        self,
+        init=None,
+        identifier=None,
+        export_file=None,
+        rho_range_factor=None,
+        resolution=None,
+        species=None,
+    ):
+
+        super().__init__(init=init)
+        if init is None:
+            self.pair_interactions = DataContainer(table_name="pair_interactions")
+            self.electron_densities = DataContainer(table_name="electron_densities")
+            self.embedding_energies = DataContainer(table_name="embedding_energies")
+            self.u_functions = DataContainer(table_name="u_functions")
+            self.w_functions = DataContainer(table_name="w_functions")
+            self.identifier = identifier
+            self.export_file = export_file
+            self.rho_range_factor = rho_range_factor
+            self.resolution = resolution
+            self.species = species
+
+    @property
+    def _function_tuple(self):
+        return (
+            self.pair_interactions,
+            self.electron_densities,
+            self.embedding_energies,
+            self.u_functions,
+            self.w_functions,
+        )
+
+    def _potential_as_pd_df(self, job):
+        """
+        Makes the tabulated eam potential written by atomicrex usable
+        for pyiron lammps jobs.
+        """
+        if self.export_file is None:
+            raise ValueError("export_file must be set to use the potential with lammps")
+
+        species = [el for el in job.input.atom_types.keys()]
+        species_str = ""
+        for s in species:
+            species_str += f"{s} "
+
+        pot = pd.DataFrame(
+            {
+                "Name": f"{self.identifier}",
+                "Filename": [[f"{job.working_directory}/{self.export_file}"]],
+                "Model": ["Custom"],
+                "Species": [species],
+                "Config": [
+                    [
+                        "pair_style adp\n",
+                        f"pair_coeff * * {job.working_directory}/{self.export_file} {species_str}\n",
+                    ]
+                ],
+            }
+        )
+        return pot
+
+    def write_xml_file(self, directory):
+        """
+        Internal function to convert to an xml element
+        """
+        adp = ET.Element("adp")
+        adp.set("id", f"{self.identifier}")
+        adp.set("species-a", f"{self.species[0]}")
+        adp.set("species-b", f"{self.species[1]}")
+
+        if self.export_file:
+            export = ET.SubElement(adp, "export-adp-file")
+            export.set("resolution", f"{self.resolution}")
+            export.set("rho-range-factor", f"{self.rho_range_factor}")
+            export.text = f"{self.export_file}"
+
+        mapping = ET.SubElement(adp, "mapping")
+        functions = ET.SubElement(adp, "functions")
+
+        for pot in self.pair_interactions.values():
+            pair_interaction = ET.SubElement(mapping, "pair-interaction")
+            pair_interaction.set("species-a", f"{pot.species[0]}")
+            pair_interaction.set("species-b", f"{pot.species[1]}")
+            pair_interaction.set("function", f"{pot.identifier}")
+            functions.append(pot._to_xml_element())
+
+        for pot in self.electron_densities.values():
+            electron_density = ET.SubElement(mapping, "electron-density")
+            electron_density.set("species-a", f"{pot.species[0]}")
+            electron_density.set("species-b", f"{pot.species[1]}")
+            electron_density.set("function", f"{pot.identifier}")
+            functions.append(pot._to_xml_element())
+
+        for pot in self.embedding_energies.values():
+            embedding_energy = ET.SubElement(mapping, "embedding-energy")
+            embedding_energy.set("species", f"{pot.species[0]}")
+            embedding_energy.set("function", f"{pot.identifier}")
+            functions.append(pot._to_xml_element())
+
+        for pot in self.u_functions.values():
+            u = ET.SubElement(mapping, "u-function")
+            u.set("species-a", f"{pot.species[0]}")
+            u.set("species-b", f"{pot.species[1]}")
+            u.set("function", f"{pot.identifier}")
+            functions.append(pot._to_xml_element())
+
+        for pot in self.w_functions.values():
+            w = ET.SubElement(mapping, "w-function")
+            w.set("species-a", f"{pot.species[0]}")
+            w.set("species-b", f"{pot.species[1]}")
+            w.set("function", f"{pot.identifier}")
+            functions.append(pot._to_xml_element())
+
+        filename = posixpath.join(directory, "potential.xml")
+        write_pretty_xml(adp, filename)
+
+    def _parse_final_parameters(self, lines):
+        """
+        Internal Function.
+        Parse function parameters from atomicrex output.
+
+        Args:
+            lines (list[str]): atomicrex output lines
+
+        Raises:
+            KeyError: Raises if a parsed parameter can't be matched to a function.
+        """
+        for l in lines:
+            identifier, leftover, value = _parse_parameter_line(l)
+            for functions in self._function_tuple:
+                if identifier in functions:
+                    functions._parse_final_parameter(leftover, value)
+                    continue
+                else:
+                    raise KeyError(
+                        f"Can't find {identifier} in potential, probably something went wrong during parsing.\n"
+                        "Fitting parameters of screening functions probably doesn't work right now"
+                    )
 
 
 class MEAMPotential(AbstractPotential, EAMlikeMixin):

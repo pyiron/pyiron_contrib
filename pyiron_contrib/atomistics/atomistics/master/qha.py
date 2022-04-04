@@ -32,7 +32,20 @@ def get_potential_energy(frequencies, temperature, E_0=0):
 
 
 class Displacements:
+    """Creationg of displacement field."""
     def __init__(self, structure, symprec=1.0e-2, include_zero=True, second_order=True):
+        """
+        Displacement field
+
+        Args:
+            structure (pyiron_atomistics.atomistics.structure.atoms): pyiron structure
+            symprec (float): Symmetry search precision
+            include_zero (bool): Whether or not to include the non-diplaced structure. By
+                including this, results get stabilized, while the computational cost does not
+                increase significantly.
+            second_order (bool): Whether or not to displace in both positive and negative
+                direction. For symmetric displacement it is not performed.
+        """
         self.structure = structure
         self.symprec = symprec
         self.include_zero = include_zero
@@ -120,6 +133,7 @@ class Hessian:
         second_order=True,
     ):
         """
+        Calculation of the Hessian matrix
 
         Args:
             structure (pyiron_atomistics.structure.atoms.Atoms): Structure

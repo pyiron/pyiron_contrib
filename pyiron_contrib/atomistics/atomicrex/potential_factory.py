@@ -571,11 +571,11 @@ class EAMlikeMixin:
             for f in functions.values():
                 parameters += f.count_parameters(enabled_only=enabled_only)
         return parameters
-    
+
     @property
     def _function_tuple(self):
         raise NotImplementedError("Implement a tuple with functions in subclass")
-    
+
     @property
     def _function_dict(self):
         raise NotImplementedError("Implement a tuple with functions in subclass")
@@ -879,7 +879,7 @@ class ADPotential(AbstractPotential, EAMlikeMixin):
             self.u_functions,
             self.w_functions,
         )
-    
+
     @property
     def _function_dict(self):
         return {
@@ -941,6 +941,7 @@ class ADPotential(AbstractPotential, EAMlikeMixin):
 
     def _parse_final_parameters(self, lines):
         return self._eam_parse_final_parameters(lines)
+
 
 class MEAMPotential(AbstractPotential, EAMlikeMixin):
     def __init__(self, init=None, identifier=None, export_file=None, species=None):

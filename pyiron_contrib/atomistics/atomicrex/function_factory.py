@@ -248,8 +248,8 @@ class FunctionFactory(PyironFactory):
         return MishinCuF(identifier, F0, F2, q1, q2, q3, q4, Q1, Q2, species)
 
     @staticmethod
-    def RsMinusRPowN(identifier, S, rs, N, species=["*", "*"]):
-        return RsMinusRPowN(identifier, S, rs, N, species)
+    def RsMinusRPowN(identifier, S, rs, N, species=["*", "*"], cutoff=None):
+        return RsMinusRPowN(identifier, S, rs, N, species, cutoff=cutoff)
 
     @staticmethod
     def sum(identifier, species=["*", "*"]):
@@ -983,6 +983,7 @@ class RsMinusRPowN(SpecialFunction):
         N=None,
         species=None,
         is_screening_function=False,
+        cutoff=None,
     ):
         super().__init__(
             identifier, species=species, is_screening_function=is_screening_function
@@ -1016,7 +1017,11 @@ class RsMinusRPowN(SpecialFunction):
         return func
 
     def _to_xml_element(self):
-        return super()._to_xml_element(name="RsMinusRPowN")
+        xml = super()._to_xml_element(name="RsMinusRPowN")
+        if self.cutoff is not None:
+            cutoff = ET.SubElement(xml, "cutoff")
+            cutoff.text = f"{self.cutoff}"
+        return xml
 
 
 class Constant(SpecialFunction):

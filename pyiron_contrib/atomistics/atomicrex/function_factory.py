@@ -248,8 +248,8 @@ class FunctionFactory(PyironFactory):
         return MishinCuF(identifier, F0, F2, q1, q2, q3, q4, Q1, Q2, species)
 
     @staticmethod
-    def RsMinusRPowN(identifier, S, rs, N, species=["*", "*"]):
-        return RsMinusRPowN(identifier, S, rs, N, species)
+    def RsMinusRPowN(identifier, S, rs, N, species=["*", "*"], cutoff=None):
+        return RsMinusRPowN(identifier, S, rs, N, species, cutoff=cutoff)
 
     @staticmethod
     def sum(identifier, species=["*", "*"]):

@@ -36,7 +36,7 @@ setup(
         'pyiron_base==0.5.9',
         'scipy==1.8.0',
         'seaborn==0.11.2',
-        'pyparsing==3.0.7'
+        'pyparsing==3.0.8'
     ],
     extras_require={
         'atomistic': [

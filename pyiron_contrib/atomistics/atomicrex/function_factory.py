@@ -988,6 +988,7 @@ class RsMinusRPowN(SpecialFunction):
         super().__init__(
             identifier, species=species, is_screening_function=is_screening_function
         )
+        self.cutoff=cutoff
         self.parameters.add_parameter(
             "S",
             start_val=S,

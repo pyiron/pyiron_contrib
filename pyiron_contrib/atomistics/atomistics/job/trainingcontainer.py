@@ -632,10 +632,9 @@ class TrainingStorage(StructureStorage):
         Returns:
             tuple: list of structures, energies, forces, and the number of atoms
         """
-        if filter_function is None:
-            data_table = self._table_cache
-        else:
-            data_table = filter_function(self._table_cache)
+        data_table = self.to_pandas()
+        if filter_function is not None:
+            data_table = filter_function(data_table)
         structure_list = data_table.atoms.to_list()
         energy_list = data_table.energy.to_list()
         force_list = data_table.forces.to_list()

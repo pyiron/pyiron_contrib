@@ -617,10 +617,18 @@ class TrainingStorage(StructureStorage):
             - forces (Nx3 array of float): per atom forces, where N is the number of atoms in the structure
             - stress (6 array of float): per structure stress in voigt notation
         """
+        if 'name' not in dataset.columns \
+                or 'atoms' not in dataset.columns \
+                or 'energy' not in dataset.columns:
+            raise ValueError("At least columns 'name', 'atoms' and 'energy' must be present in dataset!")
         self._table_cache = self._table_cache.append(dataset, ignore_index=True)
-        # in case given dataset has more columns than the necessary ones, swallow/ignore them in *_
-        for name, atoms, energy, forces, stress, *_ in dataset.itertuples(index=False):
-            self.add_structure(atoms, energy=energy, identifier=name, forces=forces, stress=stress)
+        for row in dataset.itertuples(index=False):
+            kwargs = {}
+            if hasattr(row, "forces"):
+                kwargs["forces"] = row.forces
+            if hasattr(row, "stress"):
+                kwargs["stress"] = row.stress
+            self.add_structure(row.atoms, energy=row.energy, identifier=row.name, **kwargs)
 
     def to_list(self, filter_function=None):
         """

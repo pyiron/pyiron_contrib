@@ -689,14 +689,14 @@ class NloptGlobalLocal(NloptAlgorithm):
 
     def __init__(
         self,
-        stopval,
-        max_iter,
-        maxtime,
-        ftol_rel,
-        ftol_abs,
-        xtol_rel,
-        name,
-        seed,
+        stopval=None,
+        max_iter=None,
+        maxtime=None,
+        ftol_rel=None,
+        ftol_abs=None,
+        xtol_rel=None,
+        name=None,
+        seed=None,
         *args,
         **kwargs,
     ):

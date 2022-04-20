@@ -10,7 +10,7 @@ import pandas as pd
 import posixpath
 import shutil
 import random
-from pyiron_base import GenericParameters, GenericJob
+from pyiron_base import GenericParameters, GenericJob, DataContainer
 
 __author__ = "Jan Janssen"
 __copyright__ = "Copyright 2020, Max-Planck-Institut für Eisenforschung GmbH - " \
@@ -34,7 +34,13 @@ class MeamFit(GenericJob):
         super(MeamFit, self).__init__(project, job_name)
         self.__version__ = None
         self.__name__ = "MeamFit"
-        self.input = MeamFitInput()
+        self.input = DataContainer({
+            'TYPE': 'EAM',
+            'SEED': 'random',
+            'CUTOFF_MAX': 5.0,
+            'NTERMS': 3,
+            'NTERMS_EMB': 3
+        }, table_name='parameter')
         self._executable_activate()
         self._potential_performance_dataframe = pd.DataFrame({})
         self._potential_timings_dataframe = pd.DataFrame({})
@@ -200,9 +206,8 @@ class MeamFit(GenericJob):
 
         """
         super(MeamFit, self).to_hdf(hdf=hdf, group_name=group_name)
-        with self.project_hdf5.open("input/parameter") as hdf5_input:
-            self.input.to_hdf(hdf5_input)
         with self.project_hdf5.open("input") as hdf5_input:
+            self.input.to_hdf(hdf5_input)
             hdf5_input['calculation'] = self._calculation_dataframe.reset_index().to_dict(orient='list')
         with self.project_hdf5.open("output") as hdf5_output:
             hdf5_output['performance'] = self._potential_performance_dataframe.to_dict(orient='list')
@@ -219,9 +224,19 @@ class MeamFit(GenericJob):
 
         """
         super(MeamFit, self).from_hdf(hdf=hdf, group_name=group_name)
-        with self.project_hdf5.open("input/parameter") as hdf5_input:
-            self.input.from_hdf(hdf5_input)
         with self.project_hdf5.open("input") as hdf5_input:
+            # backwards compatible loading of input
+            if hdf5_input["parameter/NAME"] == "GenericParameters":
+                gp = GenericParameters()
+                gp.from_hdf(hdf5_input["parameter"])
+                self.input['TYPE'] = gp['TYPE']
+                self.input['SEED'] = gp['SEED']
+                self.input['CUTOFF_MAX'] = gp['CUTOFF_MAX']
+                self.input['NTERMS'] = gp['NTERMS']
+                self.input['NTERMS_EMB'] = gp['NTERMS_EMB']
+            else:
+                self.input.from_hdf(hdf5_input)
+            self.input.from_hdf(hdf5_input)
             self._calculation_dataframe = pd.DataFrame(hdf5_input['calculation']).set_index('Job id')
         with self.project_hdf5.open("output") as hdf5_output:
             self._potential_performance_dataframe = pd.DataFrame(hdf5_output['performance'])
@@ -327,30 +342,3 @@ class MeamFit(GenericJob):
         std_df = pd.DataFrame({'Std': std_lst})
         std_df = std_df.set_index(index_lst)
         return pd.concat([potential_timings_df, std_df], axis=1)
-
-
-class MeamFitInput(GenericParameters):
-    """
-
-    Args:
-        input_file_name:
-    """
-
-    def __init__(self, input_file_name=None):
-        super(MeamFitInput, self).__init__(input_file_name=input_file_name, table_name="input", comment_char="#",
-                                           separator_char="=")
-
-    def load_default(self):
-        """
-
-        Returns:
-
-        """
-        input_str = '''\
-TYPE=EAM
-SEED=random
-CUTOFF_MAX=5.0
-NTERMS=3
-NTERMS_EMB=3
-'''
-        self.load_string(input_str)

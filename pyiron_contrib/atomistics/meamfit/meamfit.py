@@ -72,26 +72,6 @@ class MeamFit(GenericJob):
     def potential_paths(self):
         return [posixpath.join(self.working_directory, pot) for pot in self.potentials]
 
-    @property
-    def structure(self):
-        """
-
-        Returns:
-
-        """
-        return None
-
-    @structure.setter
-    def structure(self, structure):
-        """
-
-        Args:
-            structure:
-
-        Returns:
-
-        """
-        raise ValueError('MeamFit has no structure!')
 
     @property
     def random_seed(self):

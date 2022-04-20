@@ -593,18 +593,6 @@ class TrainingStorage(StructureStorage):
         if stress is not None:
             data["stress"] = stress
         super().add_structure(structure, identifier, **data)
-        if self._table_cache is not None:
-            self._table_cache = self._table_cache.append(
-                {
-                    "name": identifier,
-                    "atoms": structure,
-                    "energy": energy,
-                    "forces": forces,
-                    "stress": stress,
-                    "number_of_atoms": len(structure),
-                },
-                ignore_index=True,
-            )
 
     def include_dataset(self, dataset):
         """
@@ -621,7 +609,6 @@ class TrainingStorage(StructureStorage):
                 or 'atoms' not in dataset.columns \
                 or 'energy' not in dataset.columns:
             raise ValueError("At least columns 'name', 'atoms' and 'energy' must be present in dataset!")
-        self._table_cache = self._table_cache.append(dataset, ignore_index=True)
         for row in dataset.itertuples(index=False):
             kwargs = {}
             if hasattr(row, "forces"):

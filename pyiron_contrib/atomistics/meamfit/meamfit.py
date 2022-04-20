@@ -151,11 +151,6 @@ class MeamFit(GenericJob):
         self.to_hdf()
 
     def collect_logfiles(self):
-        """
-
-        Returns:
-
-        """
         pass
 
     def from_directory(self, directory):

@@ -166,15 +166,6 @@ class MeamFit(GenericJob):
 
     # define hdf5 input and output
     def to_hdf(self, hdf=None, group_name=None):
-        """
-
-        Args:
-            hdf:
-            group_name:
-
-        Returns:
-
-        """
         super(MeamFit, self).to_hdf(hdf=hdf, group_name=group_name)
         with self.project_hdf5.open("input") as hdf5_input:
             self.input.to_hdf(hdf5_input)

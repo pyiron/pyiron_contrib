@@ -175,15 +175,6 @@ class MeamFit(GenericJob):
             hdf5_output['timings'] = self._potential_timings_dataframe.reset_index().to_dict(orient='list')
 
     def from_hdf(self, hdf=None, group_name=None):
-        """
-
-        Args:
-            hdf:
-            group_name:
-
-        Returns:
-
-        """
         super(MeamFit, self).from_hdf(hdf=hdf, group_name=group_name)
         with self.project_hdf5.open("input") as hdf5_input:
             # backwards compatible loading of input

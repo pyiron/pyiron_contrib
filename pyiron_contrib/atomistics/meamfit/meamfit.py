@@ -144,11 +144,6 @@ class MeamFit(GenericJob):
 
     # define routines that collect all output files
     def collect_output(self):
-        """
-
-        Returns:
-
-        """
         potential_timings_df = self._collect_timings(file_name='bestoptfuncs', cwd=self.working_directory)
         self._potential_performance_dataframe = self._collect_potential_performance(cwd=self.working_directory)
         self._potential_timings_dataframe = self._calculate_std(potential_timings_df,

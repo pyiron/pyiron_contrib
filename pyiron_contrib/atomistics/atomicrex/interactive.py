@@ -87,12 +87,13 @@ class AtomicrexInteractive(AtomicrexBase, InteractiveBase):
         if isinstance(self.input.fit_algorithm, ScipyAlgorithm):
             self._scipy_run()
             # sleep between running and collecting so atomicrex output is flushed to file
-            time.sleep(2.0)
+            ## close to flush outputs to file
+            self.interactive_close()
             self._scipy_collect(cwd=self.path)
         else:
             self._interactive_library.perform_fitting()
-            ## Delete the atomicrex object at the end to flush outputs to file
-            del self._interactive_library
+            ## close to flush outputs to file
+            self.interactive_close()
             self.collect_output(cwd=self.path)
 
     def _scipy_run(self):
@@ -111,15 +112,12 @@ class AtomicrexInteractive(AtomicrexBase, InteractiveBase):
                 **self.input.fit_algorithm.global_minimizer_kwargs,
             )
 
-        self._interactive_library.set_potential_parameters(res.x)
+        #self._interactive_library.set_potential_parameters(res.x)
         self.output.residual = self._interactive_library.calculate_residual()
         self.output.iterations = res.nit
-        print(res)
         self._interactive_library.print_potential_parameters()
         self._interactive_library.print_properties()
         self._interactive_library.output_results()
-        ## Delete the atomicrex object at the end to flush outputs to file
-        del self._interactive_library
         return res
 
     def _scipy_collect(self, cwd=None):
@@ -129,7 +127,7 @@ class AtomicrexInteractive(AtomicrexBase, InteractiveBase):
         """
         if cwd is None:
             cwd = self.working_directory
-        if self.input.__version__ == "0.1.0":
+        if self.input.__version__ >= "0.1.0":
             filepath = f"{cwd}/atomicrex.out"
 
         params_triggered = False

@@ -528,6 +528,48 @@ class AlgorithmFactory(PyironFactory):
         )
 
     @staticmethod
+    def g_mlsl(
+        stopval=1e-10,
+        max_iter=50,
+        maxtime=None,
+        ftol_rel=None,
+        ftol_abs=None,
+        xtol_rel=None,
+        seed=None,
+    ):
+        return NloptGlobalLocal(
+            name="G_MLSL",
+            stopval=stopval,
+            max_iter=max_iter,
+            maxtime=maxtime,
+            ftol_rel=ftol_rel,
+            ftol_abs=ftol_abs,
+            xtol_rel=xtol_rel,
+            seed=seed,
+        )
+
+    @staticmethod
+    def gd_stogo(
+        stopval=1e-10,
+        max_iter=50,
+        maxtime=None,
+        ftol_rel=None,
+        ftol_abs=None,
+        xtol_rel=None,
+        seed=None,
+    ):
+        return NloptAlgorithm(
+            name="GD_STOGO",
+            stopval=stopval,
+            max_iter=max_iter,
+            maxtime=maxtime,
+            ftol_rel=ftol_rel,
+            ftol_abs=ftol_abs,
+            xtol_rel=xtol_rel,
+            seed=seed,
+        )
+
+    @staticmethod
     def scipy_algorithm():
         return ScipyAlgorithm()
 
@@ -649,14 +691,14 @@ class NloptGlobalLocal(NloptAlgorithm):
 
     def __init__(
         self,
-        stopval,
-        max_iter,
-        maxtime,
-        ftol_rel,
-        ftol_abs,
-        xtol_rel,
-        name,
-        seed,
+        stopval=None,
+        max_iter=None,
+        maxtime=None,
+        ftol_rel=None,
+        ftol_abs=None,
+        xtol_rel=None,
+        name=None,
+        seed=None,
         *args,
         **kwargs,
     ):
@@ -708,12 +750,32 @@ class ScipyAlgorithm:
         with hdf.open(group_name) as h:
             self._type_to_hdf(h)
             h["global_minimizer"] = self.global_minimizer
-            h.put("local_minimizer_kwargs", self.local_minimizer_kwargs)
-            h.put("global_minimizer_kwargs", self.global_minimizer_kwargs)
+        """
+            with h.open("local_minimizer_kwargs") as loc_hdf:
+                for k, v in self.local_minimizer_kwargs.items():
+                    try:
+                        loc_hdf[k] = v
+                    except TypeError:
+                        loc_hdf[k] = v.__name__
+            with h.open("global_minimizer_kwargs") as glob_hdf:
+                for k, v in self.global_minimizer_kwargs.items():
+                    if isinstance(v, dict):
+                        with glob_hdf.open(k) as v_hdf:
+                            for k, v in self.v.items():
+                                try:
+                                    v_hdf[k] = v
+                                except TypeError:
+                                    v_hdf[k] = v.__name__
+                    else:           
+                        try:
+                            glob_hdf[k] = v
+                        except TypeError:
+                            glob_hdf[k] = v.__name__
+        """
 
     def from_hdf(self, hdf, group_name):
         with hdf.open(group_name) as h:
-            self._type_to_hdf(h)
+            #self._type_from_hdf(h)
             self.global_minimizer = h["global_minimizer"]
 
     def _type_to_hdf(self, hdf):

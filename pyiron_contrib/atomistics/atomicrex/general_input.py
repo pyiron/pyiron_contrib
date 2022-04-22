@@ -589,7 +589,7 @@ class AlgorithmFactory(PyironFactory):
             xtol_rel=xtol_rel,
             seed=seed,
         )
-    
+
     @staticmethod
     def gd_stogo_rand(
         stopval=1e-10,

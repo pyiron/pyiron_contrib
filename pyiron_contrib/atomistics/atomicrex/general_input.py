@@ -549,6 +549,27 @@ class AlgorithmFactory(PyironFactory):
         )
 
     @staticmethod
+    def g_mlsl_lds(
+        stopval=1e-10,
+        max_iter=50,
+        maxtime=None,
+        ftol_rel=None,
+        ftol_abs=None,
+        xtol_rel=None,
+        seed=None,
+    ):
+        return NloptGlobalLocal(
+            name="G_MLSL_LDS",
+            stopval=stopval,
+            max_iter=max_iter,
+            maxtime=maxtime,
+            ftol_rel=ftol_rel,
+            ftol_abs=ftol_abs,
+            xtol_rel=xtol_rel,
+            seed=seed,
+        )
+
+    @staticmethod
     def gd_stogo(
         stopval=1e-10,
         max_iter=50,
@@ -560,6 +581,27 @@ class AlgorithmFactory(PyironFactory):
     ):
         return NloptAlgorithm(
             name="GD_STOGO",
+            stopval=stopval,
+            max_iter=max_iter,
+            maxtime=maxtime,
+            ftol_rel=ftol_rel,
+            ftol_abs=ftol_abs,
+            xtol_rel=xtol_rel,
+            seed=seed,
+        )
+
+    @staticmethod
+    def gd_stogo_rand(
+        stopval=1e-10,
+        max_iter=50,
+        maxtime=None,
+        ftol_rel=None,
+        ftol_abs=None,
+        xtol_rel=None,
+        seed=None,
+    ):
+        return NloptAlgorithm(
+            name="GD_STOGO_RAND",
             stopval=stopval,
             max_iter=max_iter,
             maxtime=maxtime,

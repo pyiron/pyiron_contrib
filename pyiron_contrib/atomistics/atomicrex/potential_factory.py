@@ -785,7 +785,7 @@ class EAMPotential(AbstractPotential, EAMlikeMixin):
 
         # TODO: figure out how to index ax for multiple elements
         fig, ax = plt.subplots(
-            nrows=3*len(elements),
+            nrows=3 * len(elements),
             ncols=len(elements),
             figsize=(len(elements) * 8, len(elements) * 3 * 6),
             squeeze=False,
@@ -798,25 +798,29 @@ class EAMPotential(AbstractPotential, EAMlikeMixin):
                     xdata = rho_values
                     xlabel = "$\\rho $ [a.u.]"
                     k = 0
-                    ylim = (np.min(y)-0.5, 5)
-                    ax[i*3+k, 0].plot(xdata, y)
-                    ax[i*3+k, 0].set(ylim=ylim, title=f"{el} {pot}", xlabel=xlabel)
+                    ylim = (np.min(y) - 0.5, 5)
+                    ax[i * 3 + k, 0].plot(xdata, y)
+                    ax[i * 3 + k, 0].set(ylim=ylim, title=f"{el} {pot}", xlabel=xlabel)
                 elif "rho" in pot:
                     xdata = r_values
                     xlabel = "r [$\AA$]"
                     k = 1
-                    ylim = (np.min(y)-0.1, 1)
-                    ax[i*3+k, rho_count].plot(xdata, y)
-                    ax[i*3+k, rho_count].set(ylim=ylim, title=f"{el} {pot}", xlabel=xlabel)
+                    ylim = (np.min(y) - 0.1, 1)
+                    ax[i * 3 + k, rho_count].plot(xdata, y)
+                    ax[i * 3 + k, rho_count].set(
+                        ylim=ylim, title=f"{el} {pot}", xlabel=xlabel
+                    )
                     rho_count += 1
                 elif "V" in pot:
                     xdata = r_values[1:]
                     y = y[1:]
                     xlabel = "r [$\AA$]"
                     k = 2
-                    ylim = (np.min(y)-0.1, 2)
-                    ax[i*3+k, V_count].plot(xdata, y)
-                    ax[i*3+k, V_count].set(ylim=ylim, title=f"{el} {pot}", xlabel=xlabel)
+                    ylim = (np.min(y) - 0.1, 2)
+                    ax[i * 3 + k, V_count].plot(xdata, y)
+                    ax[i * 3 + k, V_count].set(
+                        ylim=ylim, title=f"{el} {pot}", xlabel=xlabel
+                    )
                     V_count += 1
         return fig, ax
 

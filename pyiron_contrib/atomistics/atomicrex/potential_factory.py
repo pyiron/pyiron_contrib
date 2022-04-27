@@ -793,7 +793,6 @@ class EAMPotential(AbstractPotential, EAMlikeMixin):
         for i, (el, pot_dict) in enumerate(elements.items()):
             V_count = 0
             rho_count = 0
-            print(el, i)
             for pot, y in pot_dict.items():
                 if pot == "F":
                     xdata = rho_values

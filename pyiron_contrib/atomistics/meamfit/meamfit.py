@@ -25,11 +25,19 @@ __date__ = "Sep 1, 2017"
 class MeamFit(GenericJob):
     def __init__(self, project, job_name):
         """
-        ExampleJob generating a list of random numbers to simulate energy fluctuations.
+        Class to setup and run and MeamFit simulations.
 
         Args:
             project: Project object (defines path where job will be created and stored)
             job_name: name of the job (must be unique within this project path)
+            
+        Examples:
+            Here is a simple example to setup and run a MeamFit job:
+            
+            >>> job = pr.create.job.MeamFit(job_name='test_job')
+            >>> job.add_job_to_fitting(job_id=job_id) # job_id of the vasp MD job you want to use for potential fitting
+            >>> job.run()       
+        
         """
         super(MeamFit, self).__init__(project, job_name)
         self.__version__ = None
@@ -115,12 +123,19 @@ class MeamFit(GenericJob):
         """
 
         Args:
-            job_id (int):
+            job_id (int): job_id of the vasp MD job you want to use for potential fitting.
             time_step_start (int): initial timestep - after equilibration
             time_step_end (int): last timestep to use
-            time_step_delta (int):
-            quantity (str): ['E', 'F'] for fitting the energies use 'E' and 'F' for fitting the forces
-            weight (list): default is one, but for lower temperatures use higher weights [100, 1000]
+            time_step_delta (int): time step
+            quantity (str): the property in the vasprun file to be fit to, and can take the values ['E0', 'Free‐Energy', 'Force']
+                            ‘E0’: to the total energy (specifically the E0, sigma‐>0 value in the vasprun file);
+                            ‘Free‐Energy’: will fit to the free energy (the F value in the vasprun file);  
+                            ‘Force’: will fit to atomic forces.
+                             Note that only the first two letters are in fact read in by MEAMfit, so that it is sufficient to
+                             write ‘Fr’ or ‘Fo’ for the second and third cases respectively.  
+            weight (list): default is [1.0, 0.0, 0.0].
+            
+            More information on these parameters are available in the MeamFit user manual- https://www.scd.stfc.ac.uk/Pages/MEAMfit-v2.aspx
 
         Returns:
 
@@ -142,6 +157,33 @@ class MeamFit(GenericJob):
                                    'Weights': [weight]})
             self._calculation_dataframe = pd.concat([self._calculation_dataframe, df_tmp.set_index('Job id')])
 
+    def _copy_vasprun_xml(self, cwd=None):
+        for job_id in self._calculation_dataframe.index:
+            self.project.load(job_id).decompress()
+            working_directory = self.project.get_job_working_directory(int(job_id))
+            shutil.copyfile(posixpath.join(working_directory, 'vasprun.xml'),
+                            posixpath.join(cwd, 'vasprun_' + str(int(job_id)) + '.xml'))
+            self.project.load(job_id).compress()
+
+    @staticmethod
+    def _write_calc_db(calculation_dataframe, file_name="fitdbse", cwd=None):
+        if cwd is not None:
+            file_name = posixpath.join(cwd, file_name)
+        with open(file_name, 'w') as f:
+            f.write(str(len(calculation_dataframe)) + ' # Files | Configs to fit | Quantity to fit | Weights \n')
+            for entry in zip(['vasprun_' + str(int(job_id)) + '.xml' for job_id in calculation_dataframe.index],
+                             [start + 1 for start in calculation_dataframe['Start config']],
+                             [end+1 for end in calculation_dataframe['End config']],
+                             list(calculation_dataframe['Step']),
+                             list(calculation_dataframe['Quantity to fit']),
+                             list(calculation_dataframe['Weights'])):
+                file, start_config, end_config, step, quantity, weight = entry
+                if isinstance(weight, list):
+                    weight = str(weight[0]) + ' ' + str(weight[1]) + ' ' + str(weight[2])
+                f.write(str(file) + ' ' + str(int(start_config)) + '-' + str(int(end_config)) + 's' + str(int(step))
+                        + ' ' + str(quantity) + ' ' + str(weight) + '\n')
+   
+    
     # define routines that collect all output files
     def collect_output(self):
         potential_timings_df = self._collect_timings(file_name='bestoptfuncs', cwd=self.working_directory)
@@ -196,35 +238,6 @@ class MeamFit(GenericJob):
             if 'File' in self._potential_timings_dataframe.columns:
                 self._potential_timings_dataframe = self._potential_timings_dataframe.set_index('File')
 
-    def _copy_vasprun_xml(self, cwd=None):
-        for job_id in self._calculation_dataframe.index:
-            self.project.load(job_id).decompress()
-            working_directory = self.project.get_job_working_directory(int(job_id))
-            shutil.copyfile(posixpath.join(working_directory, 'vasprun.xml'),
-                            posixpath.join(cwd, self._get_vasprun_name(job_id)))
-            self.project.load(job_id).compress()
-
-    @staticmethod
-    def _write_calc_db(calculation_dataframe, file_name="fitdbse", cwd=None):
-        if cwd is not None:
-            file_name = posixpath.join(cwd, file_name)
-        with open(file_name, 'w') as f:
-            f.write(str(len(calculation_dataframe)) + ' # Files | Configs to fit | Quantity to fit | Weights \n')
-            for entry in zip(['vasprun_' + str(int(job_id)) + '.xml' for job_id in calculation_dataframe.index],
-                             [start + 1 for start in calculation_dataframe['Start config']],
-                             [end+1 for end in calculation_dataframe['End config']],
-                             list(calculation_dataframe['Step']),
-                             list(calculation_dataframe['Quantity to fit']),
-                             list(calculation_dataframe['Weights'])):
-                file, start_config, end_config, step, quantity, weight = entry
-                if isinstance(weight, list):
-                    weight = str(weight[0]) + ' ' + str(weight[1]) + ' ' + str(weight[2])
-                f.write(str(file) + ' ' + str(int(start_config)) + '-' + str(int(end_config)) + 's' + str(int(step))
-                        + ' ' + str(quantity) + ' ' + str(weight) + '\n')
-
-    @staticmethod
-    def _get_vasprun_name(job_id):
-        return 'vasprun_' + str(int(job_id)) + '.xml'
 
     @staticmethod
     def _read_calc_db(file_name="fitdbse", cwd=None):

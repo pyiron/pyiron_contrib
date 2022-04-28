@@ -34,6 +34,7 @@ class MeamFit(GenericJob):
         Examples:
             Here is a simple example to setup and run a MeamFit job:
             
+            >>> pr = Project('meamfit')
             >>> job = pr.create.job.MeamFit(job_name='test_job')
             >>> job.add_job_to_fitting(job_id=job_id) # job_id of the vasp MD job you want to use for potential fitting
             >>> job.run()       

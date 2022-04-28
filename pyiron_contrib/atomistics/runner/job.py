@@ -27,24 +27,26 @@ Reference:
 
 import numpy as np
 
-import ase.io.runner.runner as io
-from ase.calculators.runner.runner import Runner, DEFAULT_PARAMETERS
-from ase.calculators.runner.runnersinglepoint import RunnerSinglePointCalculator
+from runnerase.io.ase import (read_results_mode1, read_results_mode2,
+                              read_results_mode3)
+from runnerase import Runner
+from runnerase.defaultoptions import DEFAULT_PARAMETERS
+from runnerase.singlepoint import RunnerSinglePointCalculator
 
 from pyiron_base import state, Executable, DataContainer, GenericJob
 from pyiron_base.generic.object import HasStorage
 from pyiron_atomistics.atomistics.structure.atoms import pyiron_to_ase
 
-from pyiron_contrib.atomistics.atomistics.job.trainingcontainer import TrainingContainer
+from ..atomistics.job.trainingcontainer import TrainingContainer
 
 __author__ = 'Alexander Knoll'
 __copyright__ = 'Copyright 2021, Georg-August-Universität Göttingen - Behler '\
                 'Group'
-__version__ = '0.1'
+__version__ = '0.1.0'
 __maintainer__ = 'Alexander Knoll'
 __email__ = 'alexander.knoll@chemie.uni-goettingen.de'
 __status__ = 'development'
-__date__ = 'January 7, 2022'
+__date__ = 'April 28, 2022'
 
 
 class RunnerTrainingContainer(TrainingContainer):
@@ -150,9 +152,17 @@ class RunnerFit(GenericJob, HasStorage):
     """
 
     __name__ = 'RuNNer'
+
     # These properties are needed by RuNNer as input data (depending on the
     # chosen RuNNer mode).
     _input_properties = ['scaling', 'weights', 'sfvalues', 'splittraintest']
+
+    # Define a default executable.
+    _executable = Executable(
+        codename='runner',
+        module='runner',
+        path_binary_codes=state.settings.resource_paths
+    )
 
     def __init__(self, project, job_name, **kwargs):
         """Initialize the class.
@@ -227,26 +237,32 @@ class RunnerFit(GenericJob, HasStorage):
 
     @property
     def scaling(self):
+        """Show the symmetry function scaling data in storage."""
         return self.storage.scaling
 
     @property
     def weights(self):
+        """Show the atomic neural network weights data in storage."""
         return self.storage.weights
 
     @property
     def sfvalues(self):
+        """Show the symmetry function value data in storage."""
         return self.storage.sfvalues
 
     @property
     def splittraintest(self):
+        """Show the split between training and testing data in storage."""
         return self.storage.splittraintest
 
     @property
     def input(self):
+        """Show input options in storage."""
         return self.storage.input
 
     @property
     def output(self):
+        """Show all calculation output in storage."""
         return self.storage.output
 
     @property
@@ -262,7 +278,6 @@ class RunnerFit(GenericJob, HasStorage):
             structures (list): A list of ASE Atoms objects or Pyiron Atoms
                                objects which are to be stored.
         """
-
         for structure in structures:
             energy = structure.get_potential_energy()
 
@@ -303,7 +318,7 @@ class RunnerFit(GenericJob, HasStorage):
 
         calc.write_input(
             atoms,
-            targets[self.input.runner_mode],
+            targets[self.input['runner_mode']],
             system_changes
         )
 
@@ -326,7 +341,7 @@ class RunnerFit(GenericJob, HasStorage):
         # each structure and the information, which structure belongs to the
         # training and which to the testing set.
         if self.input.runner_mode == 1:
-            sfvalues, splittraintest = io.read_results_mode1(label, directory)
+            sfvalues, splittraintest = read_results_mode1(label, directory)
             self.output.sfvalues = sfvalues
             self.output.splittraintest = splittraintest
 
@@ -334,7 +349,7 @@ class RunnerFit(GenericJob, HasStorage):
         # networks, the symmetry function scaling data, and the results of the
         # fitting process.
         if self.input.runner_mode == 2:
-            fitresults, weights, scaling = io.read_results_mode2(
+            fitresults, weights, scaling = read_results_mode2(
                 label,
                 directory
             )
@@ -345,7 +360,7 @@ class RunnerFit(GenericJob, HasStorage):
         # If successful, RuNNer Mode 3 returns the energy and forces of the
         # structure for which it was executed.
         if self.input.runner_mode == 3:
-            atoms, energy, forces = io.read_results_mode3(label, directory)
+            energy, forces = read_results_mode3(directory)
             self.output.energy = energy
             self.output.forces = forces
 
@@ -394,7 +409,7 @@ class RunnerFit(GenericJob, HasStorage):
         # structures, and outputs of the previous calculation. However, it
         # cannot access the relevant properties as input values which is
         # necessary for starting a new calculation.
-        new_ham = super(RunnerFit, self).restart(*args, **kwargs)
+        new_ham = super().restart(*args, **kwargs)
 
         for prop in self._input_properties:
             if prop in self.output.keys():

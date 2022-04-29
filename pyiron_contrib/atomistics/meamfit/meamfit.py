@@ -102,8 +102,9 @@ class MeamFit(GenericJob):
         self.input.read_only = True
 
     def validate_ready_to_run(self):
-        pass
-
+        if self._calculation_dataframe.empty:
+            raise ValueError()   
+          
     def write_input(self):
         """
         Call routines that generate the codespecifc input files

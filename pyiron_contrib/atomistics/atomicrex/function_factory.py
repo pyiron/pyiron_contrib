@@ -248,6 +248,28 @@ class FunctionFactory(PyironFactory):
         return MishinCuF(identifier, F0, F2, q1, q2, q3, q4, Q1, Q2, species)
 
     @staticmethod
+    def extendedMishinCuF(
+        identifier, F0, F2, f3, f4, f5, f6, a3, a4, a5, a6, d3, d4, d5, species=["*"]
+    ):
+        return ExtendedMishinCuF(
+            identifier=identifier,
+            F0=F0,
+            F2=F2,
+            f3=f3,
+            f4=f4,
+            f5=f5,
+            f6=f6,
+            a3=a3,
+            a4=a4,
+            a5=a5,
+            a6=a6,
+            d3=d3,
+            d4=d4,
+            d5=d5,
+            species=species,
+        )
+
+    @staticmethod
     def RsMinusRPowN(identifier, S, rs, N, species=["*", "*"], cutoff=None):
         return RsMinusRPowN(identifier, S, rs, N, species, cutoff=cutoff)
 
@@ -988,7 +1010,7 @@ class RsMinusRPowN(SpecialFunction):
         super().__init__(
             identifier, species=species, is_screening_function=is_screening_function
         )
-        self.cutoff=cutoff
+        self.cutoff = cutoff
         self.parameters.add_parameter(
             "S",
             start_val=S,
@@ -1186,6 +1208,7 @@ class MishinCuF(SpecialFunction):
 
     def _to_xml_element(self):
         return super()._to_xml_element(name="Mishin-Cu-F")
+
 
 class ExtendedMishinCuF(SpecialFunction):
     def __init__(

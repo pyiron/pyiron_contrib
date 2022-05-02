@@ -1187,6 +1187,95 @@ class MishinCuF(SpecialFunction):
     def _to_xml_element(self):
         return super()._to_xml_element(name="Mishin-Cu-F")
 
+class ExtendedMishinCuF(SpecialFunction):
+    def __init__(
+        self,
+        identifier=None,
+        F0=None,
+        F2=None,
+        f3=None,
+        f4=None,
+        f5=None,
+        f6=None,
+        a3=None,
+        a4=None,
+        a5=None,
+        a6=None,
+        d3=None,
+        d4=None,
+        d5=None,
+        species=["*"],
+    ):
+        super().__init__(identifier, species=species, is_screening_function=False)
+        self.parameters.add_parameter(
+            "F0",
+            start_val=F0,
+            enabled=True,
+        )
+        self.parameters.add_parameter(
+            "F2",
+            start_val=F2,
+            enabled=True,
+        )
+        self.parameters.add_parameter(
+            "f3",
+            start_val=f3,
+            enabled=True,
+        )
+        self.parameters.add_parameter(
+            "f4",
+            start_val=f4,
+            enabled=True,
+        )
+        self.parameters.add_parameter(
+            "f5",
+            start_val=f5,
+            enabled=True,
+        )
+        self.parameters.add_parameter(
+            "f6",
+            start_val=f6,
+            enabled=True,
+        )
+        self.parameters.add_parameter(
+            "a3",
+            start_val=a3,
+            enabled=True,
+        )
+        self.parameters.add_parameter(
+            "a4",
+            start_val=a4,
+            enabled=True,
+        )
+        self.parameters.add_parameter(
+            "a5",
+            start_val=a5,
+            enabled=True,
+        )
+        self.parameters.add_parameter(
+            "a6",
+            start_val=a6,
+            enabled=True,
+        )
+        self.parameters.add_parameter(
+            "d3",
+            start_val=d3,
+            enabled=True,
+        )
+        self.parameters.add_parameter(
+            "d4",
+            start_val=d4,
+            enabled=True,
+        )
+        self.parameters.add_parameter(
+            "d5",
+            start_val=d5,
+            enabled=True,
+        )
+
+    def _to_xml_element(self):
+        return super()._to_xml_element(name="extended-Mishin-Cu-F")
+
 
 class UserFunction(DataContainer, BaseFunctionMixin):
     """

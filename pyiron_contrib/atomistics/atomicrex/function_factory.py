@@ -1297,7 +1297,7 @@ class ExtendedMishinCuF(SpecialFunction):
         )
 
     def _to_xml_element(self):
-        return super()._to_xml_element(name="extended-Mishin-Cu-F")
+        return super()._to_xml_element(name="Extended-Mishin-Cu-F")
 
 
 class UserFunction(DataContainer, BaseFunctionMixin):

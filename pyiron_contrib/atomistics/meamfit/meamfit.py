@@ -26,19 +26,19 @@ class MeamFit(GenericJob):
     def __init__(self, project, job_name):
         """
         Class to setup and run and MeamFit simulations.
-
-        Args:
-            project: Project object (defines path where job will be created and stored)
-            job_name: name of the job (must be unique within this project path)
-            
+        
         Examples:
             Here is a simple example to setup and run a MeamFit job:
             
             >>> pr = Project('meamfit')
             >>> job = pr.create.job.MeamFit(job_name='test_job')
-            >>> job.add_job_to_fitting(job_id=job_id) # job_id of the vasp MD job you want to use for potential fitting
+            >>> job.add_job_to_fitting(job_id=job_id) # job_id of the vasp MD job using for potential fitting
             >>> job.run()       
         
+        Args:
+            project: Project object (defines path where job will be created and stored)
+            job_name: name of the job (must be unique within this project path)
+            
         """
         super(MeamFit, self).__init__(project, job_name)
         self.__version__ = None

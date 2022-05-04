@@ -761,13 +761,3 @@ def predefined_structure_xml(
     else:
         struct_xml.append(fit_properties)
     return struct_xml
-
-def sort_structure(structure, forces=None):
-    sort_array = get_sort_array(structure)
-    if forces is None:
-        return structure[sort_array]
-    return structure[sort_array], forces[sort_array]
-
-def get_sort_array(structure):
-    sort_array = np.argsort(structure.numbers, kind="stable")
-    return sort_array

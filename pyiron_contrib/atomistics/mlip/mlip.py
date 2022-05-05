@@ -198,20 +198,18 @@ class Mlip(GenericJob, PotentialFit):
         training_store.add_array('energy', dtype=np.float64, shape=(), per='chunk')
         training_store.add_array('forces', dtype=np.float64, shape=(3,), per='element')
         training_store.add_array('stress', dtype=np.float64, shape=(6,), per='chunk')
-        training_store.add_array('grade',  dtype=np.float64, shape=(), per='chunk')
         for cfg in loadcfgs(os.path.join(self.working_directory, "training_efs.cfg")):
             training_store.add_chunk(len(cfg.pos), identifier=cfg.desc,
-                    energy=cfg.energy, forces=cfg.forces, stress=cfg.stresses, grade=cfg.grade
+                    energy=cfg.energy, forces=cfg.forces, stress=cfg.stresses
             )
 
         testing_store = FlattenedStorage()
         testing_store.add_array('energy', dtype=np.float64, shape=(), per='chunk')
         testing_store.add_array('forces', dtype=np.float64, shape=(3,), per='element')
         testing_store.add_array('stress', dtype=np.float64, shape=(6,), per='chunk')
-        testing_store.add_array('grade',  dtype=np.float64, shape=(), per='chunk')
         for cfg in loadcfgs(os.path.join(self.working_directory, "testing_efs.cfg")):
             testing_store.add_chunk(len(cfg.pos), identifier=cfg.desc,
-                    energy=cfg.energy, forces=cfg.forces, stress=cfg.stresses, grade=cfg.grade
+                    energy=cfg.energy, forces=cfg.forces, stress=cfg.stresses
             )
 
         with self.project_hdf5.open('output') as hdf5_output:

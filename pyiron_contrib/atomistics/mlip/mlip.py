@@ -161,10 +161,9 @@ class Mlip(GenericJob, PotentialFit):
 
         species = np.array(species)
         input_store = StructureStorage()
-        input_store.add_array('energy', dtype=np.float64, shape=(1,), per='chunk')
+        input_store.add_array('energy', dtype=np.float64, shape=(), per='chunk')
         input_store.add_array('forces', dtype=np.float64, shape=(3,), per='element')
         input_store.add_array('stress', dtype=np.float64, shape=(6,), per='chunk')
-        input_store.add_array('grade',  dtype=np.float64, shape=(1,), per='chunk')
         for cfg in loadcfgs(os.path.join(self.working_directory, "training.cfg")):
             struct = Atoms(symbols=species[np.cast[np.int64](cfg.types)], positions=cfg.pos, cell=cfg.lat, pbc=[True]*3) # HACK for pbc
             input_store.add_structure(struct, identifier=cfg.desc,
@@ -196,20 +195,20 @@ class Mlip(GenericJob, PotentialFit):
         self._potential.load(os.path.join(self.working_directory, "Trained.mtp_"))
 
         training_store = FlattenedStorage()
-        training_store.add_array('energy', dtype=np.float64, shape=(1,), per='chunk')
+        training_store.add_array('energy', dtype=np.float64, shape=(), per='chunk')
         training_store.add_array('forces', dtype=np.float64, shape=(3,), per='element')
         training_store.add_array('stress', dtype=np.float64, shape=(6,), per='chunk')
-        training_store.add_array('grade',  dtype=np.float64, shape=(1,), per='chunk')
+        training_store.add_array('grade',  dtype=np.float64, shape=(), per='chunk')
         for cfg in loadcfgs(os.path.join(self.working_directory, "training_efs.cfg")):
             training_store.add_chunk(len(cfg.pos), identifier=cfg.desc,
                     energy=cfg.energy, forces=cfg.forces, stress=cfg.stresses, grade=cfg.grade
             )
 
         testing_store = FlattenedStorage()
-        testing_store.add_array('energy', dtype=np.float64, shape=(1,), per='chunk')
+        testing_store.add_array('energy', dtype=np.float64, shape=(), per='chunk')
         testing_store.add_array('forces', dtype=np.float64, shape=(3,), per='element')
         testing_store.add_array('stress', dtype=np.float64, shape=(6,), per='chunk')
-        testing_store.add_array('grade',  dtype=np.float64, shape=(1,), per='chunk')
+        testing_store.add_array('grade',  dtype=np.float64, shape=(), per='chunk')
         for cfg in loadcfgs(os.path.join(self.working_directory, "testing_efs.cfg")):
             testing_store.add_chunk(len(cfg.pos), identifier=cfg.desc,
                     energy=cfg.energy, forces=cfg.forces, stress=cfg.stresses, grade=cfg.grade

@@ -8,7 +8,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from pyiron_base import FlattenedStorage
-from pyiron_contrib.atomistics.atomistics.job.trainingcontainer import TrainingContainer
+from pyiron_contrib.atomistics.atomistics.job.trainingcontainer import TrainingContainer, TrainingStorage
 
 class PotentialFit(abc.ABC):
     """
@@ -41,16 +41,16 @@ class PotentialFit(abc.ABC):
             raise ValueError("Data can only be added before fitting is started!")
 
     @abc.abstractmethod
-    def _get_training_data(self) -> FlattenedStorage:
+    def _get_training_data(self) -> TrainingStorage:
         pass
 
     @property
-    def training_data(self) -> FlattenedStorage:
+    def training_data(self) -> TrainingStorage:
         """
         Return all training data added so far.
 
         Returns:
-            :class:`pyiron_base.FlattenedStorage`: container holding all training data
+            :class:`pyiron_contrib.atomistics.atomistics.job.trainingcontainer.TrainingStorage`: container holding all training data
         """
         return self._get_training_data()
 

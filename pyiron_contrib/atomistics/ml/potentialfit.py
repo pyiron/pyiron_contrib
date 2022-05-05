@@ -39,7 +39,7 @@ class PotentialFit(abc.ABC):
         else:
             raise ValueError("Data can only be added before fitting is started!")
 
-    @abstract
+    @abc.abstractmethod
     def _get_training_data(self) -> FlattenedStorage:
         pass
 
@@ -53,7 +53,7 @@ class PotentialFit(abc.ABC):
         """
         return self._get_training_data()
 
-    @abstract
+    @abc.abstractmethod
     def _get_predicted_data(self) -> FlattenedStorage:
         pass
 
@@ -94,7 +94,7 @@ class PotentialFit(abc.ABC):
         plt.hist(energy_train - energy_pred)
         plt.xlabel("Training Error [eV]")
 
-    @abstract
+    @abc.abstractmethod
     def get_lammps_potential(self) -> pd.DataFrame:
         """
         Return a pyiron compatible dataframe that defines a potential to be used with a Lammps job (or subclass

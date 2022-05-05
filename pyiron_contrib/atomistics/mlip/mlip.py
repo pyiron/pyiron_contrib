@@ -477,7 +477,7 @@ class Mlip(GenericJob, PotentialFit):
 
     # PotentialFit Implementation
     def _add_training_data(self, container):
-        self.add_job_to_fitting(container.id, 0, container.number_of_structures, 1)
+        self.add_job_to_fitting(container.id, 0, container.number_of_structures - 1, 1)
 
     def _get_training_data(self):
         # TODO/BUG: only works after input is written for now, instead this should go over _job_

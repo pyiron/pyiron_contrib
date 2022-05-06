@@ -56,6 +56,14 @@ class ARStructureContainer:
             pass
         self._prepared_plotting = False
 
+    @property
+    def training_data(self):
+        pass
+
+    @property
+    def predicted_data(self):
+        pass
+
     def add_structure(
         self,
         structure,

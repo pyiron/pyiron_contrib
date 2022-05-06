@@ -76,24 +76,12 @@ class PotentialFit(abc.ABC):
         else:
             raise ValueError("Data can only be accessed after successful fit!")
 
+    @property
     def plot(self):
         """
         Plots correlation and (training) error histograms.
         """
-        if not self.status.finished:
-            raise ValueError("Results can only be plotted after job finished successfully!")
-
-        energy_train = self.training_data["energy"] / self.training_data["length"]
-        energy_pred = self.predicted_data["energy"] / self.predicted_data["length"]
-
-        plt.subplot(1, 2, 1)
-        plt.scatter(energy_train, energy_pred)
-        plt.xlabel("True Energy Per Atom [eV]")
-        plt.ylabel("Predicted Energy Per Atom [eV]")
-
-        plt.subplot(1, 2, 2)
-        plt.hist(energy_train - energy_pred)
-        plt.xlabel("Training Error [eV]")
+        raise NotImplementedError("Implementation of interface to TrainingPlots in subclass necessary")
 
     @abc.abstractmethod
     def get_lammps_potential(self) -> pd.DataFrame:

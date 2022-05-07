@@ -51,16 +51,7 @@ class TrainingContainer(GenericJob, HasStructure):
         super().__init__(project=project, job_name=job_name)
         self.__name__ = "TrainingContainer"
         self.__hdf_version__ = "0.3.0"
-        self._container = StructureStorage()
-        self._container.add_array("energy", dtype=np.float64, per="chunk")
-        self._container.add_array("forces", shape=(3,), dtype=np.float64, per="element")
-        # save stress in voigt notation
-        self._container.add_array("stress", shape=(6,), dtype=np.float64, per="chunk")
-        # Store total (per-structure) and atomic charge information.
-        self._container.add_array('totalcharge', dtype=np.float64, per='chunk')
-        self._container.add_array("charges", dtype=np.float64, per="element")
-
-        self._table_cache = None
+        self._container = TrainingStorage()
 
         self.input = DataContainer(
             {"save_neighbors": True, "num_neighbors": 12}, table_name="parameters"
@@ -77,7 +68,16 @@ class TrainingContainer(GenericJob, HasStructure):
         self._container.include_job(job, iteration_step)
 
     @deprecate("Use add_structure instead")
-    def include_structure(self, structure, energy, forces=None, stress=None, name=None):
+    def include_structure(
+        self,
+        structure,
+        energy,
+        forces=None,
+        totalcharge=None,
+        charges=None,
+        stress=None,
+        name=None
+    ):
         """
         Add new structure to structure list and save energy and forces with it.
 
@@ -91,7 +91,12 @@ class TrainingContainer(GenericJob, HasStructure):
             stress (6 array of float, optional): per structure stresses in voigt notation
             name (str, optional): name describing the structure
         """
-        self._container.include_structure(structure, energy, forces, stress, name)
+        self._container.include_structure(structure, energy,
+                                          forces=forces,
+                                          totalcharge=totalcharge,
+                                          charges=charges,
+                                          stress=stress,
+                                          name=name)
 
     def include_dataset(self, dataset):
         """
@@ -235,25 +240,6 @@ class TrainingContainer(GenericJob, HasStructure):
         return cont
 
     @property
-    def _table(self):
-        if self._table_cache is None or len(self._table_cache) != len(self._container):
-            self._table_cache = pd.DataFrame({
-                "name":             [self._container.get_array("identifier", i)
-                                        for i in range(len(self._container))],
-                "atoms":            [self._container.get_structure(i)
-                                        for i in range(len(self._container))],
-                "energy":           [self._container.get_array("energy", i)
-                                        for i in range(len(self._container))],
-                "totalcharge":      [self._container.get_array("totalcharge", i)
-                                        for i in range(len(self._container))],
-                "forces":           [self._container.get_array("forces", i)
-                                        for i in range(len(self._container))],
-                "charges":           [self._container.get_array("charges", i)
-                                        for i in range(len(self._container))],
-                "stress":           [self._container.get_array("stress", i)
-                                        for i in range(len(self._container))],
-            })
-            self._table_cache["number_of_atoms"] = [len(s) for s in self._table_cache.atoms]
     def plot(self):
         """
         :class:`.TrainingPlots`: plotting interface
@@ -514,6 +500,10 @@ class TrainingStorage(StructureStorage):
         self.add_array(
             "forces", shape=(3,), dtype=np.float64, per="element", fill=np.nan
         )
+        # Store total (per-structure) and atomic charge information.
+        self.add_array('totalcharge', dtype=np.float64, per='chunk',
+                       fill=np.nan)
+        self.add_array("charges", dtype=np.float64, per="element", fill=np.nan)
         # save stress in voigt notation
         self.add_array("stress", shape=(6,), dtype=np.float64, per="chunk", fill=np.nan)
         self._table_cache = None
@@ -540,6 +530,8 @@ class TrainingStorage(StructureStorage):
                     "name": [self.get_array("identifier", i) for i in range(len(self))],
                     "atoms": [self.get_structure(i) for i in range(len(self))],
                     "energy": [self.get_array("energy", i) for i in range(len(self))],
+                    "totalcharge": [self.get_array("totalcharge", i) for i in range(len(self))],
+                    "charges": [self.get_array("charges", i) for i in range(len(self))],
                     "forces": [self.get_array("forces", i) for i in range(len(self))],
                     "stress": [self.get_array("stress", i) for i in range(len(self))],
                 }
@@ -563,21 +555,6 @@ class TrainingStorage(StructureStorage):
             forces = ff[iteration_step]
         else:
             forces = None
-
-        # Retrieve total charge.
-        tc = job.output.totalcharge
-        if tc is not None:
-            totalcharge = tc[iteration_step]
-        else:
-            totalcharge = None
-
-        # Retrieve atomic charges.
-        cc = job.output.charges
-        if cc is not None:
-            charges = cc[iteration_step]
-        else:
-            charges = None
-
         # HACK: VASP work-around, current contents of pressures are meaningless, correct values are in
         # output/generic/stresses
         pp = job["output/generic/stresses"]
@@ -590,14 +567,6 @@ class TrainingStorage(StructureStorage):
         if stress is not None:
             stress = np.asarray(stress)
             if stress.shape == (3, 3):
-                stress = np.array([stress[0, 0], stress[1 ,1], stress[2, 2],
-                                   stress[1, 2], stress[0, 2], stress[0, 1]])
-        self.include_structure(job.get_structure(iteration_step=iteration_step),
-                               energy=energy, totalcharge=totalcharge,
-                               forces=forces, charges=charges, stress=stress,
-                               name=job.name)
-
-    def include_structure(self, structure, energy, totalcharge=None, forces=None, charges=None, stress=None, name=None):
                 stress = np.array(
                     [
                         stress[0, 0],
@@ -617,7 +586,16 @@ class TrainingStorage(StructureStorage):
         )
 
     @deprecate("Use add_structure instead")
-    def include_structure(self, structure, energy, forces=None, stress=None, name=None):
+    def include_structure(
+        self,
+        structure,
+        energy,
+        forces=None,
+        totalcharge=None,
+        charges=None,
+        stress=None,
+        name=None
+    ):
         """
         Add new structure to structure list and save energy and forces with it.
 
@@ -632,11 +610,25 @@ class TrainingStorage(StructureStorage):
             name (str, optional): name describing the structure
         """
         self.add_structure(
-            structure, energy, identifier=name, forces=forces, stress=stress
+            structure,
+            energy,
+            identifier=name,
+            totalcharge=totalcharge,
+            charges=charges,
+            forces=forces,
+            stress=stress
         )
 
     def add_structure(
-        self, structure, energy, identifier=None, forces=None, stress=None, **arrays
+        self,
+        structure,
+        energy,
+        identifier=None,
+        totalcharge=None,
+        charges=None,
+        forces=None,
+        stress=None,
+        **arrays
     ):
         data = {"energy": energy}
         if forces is not None:
@@ -647,15 +639,7 @@ class TrainingStorage(StructureStorage):
             data["totalcharge"] = totalcharge
         if charges is not None:
             data["charges"] = charges
-        self._container.add_structure(structure, name, **data)
-        if self._table_cache:
-            self._table = self._table.append(
-                    {"name": name, "atoms": structure, "energy": energy,
-                     "totalcharge": totalcharge,
-                     "forces": forces, "charges": charges,
-                     "stress": stress,
-                     "number_of_atoms": len(structure)},
-                    ignore_index=True)
+        super().add_structure(structure, identifier, **data)
 
     def include_dataset(self, dataset):
         """
@@ -665,7 +649,6 @@ class TrainingStorage(StructureStorage):
             - name: human readable name of the structure
             - atoms(:class:`ase.Atoms`): the atomic structure
             - energy(float): energy of the whole structure
-            - totalcharge(float): charge of the whole structure
             - forces (Nx3 array of float): per atom forces, where N is the number of atoms in the structure
             - charges (Nx3 array of floats):
             - stress (6 array of float): per structure stress in voigt notation
@@ -680,6 +663,10 @@ class TrainingStorage(StructureStorage):
                 kwargs["forces"] = row.forces
             if hasattr(row, "stress"):
                 kwargs["stress"] = row.stress
+            if hasattr(row, "totalcharge"):
+                kwargs["totalcharge"] = row.totalcharge
+            if hasattr(row, "charges"):
+                kwargs["charges"] = row.charges
             self.add_structure(row.atoms, energy=row.energy, identifier=row.name, **kwargs)
 
     def to_list(self, filter_function=None):
@@ -701,4 +688,5 @@ class TrainingStorage(StructureStorage):
         force_list = data_table.forces.to_list()
         charges_list = data_table.charges.to_list()
         num_atoms_list = data_table.number_of_atoms.to_list()
-        return structure_list, energy_list, force_list, num_atoms_list
+        return (structure_list, energy_list, force_list, totalcharge_list,
+                charges_list, num_atoms_list)

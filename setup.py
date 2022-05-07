@@ -33,7 +33,7 @@ setup(
     install_requires=[        
         'matplotlib==3.5.1',
         'numpy==1.22.3',
-        'pyiron_base==0.5.11',
+        'pyiron_base==0.5.12',
         'scipy==1.8.0',
         'seaborn==0.11.2',
         'pyparsing==3.0.8'
@@ -41,7 +41,7 @@ setup(
     extras_require={
         'atomistic': [
             'ase==3.22.1',
-            'pyiron_atomistics==0.2.44',
+            'pyiron_atomistics==0.2.45',
         ],
         'fenics': [
             'fenics==2019.1.0',
@@ -49,8 +49,8 @@ setup(
         ],
         'image': ['scikit-image==0.19.2'],
         'generic': [
-            'boto3==1.21.46', 
-            'moto==3.1.6'
+            'boto3==1.22.4', 
+            'moto==3.1.7'
         ],
     },
     cmdclass=versioneer.get_cmdclass(),

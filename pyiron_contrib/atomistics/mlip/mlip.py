@@ -10,9 +10,10 @@ import os
 import pandas as pd
 import posixpath
 import scipy.constants
+from pyiron_atomistics.atomistics.structure.structurestorage import StructureStorage
 from pyiron_base import state, GenericParameters, GenericJob, Executable, FlattenedStorage
 from pyiron_atomistics import ase_to_pyiron, Atoms
-from pyiron_atomistics.atomistics.structure.structurestorage import StructureStorage
+from pyiron_contrib.atomistics.ml.potentialfit import PotentialFit
 from pyiron_contrib.atomistics.mlip.cfgs import savecfgs, loadcfgs, Cfg
 from pyiron_contrib.atomistics.mlip.potential import MtpPotential
 
@@ -28,8 +29,7 @@ __date__ = "Sep 1, 2017"
 
 gpa_to_ev_ang = 1e22 / scipy.constants.physical_constants['joule-electron volt relationship'][0]
 
-
-class Mlip(GenericJob):
+class Mlip(GenericJob, PotentialFit):
     def __init__(self, project, job_name):
         super(Mlip, self).__init__(project, job_name)
         self.__version__ = '0.1.0'
@@ -68,6 +68,22 @@ class Mlip(GenericJob):
         if os.path.exists(pot) and os.path.exists(states):
             return [pot, states]
 
+    def _get_elements(self):
+        """
+        Return elements in training in insertion order, i.e. elements seen earlier get lower indices.
+        """
+        elements = []
+        for job_id in self._job_dict:
+            j = self.project.inspect(job_id)
+            if j["NAME"] == "TrainingContainer":
+                candidates = j.to_object().get_elements()
+            else:
+                candidates = j["input/structure/species"]
+            for e in candidates:
+                if e not in elements:
+                    elements.append(e)
+        return elements
+
     def potential_dataframe(self, elements=None):
         """
         :class:`pandas.DataFrame`: potential dataframe for lammps jobs
@@ -84,7 +100,7 @@ class Mlip(GenericJob):
         if elements is None:
             elements = self.input["species"]
             if elements is None:
-                raise ValueError("elements not defined in input, elements must be explicitely passed!")
+                elements = self._get_elements() # AAAH
 
         if self.status.finished:
             return pd.DataFrame({
@@ -145,10 +161,9 @@ class Mlip(GenericJob):
 
         species = np.array(species)
         input_store = StructureStorage()
-        input_store.add_array('energy', dtype=np.float64, shape=(1,), per='chunk')
+        input_store.add_array('energy', dtype=np.float64, shape=(), per='chunk')
         input_store.add_array('forces', dtype=np.float64, shape=(3,), per='element')
         input_store.add_array('stress', dtype=np.float64, shape=(6,), per='chunk')
-        input_store.add_array('grade',  dtype=np.float64, shape=(1,), per='chunk')
         for cfg in loadcfgs(os.path.join(self.working_directory, "training.cfg")):
             struct = Atoms(symbols=species[np.cast[np.int64](cfg.types)], positions=cfg.pos, cell=cfg.lat, pbc=[True]*3) # HACK for pbc
             input_store.add_structure(struct, identifier=cfg.desc,
@@ -180,23 +195,21 @@ class Mlip(GenericJob):
         self._potential.load(os.path.join(self.working_directory, "Trained.mtp_"))
 
         training_store = FlattenedStorage()
-        training_store.add_array('energy', dtype=np.float64, shape=(1,), per='chunk')
+        training_store.add_array('energy', dtype=np.float64, shape=(), per='chunk')
         training_store.add_array('forces', dtype=np.float64, shape=(3,), per='element')
         training_store.add_array('stress', dtype=np.float64, shape=(6,), per='chunk')
-        training_store.add_array('grade',  dtype=np.float64, shape=(1,), per='chunk')
         for cfg in loadcfgs(os.path.join(self.working_directory, "training_efs.cfg")):
             training_store.add_chunk(len(cfg.pos), identifier=cfg.desc,
-                    energy=cfg.energy, forces=cfg.forces, stress=cfg.stresses, grade=cfg.grade
+                    energy=cfg.energy, forces=cfg.forces, stress=cfg.stresses
             )
 
         testing_store = FlattenedStorage()
-        testing_store.add_array('energy', dtype=np.float64, shape=(1,), per='chunk')
+        testing_store.add_array('energy', dtype=np.float64, shape=(), per='chunk')
         testing_store.add_array('forces', dtype=np.float64, shape=(3,), per='element')
         testing_store.add_array('stress', dtype=np.float64, shape=(6,), per='chunk')
-        testing_store.add_array('grade',  dtype=np.float64, shape=(1,), per='chunk')
         for cfg in loadcfgs(os.path.join(self.working_directory, "testing_efs.cfg")):
             testing_store.add_chunk(len(cfg.pos), identifier=cfg.desc,
-                    energy=cfg.energy, forces=cfg.forces, stress=cfg.stresses, grade=cfg.grade
+                    energy=cfg.energy, forces=cfg.forces, stress=cfg.stresses
             )
 
         with self.project_hdf5.open('output') as hdf5_output:
@@ -457,6 +470,21 @@ class Mlip(GenericJob):
                     os.path.exists(os.path.join(resource_path, potential_name)):
                 return os.path.join(resource_path, potential_name)
         raise ValueError('Potential not found!')
+
+
+    # PotentialFit Implementation
+    def _add_training_data(self, container):
+        self.add_job_to_fitting(container.id, 0, container.number_of_structures - 1, 1)
+
+    def _get_training_data(self):
+        # TODO/BUG: only works after input is written for now, instead this should go over _job_
+        return self["input/training_data"].to_object()
+
+    def _get_predicted_data(self):
+        return self["output/training_efs"].to_object()
+
+    def get_lammps_potential(self):
+        return self.potential_dataframe()
 
 
 class MlipParameter(GenericParameters):

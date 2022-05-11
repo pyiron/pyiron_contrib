@@ -28,13 +28,16 @@ name    atoms   energy  forces  number_of_atoms
 Fe_bcc  ...
 """
 
-from typing import Callable
+from typing import Callable, Optional, Union
 from warnings import catch_warnings
 
 import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+
+from ase.atoms import Atoms as ASEAtoms
+
 from pyiron_contrib.atomistics.atomistics.job.structurestorage import StructureStorage
 from pyiron_atomistics.atomistics.structure.atoms import Atoms
 from pyiron_atomistics.atomistics.structure.has_structure import HasStructure
@@ -54,7 +57,8 @@ class TrainingContainer(GenericJob, HasStructure):
         self._container = TrainingStorage()
 
         self.input = DataContainer(
-            {"save_neighbors": True, "num_neighbors": 12}, table_name="parameters"
+            {"save_neighbors": True, "num_neighbors": 12},
+            table_name="parameters"
         )
 
     def include_job(self, job, iteration_step=-1):
@@ -63,7 +67,8 @@ class TrainingContainer(GenericJob, HasStructure):
 
         Args:
             job (:class:`.AtomisticGenericJob`): job to take structure from
-            iteration_step (int, optional): if job has multiple steps, this selects which to add
+            iteration_step (int, optional): if job has multiple steps, this
+            selects which to add
         """
         self._container.include_job(job, iteration_step)
 
@@ -71,32 +76,24 @@ class TrainingContainer(GenericJob, HasStructure):
     def include_structure(
         self,
         structure,
-        energy,
-        forces=None,
-        totalcharge=None,
-        charges=None,
-        stress=None,
-        name=None
+        **properties
     ):
         """
         Add new structure to structure list and save energy and forces with it.
 
-        For consistency with the rest of pyiron, energy should be in units of eV and forces in eV/A, but no conversion
-        is performed.
+        For consistency with the rest of pyiron, energy should be in units of eV
+        and forces in eV/A, but no conversion is performed.
 
         Args:
             structure_or_job (:class:`~.Atoms`): structure to add
             energy (float): energy of the whole structure
-            forces (Nx3 array of float, optional): per atom forces, where N is the number of atoms in the structure
-            stress (6 array of float, optional): per structure stresses in voigt notation
+            forces (Nx3 array of float, optional): per atom forces, where N is
+                the number of atoms in the structure
+            stress (6 array of float, optional): per structure stresses in voigt
+                notation
             name (str, optional): name describing the structure
         """
-        self._container.include_structure(structure, energy,
-                                          forces=forces,
-                                          totalcharge=totalcharge,
-                                          charges=charges,
-                                          stress=stress,
-                                          name=name)
+        self._container.include_structure(structure, **properties)
 
     def include_dataset(self, dataset):
         """
@@ -177,6 +174,9 @@ class TrainingContainer(GenericJob, HasStructure):
             tuple: list of structures, energies, forces, and the number of atoms
         """
         return self._container.to_list(filter_function)
+
+    def to_dict(self):
+        return self._container.to_dict()
 
     def write_input(self):
         pass
@@ -496,16 +496,12 @@ class TrainingPlots:
 class TrainingStorage(StructureStorage):
     def __init__(self):
         super().__init__()
-        self.add_array("energy", dtype=np.float64, per="chunk", fill=np.nan)
-        self.add_array(
-            "forces", shape=(3,), dtype=np.float64, per="element", fill=np.nan
-        )
-        # Store total (per-structure) and atomic charge information.
-        self.add_array('totalcharge', dtype=np.float64, per='chunk',
-                       fill=np.nan)
-        self.add_array("charges", dtype=np.float64, per="element", fill=np.nan)
-        # save stress in voigt notation
-        self.add_array("stress", shape=(6,), dtype=np.float64, per="chunk", fill=np.nan)
+        # self.add_array("energy", dtype=np.float64, per="chunk", fill=np.nan)
+        # self.add_array(
+        #     "forces", shape=(3,), dtype=np.float64, per="element", fill=np.nan
+        # )
+        # # save stress in voigt notation
+        # self.add_array("stress", shape=(6,), dtype=np.float64, per="chunk", fill=np.nan)
         self._table_cache = None
         self.to_pandas()
 
@@ -530,8 +526,6 @@ class TrainingStorage(StructureStorage):
                     "name": [self.get_array("identifier", i) for i in range(len(self))],
                     "atoms": [self.get_structure(i) for i in range(len(self))],
                     "energy": [self.get_array("energy", i) for i in range(len(self))],
-                    "totalcharge": [self.get_array("totalcharge", i) for i in range(len(self))],
-                    "charges": [self.get_array("charges", i) for i in range(len(self))],
                     "forces": [self.get_array("forces", i) for i in range(len(self))],
                     "stress": [self.get_array("stress", i) for i in range(len(self))],
                 }
@@ -589,12 +583,7 @@ class TrainingStorage(StructureStorage):
     def include_structure(
         self,
         structure,
-        energy,
-        forces=None,
-        totalcharge=None,
-        charges=None,
-        stress=None,
-        name=None
+        **properties
     ):
         """
         Add new structure to structure list and save energy and forces with it.
@@ -609,37 +598,16 @@ class TrainingStorage(StructureStorage):
             stress (6 array of float, optional): per structure stresses in voigt notation
             name (str, optional): name describing the structure
         """
-        self.add_structure(
-            structure,
-            energy,
-            identifier=name,
-            totalcharge=totalcharge,
-            charges=charges,
-            forces=forces,
-            stress=stress
-        )
+        name = properties.pop('name', None)
+        self.add_structure(structure, identifier=name, **properties)
 
     def add_structure(
         self,
-        structure,
-        energy,
+        structure: Atoms,
         identifier=None,
-        totalcharge=None,
-        charges=None,
-        forces=None,
-        stress=None,
         **arrays
-    ):
-        data = {"energy": energy}
-        if forces is not None:
-            data["forces"] = forces
-        if stress is not None:
-            data["stress"] = stress
-        if totalcharge is not None:
-            data["totalcharge"] = totalcharge
-        if charges is not None:
-            data["charges"] = charges
-        super().add_structure(structure, identifier, **data)
+    ) -> None:
+        super().add_structure(structure, identifier, **arrays)
 
     def include_dataset(self, dataset):
         """
@@ -663,10 +631,6 @@ class TrainingStorage(StructureStorage):
                 kwargs["forces"] = row.forces
             if hasattr(row, "stress"):
                 kwargs["stress"] = row.stress
-            if hasattr(row, "totalcharge"):
-                kwargs["totalcharge"] = row.totalcharge
-            if hasattr(row, "charges"):
-                kwargs["charges"] = row.charges
             self.add_structure(row.atoms, energy=row.energy, identifier=row.name, **kwargs)
 
     def to_list(self, filter_function=None):
@@ -684,9 +648,24 @@ class TrainingStorage(StructureStorage):
             data_table = filter_function(data_table)
         structure_list = data_table.atoms.to_list()
         energy_list = data_table.energy.to_list()
-        totalcharge_list = data_table.totalcharge.to_list()
         force_list = data_table.forces.to_list()
-        charges_list = data_table.charges.to_list()
         num_atoms_list = data_table.number_of_atoms.to_list()
-        return (structure_list, energy_list, force_list, totalcharge_list,
-                charges_list, num_atoms_list)
+        return (structure_list, energy_list, force_list, num_atoms_list)
+
+    def to_dict(self):
+        dict = {}
+
+        # Get structure information.
+        dict['structure'] = list(self.iter_structures())
+
+        # Some arrays are only for internal usage or structure information that
+        # was already saved in dict['structure'].
+        internal_arrays = ['start_index', 'length', 'cell', 'pbc', 'positions',
+                           'symbols']
+        for array in self.list_arrays():
+            # Skip internal arrays.
+            if array in internal_arrays:
+                continue
+
+            dict[array] = [self.get_array(array, i) for i in range(len(self))]
+        return dict

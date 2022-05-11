@@ -88,12 +88,12 @@ class PotentialFit(abc.ABC):
 
         plt.subplot(1, 2, 1)
         plt.scatter(energy_train, energy_pred)
-        plt.xlabel("True Energy Per Atom [eV]")
-        plt.ylabel("Predicted Energy Per Atom [eV]")
+        plt.xlabel("True Energy Per Atom [eV / atom]")
+        plt.ylabel("Predicted Energy Per Atom [eV / atom]")
 
         plt.subplot(1, 2, 2)
         plt.hist(energy_train - energy_pred)
-        plt.xlabel("Training Error [eV]")
+        plt.xlabel("Training Error [eV / atom]")
 
     @abc.abstractmethod
     def get_lammps_potential(self) -> pd.DataFrame:

@@ -24,7 +24,6 @@ Reference
 from typing import Optional
 from abc import abstractmethod
 
-
 import numpy as np
 
 from runnerase.symmetryfunctions import SymmetryFunctionSet
@@ -187,36 +186,20 @@ class RunneraseHDFMixin(HasHDF):
 
         return runnerase_class
 
-    def _to_hdf(
-        self,
-        hdf: ProjectHDFio,
-        group_name: Optional[str] = None
-    ) -> None:
+    def _to_hdf(self, hdf: ProjectHDFio) -> None:
         """Write `self` to HDF5 storage.
 
         Parameters
         ----------
         hdf : ProjectHDFio
             The HDF file where `self` will be stored.
-        group_name : str
-            The name of the subgroup.
         """
-        if group_name is None:
-            group_name = self._get_hdf_group_name()
-
-        # Store HDF node metadata.
-        with hdf.open(group_name) as hdf_group:
-            hdf_group['NAME'] = self.__class__.__name__
-            hdf_group['TYPE'] = str(type(self))
-            hdf_group['HDF_VERSION'] = self.__hdf_version__
-
-            for idx, prop in enumerate(self.runnerase_properties):
-                hdf_group[f'{prop}__index_{idx}'] = self.__dict__[prop]
+        for idx, prop in enumerate(self.runnerase_properties):
+            hdf[f'{prop}__index_{idx}'] = self.__dict__[prop]
 
     def _from_hdf(
         self,
         hdf: ProjectHDFio,
-        group_name: Optional[str] = None,
         version: Optional[str] = None
     ) -> 'HDFSplitTrainTest':
         """Read `self` from HDF5 storage.
@@ -225,22 +208,16 @@ class RunneraseHDFMixin(HasHDF):
         ----------
         hdf : ProjectHDFio
             The HDF file where `self` will be stored.
-        group_name : str
-            The name of the subgroup.
         """
         if version != self.__hdf_version__:
             raise RuntimeError('Invalid HDF5 version found while reading '
                                + self.__class__.__name__)
 
-        if group_name is None:
-            group_name = self._get_hdf_group_name()
-
         # Open HDF file at the right group with a context manager.
-        with hdf.open(group_name) as hdf_group:
-            for node in hdf_group.list_nodes():
-                for prop in self.runnerase_properties:
-                    if prop in node:
-                        self.__dict__[prop] = hdf_group[node]
+        for node in hdf.list_nodes():
+            for prop in self.runnerase_properties:
+                if prop in node:
+                    self.__dict__[prop] = hdf[node]
 
         return self
 

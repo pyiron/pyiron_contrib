@@ -14,7 +14,7 @@ Reference
     [RuNNer online documentation](https://theochem.gitlab.io/runner)
 """
 
-from typing import List, Optional
+from typing import List
 
 import numpy as np
 
@@ -31,16 +31,35 @@ def container_to_ase(container: TrainingContainer) -> List[Atoms]:
     """Convert a `TrainingContainer` into a list of ASE Atoms objects."""
     structure_lst = []
 
-    for row in list(zip(*container.to_list())):
+    arrays = container.to_dict()
+    arraynames = arrays.keys()
 
-        # Retrieve all properties, i.e. energy, forces, etc.
-        structure, energy, forces, totalcharge, charges, _ = row
+    # Iterate over the structures by zipping the dictionary values.
+    for properties in zip(*arrays.values()):
+        zipped = dict(zip(arraynames, properties))
 
         # Retrieve atomic positions, cell vectors, etc.
-        atoms = pyiron_to_ase(structure)
+        atoms = pyiron_to_ase(zipped['structure'])
 
         # Attach properties to the Atoms object.
-        atoms.set_initial_charges(charges)
+        if 'charges' in zipped:
+            atoms.set_initial_charges(zipped['charges'])
+
+        if 'energy' in zipped:
+            energy = zipped['energy']
+        else:
+            energy = None
+
+        if 'forces' in zipped:
+            forces = zipped['forces']
+        else:
+            forces = None
+
+        if 'totalcharge' in zipped:
+            totalcharge = zipped['totalcharge']
+        else:
+            totalcharge = None
+
         atoms.calc = RunnerSinglePointCalculator(
             atoms=atoms,
             energy=energy,
@@ -54,7 +73,7 @@ def container_to_ase(container: TrainingContainer) -> List[Atoms]:
 
 def ase_to_container(
     structures: List[Atoms],
-    container: Optional[TrainingContainer]
+    container: TrainingContainer
 ) -> None:
     """Add `structures` to `TrainingContainer`."""
     for structure in structures:
@@ -81,7 +100,6 @@ def ase_to_container(
             structure.spins = None
 
         container.include_structure(structure, **properties)
-
 
 
 def pad(array: np.ndarray, desired_length: int) -> np.ndarray:

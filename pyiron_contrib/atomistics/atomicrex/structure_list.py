@@ -7,11 +7,15 @@ import xml.etree.ElementTree as ET
 
 import numpy as np
 from numpy import ndarray
-from pyiron_base import state, DataContainer
+from pyiron_base import state, DataContainer, FlattenedStorage
 from pyiron_atomistics import Atoms, ase_to_pyiron
 
 from pyiron_atomistics.atomistics.structure.structurestorage import StructureStorage
-from pyiron_contrib.atomistics.atomistics.job.trainingcontainer import TrainingPlots
+from pyiron_contrib.atomistics.atomistics.job.trainingcontainer import (
+    TrainingPlots,
+    TrainingContainer,
+    TrainingStorage,
+)
 from pyiron_contrib.atomistics.atomicrex.fit_properties import (
     ARFitPropertyList,
     ARFitProperty,
@@ -38,10 +42,10 @@ class ARStructureContainer:
             num_atoms=num_atoms, num_structures=num_structures
         )
         self._predefined_storage = DataContainer(table_name="predefined_structures")
-        self._structures.add_array("fit", dtype=bool, per="chunk")
-        self._structures.add_array("clamp", dtype=bool, per="chunk")
-        self._structures.add_array("predefined", dtype=bool, per="chunk")
-        self._structures.add_array("relative_weight", per="chunk")
+        self._structures.add_array("fit", dtype=bool, per="chunk", fill=True)
+        self._structures.add_array("clamp", dtype=bool, per="chunk", fill=True)
+        self._structures.add_array("predefined", dtype=bool, per="chunk", fill=False)
+        self._structures.add_array("relative_weight", per="chunk", fill=1.0)
         self.structure_file_path = None
         try:
             self._interactive_library = atomicrex.Job()
@@ -55,14 +59,6 @@ class ARStructureContainer:
         except:
             pass
         self._prepared_plotting = False
-
-    @property
-    def training_data(self):
-        pass
-
-    @property
-    def predicted_data(self):
-        pass
 
     def add_structure(
         self,
@@ -524,6 +520,70 @@ class ARStructureContainer:
             self.fit_properties["atomic-energy"]._per_chunk_arrays[val_str]
             * self._structures.length
         )
+
+    #### PotentialFit methods
+    def add_training_data(self, container: TrainingContainer) -> None:
+        storage = container._container
+        identifier = storage.get_array("identifier")
+        energy = storage.get_array("energy")
+        forces = storage.get_array("forces")
+        length = storage.get_arry("length")
+        start_index = storage.get_array("start_index")
+        for idx in range(len(storage)):
+            self.add_structure(
+                identifier=identifier[idx],
+                structure=storage.get_structure(frame=idx),
+            )
+            self.add_scalar_fit_property(
+                prop="atomic-energy",
+                target_val=energy[idx]/length[idx],
+                tolerance=0.001,
+            )
+            self.add_vector_fit_property(
+                prop="atomic-forces",
+                target_val=forces[start_index[idx]:start_index[idx]+length[idx]],
+                tolerance=0.01,
+            )
+
+    def get_training_data(self) -> TrainingStorage:
+        storage = TrainingStorage()
+        forces = self.fit_properties["atomic-forces"].target_val
+        atomic_energy = self.fit_properties["atomic-energy"].target_val
+        identifier = self._structures.get_array("identifier")
+        length = self._structures.get_arry("length")
+        start_index = storage.get_array("start_index")
+        for idx in len(self._structures):
+            storage.add_structure(
+                structure = self._structures.get_structure(frame=idx),
+                energy = atomic_energy[idx]*length[idx],
+                forces = forces[start_index[idx]:start_index[idx]+length[idx]],
+                identifier=identifier[idx],
+            )
+        return storage
+
+    def get_predicted_data(self) -> FlattenedStorage:
+        storage = TrainingStorage()
+        forces = self.fit_properties["atomic-forces"].final_val
+        atomic_energy = self.fit_properties["atomic-energy"].final_val
+        identifier = self._structures.get_array("identifier")
+        length = self._structures.get_arry("length")
+        start_index = storage.get_array("start_index")
+        for idx in len(self._structures):
+            storage.add_structure(
+                structure = self._structures.get_structure(frame=idx),
+                energy = atomic_energy[idx]*length[idx],
+                forces = forces[start_index[idx]:start_index[idx]+length[idx]],
+                identifier=identifier[idx],
+            )
+        return storage
+
+    @property
+    def training_data(self):
+        return self.get_training_data()
+
+    @property
+    def predicted_data(self):
+        return self.get_predicted_data()
 
 
 ### This is probably useless like this in most cases because forces can't be passed.

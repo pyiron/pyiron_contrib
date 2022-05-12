@@ -2,6 +2,8 @@
 Abstract base class for fitting interactomic potentials.
 """
 
+from typing import List
+
 import abc
 
 import pandas as pd
@@ -96,7 +98,7 @@ class PotentialFit(abc.ABC):
         plt.xlabel("Training Error [eV / atom]")
 
     @abc.abstractmethod
-    def get_lammps_potential(self) -> pd.DataFrame:
+    def get_lammps_potential(self, elements: List[str] = None) -> pd.DataFrame:
         """
         Return a pyiron compatible dataframe that defines a potential to be used with a Lammps job (or subclass
         thereof).

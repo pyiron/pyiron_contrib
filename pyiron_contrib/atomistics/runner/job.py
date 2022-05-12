@@ -22,7 +22,7 @@ FIXME
 Paket bitte auch via Conda Forge anbieten
 """
 
-from typing import Optional
+from typing import Optional, List
 
 import numpy as np
 import pandas as pd
@@ -336,7 +336,10 @@ class RunnerJob(GenericJob, HasStorage, PotentialFit):
 
         return predicted_data
 
-    def get_lammps_potential(self) -> pd.DataFrame:
+    def get_lammps_potential(
+        self,
+        elements: Optional[List[str]] = None
+    ) -> pd.DataFrame:
         """Return a pandas dataframe with information for setting up LAMMPS."""
         if not self.status.finished:
             raise RuntimeError('LAMMPS potential can only be generated after a '
@@ -346,7 +349,8 @@ class RunnerJob(GenericJob, HasStorage, PotentialFit):
             raise RuntimeError('This potential has not been trained yet.')
 
         # Get all elements in the training dataset.
-        elements = self.training_data.get_elements()
+        if elements is None:
+            elements = self.training_data.get_elements()
 
         # Create a list of all files needed by the potential.
         files = [f'{self.working_directory}/input.nn',

@@ -303,6 +303,11 @@ class ARStructureContainer:
         else:
             return self.fit_properties[prop]._per_element_arrays["target_val"][slc]
 
+    def _sync(self):
+        for flat in self.fit_properties.values():
+            flat.num_elements = self._structures.num_elements
+            flat.num_chunks = self._structures.num_chunks
+
     def _shrink(self):
         self._resize_all(
             num_chunks=self._structures.num_chunks,
@@ -524,58 +529,59 @@ class ARStructureContainer:
     #### PotentialFit methods
     def add_training_data(self, container: TrainingContainer) -> None:
         storage = container._container
-        identifier = storage.get_array("identifier")
-        energy = storage.get_array("energy")
-        forces = storage.get_array("forces")
-        length = storage.get_arry("length")
-        start_index = storage.get_array("start_index")
-        for idx in range(len(storage)):
-            self.add_structure(
-                identifier=identifier[idx],
-                structure=storage.get_structure(frame=idx),
+        atomic_energy_storage = FlattenedARScalarProperty(num_chunks=storage.num_chunks)
+        atomic_energy_storage._per_chunk_arrays["target_val"] = (
+            storage._per_chunk_arrays.pop("energy")
+            / storage._per_chunk_arrays["length"]
+        )
+        atomic_forces_storage = FlattenedARVectorProperty(
+            num_chunks=storage.num_chunks, num_elements=storage.num_elements
+        )
+        atomic_forces_storage._per_element_arrays[
+            "target_val"
+        ] = storage._per_element_arrays.pop("forces")
+        if "atomic-energy" in self.fit_properties:
+            self._sync()
+        else:
+            self.fit_properties["atomic-energy"] = FlattenedARScalarProperty(
+                num_chunks=self._structures.num_chunks,
+                num_elements=self._structures.num_elements,
             )
-            self.add_scalar_fit_property(
-                prop="atomic-energy",
-                target_val=energy[idx]/length[idx],
-                tolerance=0.001,
+        if "atomic-forces" in self.fit_properties:
+            self._sync()
+        else:
+            self.fit_properties["atomic-energy"] = FlattenedARVectorProperty(
+                num_chunks=self._structures.num_chunks,
+                num_elements=self._structures.num_elements,
             )
-            self.add_vector_fit_property(
-                prop="atomic-forces",
-                target_val=forces[start_index[idx]:start_index[idx]+length[idx]],
-                tolerance=0.01,
-            )
+
+        self._structures.extend(storage)
+        self.fit_properties["atomic-energy"].extend(atomic_energy_storage)
+        self.fit_properties["atomic-forces"].extend(atomic_forces_storage)
+        
+
+    def _to_TrainingStorage(self, final: bool = False) -> TrainingStorage:
+        self._shrink()
+        storage = TrainingStorage()
+        storage.extend(self._structures)
+        if final:
+            val_str = "final_val"
+        else:
+            val_str = "target_val"
+        storage._per_chunk_arrays["energy"][0 : storage.num_chunks] = (
+            self.fit_properties["atomic-energy"][val_str]
+            * self._structures._per_chunk_arrays["length"]
+        )
+        storage._per_element_arrays["forces"][
+            0 : storage.num_elements
+        ] = self.fit_properties["atomic-forces"][val_str]
+        return storage
 
     def get_training_data(self) -> TrainingStorage:
-        storage = TrainingStorage()
-        forces = self.fit_properties["atomic-forces"].target_val
-        atomic_energy = self.fit_properties["atomic-energy"].target_val
-        identifier = self._structures.get_array("identifier")
-        length = self._structures.get_arry("length")
-        start_index = storage.get_array("start_index")
-        for idx in len(self._structures):
-            storage.add_structure(
-                structure = self._structures.get_structure(frame=idx),
-                energy = atomic_energy[idx]*length[idx],
-                forces = forces[start_index[idx]:start_index[idx]+length[idx]],
-                identifier=identifier[idx],
-            )
-        return storage
+        return self._to_TrainingStorage(final=False)
 
     def get_predicted_data(self) -> FlattenedStorage:
-        storage = TrainingStorage()
-        forces = self.fit_properties["atomic-forces"].final_val
-        atomic_energy = self.fit_properties["atomic-energy"].final_val
-        identifier = self._structures.get_array("identifier")
-        length = self._structures.get_arry("length")
-        start_index = storage.get_array("start_index")
-        for idx in len(self._structures):
-            storage.add_structure(
-                structure = self._structures.get_structure(frame=idx),
-                energy = atomic_energy[idx]*length[idx],
-                forces = forces[start_index[idx]:start_index[idx]+length[idx]],
-                identifier=identifier[idx],
-            )
-        return storage
+        return self._to_TrainingStorage(final=True)
 
     @property
     def training_data(self):

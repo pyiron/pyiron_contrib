@@ -529,17 +529,20 @@ class ARStructureContainer:
     #### PotentialFit methods
     def add_training_data(self, container: TrainingContainer) -> None:
         storage = container._container
-        atomic_energy_storage = FlattenedARScalarProperty(num_chunks=storage.num_chunks)
+        atomic_energy_storage = FlattenedARScalarProperty(
+            num_chunks=storage.num_chunks, num_elements=storage.num_elements
+        )
         atomic_energy_storage._per_chunk_arrays["target_val"] = (
-            storage._per_chunk_arrays.pop("energy")
-            / storage._per_chunk_arrays["length"]
+            storage._per_chunk_arrays["energy"][0 : storage.num_chunks]
+            / storage.length[0 : storage.num_chunks]
         )
         atomic_forces_storage = FlattenedARVectorProperty(
             num_chunks=storage.num_chunks, num_elements=storage.num_elements
         )
         atomic_forces_storage._per_element_arrays[
             "target_val"
-        ] = storage._per_element_arrays.pop("forces")
+        ] = storage._per_element_arrays["forces"][0 : storage.num_elements]
+
         if "atomic-energy" in self.fit_properties:
             self._sync()
         else:
@@ -550,7 +553,7 @@ class ARStructureContainer:
         if "atomic-forces" in self.fit_properties:
             self._sync()
         else:
-            self.fit_properties["atomic-energy"] = FlattenedARVectorProperty(
+            self.fit_properties["atomic-forces"] = FlattenedARVectorProperty(
                 num_chunks=self._structures.num_chunks,
                 num_elements=self._structures.num_elements,
             )
@@ -558,7 +561,6 @@ class ARStructureContainer:
         self._structures.extend(storage)
         self.fit_properties["atomic-energy"].extend(atomic_energy_storage)
         self.fit_properties["atomic-forces"].extend(atomic_forces_storage)
-        
 
     def _to_TrainingStorage(self, final: bool = False) -> TrainingStorage:
         self._shrink()

@@ -36,7 +36,7 @@ class ARStructureContainer:
     __version__ = "0.3.0"
     __hdf_version__ = "0.3.0"
 
-    def __init__(self, num_atoms=1, num_structures=1):
+    def __init__(self, num_atoms=0, num_structures=0):
         self.fit_properties = DataContainer(table_name="fit_properties")
         self._structures = StructureStorage(
             num_atoms=num_atoms, num_structures=num_structures
@@ -532,34 +532,45 @@ class ARStructureContainer:
         atomic_energy_storage = FlattenedARScalarProperty(
             num_chunks=storage.num_chunks, num_elements=storage.num_elements
         )
+        atomic_energy_storage.num_chunks = storage.num_chunks
+        atomic_energy_storage.num_elements = storage.num_elements
+        atomic_energy_storage._per_chunk_arrays["fit"][0 : storage.num_chunks] = True
+        atomic_energy_storage._per_chunk_arrays["tolerance"][
+            0 : storage.num_chunks
+        ] = 0.001
         atomic_energy_storage._per_chunk_arrays["target_val"] = (
             storage._per_chunk_arrays["energy"][0 : storage.num_chunks]
             / storage.length[0 : storage.num_chunks]
         )
+
         atomic_forces_storage = FlattenedARVectorProperty(
             num_chunks=storage.num_chunks, num_elements=storage.num_elements
         )
+        atomic_forces_storage.num_chunks = storage.num_chunks
+        atomic_forces_storage.num_elements = storage.num_elements
+        atomic_forces_storage._per_chunk_arrays["fit"][0 : storage.num_chunks] = True
+        atomic_forces_storage._per_chunk_arrays["tolerance"][
+            0 : storage.num_chunks
+        ] = 0.01
         atomic_forces_storage._per_element_arrays[
             "target_val"
         ] = storage._per_element_arrays["forces"][0 : storage.num_elements]
 
-        if "atomic-energy" in self.fit_properties:
-            self._sync()
-        else:
+        if "atomic-energy" not in self.fit_properties:
             self.fit_properties["atomic-energy"] = FlattenedARScalarProperty(
                 num_chunks=self._structures.num_chunks,
                 num_elements=self._structures.num_elements,
             )
-        if "atomic-forces" in self.fit_properties:
-            self._sync()
-        else:
+        if "atomic-forces" not in self.fit_properties:
             self.fit_properties["atomic-forces"] = FlattenedARVectorProperty(
                 num_chunks=self._structures.num_chunks,
                 num_elements=self._structures.num_elements,
             )
+        self._sync()
 
         self._structures.extend(storage)
         self.fit_properties["atomic-energy"].extend(atomic_energy_storage)
+        print(self.fit_properties["atomic-energy"].target_val)
         self.fit_properties["atomic-forces"].extend(atomic_forces_storage)
 
     def _to_TrainingStorage(self, final: bool = False) -> TrainingStorage:

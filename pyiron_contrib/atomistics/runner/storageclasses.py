@@ -194,8 +194,8 @@ class RunneraseHDFMixin(HasHDF):
         hdf : ProjectHDFio
             The HDF file where `self` will be stored.
         """
-        for idx, prop in enumerate(self.runnerase_properties):
-            hdf[f'{prop}__index_{idx}'] = self.__dict__[prop]
+        for prop in self.runnerase_properties:
+            hdf[f'{prop}'] = self.__dict__[prop]
 
     def _from_hdf(
         self,

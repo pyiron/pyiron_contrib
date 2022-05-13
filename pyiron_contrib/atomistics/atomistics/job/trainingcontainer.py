@@ -667,5 +667,5 @@ class TrainingStorage(StructureStorage):
             if array in internal_arrays:
                 continue
 
-            dict[array] = [self.get_array(array, i) for i in range(len(self))]
+            dict[array] = self.get_array_ragged(array)
         return dict

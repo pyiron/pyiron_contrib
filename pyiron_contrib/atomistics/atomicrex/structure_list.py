@@ -570,7 +570,6 @@ class ARStructureContainer:
 
         self._structures.extend(storage)
         self.fit_properties["atomic-energy"].extend(atomic_energy_storage)
-        print(self.fit_properties["atomic-energy"].target_val)
         self.fit_properties["atomic-forces"].extend(atomic_forces_storage)
 
     def _to_TrainingStorage(self, final: bool = False) -> TrainingStorage:

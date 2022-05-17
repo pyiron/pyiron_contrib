@@ -41,31 +41,24 @@ def container_to_ase(container: TrainingContainer) -> List[Atoms]:
         # Retrieve atomic positions, cell vectors, etc.
         atoms = pyiron_to_ase(zipped['structure'])
 
-        # Attach properties to the Atoms object.
+        # Attach charges to the Atoms object.
         if 'charges' in zipped:
             atoms.set_initial_charges(zipped['charges'])
 
-        if 'energy' in zipped:
-            energy = zipped['energy']
-        else:
-            energy = None
+        # Store all properties that will be saved on the calculator below.
+        calc_properties = {'energy': None, 'forces': None, 'totalcharge': None}
+        for prop in calc_properties:
+            if prop in zipped:
+                calc_properties[prop] = zipped[prop]
 
-        if 'forces' in zipped:
-            forces = zipped['forces']
-        else:
-            forces = None
-
-        if 'totalcharge' in zipped:
-            totalcharge = zipped['totalcharge']
-        else:
-            totalcharge = None
-
+        # Storage energies, forces, and totalcharge on a calculator object.
         atoms.calc = RunnerSinglePointCalculator(
             atoms=atoms,
-            energy=energy,
-            forces=forces,
-            totalcharge=totalcharge
+            energy=calc_properties['energy'],
+            forces=calc_properties['forces'],
+            totalcharge=calc_properties['totalcharge']
         )
+
         structure_lst.append(atoms)
 
     return structure_lst

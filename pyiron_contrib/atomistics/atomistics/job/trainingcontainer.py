@@ -653,11 +653,12 @@ class TrainingStorage(StructureStorage):
         num_atoms_list = data_table.number_of_atoms.to_list()
         return (structure_list, energy_list, force_list, num_atoms_list)
 
-    def to_dict(self):
-        dict = {}
+    def to_dict(self) -> Dict[str, Any]:
+        """Return a dictionary of all structures and training properties."""
+        dict_arrays = {}
 
         # Get structure information.
-        dict['structure'] = list(self.iter_structures())
+        dict_arrays['structure'] = list(self.iter_structures())
 
         # Some arrays are only for internal usage or structure information that
         # was already saved in dict['structure'].
@@ -668,5 +669,5 @@ class TrainingStorage(StructureStorage):
             if array in internal_arrays:
                 continue
 
-            dict[array] = self.get_array_ragged(array)
-        return dict
+            dict_arrays[array] = self.get_array_ragged(array)
+        return dict_arrays

@@ -28,7 +28,7 @@ name    atoms   energy  forces  number_of_atoms
 Fe_bcc  ...
 """
 
-from typing import Callable, Optional, Union
+from typing import Callable, Dict, Any
 from warnings import catch_warnings
 
 import numpy as np
@@ -75,6 +75,8 @@ class TrainingContainer(GenericJob, HasStructure):
     def include_structure(
         self,
         structure,
+        energy=None,
+        name=None,
         **properties
     ):
         """
@@ -92,7 +94,8 @@ class TrainingContainer(GenericJob, HasStructure):
                 notation
             name (str, optional): name describing the structure
         """
-        self._container.include_structure(structure, **properties)
+        self._container.include_structure(structure, name=name, energy=energy,
+                                          **properties)
 
     def include_dataset(self, dataset):
         """
@@ -495,12 +498,7 @@ class TrainingPlots:
 class TrainingStorage(StructureStorage):
     def __init__(self):
         super().__init__()
-        # self.add_array("energy", dtype=np.float64, per="chunk", fill=np.nan)
-        # self.add_array(
-        #     "forces", shape=(3,), dtype=np.float64, per="element", fill=np.nan
-        # )
-        # # save stress in voigt notation
-        # self.add_array("stress", shape=(6,), dtype=np.float64, per="chunk", fill=np.nan)
+        self.add_array("energy", dtype=np.float64, per="chunk", fill=np.nan)
         self._table_cache = None
         self.to_pandas()
 
@@ -582,6 +580,8 @@ class TrainingStorage(StructureStorage):
     def include_structure(
         self,
         structure,
+        energy,
+        name=None,
         **properties
     ):
         """
@@ -597,16 +597,18 @@ class TrainingStorage(StructureStorage):
             stress (6 array of float, optional): per structure stresses in voigt notation
             name (str, optional): name describing the structure
         """
-        name = properties.pop('name', None)
-        self.add_structure(structure, identifier=name, **properties)
+        self.add_structure(structure, identifier=name, energy=energy,
+                           **properties)
 
     def add_structure(
         self,
         structure: Atoms,
+        energy,
         identifier=None,
         **arrays
     ) -> None:
-        super().add_structure(structure, identifier, **arrays)
+        super().add_structure(structure, identifier=identifier, energy=energy,
+                              **arrays)
 
     def include_dataset(self, dataset):
         """

@@ -206,7 +206,7 @@ class MeamFit(GenericJob):
             self.collect_output()
             self.status.finished = True
         else:
-            return
+            raise RuntimeError('Can import MEAMfit calculation into finished job.  Needs to be `initialized`.)
 
     # define hdf5 input and output
     def to_hdf(self, hdf=None, group_name=None):

@@ -84,6 +84,22 @@ class TrainingContainer(GenericJob, HasStructure):
         """
         self._container.include_structure(structure, energy, forces, stress, name)
 
+    def add_structure(self, structure, energy, forces=None, stress=None, name=None, **arrays):
+        """
+        Add new structure to structure list and save energy and forces with it.
+
+        For consistency with the rest of pyiron, energy should be in units of eV and forces in eV/A, but no conversion
+        is performed.
+
+        Args:
+            structure_or_job (:class:`~.Atoms`): structure to add
+            energy (float): energy of the whole structure
+            forces (Nx3 array of float, optional): per atom forces, where N is the number of atoms in the structure
+            stress (6 array of float, optional): per structure stresses in voigt notation
+            name (str, optional): name describing the structure
+        """
+        self._container.add_structure(structure, energy, identifier=None, forces=None, stress=None, **arrays)
+
     def include_dataset(self, dataset):
         """
         Add a pandas DataFrame to the saved structures.
@@ -635,3 +651,10 @@ class TrainingStorage(StructureStorage):
         force_list = data_table.forces.to_list()
         num_atoms_list = data_table.number_of_atoms.to_list()
         return structure_list, energy_list, force_list, num_atoms_list
+
+    @property
+    def plot(self):
+        """
+        :class:`.TrainingPlots`: plotting interface
+        """
+        return TrainingPlots(self)

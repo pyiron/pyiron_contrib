@@ -52,7 +52,7 @@ __status__ = 'development'
 __date__ = 'May 11, 2022'
 
 
-class RunnerJob(GenericJob, HasStorage, PotentialFit):
+class RunnerFit(GenericJob, HasStorage, PotentialFit):
     """Generate a potential energy surface using RuNNer.
 
     The RuNNer Neural Network Energy Representation (RuNNer) is a Fortran code
@@ -95,7 +95,7 @@ class RunnerJob(GenericJob, HasStorage, PotentialFit):
 
         # Create an empty sample project and a new job.
         pr = Project(path='example')
-        job = pr.create_job(RunnerJob, 'mode1')
+        job = pr.create_job(RunnerFit, 'mode1')
 
         # Import RuNNer settings from RuNNer input.nn file using ASE's I/O
         # routines.
@@ -131,7 +131,7 @@ class RunnerJob(GenericJob, HasStorage, PotentialFit):
         ```
     """
 
-    __name__ = 'RuNNerJob'
+    __name__ = 'RuNNerFit'
 
     # These properties are needed by RuNNer as input data (depending on the
     # chosen RuNNer mode).

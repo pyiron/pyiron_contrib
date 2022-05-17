@@ -373,12 +373,12 @@ class RunnerJob(GenericJob, HasStorage, PotentialFit):
             raise RuntimeError('You have to run RuNNer prediction mode '
                                + '(Mode 3) before you can access predictions.')
 
-        pred_properties = {'energy': None, 'forces': None}
-
-        # Get a list of structures and energies.
+        # Get a list of structures.
         structures = list(self.training_data.iter_structures())
 
         # Get the values of all properties RuNNer can predict for a structure.
+        pred_properties = {'energy': np.full((len(structures),), np.nan),
+                           'forces': np.full((3, len(structures)), np.nan)}
         for prop in pred_properties:
             if prop in self.output:
                 pred_properties[prop] = self.output[prop]

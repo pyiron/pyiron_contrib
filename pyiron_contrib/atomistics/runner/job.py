@@ -451,7 +451,7 @@ class RunnerJob(GenericJob, HasStorage, PotentialFit):
             'Model': ['RuNNer'],
             'Species': [elements],
             'Config': [['pair_style nnp dir "./" '
-                        + 'showew no showewsum 0 resetew no maxew 100 '
+                        + 'showew yes showewsum 0 resetew no maxew 100 '
                         + 'cflength 1.8897261328 cfenergy 0.0367493254 '
                         + f'emap "{emap}"\n',
                         f'pair_coeff * * {cutoff}\n']]

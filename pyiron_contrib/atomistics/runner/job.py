@@ -22,20 +22,16 @@ import numpy as np
 import pandas as pd
 
 from ase.data import atomic_numbers
-# from ase.atoms import Atoms as ASEAtoms
 
 from runnerase.io.ase import (read_results_mode1, read_results_mode2,
                               read_results_mode3)
 from runnerase import Runner
 from runnerase.defaultoptions import DEFAULT_PARAMETERS
-# from runnerase.singlepoint import RunnerSinglePointCalculator
 
 from pyiron import Project
 from pyiron_base import ProjectHDFio, FlattenedStorage
 from pyiron_base import state, Executable, GenericJob, DataContainer
 from pyiron_base.generic.object import HasStorage
-
-# from pyiron_atomistics.atomistics.structure.atoms import Atoms
 
 from pyiron_contrib.atomistics.ml.potentialfit import PotentialFit
 from pyiron_contrib.atomistics.atomistics.job import (TrainingContainer,
@@ -447,7 +443,7 @@ class RunnerJob(GenericJob, HasStorage, PotentialFit):
 
         if len(cutoffs) > 1:
             raise RuntimeError('LAMMPS potential can only be generated for a '
-                               + 'a uniform cutoff radius.')
+                               + 'uniform cutoff radius.')
 
         return pd.DataFrame({
             'Name': [f"RuNNer-{''.join(elements)}"],

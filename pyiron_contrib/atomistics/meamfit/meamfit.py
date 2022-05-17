@@ -198,6 +198,12 @@ class MeamFit(GenericJob):
         pass
 
     def from_directory(self, directory):
+        """
+            Collect input and output of a finished MeamFit job from a directory and convert into pyiron hdf file.  
+        Args:
+            directory: working directory of the job.
+            
+        """
         if not self.status.finished:
             self.status.collect = True
             self._import_directory = directory
@@ -206,7 +212,7 @@ class MeamFit(GenericJob):
             self.collect_output()
             self.status.finished = True
         else:
-            raise RuntimeError('Can import MEAMfit calculation into finished job.  Needs to be `initialized`.)
+            raise RuntimeError("Unable to import MEAMfit calculation into finished job. Needs to be `initialized`.")
 
     # define hdf5 input and output
     def to_hdf(self, hdf=None, group_name=None):
@@ -285,7 +291,7 @@ class MeamFit(GenericJob):
             if 'datapnts_best' in file:
                 with open(posixpath.join(cwd, file), 'r') as f:
                     content = f.readlines()
-                data_points_lst = list(zip(*[line.split() for line in content[5:]]))
+                data_points_lst = list(zip(*[line.split() for line in content[6:]]))
                 df_new = pd.DataFrame({'Potential': [pot_file for pot_file in files_in_cwd_lst if
                                                      'alloy_' + str(file).split('_best')[-1] ==
                                                      pot_file.split('.')[-1]] * len(data_points_lst[0]),

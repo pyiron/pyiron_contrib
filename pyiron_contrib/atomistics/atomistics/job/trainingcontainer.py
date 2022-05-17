@@ -72,7 +72,6 @@ class TrainingContainer(GenericJob, HasStructure):
         """
         self._container.include_job(job, iteration_step)
 
-    @deprecate("Use add_structure instead")
     def include_structure(
         self,
         structure,
@@ -667,5 +666,5 @@ class TrainingStorage(StructureStorage):
             if array in internal_arrays:
                 continue
 
-            dict[array] = [self.get_array(array, i) for i in range(len(self))]
+            dict[array] = self.get_array_ragged(array)
         return dict

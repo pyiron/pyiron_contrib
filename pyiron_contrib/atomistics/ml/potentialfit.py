@@ -5,7 +5,6 @@ Abstract base class for fitting interactomic potentials.
 import abc
 
 import pandas as pd
-import matplotlib.pyplot as plt
 
 from pyiron_base import FlattenedStorage
 from pyiron_contrib.atomistics.atomistics.job.trainingcontainer import TrainingContainer, TrainingStorage

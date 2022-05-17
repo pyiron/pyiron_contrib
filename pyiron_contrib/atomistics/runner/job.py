@@ -7,19 +7,13 @@ The RuNNer Neural Network Energy Representation is a framework for the
 construction of high-dimensional neural network potentials developed in the
 group of Prof. Dr. Jörg Behler at Georg-August-Universität Göttingen.
 
-Attributes
-----------
-     RunnerJob : GenericJob, HasStorage
+Attributes:
+     RunnerFit : GenericJob, HasStorage, PotentialFit
         Job class for generating and evaluating potential energy surfaces using
         RuNNer.
 
-Reference
----------
-    [RuNNer online documentation](https://theochem.gitlab.io/runner)
-
-FIXME
------
-Paket bitte auch via Conda Forge anbieten
+.. _RuNNer online documentation:
+   https://theochem.gitlab.io/runner
 """
 
 from typing import Optional, List
@@ -95,51 +89,50 @@ class RunnerJob(GenericJob, HasStorage, PotentialFit):
             - energy
             - forces
 
-    Examples
-    --------
-    Starting a new calculation (Mode 1):
+    Examples:
+        Starting a new calculation (Mode 1):
 
-    ```python
-    from pyiron import Project
-    from job import RunnerFit
-    from runnerase import read_runnerase
+        ```python
+        from pyiron import Project
+        from job import RunnerFit
+        from runnerase import read_runnerase
 
-    # Create an empty sample project and a new job.
-    pr = Project(path='example')
-    job = pr.create_job(RunnerJob, 'mode1')
+        # Create an empty sample project and a new job.
+        pr = Project(path='example')
+        job = pr.create_job(RunnerJob, 'mode1')
 
-    # Import RuNNer settings from RuNNer input.nn file using ASE's I/O routines.
-    options = read_runnerconfig('./')
+        # Import RuNNer settings from RuNNer input.nn file using ASE's I/O
+        # routines.
+        options = read_runnerconfig('./')
 
-    # Read input structures from a TrainingContainer that was saved before.
-    container = pr['H2O_MD']
+        # Read input structures from a TrainingContainer that was saved before.
+        container = pr['H2O_MD']
 
-    # Attach the information to the job.
+        # Attach the information to the job.
+        job.add_training_data = container
+        job.parameters.update(options)
 
-    job.add_training_data = container
-    job.parameters.update(options)
+        # Set the RuNNer Mode to 1.
+        job.input.runner_mode = 1
 
-    # Set the RuNNer Mode to 1.
-    job.input.runner_mode = 1
+        job.run()
+        ```
 
-    job.run()
-    ```
+        Restarting Mode 1 and running Mode 2:
 
-    Restarting Mode 1 and running Mode 2:
+        ```python
+        job = Project('example')['mode1'].restart('mode2')
+        job.parameters.runner_mode = 2
+        job.run()
+        ```
 
-    ```python
-    job = Project('example')['mode1'].restart('mode2')
-    job.parameters.runner_mode = 2
-    job.run()
-    ```
+        Restarting Mode 2 and running Mode 3:
 
-    Restarting Mode 2 and running Mode 3:
-
-    ```python
-    job = Project('runnertest')['mode2'].restart('mode3')
-    job.parameters.runner_mode = 3
-    job.run()
-    ```
+        ```python
+        job = Project('runnertest')['mode2'].restart('mode3')
+        job.parameters.runner_mode = 3
+        job.run()
+        ```
     """
 
     __name__ = 'RuNNerJob'
@@ -158,14 +151,11 @@ class RunnerJob(GenericJob, HasStorage, PotentialFit):
     def __init__(self, project: Project, job_name: str) -> None:
         """Initialize the class.
 
-        Parameters
-        ----------
-            project : Project
-                The project container where the job is created.
-            job_name : str
-                The label of the job (used for all directories).
+        Args:
+            project (Project): The project container where the job is created.
+            job_name (str): The label of the job (used for all directories).
         """
-        # Initialize the base class.
+        # Initialize first the job, then the job storage.
         GenericJob.__init__(self, project=project, job_name=job_name)
         HasStorage.__init__(self)
 
@@ -229,22 +219,42 @@ class RunnerJob(GenericJob, HasStorage, PotentialFit):
 
     @property
     def input(self) -> DataContainer:
-        """Show all input properties in storage."""
+        """Show all input properties in storage.
+
+        Returns:
+            self.storage.input (DataContainer): The data container with all
+                input properties.
+        """
         return self.storage.input
 
     @property
-    def output(self):
-        """Show all calculation output in storage."""
+    def output(self) -> DataContainer:
+        """Show all calculation output in storage.
+
+        Returns:
+            self.storage.output (DataContainer): The data container with all
+                output properties.
+        """
         return self.storage.output
 
     @property
-    def parameters(self):
-        """Show the input parameters/settings in storage."""
+    def parameters(self) -> DataContainer:
+        """Show the input parameters/settings in storage.
+
+        Returns:
+            self.storage.input.parameters (DataContainer): The data container
+                with all input parameters for RuNNer.
+        """
         return self.storage.input.parameters
 
     @property
     def scaling(self) -> Optional[HDFScaling]:
-        """Show the symmetry function scaling data in storage."""
+        """Show the symmetry function scaling data in storage.
+
+        Returns:
+            self.output.scaling (HDFScaling, None): If defined, the symmetry
+                function scaling data in storage.
+        """
         if 'scaling' in self.output:
             return self.output.scaling
 
@@ -252,12 +262,22 @@ class RunnerJob(GenericJob, HasStorage, PotentialFit):
 
     @scaling.setter
     def scaling(self, scaling: HDFScaling) -> None:
-        """Set the symmetry function scaling data in storage."""
+        """Set the symmetry function scaling data in storage.
+
+        Args:
+            scaling (HDFScaling): RuNNer symmetry function scaling data wrapped
+                in a HDFScaling storage container.
+        """
         self.output.scaling = scaling
 
     @property
     def weights(self) -> Optional[HDFWeights]:
-        """Show the atomic neural network weights data in storage."""
+        """Show the atomic neural network weights data in storage.
+
+        Returns:
+            self.output.weights (HDFWeights, None): If defined, the weights in
+                storage.
+        """
         if 'weights' in self.output:
             return self.output.weights
 
@@ -265,12 +285,22 @@ class RunnerJob(GenericJob, HasStorage, PotentialFit):
 
     @weights.setter
     def weights(self, weights: HDFWeights) -> None:
-        """Set the weights of the atomic neural networks in storage."""
+        """Set the weights of the atomic neural networks in storage.
+
+        Args:
+            weights (HDFWeights): Atomic neural network weights wrapped in a
+                HDWeights storage container.
+        """
         self.output.weights = weights
 
     @property
     def sfvalues(self) -> Optional[HDFSymmetryFunctionValues]:
-        """Show the symmetry function value data in storage."""
+        """Show the symmetry function value data in storage.
+
+        Returns:
+            self.output.sfvalues (HDFSymmetryFunctionValues, None): If defined,
+                the symmetry function values in storage.
+        """
         if 'sfvalues' in self.output:
             return self.output.sfvalues
 
@@ -278,12 +308,22 @@ class RunnerJob(GenericJob, HasStorage, PotentialFit):
 
     @sfvalues.setter
     def sfvalues(self, sfvalues: HDFSymmetryFunctionValues) -> None:
-        """Set the symmetry function value data in storage."""
+        """Set the symmetry function value data in storage.
+
+        Args:
+            sfvalues (HDFSymmetryFunctionValues): Symmetry function values
+                wrapped in a HDF storage container.
+        """
         self.output.sfvalues = sfvalues
 
     @property
-    def splittraintest(self):
-        """Show the split between training and testing data in storage."""
+    def splittraintest(self) -> Optional[HDFSplitTrainTest]:
+        """Show the split between training and testing data in storage.
+
+        Returns:
+            self.output.splittraintest (HDFSplitTrainTest, None): If defined,
+                the splitting data in storage.
+        """
         if 'splittraintest' in self.output:
             return self.output.splittraintest
 
@@ -291,11 +331,21 @@ class RunnerJob(GenericJob, HasStorage, PotentialFit):
 
     @splittraintest.setter
     def splittraintest(self, splittraintest: HDFSplitTrainTest) -> None:
-        """Set the split between training and testing data in storage."""
+        """Set the split between training and testing data in storage.
+
+        Args:
+            splittraintest (HDFSplitTrainTest): Split between training and
+                testing data wrapped in a HDF storage container.
+        """
         self.output.splittraintest = splittraintest
 
     def _add_training_data(self, container: TrainingContainer) -> None:
-        """Add a set of training data to storage."""
+        """Add a set of training data to storage.
+
+        Args:
+            container (TrainingContainer): The training data that will be added
+                to `self`.
+        """
         # Get a dictionary of all property arrays saved in this container.
         arrays = container.to_dict()
         arraynames = arrays.keys()
@@ -306,11 +356,22 @@ class RunnerJob(GenericJob, HasStorage, PotentialFit):
             self.storage.input.training_data.add_structure(**zipped)
 
     def _get_training_data(self) -> TrainingStorage:
-        """Show the stored training data."""
+        """Show the stored training data.
+
+        Returns:
+            self.storage.input.training_data (TrainingContainer): The stored
+                training data.
+        """
         return self.storage.input.training_data
 
     def _get_predicted_data(self) -> FlattenedStorage:
-        """Show the predicted data after a successful fit."""
+        """Show the predicted data after a successful fit.
+
+        Returns:
+            predicted_data (TrainingContainer): The predicted data in storage.
+                At the moment, pyiron can interpret the energies and forces
+                predicted by RuNNer.
+        """
         # Energies and forces will only be available after RuNNer Mode 3.
         if 'energy' not in self.output:
             raise RuntimeError('You have to run RuNNer prediction mode '
@@ -340,7 +401,22 @@ class RunnerJob(GenericJob, HasStorage, PotentialFit):
         self,
         elements: Optional[List[str]] = None
     ) -> pd.DataFrame:
-        """Return a pandas dataframe with information for setting up LAMMPS."""
+        """Return a pandas dataframe with information for setting up LAMMPS.
+
+        The nnp pair_style for LAMMPS is provided by the external package n2p2,
+        that is maintained by Andreas Singgraber. Please take a look at their
+        [documentation](https://compphysvienna.github.io/n2p2/interfaces/pair_\
+        nnp.html)
+        to understand more about the configuration options.
+
+        Args:
+            elements (List[str], optional): A list of elements for which the
+                potential will be returned.
+
+        Returns:
+            df (pd.DataFrame): A dataframe containing all the information
+                required to set up a LAMMPS job with RuNNer.
+        """
         if not self.status.finished:
             raise RuntimeError('LAMMPS potential can only be generated after a '
                                + 'successful fit.')
@@ -504,12 +580,9 @@ class RunnerJob(GenericJob, HasStorage, PotentialFit):
     ) -> None:
         """Store all job information in HDF5 format.
 
-        Parameters
-        ----------
-            hdf : ProjectHDFio
-                HDF5-object which contains the project data.
-            group_name : str
-                Subcontainer name.
+        Args:
+            hdf (ProjectHDFio): HDF5-object which contains the project data.
+            group_name (str): Subcontainer name.
         """
         # Replace the runnerase class `SymmetryFunctionSet` by the extended
         # class from the `storageclasses` module which knows how to write itself
@@ -529,12 +602,9 @@ class RunnerJob(GenericJob, HasStorage, PotentialFit):
     ) -> None:
         """Reload all job information from HDF5 format.
 
-        Parameters
-        ----------
-            hdf : ProjectHDFio
-                HDF5-object which contains the project data.
-            group_name : str
-                Subcontainer name.
+        Args:
+            hdf (ProjectHDFio): HDF5-object which contains the project data.
+            group_name (str): Subcontainer name.
         """
         GenericJob.from_hdf(self, hdf=hdf, group_name=group_name)
         HasStorage.from_hdf(self, hdf=self.project_hdf5, group_name='')

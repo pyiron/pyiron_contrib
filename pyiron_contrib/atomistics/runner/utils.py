@@ -3,15 +3,8 @@
 # Distributed under the terms of "New BSD License", see the LICENSE file.
 """Utility functions for use with the pyiron Hamiltonian of RuNNer.
 
-Attributes
-----------
-    RunnerTrainingContainer : TrainingContainer
-        Extension of the TrainingContainer class with a function to convert
-        to_ase.
-
-Reference
----------
-    [RuNNer online documentation](https://theochem.gitlab.io/runner)
+.. _RuNNer online documentation:
+   https://theochem.gitlab.io/runner
 """
 
 from typing import List
@@ -28,7 +21,14 @@ from ..atomistics.job.trainingcontainer import TrainingContainer
 
 
 def container_to_ase(container: TrainingContainer) -> List[Atoms]:
-    """Convert a `TrainingContainer` into a list of ASE Atoms objects."""
+    """Convert a `TrainingContainer` into a list of ASE Atoms objects.
+
+    Args:
+        container (TrainingContainer): The training data to be converted.
+
+    Returns:
+        structures (List[Atoms]): A list of ASE Atoms objects.
+    """
     structure_lst = []
 
     arrays = container.to_dict()
@@ -75,7 +75,14 @@ def ase_to_container(
     structures: List[Atoms],
     container: TrainingContainer
 ) -> None:
-    """Add `structures` to `TrainingContainer`."""
+    """Append `structures` to `TrainingContainer`.
+
+    Args:
+        structures (List[Atoms]): A list of ASE Atoms objects to be stored on
+            the given `container`.
+        container (TrainingContainer): The container to which the data will be
+            appended.
+    """
     for structure in structures:
 
         properties = {}
@@ -91,6 +98,7 @@ def ase_to_container(
                 properties['totalcharge'] = structure.calc.get_property(
                     'totalcharge'
                 )
+
             else:
                 properties['totalcharge'] = np.sum(properties['charges'])
 
@@ -103,7 +111,19 @@ def ase_to_container(
 
 
 def pad(array: np.ndarray, desired_length: int) -> np.ndarray:
-    """Pad `sfvalues` with `np.NaN` rows up to `num_atoms`."""
+    """Pad `array` with `np.NaN` rows up to `desired_length`.
+
+    This routine pads an array of symmetry function values with np.NaN in those
+    places where the index (first column of sfvalue arrays) is missing.
+
+    Args:
+        array (np.ndarray): The array to be padded. The first column must
+            contain a continuous index.
+        desired_length (int): The final desired length of the array.
+
+    Returns:
+        array_padded (np.ndarray): The padded array.
+    """
     # Create a sequence of missing indices.
     all_indices = np.arange(0, desired_length, 1)
     contained_indices = array[:, 0].astype(int)

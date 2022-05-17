@@ -10,18 +10,27 @@ how to write themselves to HDF5 storage format. Therefore, these classes are
 extended in this module with additional functions, typically `to_hdf(...)` and
 `from_hdf(...)`.
 
-Attributes
-----------
-     SymmetryFunctionSet : runnerase.SymmetryFunctionSet
-        Job class for generating and evaluating potential energy surfaces using
-        RuNNer.
+Attributes:
+     HDFSymmetryFunctionValues (FlattenedStorage): Storage container for
+        symmetry function values.
+    RunneraseHDFMixin (HasHDF): Abstract mixin for all classes that store
+        RuNNer results to HDF.
+    HDFSymmetryFunctionSet (SymmetryFunctionSet, RunneraseHDFMixin): Storage
+        container for a set of symmetry functions.
+    HDFSplitTrainTest (RunnerSplitTrainTest, RunneraseHDFMixin): Storage
+        container for the splitting between training and testing dataset.
+    HDFFitResults (RunnerFitResults, RunneraseHDFMixin): Storage container
+        for the results of a RuNNer fit.
+    HDFWeights (RunnerWeights, RunneraseHDFMixin): Storage container for the
+        weights of atomic neural networks.
+    HDFScaling (RunnerScaling, RunneraseHDFMixin): Storage container for the
+        symmetry function scaling data.
 
-Reference
----------
-    [RuNNer online documentation](https://theochem.gitlab.io/runner)
+.. _RuNNer online documentation:
+   https://theochem.gitlab.io/runner
 """
 
-from typing import Optional
+from typing import Optional, Union
 from abc import abstractmethod
 
 import numpy as np
@@ -139,7 +148,7 @@ class HDFSymmetryFunctionValues(FlattenedStorage):
 
 
 class RunneraseHDFMixin(HasHDF):
-    """Extend RunnerStructureSymmetryFunctionValues with HDF5 compatibility."""
+    """Abstract Mixin to add HDF5 compatibility to runnerase classes."""
 
     __hdf_version__ = '0.3.0'
 
@@ -152,32 +161,32 @@ class RunneraseHDFMixin(HasHDF):
     @property
     @abstractmethod
     def baseclass(self):
-        """Define the base class which is wrapped by this HDF class."""
+        """Define the runnerase class which is wrapped by this HDF class."""
         ...
 
     def from_runnerase(
         self,
-        runnerase_class
+        runnerase_class: Union[RunnerSplitTrainTest, RunnerWeights,
+                               RunnerScaling, RunnerFitResults,
+                               RunnerSymmetryFunctionValues]
     ) -> None:
         """Fill `self` with information of the corresponding `runnerase` object.
 
-        Parameters
-        ----------
-        runnerase_split : RunnerSplitTrainTest
-            A `runnerase` class object containing the split between training
-            and testing data.
+        Args:
+            runnerase_class (runnerase storage class): The runnerase class whose
+                information will be wrapped.
         """
         for prop in self.runnerase_properties:
             self.__dict__[prop] = runnerase_class.__dict__[prop]
 
-    def to_runnerase(self) -> RunnerSplitTrainTest:
+    def to_runnerase(self) -> Union[RunnerSplitTrainTest, RunnerWeights,
+                                    RunnerScaling, RunnerFitResults,
+                                    RunnerSymmetryFunctionValues]:
         """Create the corresponding `runnerase` object from `self`.
 
-        Returns
-        ----------
-        runnerase_split : RunnerSplitTrainTest
-            A `runnerase` class object containing the split between training
-            and testing data.
+        Returns:
+            runnerase_class (runnerase storage class): The runnerase class whose
+                information was wrapped.
         """
         runnerase_class = self.baseclass()
 
@@ -189,10 +198,8 @@ class RunneraseHDFMixin(HasHDF):
     def _to_hdf(self, hdf: ProjectHDFio) -> None:
         """Write `self` to HDF5 storage.
 
-        Parameters
-        ----------
-        hdf : ProjectHDFio
-            The HDF file where `self` will be stored.
+        Args:
+            hdf (ProjectHDFio): The HDF file where `self` will be stored.
         """
         for idx, prop in enumerate(self.runnerase_properties):
             hdf[f'{prop}__index_{idx}'] = self.__dict__[prop]
@@ -201,13 +208,13 @@ class RunneraseHDFMixin(HasHDF):
         self,
         hdf: ProjectHDFio,
         version: Optional[str] = None
-    ) -> 'HDFSplitTrainTest':
+    ) -> Union[RunnerSplitTrainTest, RunnerWeights, RunnerScaling,
+               RunnerFitResults, RunnerSymmetryFunctionValues]:
         """Read `self` from HDF5 storage.
 
-        Parameters
-        ----------
-        hdf : ProjectHDFio
-            The HDF file where `self` will be stored.
+        Args:
+            hdf (ProjectHDFio): The HDF file where `self` will be stored.
+            version (str): The HDF version of the storage file.
         """
         if version != self.__hdf_version__:
             raise RuntimeError('Invalid HDF5 version found while reading '
@@ -222,6 +229,7 @@ class RunneraseHDFMixin(HasHDF):
         return self
 
     def _get_hdf_group_name(self):
+        """Get the name of the group where this object is stored in HDF."""
         return self.__class__.__name__
 
 
@@ -250,10 +258,8 @@ class HDFSymmetryFunctionSet(SymmetryFunctionSet, RunneraseHDFMixin):
         all symmetry functions can be written to and read from a list
         representation. Therefore, they are also stored as lists in HDF format.
 
-        Parameters
-        ----------
-        hdf : ProjectHDFio
-            The HDF file where `self` will be stored.
+        Args:
+            hdf (ProjectHDFio): The HDF file where `self` will be stored.
         """
         for idx, sfset in enumerate(self.sets):
             hdfset = HDFSymmetryFunctionSet()
@@ -270,12 +276,9 @@ class HDFSymmetryFunctionSet(SymmetryFunctionSet, RunneraseHDFMixin):
     ) -> 'HDFSplitTrainTest':
         """Read `self` from HDF5 storage.
 
-        Parameters
-        ----------
-        hdf : ProjectHDFio
-            The HDF file where `self` will be stored.
-        group_name : str
-            The name of the subgroup.
+        Args:
+            hdf (ProjectHDFio): The HDF file where `self` will be stored.
+            version (str): The HDF version of the storage file.
         """
         if version != self.__hdf_version__:
             raise RuntimeError('Invalid HDF5 version found while reading '

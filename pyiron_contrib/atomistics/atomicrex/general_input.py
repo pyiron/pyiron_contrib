@@ -649,14 +649,15 @@ class AtomicrexAlgorithm(DataContainer):
         return algo
 
 
-class SpaMinimizer:
+class SpaMinimizer(DataContainer):
     """
     Global optimizer implemented in atomicrex.
     Should be used in combination with a local minimizer.
     See the atomicrex documentation for details.
     """
 
-    def __init__(self, spa_iterations, seed):
+    def __init__(self, spa_iterations, seed, *args, **kwargs):
+        super().__init__(table_name="fitting_algorithm", *args, **kwargs)
         self.spa_iterations = spa_iterations
         self.seed = seed
         self.local_minimizer = None
@@ -671,6 +672,8 @@ class SpaMinimizer:
         spa.set("seed", f"{self.seed}")
         if self.local_minimizer is not None:
             spa.append(self.local_minimizer._to_xml_element())
+        else:
+            raise ValueError("Set a local minimizer for Spa")
         return spa
 
 

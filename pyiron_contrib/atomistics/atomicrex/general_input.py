@@ -656,7 +656,7 @@ class SpaMinimizer(DataContainer):
     See the atomicrex documentation for details.
     """
 
-    def __init__(self, spa_iterations, seed, *args, **kwargs):
+    def __init__(self, spa_iterations=None, seed=None, *args, **kwargs):
         super().__init__(table_name="fitting_algorithm", *args, **kwargs)
         self.spa_iterations = spa_iterations
         self.seed = seed

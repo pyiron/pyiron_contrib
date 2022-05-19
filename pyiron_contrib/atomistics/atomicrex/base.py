@@ -17,7 +17,11 @@ from pyiron_contrib.atomistics.atomicrex.potential_factory import ARPotFactory
 from pyiron_contrib.atomistics.atomicrex.output import Output
 from pyiron_contrib.atomistics.atomicrex.function_factory import FunctionFactory
 from pyiron_contrib.atomistics.ml.potentialfit import PotentialFit
-from pyiron_contrib.atomistics.atomistics.job.trainingcontainer import TrainingContainer, TrainingStorage
+from pyiron_contrib.atomistics.atomistics.job.trainingcontainer import (
+    TrainingContainer,
+    TrainingStorage,
+)
+
 
 class AtomicrexBase(GenericJob, PotentialFit):
     __version__ = "0.1.0"
@@ -252,7 +256,6 @@ class AtomicrexBase(GenericJob, PotentialFit):
         """
         return self.potential._potential_as_pd_df(job=self)
 
-
     #### PotentialFit methods
     def _add_training_data(self, container: TrainingContainer) -> None:
         self.structures.add_training_data(container)
@@ -273,9 +276,6 @@ class AtomicrexBase(GenericJob, PotentialFit):
         """
         return self.potential_as_pd_df()
 
-    @property
-    def plot(self):
-        return self.structures.plot
 
 class Factories:
     """

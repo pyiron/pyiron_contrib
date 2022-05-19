@@ -115,6 +115,7 @@ class PotentialStandardPlots:
         plt.scatter(energy_train, energy_pred)
         plt.xlabel("True Energy Per Atom [eV]")
         plt.ylabel("Predicted Energy Per Atom [eV]")
+        plt.plot()
         plt.subplot(1, 2, 2)
         plt.hist(energy_train - energy_pred)
         plt.xlabel("Training Error [eV]")
@@ -131,8 +132,8 @@ class PotentialStandardPlots:
         force_pred = self.predicted_data["forces"]
 
         if axis is None:
-            ft = np.linalg_norm(force_train, axis=1)
-            fp = np.linalg_norm(force_pred, axis=1)
+            ft = np.linalg.norm(force_train, axis=1)
+            fp = np.linalg.norm(force_pred, axis=1)
         else:
             ft = force_train[:, axis]
             fp = force_pred[:, axis]

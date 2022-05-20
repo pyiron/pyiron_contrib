@@ -129,8 +129,8 @@ class Pacemaker2022(GenericJob, PotentialFit):
             df = self.structure_data.to_pandas()
             data_file_name = self._save_structure_dataframe_pckl_gzip(df)
             self.input["data"] = {"filename": data_file_name}
-        elif self._training_ids:
-            logging.info("structure_data is from another pyiron jobs")
+        elif self._job_dict:
+            raise NotImplementedError()
 
         metadata_dict = self.input["metadata"]
         metadata_dict["pyiron_job_id"] = str(self.job_id)

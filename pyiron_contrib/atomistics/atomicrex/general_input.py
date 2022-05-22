@@ -656,9 +656,9 @@ class SpaMinimizer(DataContainer):
     See the atomicrex documentation for details.
     """
 
-    def __init__(self, spa_iterations=None, seed=None, *args, **kwargs):
+    def __init__(self, max_iter=None, seed=None, *args, **kwargs):
         super().__init__(table_name="fitting_algorithm", *args, **kwargs)
-        self.spa_iterations = spa_iterations
+        self.max_iter = max_iter
         self.seed = seed
         self.local_minimizer = None
     
@@ -672,7 +672,7 @@ class SpaMinimizer(DataContainer):
         and returns it
         """
         spa = ET.Element("spa")
-        spa.set("max-iter", f"{self.spa_iterations}")
+        spa.set("max-iter", f"{self.max_iter}")
         spa.set("seed", f"{self.seed}")
         if self.local_minimizer is not None:
             spa.append(self.local_minimizer._to_xml_element())

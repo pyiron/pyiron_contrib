@@ -661,6 +661,10 @@ class SpaMinimizer(DataContainer):
         self.spa_iterations = spa_iterations
         self.seed = seed
         self.local_minimizer = None
+    
+    @property
+    def name(self):
+        return "spa"
 
     def _to_xml_element(self):
         """Internal function.

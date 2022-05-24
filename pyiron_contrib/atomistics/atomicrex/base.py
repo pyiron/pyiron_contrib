@@ -216,7 +216,7 @@ class AtomicrexBase(GenericJob, PotentialFit):
         """
         if directory is None:
             directory = self.working_directory
-        self.input._write_xml_file(directory=directory)
+        self.input._write_xml_file(directory=directory, job=self)
         self.potential.write_xml_file(directory=directory)
         self.structures.write_xml_file(directory=directory)
 

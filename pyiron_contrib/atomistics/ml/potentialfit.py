@@ -120,7 +120,7 @@ class PotentialPlots:
         plt.hist(energy_train - energy_pred)
         plt.xlabel("Training Error [eV]")
 
-    def force_scatter_hist(self, axis=None):
+    def force_scatter_histogram(self, axis=None):
         """
         Plots correlation and (training) error histograms.
 

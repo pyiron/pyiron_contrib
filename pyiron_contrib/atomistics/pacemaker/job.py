@@ -30,7 +30,7 @@ for logger in loggers:
 
 
 # TODO: maybe need better rename to Pacemaker
-class Pacemaker2022(GenericJob, PotentialFit):
+class PacemakerJob(GenericJob, PotentialFit):
 
     def __init__(self, project, job_name):
         super().__init__(project, job_name)

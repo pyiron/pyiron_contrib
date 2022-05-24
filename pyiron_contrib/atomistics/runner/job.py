@@ -17,6 +17,7 @@ Attributes:
 """
 
 from typing import Optional, List
+from copy import deepcopy
 
 import numpy as np
 import pandas as pd
@@ -47,9 +48,9 @@ __maintainer__ = 'Alexander Knoll'
 __email__ = 'alexander.knoll@chemie.uni-goettingen.de'
 __copyright__ = 'Copyright 2022, Georg-August-Universität Göttingen - Behler '\
                 'Group'
-__version__ = '0.1.0'
+__version__ = '0.1.1'
 __status__ = 'development'
-__date__ = 'May 11, 2022'
+__date__ = 'May 17, 2022'
 
 
 class RunnerFit(GenericJob, HasStorage, PotentialFit):
@@ -161,7 +162,8 @@ class RunnerFit(GenericJob, HasStorage, PotentialFit):
 
         # Create a group for storing the RuNNer configuration parameters.
         self.storage.input.create_group('parameters')
-        self.storage.input.parameters.update(DEFAULT_PARAMETERS)
+
+        self.storage.input.parameters.update(deepcopy(DEFAULT_PARAMETERS))
 
         # Store training data (structures, energies, ...) in a separate node.
         self.storage.input.training_data = TrainingStorage()

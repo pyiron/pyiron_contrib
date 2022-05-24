@@ -6,9 +6,14 @@ import abc
 
 import pandas as pd
 import matplotlib.pyplot as plt
+import numpy as np
 
 from pyiron_base import FlattenedStorage
-from pyiron_contrib.atomistics.atomistics.job.trainingcontainer import TrainingContainer, TrainingStorage
+from pyiron_contrib.atomistics.atomistics.job.trainingcontainer import (
+    TrainingContainer,
+    TrainingStorage,
+)
+
 
 class PotentialFit(abc.ABC):
     """
@@ -76,24 +81,12 @@ class PotentialFit(abc.ABC):
         else:
             raise ValueError("Data can only be accessed after successful fit!")
 
+    @property
     def plot(self):
         """
         Plots correlation and (training) error histograms.
         """
-        if not self.status.finished:
-            raise ValueError("Results can only be plotted after job finished successfully!")
-
-        energy_train = self.training_data["energy"] / self.training_data["length"]
-        energy_pred = self.predicted_data["energy"] / self.predicted_data["length"]
-
-        plt.subplot(1, 2, 1)
-        plt.scatter(energy_train, energy_pred)
-        plt.xlabel("True Energy Per Atom [eV]")
-        plt.ylabel("Predicted Energy Per Atom [eV]")
-
-        plt.subplot(1, 2, 2)
-        plt.hist(energy_train - energy_pred)
-        plt.xlabel("Training Error [eV]")
+        return PotentialPlots(self.training_data, self.predicted_data)
 
     @abc.abstractmethod
     def get_lammps_potential(self) -> pd.DataFrame:
@@ -105,3 +98,50 @@ class PotentialFit(abc.ABC):
             DataFrame: contains potential information to be used with a Lammps job.
         """
         pass
+
+
+class PotentialPlots:
+    def __init__(self, training_data, predicted_data):
+        self.training_data = training_data
+        self.predicted_data = predicted_data
+
+    def energy_scatter_histogram(self):
+        """
+        Plots correlation and (training) error histograms.
+        """
+        energy_train = self.training_data["energy"] / self.training_data["length"]
+        energy_pred = self.predicted_data["energy"] / self.predicted_data["length"]
+        plt.subplot(1, 2, 1)
+        plt.scatter(energy_train, energy_pred)
+        plt.xlabel("True Energy Per Atom [eV]")
+        plt.ylabel("Predicted Energy Per Atom [eV]")
+        plt.plot()
+        plt.subplot(1, 2, 2)
+        plt.hist(energy_train - energy_pred)
+        plt.xlabel("Training Error [eV]")
+
+    def force_scatter_histogram(self, axis=None):
+        """
+        Plots correlation and (training) error histograms.
+
+        Args:
+            axis (None, int): Whether to plot for an axis or norm
+
+        """
+        force_train = self.training_data["forces"]
+        force_pred = self.predicted_data["forces"]
+
+        if axis is None:
+            ft = np.linalg.norm(force_train, axis=1)
+            fp = np.linalg.norm(force_pred, axis=1)
+        else:
+            ft = force_train[:, axis]
+            fp = force_pred[:, axis]
+
+        plt.subplot(1, 2, 1)
+        plt.scatter(ft, fp)
+        plt.xlabel("True Forces [eV]")
+        plt.ylabel("Predicted Forces [eV/$\AA$]")
+        plt.subplot(1, 2, 2)
+        plt.hist(ft - fp)
+        plt.xlabel("Training Error [eV/$\AA$]")

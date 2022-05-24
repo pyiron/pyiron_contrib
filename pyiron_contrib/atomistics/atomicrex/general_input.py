@@ -51,31 +51,36 @@ class GeneralARInput(DataContainer):
         self.output_file = "atomicrex.out"
         self.parameter_constraints = ParameterConstraints()
 
-    def _write_xml_file(self, directory):
+    def _write_xml_file(self, directory, job=None):
         """Internal function.
         Write the main input xml file in a directory.
 
         Args:
             directory (str): Working directory
         """
-        job = ET.Element("job")
+        root = ET.Element("job")
 
-        output_file = ET.SubElement(job, "output-file")
+        output_file = ET.SubElement(root, "output-file")
         output_file.text = self.output_file
 
-        name = ET.SubElement(job, "name")
+        name = ET.SubElement(root, "name")
         name.text = self.name
 
-        verbosity = ET.SubElement(job, "verbosity")
+        verbosity = ET.SubElement(root, "verbosity")
         verbosity.text = self.verbosity
 
         if self.validate_potentials:
-            validate_potentials = ET.SubElement(job, "validate-potentials")
+            validate_potentials = ET.SubElement(root, "validate-potentials")
 
-        real_precision = ET.SubElement(job, "real-precision")
+        real_precision = ET.SubElement(root, "real-precision")
         real_precision.text = f"{self.real_precision}"
 
-        atom_types = ET.SubElement(job, "atom-types")
+        atom_types = ET.SubElement(root, "atom-types")
+        if len(self.atom_types) == 0:
+            eles = job.structures._structures.get_elements()
+            for ele in eles:
+                self.atom_types[ele] = None
+
         for k, v in self.atom_types.items():
             species = ET.SubElement(atom_types, "species")
             species.text = k
@@ -89,7 +94,7 @@ class GeneralARInput(DataContainer):
             species.set("atomic-number", f"{index}")
 
         if not isinstance(self.fit_algorithm, ScipyAlgorithm):
-            fitting = ET.SubElement(job, "fitting")
+            fitting = ET.SubElement(root, "fitting")
             if self.enable_fitting:
                 fitting.set("enabled", "true")
             else:
@@ -97,21 +102,21 @@ class GeneralARInput(DataContainer):
             fitting.set("output-interval", f"{self.output_interval}")
             fitting.append(self.fit_algorithm._to_xml_element())
 
-        potentials = ET.SubElement(job, "potentials")
+        potentials = ET.SubElement(root, "potentials")
         include = ET.SubElement(potentials, "xi:include")
         include.set("href", "potential.xml")
         include.set("xmlns:xi", "http://www.w3.org/2003/XInclude")
 
-        structures = ET.SubElement(job, "structures")
+        structures = ET.SubElement(root, "structures")
         include = ET.SubElement(structures, "xi:include")
         include.set("href", "structures.xml")
         include.set("xmlns:xi", "http://www.w3.org/2003/XInclude")
 
         if len(self.parameter_constraints) > 0:
-            job.append(self.parameter_constraints._to_xml_element())
+            root.append(self.parameter_constraints._to_xml_element())
 
         file_name = posixpath.join(directory, "main.xml")
-        write_pretty_xml(job, file_name)
+        write_pretty_xml(root, file_name)
 
 
 class AtomTypes(DataContainer):
@@ -649,17 +654,22 @@ class AtomicrexAlgorithm(DataContainer):
         return algo
 
 
-class SpaMinimizer:
+class SpaMinimizer(DataContainer):
     """
     Global optimizer implemented in atomicrex.
     Should be used in combination with a local minimizer.
     See the atomicrex documentation for details.
     """
 
-    def __init__(self, spa_iterations, seed):
-        self.spa_iterations = spa_iterations
+    def __init__(self, max_iter=None, seed=None, *args, **kwargs):
+        super().__init__(table_name="fitting_algorithm", *args, **kwargs)
+        self.max_iter = max_iter
         self.seed = seed
         self.local_minimizer = None
+    
+    @property
+    def name(self):
+        return "spa"
 
     def _to_xml_element(self):
         """Internal function.
@@ -667,10 +677,12 @@ class SpaMinimizer:
         and returns it
         """
         spa = ET.Element("spa")
-        spa.set("max-iter", f"{self.spa_iterations}")
+        spa.set("max-iter", f"{self.max_iter}")
         spa.set("seed", f"{self.seed}")
         if self.local_minimizer is not None:
             spa.append(self.local_minimizer._to_xml_element())
+        else:
+            raise ValueError("Set a local minimizer for Spa")
         return spa
 
 

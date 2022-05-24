@@ -7,11 +7,15 @@ import xml.etree.ElementTree as ET
 
 import numpy as np
 from numpy import ndarray
-from pyiron_base import state, DataContainer
+from pyiron_base import state, DataContainer, FlattenedStorage
 from pyiron_atomistics import Atoms, ase_to_pyiron
 
 from pyiron_atomistics.atomistics.structure.structurestorage import StructureStorage
-from pyiron_contrib.atomistics.atomistics.job.trainingcontainer import TrainingPlots
+from pyiron_contrib.atomistics.atomistics.job.trainingcontainer import (
+    TrainingPlots,
+    TrainingContainer,
+    TrainingStorage,
+)
 from pyiron_contrib.atomistics.atomicrex.fit_properties import (
     ARFitPropertyList,
     ARFitProperty,
@@ -32,16 +36,16 @@ class ARStructureContainer:
     __version__ = "0.3.0"
     __hdf_version__ = "0.3.0"
 
-    def __init__(self, num_atoms=1, num_structures=1):
+    def __init__(self, num_atoms=0, num_structures=0):
         self.fit_properties = DataContainer(table_name="fit_properties")
         self._structures = StructureStorage(
             num_atoms=num_atoms, num_structures=num_structures
         )
         self._predefined_storage = DataContainer(table_name="predefined_structures")
-        self._structures.add_array("fit", dtype=bool, per="chunk")
-        self._structures.add_array("clamp", dtype=bool, per="chunk")
-        self._structures.add_array("predefined", dtype=bool, per="chunk")
-        self._structures.add_array("relative_weight", per="chunk")
+        self._structures.add_array("fit", dtype=bool, per="chunk", fill=True)
+        self._structures.add_array("clamp", dtype=bool, per="chunk", fill=True)
+        self._structures.add_array("predefined", dtype=bool, per="chunk", fill=False)
+        self._structures.add_array("relative_weight", per="chunk", fill=1.0)
         self.structure_file_path = None
         try:
             self._interactive_library = atomicrex.Job()
@@ -299,6 +303,11 @@ class ARStructureContainer:
         else:
             return self.fit_properties[prop]._per_element_arrays["target_val"][slc]
 
+    def _sync(self):
+        for flat in self.fit_properties.values():
+            flat.num_elements = self._structures.num_elements
+            flat.num_chunks = self._structures.num_chunks
+
     def _shrink(self):
         self._resize_all(
             num_chunks=self._structures.num_chunks,
@@ -516,6 +525,83 @@ class ARStructureContainer:
             self.fit_properties["atomic-energy"]._per_chunk_arrays[val_str]
             * self._structures.length
         )
+
+    #### PotentialFit methods
+    def add_training_data(self, container: TrainingContainer) -> None:
+        storage = container._container
+        atomic_energy_storage = FlattenedARScalarProperty(
+            num_chunks=storage.num_chunks, num_elements=storage.num_elements
+        )
+        atomic_energy_storage.num_chunks = storage.num_chunks
+        atomic_energy_storage.num_elements = storage.num_elements
+        atomic_energy_storage._per_chunk_arrays["fit"][0 : storage.num_chunks] = True
+        atomic_energy_storage._per_chunk_arrays["tolerance"][
+            0 : storage.num_chunks
+        ] = 0.001
+        atomic_energy_storage._per_chunk_arrays["target_val"] = (
+            storage._per_chunk_arrays["energy"][0 : storage.num_chunks]
+            / storage.length[0 : storage.num_chunks]
+        )
+
+        atomic_forces_storage = FlattenedARVectorProperty(
+            num_chunks=storage.num_chunks, num_elements=storage.num_elements
+        )
+        atomic_forces_storage.num_chunks = storage.num_chunks
+        atomic_forces_storage.num_elements = storage.num_elements
+        atomic_forces_storage._per_chunk_arrays["fit"][0 : storage.num_chunks] = True
+        atomic_forces_storage._per_chunk_arrays["tolerance"][
+            0 : storage.num_chunks
+        ] = 0.01
+        atomic_forces_storage._per_element_arrays[
+            "target_val"
+        ] = storage._per_element_arrays["forces"][0 : storage.num_elements]
+
+        if "atomic-energy" not in self.fit_properties:
+            self.fit_properties["atomic-energy"] = FlattenedARScalarProperty(
+                num_chunks=self._structures.num_chunks,
+                num_elements=self._structures.num_elements,
+            )
+        if "atomic-forces" not in self.fit_properties:
+            self.fit_properties["atomic-forces"] = FlattenedARVectorProperty(
+                num_chunks=self._structures.num_chunks,
+                num_elements=self._structures.num_elements,
+            )
+        self._sync()
+
+        self._structures.extend(storage)
+        self.fit_properties["atomic-energy"].extend(atomic_energy_storage)
+        self.fit_properties["atomic-forces"].extend(atomic_forces_storage)
+
+    def _to_TrainingStorage(self, final: bool = False) -> TrainingStorage:
+        self._shrink()
+        storage = TrainingStorage()
+        storage.extend(self._structures)
+        if final:
+            val_str = "final_val"
+        else:
+            val_str = "target_val"
+        storage._per_chunk_arrays["energy"][0 : storage.num_chunks] = (
+            self.fit_properties["atomic-energy"][val_str]
+            * self._structures._per_chunk_arrays["length"]
+        )
+        storage._per_element_arrays["forces"][
+            0 : storage.num_elements
+        ] = self.fit_properties["atomic-forces"][val_str]
+        return storage
+
+    def get_training_data(self) -> TrainingStorage:
+        return self._to_TrainingStorage(final=False)
+
+    def get_predicted_data(self) -> FlattenedStorage:
+        return self._to_TrainingStorage(final=True)
+
+    @property
+    def training_data(self):
+        return self.get_training_data()
+
+    @property
+    def predicted_data(self):
+        return self.get_predicted_data()
 
 
 ### This is probably useless like this in most cases because forces can't be passed.

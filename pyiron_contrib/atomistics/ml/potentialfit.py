@@ -100,7 +100,7 @@ class PotentialFit(abc.ABC):
         pass
 
 
-class PotentialStandardPlots:
+class PotentialPlots:
     def __init__(self, training_data, predicted_data):
         self.training_data = training_data
         self.predicted_data = predicted_data

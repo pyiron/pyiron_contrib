@@ -29,7 +29,6 @@ for logger in loggers:
     logger.setLevel(logging.WARNING)
 
 
-# TODO: maybe need better rename to Pacemaker
 class PacemakerJob(GenericJob, PotentialFit):
 
     def __init__(self, project, job_name):

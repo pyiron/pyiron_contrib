@@ -105,7 +105,7 @@ class PotentialPlots:
         self.training_data = training_data
         self.predicted_data = predicted_data
 
-    def energy_scatter_hist(self):
+    def energy_scatter_histogram(self):
         """
         Plots correlation and (training) error histograms.
         """

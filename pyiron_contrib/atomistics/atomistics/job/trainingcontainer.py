@@ -98,7 +98,7 @@ class TrainingContainer(GenericJob, HasStructure):
             stress (6 array of float, optional): per structure stresses in voigt notation
             name (str, optional): name describing the structure
         """
-        self._container.add_structure(structure, energy, identifier=None, forces=None, stress=None, **arrays)
+        self._container.add_structure(structure, energy, name=name, forces=forces, stress=stress, **arrays)
 
     def include_dataset(self, dataset):
         """

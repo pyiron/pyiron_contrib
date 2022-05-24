@@ -86,7 +86,7 @@ class PotentialFit(abc.ABC):
         """
         Plots correlation and (training) error histograms.
         """
-        return PotentialStandardPlots(self.training_data, self.predicted_data)
+        return PotentialPlots(self.training_data, self.predicted_data)
 
     @abc.abstractmethod
     def get_lammps_potential(self) -> pd.DataFrame:

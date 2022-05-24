@@ -100,12 +100,12 @@ class PotentialFit(abc.ABC):
         pass
 
 
-class PotentialStandardPlots:
+class PotentialPlots:
     def __init__(self, training_data, predicted_data):
         self.training_data = training_data
         self.predicted_data = predicted_data
 
-    def energy_scatter_hist(self):
+    def energy_scatter_histogram(self):
         """
         Plots correlation and (training) error histograms.
         """
@@ -120,7 +120,7 @@ class PotentialStandardPlots:
         plt.hist(energy_train - energy_pred)
         plt.xlabel("Training Error [eV]")
 
-    def force_scatter_hist(self, axis=None):
+    def force_scatter_histogram(self, axis=None):
         """
         Plots correlation and (training) error histograms.
 

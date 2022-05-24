@@ -348,7 +348,8 @@ class RunnerFit(GenericJob, HasStorage, PotentialFit):
         arrays = container.to_dict()
         arraynames = arrays.keys()
 
-        # Iterate over the structures by zipping the dictionary values together.
+        # Iterate over the structures by zipping, i.e. transposing the
+        # dictionary values.
         for properties in zip(*arrays.values()):
             zipped = dict(zip(arraynames, properties))
             self.storage.input.training_data.add_structure(**zipped)

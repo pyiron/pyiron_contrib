@@ -84,7 +84,9 @@ class TrainingContainer(GenericJob, HasStructure):
         """
         self._container.include_structure(structure, energy, forces, stress, name)
 
-    def add_structure(self, structure, energy, forces=None, stress=None, name=None, **arrays):
+    def add_structure(
+        self, structure, energy, forces=None, stress=None, name=None, **arrays
+    ):
         """
         Add new structure to structure list and save energy and forces with it.
 
@@ -98,7 +100,9 @@ class TrainingContainer(GenericJob, HasStructure):
             stress (6 array of float, optional): per structure stresses in voigt notation
             name (str, optional): name describing the structure
         """
-        self._container.add_structure(structure, energy, name=name, forces=forces, stress=stress, **arrays)
+        self._container.add_structure(
+            structure, energy, name=name, forces=forces, stress=stress, **arrays
+        )
 
     def include_dataset(self, dataset):
         """
@@ -216,7 +220,9 @@ class TrainingContainer(GenericJob, HasStructure):
             if hdf_version == "0.3.0":
                 self.input.from_hdf(self.project_hdf5, "parameters")
 
-    def sample(self, name: str, selector: Callable[[StructureStorage, int], bool]) -> "TrainingContainer":
+    def sample(
+        self, name: str, selector: Callable[[StructureStorage, int], bool]
+    ) -> "TrainingContainer":
         """
         Create a new TrainingContainer with structures filtered by selector.
 
@@ -247,6 +253,20 @@ class TrainingContainer(GenericJob, HasStructure):
         :class:`.TrainingPlots`: plotting interface
         """
         return TrainingPlots(self._container)
+
+    def iter(self, *arrays, wrap_atoms=True):
+        """
+        Iterate over all structures in this object and all arrays that are defined
+
+        Args:
+            wrap_atoms (bool): True if the atoms are to be wrapped back into the unit cell; passed to
+                               :meth:`.get_structure()`
+            *arrays (str): name of arrays that should be iterated over
+
+        Yields:
+            :class:`pyiron_atomistics.atomistitcs.structure.atoms.Atoms`, arrays: every structure attached to the object and queried arrays
+        """
+        return self._container.iter(*arrays, wrap_atoms=wrap_atoms)
 
 
 class TrainingPlots:
@@ -621,17 +641,23 @@ class TrainingStorage(StructureStorage):
             - forces (Nx3 array of float): per atom forces, where N is the number of atoms in the structure
             - stress (6 array of float): per structure stress in voigt notation
         """
-        if 'name' not in dataset.columns \
-                or 'atoms' not in dataset.columns \
-                or 'energy' not in dataset.columns:
-            raise ValueError("At least columns 'name', 'atoms' and 'energy' must be present in dataset!")
+        if (
+            "name" not in dataset.columns
+            or "atoms" not in dataset.columns
+            or "energy" not in dataset.columns
+        ):
+            raise ValueError(
+                "At least columns 'name', 'atoms' and 'energy' must be present in dataset!"
+            )
         for row in dataset.itertuples(index=False):
             kwargs = {}
             if hasattr(row, "forces"):
                 kwargs["forces"] = row.forces
             if hasattr(row, "stress"):
                 kwargs["stress"] = row.stress
-            self.add_structure(row.atoms, energy=row.energy, identifier=row.name, **kwargs)
+            self.add_structure(
+                row.atoms, energy=row.energy, identifier=row.name, **kwargs
+            )
 
     def to_list(self, filter_function=None):
         """
@@ -651,6 +677,30 @@ class TrainingStorage(StructureStorage):
         force_list = data_table.forces.to_list()
         num_atoms_list = data_table.number_of_atoms.to_list()
         return structure_list, energy_list, force_list, num_atoms_list
+
+    def iter(self, *arrays, wrap_atoms=True):
+        """
+        Iterate over all structures in this object and all arrays that are defined
+
+        Args:
+            wrap_atoms (bool): True if the atoms are to be wrapped back into the unit cell; passed to
+                               :meth:`.get_structure()`
+            *arrays (str): name of arrays that should be iterated over
+
+        Yields:
+            :class:`pyiron_atomistics.atomistitcs.structure.atoms.Atoms`, arrays: every structure attached to the object and queried arrays
+        """
+        for i in range(self.number_of_structures):
+            s = self._get_structure(frame=i, wrap_atoms=wrap_atoms)
+            vals = [s]
+            for a in arrays:
+                vals.append(
+                    self.get_array(
+                        name=a,
+                        frame=i,
+                    )
+                )
+            yield vals
 
     @property
     def plot(self):

@@ -166,7 +166,7 @@ class FunctionFactory(PyironFactory):
 
     @staticmethod
     def x_pow_n_cutoff(
-        identifier, cutoff, h=1, N=4, species=["*"], is_screening_function=True
+        identifier, cutoff, h=1, N=4, species=["*", "*"], is_screening_function=True
     ):
         return XpowNCutoff(
             identifier=identifier,

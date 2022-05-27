@@ -28,7 +28,7 @@ name    atoms   energy  forces  number_of_atoms
 Fe_bcc  ...
 """
 
-from typing import Callable
+from typing import Callable, Optional
 from warnings import catch_warnings
 
 import numpy as np
@@ -493,6 +493,21 @@ class TrainingPlots:
         sns.violinplot(y=d.shells, x=d.distance, scale="width", orient="h")
         plt.xlabel(r"Distance [$\AA$]")
         plt.ylabel("Shell")
+
+    def forces(self, axis: Optional[int] = None):
+        """
+        Plot a histogram of all forces.
+
+        Args:
+            axis (int, optional): plot only forces along this axis, if not given plot all forces
+        """
+        f = self._train.get_array("forces")
+        if axis is not None:
+            f = f[:, axis]
+        else:
+            f = f.ravel()
+        plt.hist(f, bins=20)
+        plt.xlabel(r"Force [eV/$\mathrm{\AA}$]")
 
 
 class TrainingStorage(StructureStorage):

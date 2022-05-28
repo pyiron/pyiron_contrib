@@ -266,7 +266,7 @@ class TrainingContainer(GenericJob, HasStructure):
         Yields:
             :class:`pyiron_atomistics.atomistitcs.structure.atoms.Atoms`, arrays: every structure attached to the object and queried arrays
         """
-        return self._container.iter(*arrays, wrap_atoms=wrap_atoms)
+        yield from self._container.iter(*arrays, wrap_atoms=wrap_atoms)
 
 
 class TrainingPlots:

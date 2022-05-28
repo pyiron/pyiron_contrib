@@ -690,7 +690,7 @@ class TrainingStorage(StructureStorage):
         Yields:
             :class:`pyiron_atomistics.atomistitcs.structure.atoms.Atoms`, arrays: every structure attached to the object and queried arrays
         """
-yield from zip(self._container.iter_structures(), *(self._container.get_array_ragged(a) for a in arrays))
+        yield from zip(self._container.iter_structures(), *(self._container.get_array_ragged(a) for a in arrays))
 
     @property
     def plot(self):

@@ -2,6 +2,8 @@
 Abstract base class for fitting interactomic potentials.
 """
 
+from typing import List
+
 import abc
 
 import pandas as pd
@@ -113,12 +115,14 @@ class PotentialPlots:
         energy_pred = self.predicted_data["energy"] / self.predicted_data["length"]
         plt.subplot(1, 2, 1)
         plt.scatter(energy_train, energy_pred)
-        plt.xlabel("True Energy Per Atom [eV]")
-        plt.ylabel("Predicted Energy Per Atom [eV]")
+
+        plt.xlabel("True Energy Per Atom [eV / atom]")
+        plt.ylabel("Predicted Energy Per Atom [eV / atom]")
         plt.plot()
+
         plt.subplot(1, 2, 2)
         plt.hist(energy_train - energy_pred)
-        plt.xlabel("Training Error [eV]")
+        plt.xlabel("Training Error [eV / atom]")
 
     def force_scatter_histogram(self, axis=None):
         """

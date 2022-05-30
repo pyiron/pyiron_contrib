@@ -28,7 +28,8 @@ name    atoms   energy  forces  number_of_atoms
 Fe_bcc  ...
 """
 
-from typing import Callable, Dict, Any
+from typing import Callable, Dict, Any, Optional
+
 from warnings import catch_warnings
 
 import numpy as np
@@ -96,6 +97,26 @@ class TrainingContainer(GenericJob, HasStructure):
         """
         self._container.include_structure(structure, name=name, energy=energy,
                                           **properties)
+
+    def add_structure(
+        self, structure, energy, forces=None, stress=None, name=None, **arrays
+    ):
+        """
+        Add new structure to structure list and save energy and forces with it.
+
+        For consistency with the rest of pyiron, energy should be in units of eV and forces in eV/A, but no conversion
+        is performed.
+
+        Args:
+            structure_or_job (:class:`~.Atoms`): structure to add
+            energy (float): energy of the whole structure
+            forces (Nx3 array of float, optional): per atom forces, where N is the number of atoms in the structure
+            stress (6 array of float, optional): per structure stresses in voigt notation
+            name (str, optional): name describing the structure
+        """
+        self._container.add_structure(
+            structure, energy, name=name, forces=forces, stress=stress, **arrays
+        )
 
     def include_dataset(self, dataset):
         """
@@ -216,7 +237,9 @@ class TrainingContainer(GenericJob, HasStructure):
             if hdf_version == "0.3.0":
                 self.input.from_hdf(self.project_hdf5, "parameters")
 
-    def sample(self, name: str, selector: Callable[[StructureStorage, int], bool]) -> "TrainingContainer":
+    def sample(
+        self, name: str, selector: Callable[[StructureStorage, int], bool]
+    ) -> "TrainingContainer":
         """
         Create a new TrainingContainer with structures filtered by selector.
 
@@ -247,6 +270,20 @@ class TrainingContainer(GenericJob, HasStructure):
         :class:`.TrainingPlots`: plotting interface
         """
         return TrainingPlots(self._container)
+
+    def iter(self, *arrays, wrap_atoms=True):
+        """
+        Iterate over all structures in this object and all arrays that are defined
+
+        Args:
+            wrap_atoms (bool): True if the atoms are to be wrapped back into the unit cell; passed to
+                               :meth:`.get_structure()`
+            *arrays (str): name of arrays that should be iterated over
+
+        Yields:
+            :class:`pyiron_atomistics.atomistitcs.structure.atoms.Atoms`, arrays: every structure attached to the object and queried arrays
+        """
+        yield from self._container.iter(*arrays, wrap_atoms=wrap_atoms)
 
 
 class TrainingPlots:
@@ -494,6 +531,21 @@ class TrainingPlots:
         plt.xlabel(r"Distance [$\AA$]")
         plt.ylabel("Shell")
 
+    def forces(self, axis: Optional[int] = None):
+        """
+        Plot a histogram of all forces.
+
+        Args:
+            axis (int, optional): plot only forces along this axis, if not given plot all forces
+        """
+        f = self._train.get_array("forces")
+        if axis is not None:
+            f = f[:, axis]
+        else:
+            f = f.ravel()
+        plt.hist(f, bins=20)
+        plt.xlabel(r"Force [eV/$\mathrm{\AA}$]")
+
 
 class TrainingStorage(StructureStorage):
     def __init__(self):
@@ -627,17 +679,23 @@ class TrainingStorage(StructureStorage):
             - charges (Nx3 array of floats):
             - stress (6 array of float): per structure stress in voigt notation
         """
-        if 'name' not in dataset.columns \
-                or 'atoms' not in dataset.columns \
-                or 'energy' not in dataset.columns:
-            raise ValueError("At least columns 'name', 'atoms' and 'energy' must be present in dataset!")
+        if (
+            "name" not in dataset.columns
+            or "atoms" not in dataset.columns
+            or "energy" not in dataset.columns
+        ):
+            raise ValueError(
+                "At least columns 'name', 'atoms' and 'energy' must be present in dataset!"
+            )
         for row in dataset.itertuples(index=False):
             kwargs = {}
             if hasattr(row, "forces"):
                 kwargs["forces"] = row.forces
             if hasattr(row, "stress"):
                 kwargs["stress"] = row.stress
-            self.add_structure(row.atoms, energy=row.energy, identifier=row.name, **kwargs)
+            self.add_structure(
+                row.atoms, energy=row.energy, identifier=row.name, **kwargs
+            )
 
     def to_list(self, filter_function=None):
         """
@@ -656,6 +714,7 @@ class TrainingStorage(StructureStorage):
         energy_list = data_table.energy.to_list()
         force_list = data_table.forces.to_list()
         num_atoms_list = data_table.number_of_atoms.to_list()
+
         return (structure_list, energy_list, force_list, num_atoms_list)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -676,3 +735,25 @@ class TrainingStorage(StructureStorage):
 
             dict_arrays[array] = self.get_array_ragged(array)
         return dict_arrays
+
+    def iter(self, *arrays, wrap_atoms=True):
+        """
+        Iterate over all structures in this object and all arrays that are defined
+
+        Args:
+            wrap_atoms (bool): True if the atoms are to be wrapped back into the unit cell; passed to
+                               :meth:`.get_structure()`
+            *arrays (str): name of arrays that should be iterated over
+
+        Yields:
+            :class:`pyiron_atomistics.atomistitcs.structure.atoms.Atoms`, arrays: every structure attached to the object and queried arrays
+        """
+        array_vals = (self.get_array_ragged(a) for a in arrays)
+        yield from zip(self.iter_structures(), *array_vals)
+
+    @property
+    def plot(self):
+        """
+        :class:`.TrainingPlots`: plotting interface
+        """
+        return TrainingPlots(self)

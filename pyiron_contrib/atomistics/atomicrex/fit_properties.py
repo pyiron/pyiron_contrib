@@ -240,7 +240,7 @@ class FlattenedARProperty(FlattenedStorage):
         super().__init__(num_chunks=num_chunks, num_elements=num_elements, **kwargs)
         self._per_chunk_arrays = {}
         self.add_array("fit", dtype=bool, per="chunk", fill=False)
-        self.add_array("relative_weight", per="chunk", fill=np.nan)
+        self.add_array("relative_weight", per="chunk", fill=1.0)
         self.add_array("relax", dtype=bool, per="chunk")
         self.add_array("residual_style", per="chunk", dtype=np.ubyte, fill=0)
         self.add_array("output", dtype=bool, per="chunk", fill=False)

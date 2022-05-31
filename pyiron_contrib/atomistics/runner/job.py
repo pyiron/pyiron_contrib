@@ -23,6 +23,7 @@ import numpy as np
 import pandas as pd
 
 from ase.data import atomic_numbers
+from ase.units import Bohr
 
 from runnerase.io.ase import (read_results_mode1, read_results_mode2,
                               read_results_mode3)
@@ -438,7 +439,7 @@ class RunnerFit(GenericJob, HasStorage, PotentialFit):
             files.append(f'{self.working_directory}/{filename}')
 
         # Save the mapping of elements between LAMMPS and n2p2.
-        emap = ','.join([f'{i}:{el}' for i, el in enumerate(elements)])
+        emap = ' '.join(el for el in elements)
 
         # Get the cutoff radius of the symmetry functions.
         cutoffs = self.parameters.symfunction_short.cutoffs
@@ -453,11 +454,10 @@ class RunnerFit(GenericJob, HasStorage, PotentialFit):
             'Filename': [files],
             'Model': ['RuNNer'],
             'Species': [elements],
-            'Config': [['pair_style nnp dir "./" '
+            'Config': [[f'pair_style hdnnp {cutoff * Bohr} dir "./" '
                         + 'showew yes showewsum 0 resetew no maxew 100 '
-                        + 'cflength 1.8897261328 cfenergy 0.0367493254 '
-                        + f'emap "{emap}"\n',
-                        f'pair_coeff * * {cutoff}\n']]
+                        + 'cflength 1.8897261328 cfenergy 0.0367493254\n',
+                        f'pair_coeff * * {emap}\n']]
         })
 
     def write_input(self) -> None:

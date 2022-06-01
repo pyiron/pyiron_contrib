@@ -18,15 +18,10 @@ from pyiron_base import GenericJob, GenericParameters, state, Executable, Flatte
 from pyiron_contrib.atomistics.atomistics.job.trainingcontainer import TrainingStorage, TrainingContainer
 from pyiron_contrib.atomistics.ml.potentialfit import PotentialFit
 
-from pyiron_atomistics.atomistics.structure.atoms import Atoms as pyironAtoms
+from pyiron_atomistics.atomistics.structure.atoms import Atoms as pyironAtoms, ase_to_pyiron
 from ase.atoms import Atoms as aseAtoms
 
 s = state.settings
-
-# set loggers
-loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict]
-for logger in loggers:
-    logger.setLevel(logging.WARNING)
 
 
 class PacemakerJob(GenericJob, PotentialFit):
@@ -254,7 +249,6 @@ class PacemakerJob(GenericJob, PotentialFit):
             yaml_lines = f.readlines()
         final_potential_yaml_string = "".join(yaml_lines)
 
-
         with open(self.get_final_potential_filename_ace(), "r") as f:
             ace_lines = f.readlines()
         final_potential_yace_string = "".join(ace_lines)
@@ -274,6 +268,45 @@ class PacemakerJob(GenericJob, PotentialFit):
         with self.project_hdf5.open("output/log") as h5out:
             for key, arr in log_res_dict.items():
                 h5out[key] = arr
+
+        # training data
+        training_data_fname = os.path.join(self.working_directory, "fitting_data_info.pckl.gzip")
+        df = pd.read_pickle(training_data_fname, compression="gzip")
+        df["atoms"] = df.ase_atoms.map(ase_to_pyiron)
+        training_data_ts = TrainingStorage()
+        for _, r in df.iterrows():
+            training_data_ts.add_structure(r.atoms,
+                                           energy=r.energy_corrected,
+                                           forces=r.forces,
+                                           identifier=r['name'])
+
+        # predicted data
+        predicted_fname = os.path.join(self.working_directory, "train_pred.pckl.gzip")
+        df = pd.read_pickle(predicted_fname, compression="gzip")
+        predicted_data_fs = FlattenedStorage()
+        predicted_data_fs.add_array('energy', dtype=np.float64, shape=(), per='chunk')
+        predicted_data_fs.add_array('energy_true', dtype=np.float64, shape=(), per='chunk')
+
+        predicted_data_fs.add_array('number_of_atoms', dtype=np.int, shape=(), per='chunk')
+
+        predicted_data_fs.add_array('forces', dtype=np.float64, shape=(3,), per='element')
+        predicted_data_fs.add_array('forces_true', dtype=np.float64, shape=(3,), per='element')
+        for i, r in df.iterrows():
+            identifier = r['name'] if "name" in r else str(i)
+            predicted_data_fs.add_chunk(r["NUMBER_OF_ATOMS"], identifier=identifier,
+                                        energy=r.energy_pred,
+                                        forces=r.forces_pred,
+                                        energy_true=r.energy_corrected,
+                                        forces_true=r.forces,
+                                        number_of_atoms = r.NUMBER_OF_ATOMS,
+
+                                        energy_per_atom = r.energy_pred / r.NUMBER_OF_ATOMS,
+                                        energy_per_atom_true=r.energy_corrected / r.NUMBER_OF_ATOMS,
+                                        )
+
+        with self.project_hdf5.open("output") as hdf5_output:
+            training_data_ts.to_hdf(hdf=hdf5_output, group_name="training_data")
+            predicted_data_fs.to_hdf(hdf=hdf5_output, group_name="predicted_data")
 
     def get_lammps_potential(self):
         elements_name = self["output/potential/elements_name"]
@@ -330,16 +363,10 @@ class PacemakerJob(GenericJob, PotentialFit):
         self._train_job_id_list.append(job_id)
 
     def _get_training_data(self) -> TrainingStorage:
-        # TODO: convert to TrainingStorage ?
-        fname = os.path.join(self.working_directory, "fitting_data_info.pckl.gzip")
-        df = pd.read_pickle(fname, compression="gzip")
-        return df
+        return self["output/training_data"].to_object()
 
     def _get_predicted_data(self) -> FlattenedStorage:
-        # TODO: convert to FlattenedStorage ?
-        fname = os.path.join(self.working_directory, "train_pred.pckl.gzip")
-        df = pd.read_pickle(fname, compression="gzip")
-        return df
+        return self["output/predicted_data"].to_object()
 
     # copied/adapted from mlip.py
     def create_training_dataframe(self, _train_job_id_list: List = None) -> pd.DataFrame:

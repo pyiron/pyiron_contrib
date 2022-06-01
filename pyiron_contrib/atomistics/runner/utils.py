@@ -51,6 +51,11 @@ def container_to_ase(container: TrainingContainer) -> List[Atoms]:
             if prop in zipped:
                 calc_properties[prop] = zipped[prop]
 
+        # Overwrite the totalcharge if the property was not present.
+        if calc_properties['totalcharge'] is None:
+            totalcharge = np.sum(atoms.get_initial_charges())
+            calc_properties['totalcharge'] = totalcharge
+
         # Storage energies, forces, and totalcharge on a calculator object.
         atoms.calc = RunnerSinglePointCalculator(
             atoms=atoms,

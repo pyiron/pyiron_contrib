@@ -238,7 +238,8 @@ class TrainingContainer(GenericJob, HasStructure):
                 self.input.from_hdf(self.project_hdf5, "parameters")
 
     def sample(
-        self, name: str, selector: Callable[[StructureStorage, int], bool]
+        self, name: str, selector: Callable[[StructureStorage, int], bool],
+        delete_existing_job: bool = False
     ) -> "TrainingContainer":
         """
         Create a new TrainingContainer with structures filtered by selector.
@@ -250,6 +251,7 @@ class TrainingContainer(GenericJob, HasStructure):
         Args:
             name (str): name of the new TrainingContainer
             selector (Callable[[StructureStorage, int], bool]): callable that selects structure to include
+            delete_existing_job (bool): if job with name exist, remove it first
 
         Returns:
             :class:`.TrainingContainer`: new container with selected structures
@@ -257,7 +259,7 @@ class TrainingContainer(GenericJob, HasStructure):
         Raises:
             ValueError: if a job with the given `name` already exists.
         """
-        cont = self.project.create.job.TrainingContainer(name)
+        cont = self.project.create.job.TrainingContainer(name, delete_existing_job=delete_existing_job)
         if not cont.status.initialized:
             raise ValueError(f"Job '{name}' already exists with status: {cont.status}!")
         cont._container = self._container.sample(selector)

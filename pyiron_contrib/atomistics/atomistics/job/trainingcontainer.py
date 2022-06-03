@@ -14,7 +14,7 @@ Let's make a structure and invent some forces
 
 >>> structure = pr.create.structure.ase_bulk("Fe")
 >>> forces = numpy.array([-1, 1, -1])
->>> container.include_structure(structure, energy=-1.234, forces=forces, name="Fe_bcc")
+>>> container.add_structure(structure, energy=-1.234, forces=forces, identifier="Fe_bcc")
 
 If you have a lot of precomputed structures you may also add them in bulk from a pandas DataFrame
 
@@ -99,7 +99,7 @@ class TrainingContainer(GenericJob, HasStructure):
                                           **properties)
 
     def add_structure(
-        self, structure, energy, forces=None, stress=None, name=None, **arrays
+        self, structure, energy, forces=None, stress=None, identifier=None, **arrays
     ):
         """
         Add new structure to structure list and save energy and forces with it.
@@ -115,7 +115,7 @@ class TrainingContainer(GenericJob, HasStructure):
             name (str, optional): name describing the structure
         """
         self._container.add_structure(
-            structure, energy, name=name, forces=forces, stress=stress, **arrays
+            structure, energy, identifier=identifier, forces=forces, stress=stress, **arrays
         )
 
     def include_dataset(self, dataset):

@@ -259,6 +259,8 @@ class TrainingContainer(GenericJob, HasStructure):
         Raises:
             ValueError: if a job with the given `name` already exists.
         """
+        if not self.status.finished:
+            raise ValueError(f"Job must be finished, not '{self.status}'!")
         cont = self.project.create.job.TrainingContainer(name, delete_existing_job=delete_existing_job)
         if not cont.status.initialized:
             raise ValueError(f"Job '{name}' already exists with status: {cont.status}!")

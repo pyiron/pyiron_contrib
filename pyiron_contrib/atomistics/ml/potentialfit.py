@@ -140,7 +140,7 @@ class PotentialPlots:
 
         plt.subplot(1, 2, 1)
         plt.scatter(ft, fp)
-        plt.xlabel("True Forces [eV/$\AA$]")
+        plt.xlabel("True Forces [eV/$\mathrm{\AA}$]")
         plt.ylabel("Predicted Forces [eV/$\AA$]")
         plt.subplot(1, 2, 2)
         plt.hist(ft - fp)

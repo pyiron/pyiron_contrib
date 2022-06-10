@@ -1067,6 +1067,35 @@ class MEAMPotential(AbstractPotential, EAMlikeMixin):
                     "Fitting parameters of screening functions probably doesn't work right now"
                 )
 
+    def _potential_as_pd_df(self, job):
+        """
+        Makes the tabulated eam potential written by atomicrex usable
+        for pyiron lammps jobs.
+        """
+        if self.export_file is None:
+            raise ValueError("export_file must be set to use the potential with lammps")
+
+        species = [el for el in job.input.atom_types.keys()]
+        species_str = ""
+        for s in species:
+            species_str += f"{s} "
+
+        pot = pd.DataFrame(
+            {
+                "Name": f"{self.identifier}",
+                "Filename": [[f"{job.working_directory}/{self.export_file}"]],
+                "Model": ["Custom"],
+                "Species": [species],
+                "Config": [
+                    [
+                        "pair_style meam/spline\n",
+                        f"pair_coeff * * {job.working_directory}/{self.export_file} {species_str}\n",
+                    ]
+                ],
+            }
+        )
+        return pot
+
 
 def _parse_parameter_line(line):
     """

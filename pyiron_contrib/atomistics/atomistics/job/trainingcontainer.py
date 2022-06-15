@@ -575,10 +575,12 @@ class TrainingStorage(StructureStorage):
                     "name": [self.get_array("identifier", i) for i in range(len(self))],
                     "atoms": [self.get_structure(i) for i in range(len(self))],
                     "energy": [self.get_array("energy", i) for i in range(len(self))],
-                    "forces": [self.get_array("forces", i) for i in range(len(self))],
-                    "stress": [self.get_array("stress", i) for i in range(len(self))],
                 }
             )
+            if self.has_array("forces"):
+                self._table_cache["forces"] = [self.get_array("forces", i) for i in range(len(self))]
+            if self.has_array("stress"):
+                self._table_cache["stress"] = [self.get_array("stress", i) for i in range(len(self))]
             self._table_cache["number_of_atoms"] = [
                 len(s) for s in self._table_cache.atoms
             ]

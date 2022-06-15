@@ -716,6 +716,8 @@ class TrainingStorage(StructureStorage):
             data_table = filter_function(data_table)
         structure_list = data_table.atoms.to_list()
         energy_list = data_table.energy.to_list()
+        if "forces" not in data_table.columns:
+            raise ValueError("no forces defined in storage; call to_dict() instead.")
         force_list = data_table.forces.to_list()
         num_atoms_list = data_table.number_of_atoms.to_list()
 

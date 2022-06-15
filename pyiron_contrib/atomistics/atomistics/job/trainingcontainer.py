@@ -659,10 +659,10 @@ class TrainingStorage(StructureStorage):
         identifier=None,
         **arrays
     ) -> None:
-        if "forces" in arrays and not self._container.has_array("forces"):
+        if "forces" in arrays and not self.has_array("forces"):
             self.add_array("forces", shape=(3,), dtype=np.float64, per="element",
                            fill=np.nan)
-        if "stress" in arrays and not self._container.has_array("stress"):
+        if "stress" in arrays and not self.has_array("stress"):
             # save stress in voigt notation
             self.add_array("stress", shape=(6,), dtype=np.float64, per="chunk",
                            fill=np.nan)

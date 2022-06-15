@@ -551,11 +551,6 @@ class TrainingStorage(StructureStorage):
     def __init__(self):
         super().__init__()
         self.add_array("energy", dtype=np.float64, per="chunk", fill=np.nan)
-        self.add_array("forces", shape=(3,), dtype=np.float64, per="element",
-                       fill=np.nan)
-        # save stress in voigt notation
-        self.add_array("stress", shape=(6,), dtype=np.float64, per="chunk",
-                       fill=np.nan)
         self._table_cache = None
         self.to_pandas()
 
@@ -580,10 +575,12 @@ class TrainingStorage(StructureStorage):
                     "name": [self.get_array("identifier", i) for i in range(len(self))],
                     "atoms": [self.get_structure(i) for i in range(len(self))],
                     "energy": [self.get_array("energy", i) for i in range(len(self))],
-                    "forces": [self.get_array("forces", i) for i in range(len(self))],
-                    "stress": [self.get_array("stress", i) for i in range(len(self))],
                 }
             )
+            if self.has_array("forces"):
+                self._table_cache["forces"] = [self.get_array("forces", i) for i in range(len(self))]
+            if self.has_array("stress"):
+                self._table_cache["stress"] = [self.get_array("stress", i) for i in range(len(self))]
             self._table_cache["number_of_atoms"] = [
                 len(s) for s in self._table_cache.atoms
             ]
@@ -664,6 +661,13 @@ class TrainingStorage(StructureStorage):
         identifier=None,
         **arrays
     ) -> None:
+        if "forces" in arrays and not self.has_array("forces"):
+            self.add_array("forces", shape=(3,), dtype=np.float64, per="element",
+                           fill=np.nan)
+        if "stress" in arrays and not self.has_array("stress"):
+            # save stress in voigt notation
+            self.add_array("stress", shape=(6,), dtype=np.float64, per="chunk",
+                           fill=np.nan)
         super().add_structure(structure, identifier=identifier, energy=energy,
                               **arrays)
 
@@ -712,6 +716,8 @@ class TrainingStorage(StructureStorage):
             data_table = filter_function(data_table)
         structure_list = data_table.atoms.to_list()
         energy_list = data_table.energy.to_list()
+        if "forces" not in data_table.columns:
+            raise ValueError("no forces defined in storage; call to_dict() instead.")
         force_list = data_table.forces.to_list()
         num_atoms_list = data_table.number_of_atoms.to_list()
 

@@ -115,7 +115,7 @@ class Mlip(GenericJob, PotentialFit):
 
     @property
     def potential(self):
-        if self.status.finished:
+        if self.status.finished and self._potential is not None:
             return self._potential
         else:
             raise ValueError("potential only available on successfully finished jobs")
@@ -192,7 +192,11 @@ class Mlip(GenericJob, PotentialFit):
             _, _, _, _, _, _, grades_lst, job_id_grades_lst, timestep_grades_lst = read_cgfs(file_name)
         else:
             grades_lst, job_id_grades_lst, timestep_grades_lst = [], [], []
-        self._potential.load(os.path.join(self.working_directory, "Trained.mtp_"))
+        try:
+            self._potential.load(os.path.join(self.working_directory, "Trained.mtp_"))
+        except:
+            self.logger.warn('Failed to parse potential file! job.potential will not be available.')
+            self._potential = None
 
         training_store = FlattenedStorage()
         training_store.add_array('energy', dtype=np.float64, shape=(), per='chunk')
@@ -220,7 +224,8 @@ class Mlip(GenericJob, PotentialFit):
             hdf5_output['timestep_diff'] = timestep_diff_lst
             hdf5_output['job_id_new'] = job_id_new_training_lst
             hdf5_output['timestep_new'] = timestep_new_training_lst
-            self._potential.to_hdf(hdf=hdf5_output)
+            if self._potential is not None:
+                self._potential.to_hdf(hdf=hdf5_output)
             training_store.to_hdf(hdf=hdf5_output, group_name="training_efs")
             testing_store.to_hdf(hdf=hdf5_output, group_name="testing_efs")
 

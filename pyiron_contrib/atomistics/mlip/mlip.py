@@ -369,6 +369,8 @@ class Mlip(GenericJob, PotentialFit):
                     if job._container.has_array("stress"):
                         volume = np.abs(np.linalg.det(cell_lst[-1]))
                         stress_lst.append(job._container.get_array("stress", time_step) * volume)
+                        if np.isnan(stress_lst[-1]):
+                            stress_lst[-1] = None
                     track_lst.append(str(ham.job_id) + '_' + str(time_step))
                 continue
             original_dict = {el: ind for ind, el in enumerate(sorted(ham['input/structure/species']))}

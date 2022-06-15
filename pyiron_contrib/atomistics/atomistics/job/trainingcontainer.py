@@ -551,11 +551,6 @@ class TrainingStorage(StructureStorage):
     def __init__(self):
         super().__init__()
         self.add_array("energy", dtype=np.float64, per="chunk", fill=np.nan)
-        # self.add_array("forces", shape=(3,), dtype=np.float64, per="element",
-        #                fill=np.nan)
-        # save stress in voigt notation
-        # self.add_array("stress", shape=(6,), dtype=np.float64, per="chunk",
-        #                fill=np.nan)
         self._table_cache = None
         self.to_pandas()
 
@@ -654,12 +649,6 @@ class TrainingStorage(StructureStorage):
             stress (6 array of float, optional): per structure stresses in voigt notation
             name (str, optional): name describing the structure
         """
-        if 'forces' in properties:
-            self.add_array("forces", shape=(3,), dtype=np.float64, per="element",
-                           fill=np.nan)
-        if 'stress' in properties:
-            self.add_array("stress", shape=(6,), dtype=np.float64, per="chunk",
-                           fill=np.nan)
         self.add_structure(structure, identifier=name, energy=energy,
                            **properties)
 
@@ -670,6 +659,13 @@ class TrainingStorage(StructureStorage):
         identifier=None,
         **arrays
     ) -> None:
+        if "forces" in properties and not self._container.has_array("forces"):
+            self.add_array("forces", shape=(3,), dtype=np.float64, per="element",
+                           fill=np.nan)
+        if "stress" in properties and not self._container.has_array("stress"):
+            # save stress in voigt notation
+            self.add_array("stress", shape=(6,), dtype=np.float64, per="chunk",
+                           fill=np.nan)
         super().add_structure(structure, identifier=identifier, energy=energy,
                               **arrays)
 

@@ -49,7 +49,7 @@ setup(
         ],
         'image': ['scikit-image==0.19.3'],
         'generic': [
-            'boto3==1.24.12', 
+            'boto3==1.24.17', 
             'moto==3.1.15'
         ],
     },

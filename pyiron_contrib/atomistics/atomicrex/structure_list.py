@@ -68,6 +68,12 @@ class ARStructureContainer:
         relative_weight=1,
         clamp=True,
     ):
+        if "/" in identifier:
+            raise ValueError(
+                "Structure identifiers must not contain '/'."
+                "Use .structure_file_path to use existing POSCAR files"
+            )
+
         self._structures.add_structure(structure, identifier)
         self._structures._per_chunk_arrays["fit"][
             self._structures.prev_chunk_index

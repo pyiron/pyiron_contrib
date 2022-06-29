@@ -70,7 +70,7 @@ class ARStructureContainer:
     ):
         if "/" in identifier:
             raise ValueError(
-                "Structure identifiers must not contain '/'."
+                "Structure identifiers must not contain '/'. "
                 "Use .structure_file_path to use existing POSCAR files"
             )
 
@@ -398,6 +398,14 @@ class ARStructureContainer:
                     "relative_weight"
                 ]
 
+    def _check_identifiers(self):
+        identifiers = self._structures.get_array("identifier")
+        if not np.all(np.char.find(identifiers, "/")==-1):
+            raise ValueError(
+                "Structure identifiers must not contain '/'. "
+                "Use .structure_file_path to use existing POSCAR files"
+            )
+
     def write_xml_file(self, directory, name="structures.xml"):
         """
         Internal helper function that writes an atomicrex style
@@ -407,6 +415,7 @@ class ARStructureContainer:
             directory (string): Working directory.
             name (str, optional): . Defaults to "structures.xml".
         """
+        self._check_identifiers()
         self._shrink()
         root = ET.Element("group")
         if self.structure_file_path is None and "atomic-forces" in self.fit_properties:

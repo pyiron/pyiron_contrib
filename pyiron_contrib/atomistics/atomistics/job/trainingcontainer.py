@@ -14,7 +14,7 @@ Let's make a structure and invent some forces
 
 >>> structure = pr.create.structure.ase_bulk("Fe")
 >>> forces = numpy.array([-1, 1, -1])
->>> container.include_structure(structure, energy=-1.234, forces=forces, name="Fe_bcc")
+>>> container.add_structure(structure, energy=-1.234, forces=forces, identifier="Fe_bcc")
 
 If you have a lot of precomputed structures you may also add them in bulk from a pandas DataFrame
 
@@ -28,13 +28,17 @@ name    atoms   energy  forces  number_of_atoms
 Fe_bcc  ...
 """
 
-from typing import Callable
+from typing import Callable, Dict, Any, Optional
+
 from warnings import catch_warnings
 
 import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+
+from ase.atoms import Atoms as ASEAtoms
+
 from pyiron_contrib.atomistics.atomistics.job.structurestorage import StructureStorage
 from pyiron_atomistics.atomistics.structure.atoms import Atoms
 from pyiron_atomistics.atomistics.structure.has_structure import HasStructure
@@ -54,7 +58,8 @@ class TrainingContainer(GenericJob, HasStructure):
         self._container = TrainingStorage()
 
         self.input = DataContainer(
-            {"save_neighbors": True, "num_neighbors": 12}, table_name="parameters"
+            {"save_neighbors": True, "num_neighbors": 12},
+            table_name="parameters"
         )
 
     def include_job(self, job, iteration_step=-1):
@@ -63,12 +68,39 @@ class TrainingContainer(GenericJob, HasStructure):
 
         Args:
             job (:class:`.AtomisticGenericJob`): job to take structure from
-            iteration_step (int, optional): if job has multiple steps, this selects which to add
+            iteration_step (int, optional): if job has multiple steps, this
+            selects which to add
         """
         self._container.include_job(job, iteration_step)
 
-    @deprecate("Use add_structure instead")
-    def include_structure(self, structure, energy, forces=None, stress=None, name=None):
+    def include_structure(
+        self,
+        structure,
+        energy=None,
+        name=None,
+        **properties
+    ):
+        """
+        Add new structure to structure list and save energy and forces with it.
+
+        For consistency with the rest of pyiron, energy should be in units of eV
+        and forces in eV/A, but no conversion is performed.
+
+        Args:
+            structure_or_job (:class:`~.Atoms`): structure to add
+            energy (float): energy of the whole structure
+            forces (Nx3 array of float, optional): per atom forces, where N is
+                the number of atoms in the structure
+            stress (6 array of float, optional): per structure stresses in voigt
+                notation
+            name (str, optional): name describing the structure
+        """
+        self._container.include_structure(structure, name=name, energy=energy,
+                                          **properties)
+
+    def add_structure(
+        self, structure, energy, forces=None, stress=None, identifier=None, **arrays
+    ):
         """
         Add new structure to structure list and save energy and forces with it.
 
@@ -82,7 +114,9 @@ class TrainingContainer(GenericJob, HasStructure):
             stress (6 array of float, optional): per structure stresses in voigt notation
             name (str, optional): name describing the structure
         """
-        self._container.include_structure(structure, energy, forces, stress, name)
+        self._container.add_structure(
+            structure, energy, identifier=identifier, forces=forces, stress=stress, **arrays
+        )
 
     def include_dataset(self, dataset):
         """
@@ -164,6 +198,9 @@ class TrainingContainer(GenericJob, HasStructure):
         """
         return self._container.to_list(filter_function)
 
+    def to_dict(self):
+        return self._container.to_dict()
+
     def write_input(self):
         pass
 
@@ -200,7 +237,10 @@ class TrainingContainer(GenericJob, HasStructure):
             if hdf_version == "0.3.0":
                 self.input.from_hdf(self.project_hdf5, "parameters")
 
-    def sample(self, name: str, selector: Callable[[StructureStorage, int], bool]) -> "TrainingContainer":
+    def sample(
+        self, name: str, selector: Callable[[StructureStorage, int], bool],
+        delete_existing_job: bool = False
+    ) -> "TrainingContainer":
         """
         Create a new TrainingContainer with structures filtered by selector.
 
@@ -211,6 +251,7 @@ class TrainingContainer(GenericJob, HasStructure):
         Args:
             name (str): name of the new TrainingContainer
             selector (Callable[[StructureStorage, int], bool]): callable that selects structure to include
+            delete_existing_job (bool): if job with name exist, remove it first
 
         Returns:
             :class:`.TrainingContainer`: new container with selected structures
@@ -218,7 +259,9 @@ class TrainingContainer(GenericJob, HasStructure):
         Raises:
             ValueError: if a job with the given `name` already exists.
         """
-        cont = self.project.create.job.TrainingContainer(name)
+        if not self.status.finished:
+            raise ValueError(f"Job must be finished, not '{self.status}'!")
+        cont = self.project.create.job.TrainingContainer(name, delete_existing_job=delete_existing_job)
         if not cont.status.initialized:
             raise ValueError(f"Job '{name}' already exists with status: {cont.status}!")
         cont._container = self._container.sample(selector)
@@ -231,6 +274,20 @@ class TrainingContainer(GenericJob, HasStructure):
         :class:`.TrainingPlots`: plotting interface
         """
         return TrainingPlots(self._container)
+
+    def iter(self, *arrays, wrap_atoms=True):
+        """
+        Iterate over all structures in this object and all arrays that are defined
+
+        Args:
+            wrap_atoms (bool): True if the atoms are to be wrapped back into the unit cell; passed to
+                               :meth:`.get_structure()`
+            *arrays (str): name of arrays that should be iterated over
+
+        Yields:
+            :class:`pyiron_atomistics.atomistitcs.structure.atoms.Atoms`, arrays: every structure attached to the object and queried arrays
+        """
+        yield from self._container.iter(*arrays, wrap_atoms=wrap_atoms)
 
 
 class TrainingPlots:
@@ -478,34 +535,28 @@ class TrainingPlots:
         plt.xlabel(r"Distance [$\AA$]")
         plt.ylabel("Shell")
 
+    def forces(self, axis: Optional[int] = None):
+        """
+        Plot a histogram of all forces.
+
+        Args:
+            axis (int, optional): plot only forces along this axis, if not given plot all forces
+        """
+        f = self._train.get_array("forces")
+        if axis is not None:
+            f = f[:, axis]
+        else:
+            f = f.ravel()
+        plt.hist(f, bins=20)
+        plt.xlabel(r"Force [eV/$\mathrm{\AA}$]")
+
 
 class TrainingStorage(StructureStorage):
     def __init__(self):
         super().__init__()
         self.add_array("energy", dtype=np.float64, per="chunk", fill=np.nan)
-        self.add_array(
-            "forces", shape=(3,), dtype=np.float64, per="element", fill=np.nan
-        )
-        # save stress in voigt notation
-        self.add_array("stress", shape=(6,), dtype=np.float64, per="chunk", fill=np.nan)
         self._table_cache = None
-
-    @property
-    def _table(self):
-        if self._table_cache is None or len(self._table_cache) != len(self):
-            self._table_cache = pd.DataFrame(
-                {
-                    "name": [self.get_array("identifier", i) for i in range(len(self))],
-                    "atoms": [self.get_structure(i) for i in range(len(self))],
-                    "energy": [self.get_array("energy", i) for i in range(len(self))],
-                    "forces": [self.get_array("forces", i) for i in range(len(self))],
-                    "stress": [self.get_array("stress", i) for i in range(len(self))],
-                }
-            )
-            self._table_cache["number_of_atoms"] = [
-                len(s) for s in self._table_cache.atoms
-            ]
-        return self._table_cache
+        self.to_pandas()
 
     def to_pandas(self):
         """
@@ -522,7 +573,22 @@ class TrainingStorage(StructureStorage):
         Returns:
             :class:`pandas.DataFrame`: collected structures
         """
-        return self._table
+        if self._table_cache is None or len(self._table_cache) != len(self):
+            self._table_cache = pd.DataFrame(
+                {
+                    "name": [self.get_array("identifier", i) for i in range(len(self))],
+                    "atoms": [self.get_structure(i) for i in range(len(self))],
+                    "energy": [self.get_array("energy", i) for i in range(len(self))],
+                }
+            )
+            if self.has_array("forces"):
+                self._table_cache["forces"] = [self.get_array("forces", i) for i in range(len(self))]
+            if self.has_array("stress"):
+                self._table_cache["stress"] = [self.get_array("stress", i) for i in range(len(self))]
+            self._table_cache["number_of_atoms"] = [
+                len(s) for s in self._table_cache.atoms
+            ]
+        return self._table_cache
 
     def include_job(self, job, iteration_step=-1):
         """
@@ -569,7 +635,13 @@ class TrainingStorage(StructureStorage):
         )
 
     @deprecate("Use add_structure instead")
-    def include_structure(self, structure, energy, forces=None, stress=None, name=None):
+    def include_structure(
+        self,
+        structure,
+        energy,
+        name=None,
+        **properties
+    ):
         """
         Add new structure to structure list and save energy and forces with it.
 
@@ -583,31 +655,25 @@ class TrainingStorage(StructureStorage):
             stress (6 array of float, optional): per structure stresses in voigt notation
             name (str, optional): name describing the structure
         """
-        self.add_structure(
-            structure, energy, identifier=name, forces=forces, stress=stress
-        )
+        self.add_structure(structure, identifier=name, energy=energy,
+                           **properties)
 
     def add_structure(
-        self, structure, energy, identifier=None, forces=None, stress=None, **arrays
-    ):
-        data = {"energy": energy}
-        if forces is not None:
-            data["forces"] = forces
-        if stress is not None:
-            data["stress"] = stress
-        super().add_structure(structure, identifier, **data)
-        if self._table_cache:
-            self._table = self._table.append(
-                {
-                    "name": identifier,
-                    "atoms": structure,
-                    "energy": energy,
-                    "forces": forces,
-                    "stress": stress,
-                    "number_of_atoms": len(structure),
-                },
-                ignore_index=True,
-            )
+        self,
+        structure: Atoms,
+        energy,
+        identifier=None,
+        **arrays
+    ) -> None:
+        if "forces" in arrays and not self.has_array("forces"):
+            self.add_array("forces", shape=(3,), dtype=np.float64, per="element",
+                           fill=np.nan)
+        if "stress" in arrays and not self.has_array("stress"):
+            # save stress in voigt notation
+            self.add_array("stress", shape=(6,), dtype=np.float64, per="chunk",
+                           fill=np.nan)
+        super().add_structure(structure, identifier=identifier, energy=energy,
+                              **arrays)
 
     def include_dataset(self, dataset):
         """
@@ -618,12 +684,26 @@ class TrainingStorage(StructureStorage):
             - atoms(:class:`ase.Atoms`): the atomic structure
             - energy(float): energy of the whole structure
             - forces (Nx3 array of float): per atom forces, where N is the number of atoms in the structure
+            - charges (Nx3 array of floats):
             - stress (6 array of float): per structure stress in voigt notation
         """
-        self._table_cache = self._table.append(dataset, ignore_index=True)
-        # in case given dataset has more columns than the necessary ones, swallow/ignore them in *_
-        for name, atoms, energy, forces, stress, *_ in dataset.itertuples(index=False):
-            self.add_structure(atoms, name, energy=energy, forces=forces, stress=stress)
+        if (
+            "name" not in dataset.columns
+            or "atoms" not in dataset.columns
+            or "energy" not in dataset.columns
+        ):
+            raise ValueError(
+                "At least columns 'name', 'atoms' and 'energy' must be present in dataset!"
+            )
+        for row in dataset.itertuples(index=False):
+            kwargs = {}
+            if hasattr(row, "forces"):
+                kwargs["forces"] = row.forces
+            if hasattr(row, "stress"):
+                kwargs["stress"] = row.stress
+            self.add_structure(
+                row.atoms, energy=row.energy, identifier=row.name, **kwargs
+            )
 
     def to_list(self, filter_function=None):
         """
@@ -635,12 +715,55 @@ class TrainingStorage(StructureStorage):
         Returns:
             tuple: list of structures, energies, forces, and the number of atoms
         """
-        if filter_function is None:
-            data_table = self._table
-        else:
-            data_table = filter_function(self._table)
+        data_table = self.to_pandas()
+        if filter_function is not None:
+            data_table = filter_function(data_table)
         structure_list = data_table.atoms.to_list()
         energy_list = data_table.energy.to_list()
+        if "forces" not in data_table.columns:
+            raise ValueError("no forces defined in storage; call to_dict() instead.")
         force_list = data_table.forces.to_list()
         num_atoms_list = data_table.number_of_atoms.to_list()
-        return structure_list, energy_list, force_list, num_atoms_list
+
+        return (structure_list, energy_list, force_list, num_atoms_list)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Return a dictionary of all structures and training properties."""
+        dict_arrays = {}
+
+        # Get structure information.
+        dict_arrays['structure'] = list(self.iter_structures())
+
+        # Some arrays are only for internal usage or structure information that
+        # was already saved in dict['structure'].
+        internal_arrays = ['start_index', 'length', 'cell', 'pbc', 'positions',
+                           'symbols']
+        for array in self.list_arrays():
+            # Skip internal arrays.
+            if array in internal_arrays:
+                continue
+
+            dict_arrays[array] = self.get_array_ragged(array)
+        return dict_arrays
+
+    def iter(self, *arrays, wrap_atoms=True):
+        """
+        Iterate over all structures in this object and all arrays that are defined
+
+        Args:
+            wrap_atoms (bool): True if the atoms are to be wrapped back into the unit cell; passed to
+                               :meth:`.get_structure()`
+            *arrays (str): name of arrays that should be iterated over
+
+        Yields:
+            :class:`pyiron_atomistics.atomistitcs.structure.atoms.Atoms`, arrays: every structure attached to the object and queried arrays
+        """
+        array_vals = (self.get_array_ragged(a) for a in arrays)
+        yield from zip(self.iter_structures(), *array_vals)
+
+    @property
+    def plot(self):
+        """
+        :class:`.TrainingPlots`: plotting interface
+        """
+        return TrainingPlots(self)

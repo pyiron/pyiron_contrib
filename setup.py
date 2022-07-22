@@ -41,7 +41,7 @@ setup(
     extras_require={
         'atomistic': [
             'ase==3.22.1',
-            'pyiron_atomistics==0.2.50',
+            'pyiron_atomistics==0.2.51',
         ],
         'fenics': [
             'fenics==2019.1.0',

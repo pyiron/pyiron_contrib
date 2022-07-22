@@ -8,8 +8,8 @@ from functools import lru_cache
 import boto3
 from botocore.client import Config
 
-from pyiron_base.interfaces.has_groups import HasGroups
-from pyiron_base.generic.filedata import load_file, FileDataTemplate
+from pyiron_base import HasGroups
+from pyiron_base import load_file, FileDataTemplate
 
 
 class S3FileData(FileDataTemplate):

@@ -560,6 +560,6 @@ class TrainingStorage(StructureStorage):
         """
         :class:`.TrainingPlots`: plotting interface
         """
-        if self._plot is None:
-            self._plot = TrainingPlots(self)
-        return self._plot
+        if self._plots is None:
+            self._plots = TrainingPlots(self)
+        return self._plots

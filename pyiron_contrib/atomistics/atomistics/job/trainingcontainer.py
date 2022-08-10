@@ -39,9 +39,9 @@ import matplotlib.pyplot as plt
 
 from ase.atoms import Atoms as ASEAtoms
 
-from pyiron_contrib.atomistics.atomistics.job.structurestorage import StructureStorage, StructurePlots
 from pyiron_atomistics.atomistics.structure.atoms import Atoms
 from pyiron_atomistics.atomistics.structure.has_structure import HasStructure
+from pyiron_atomistics.atomistics.structure.structurestorage import StructureStorage, StructurePlots
 from pyiron_atomistics.atomistics.structure.neighbors import NeighborsTrajectory
 from pyiron_base import GenericJob, DataContainer, deprecate
 

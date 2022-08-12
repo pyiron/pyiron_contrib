@@ -8,12 +8,13 @@ import shutil
 from abc import ABC, abstractmethod
 import os
 from functools import lru_cache
-from os import path
+from pathlib import Path
+
 import pandas as pd
 
 from pyiron_base import GenericJob, state
-from pyiron_base.generic.filedata import FileDataTemplate as BaseFileDataTemplate, load_file, FileData as FileDataBase
-from pyiron_base.interfaces.has_groups import HasGroups
+from pyiron_base import FileDataTemplate as BaseFileDataTemplate, load_file, FileData as FileDataBase
+from pyiron_base import HasGroups
 
 import ipywidgets as widgets
 from IPython.display import display
@@ -144,6 +145,29 @@ class FileData(FileDataTemplate):
 class StorageInterface(HasGroups, ABC):
     """File handling in different storage interfaces"""
 
+    def __init__(self, *args, **kwargs):
+        self._path = None
+
+    @property
+    def path(self):
+        """Represents the path of the storage interface (always posix-path)"""
+        return self._path
+
+    @path.setter
+    def path(self, new_path):
+        self._path = self._path_setter(new_path)
+
+    def _path_setter(self, new_path):
+        return new_path
+
+    @abstractmethod
+    def is_file(self, item):
+        """Check if the given item is a node/file"""
+
+    @abstractmethod
+    def is_dir(self, item):
+        """Check if the given item is a group/directory"""
+
     @abstractmethod
     def upload_file(self, file, metadata=None, filename=None):
         """Upload the provided files to the storage"""
@@ -180,39 +204,108 @@ class StorageInterface(HasGroups, ABC):
         """
 
 
-class LocalStorage(StorageInterface):
-    """The local storage operates on the usual working directory of the job"""
+class LocalFileStorage(StorageInterface):
+    def upload_file(self, file, metadata=None, filename=None):
+        self.put(file=file, filepath=filename)
 
-    def __init__(self, job: GenericJob):
-        self._job = job
+    def __init__(self, path, root_path=None):
+        super().__init__()
+        self.path = path
+        if root_path is not None:
+            self._root_path = Path(root_path)
+        else:
+            self._root_path = root_path
+
+    def _path_setter(self, new_path):
+        path = Path(new_path).expanduser()
+        if not path.is_dir():
+            raise ValueError(f"Provided path '{new_path}' is not a directory.")
+        return path.resolve()
+
+    def create_group(self, name):
+        new_path = self._join_path(name)
+        if new_path.exists() and not new_path.is_dir():
+            raise ValueError(f"{new_path} already exists and is not a directory.")
+        elif not new_path.exists():
+            new_path.mkdir(parents=True)
+
+        return self.__class__(new_path)
+
+    def is_file(self, item):
+        return self._join_path(item).is_file()
+
+    def is_dir(self, item):
+        return self._join_path(item).is_dir()
+
+    def _list_groups(self):
+        return [g for g in os.listdir(self.path) if self.is_dir(g)]
+
+    def _list_nodes(self):
+        return [f for f in os.listdir(self.path) if self.is_file(f)]
+
+    def _join_path(self, item):
+        if os.path.isabs(item):
+            return item
+        return self._path.joinpath(item).resolve()
+
+    def __getitem__(self, item):
+        item_path = self._join_path(item)
+        if item_path.is_file():
+            return FileData(str(item_path))
+        elif item_path.is_dir():
+            return self.__class__(item_path)
+        else:
+            raise KeyError(f"No such file or directory: '{item}' in '{self._path}'")
 
     def validate_metadata(self, metadata, raise_error=True):
         state.logger.warn("Storing metadata for LocalStorage is currently handled only on the job level.")
         return metadata
 
-    def upload_file(self, file, _metadata=None, filename=None):
-        filename = filename or os.path.basename(file)
-        shutil.copy(file, os.path.join(self._job.working_directory, filename))
+    def put(self, file, filepath=None, overwrite=False):
+        if filepath is None:
+            filepath = self._path
+        else:
+            filepath = self._join_path(filepath)
 
-    def remove_file(self, file):
-        os.remove(os.path.join(self._job.working_directory, file))
+        if filepath.is_file() and not overwrite:
+            raise ValueError(f"File already present and overwrite=False.")
+
+        if isinstance(file, (str, Path)):
+            shutil.copy2(file, filepath)
+        else:
+            # Expecting file to be a file handle
+            if filepath.is_dir():
+                filepath = filepath.joinpath(file.name)
+            shutil.copyfileobj(file, filepath.open('wb'))
+
+    def remove_file(self, filename, missing_ok=False):
+        file = self._join_path(filename)
+        if file.is_dir():
+            raise ValueError(f'{filename} is a directory but expected a file.')
+        file.unlink(missing_ok=missing_ok)
+
+
+class JobFileStorage(LocalFileStorage):
+    """The job storage operates on the usual working directory of the job"""
+
+    def _path_setter(self, new_path):
+        new_path = super()._path_setter(new_path)
+        self._validate_path(new_path)
+        self._path = new_path
+
+    def __init__(self, working_directory):
+        super().__init__(path='.', root_path=working_directory)
+
+    def _join_path(self, item):
+        new_path = super()._join_path(item)
+        self._validate_path(new_path)
+        return new_path
+
+    def _validate_path(self, path):
+        rel_path = os.path.relpath(path, self._root_path)
+        if rel_path.startswith('..'):
+            raise ValueError(f'New path not within the jobs working directory {self._root_path}')
 
     def setup_storage(self):
-        self._job._create_working_directory()
+        os.mkdir(self._root_path)
 
-    def __getitem__(self, item):
-        if item in self.list_nodes():
-            file_name = posixpath.join(self._job.working_directory, f"{item}")
-            if hasattr(self._job, '_stored_files'):
-                metadata = self._job._stored_files[item]
-            else:
-                metadata = None
-            return FileData(file=file_name, metadata=metadata)
-        pass
-
-    def _list_groups(self):
-        """Every files is expected to be stored in the working directory - thus, no nesting of groups."""
-        return []
-
-    def _list_nodes(self):
-        return self._job.list_files()

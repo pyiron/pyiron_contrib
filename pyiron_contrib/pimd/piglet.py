@@ -59,8 +59,7 @@ class Piglet(AtomisticGenericJob):
         self.potential_input.potential.df = potential
         
     def calc_npt_md(self, temperature=300., pressure=101325e-9, n_beads=4, timestep=1., damping_timescale=100., 
-                    n_ionic_steps=100, n_print=1, seed=32345, port=31415, A=None, C=None, rdf_r_min=2., rdf_r_max=5.,
-                    rdf_bins=100, rdf_thermalize=50):
+                    n_ionic_steps=100, n_print=1, seed=32345, port=31415, A=None, C=None):
         self.input.temperature = temperature
         self.input.pressure = pressure
         self.input.n_beads = n_beads
@@ -72,10 +71,6 @@ class Piglet(AtomisticGenericJob):
         self.input.port = port
         self.input.A = A
         self.input.C = C
-        self.input.rdf_r_min = rdf_r_min
-        self.input.rdf_r_max = rdf_r_max
-        self.input.rdf_bins = rdf_bins
-        self.input.rdf_thermalize = rdf_thermalize
         
     def write_potential(self):
         self.potential_input.potential.write_file(file_name="potential.inp", cwd=self.working_directory)
@@ -120,7 +115,7 @@ class Piglet(AtomisticGenericJob):
         tree = ET.parse(self._templates_directory+ '/piglet_template.xml')
         root = tree.getroot()
         filepath = self.working_directory + '/ipi_input.xml'
-        for i in range(3):
+        for i in range(4):
             root[0][i].attrib['stride'] = str(self.input.n_print)
         root[1].text = str(self.input.n_ionic_steps)
         root[2][0].text = str(self.input.seed)
@@ -159,55 +154,60 @@ class Piglet(AtomisticGenericJob):
     def collect_rdf(self):
         f=open(self.working_directory + '/ipi_out.AlAl.rdf.dat', "r")
         lines=f.readlines()
-        self.output.rdf_r = []
-        self.output.rdf_g_r = []
+        rdf_r = []
+        rdf_g_r = []
         for x in lines:
-            self.output.rdf_r.append(x.split()[0])
-            self.output.rdf_g_r.append(x.split()[1])
+            rdf_r.append(x.split()[0])
+            rdf_g_r.append(x.split()[1])
         f.close()
-        self.output.rdf_r = np.array([float(i) for i in self.output.rdf_r])
-        self.output.rdf_g_r = np.array([float(i) for i in self.output.rdf_g_r])
+        return np.array([float(i) for i in rdf_r]), np.array([float(i) for i in rdf_g_r])
         
     def collect_props(self):
         f=open(self.working_directory + '/ipi_out.out', "r")
         lines=f.readlines()
         self.output.time=[]
-        self.output.kinetic=[]
-        self.output.potential=[]
         self.output.temperature=[]
-        self.output.pressure=[]
+        self.output.en_kin=[]
+        self.output.en_pot=[]
         self.output.volume=[]
+        self.output.pressure=[]
         for x in lines:
             if not x.startswith('#'):
                 self.output.time.append(x.split()[1])
                 self.output.temperature.append(x.split()[2])
-                self.output.kinetic.append(x.split()[3])
-                self.output.potential.append(x.split()[4])
+                self.output.en_kin.append(x.split()[3])
+                self.output.en_pot.append(x.split()[4])
                 self.output.volume.append(x.split()[5])
                 self.output.pressure.append(x.split()[6])
         f.close()
         self.output.time = np.array([float(i) for i in self.output.time])
-        self.output.kinetic = np.array([float(i) for i in self.output.kinetic])
-        self.output.potential = np.array([float(i) for i in self.output.potential])
         self.output.temperature = np.array([float(i) for i in self.output.temperature])
+        self.output.en_kin = np.array([float(i) for i in self.output.en_kin])
+        self.output.en_pot = np.array([float(i) for i in self.output.en_pot])
         self.output.volume = np.array([float(i) for i in self.output.volume])
-        self.output.pressure = np.array([float(i) for i in self.output.pressure]) 
+        self.output.pressure = np.array([float(i) for i in self.output.pressure])
+        self.output.en_tot = self.output.en_pot + self.output.en_kin
         
     def collect_output(self):
         self.collect_props()
-        self.collect_rdf()
         self.compress()
-                        
-    def run_static(self):
-        subprocess.check_call([self.working_directory + '/./run_ipi.sh', self.working_directory, str(self.server.cores)])
+        
+    def get_rdf(self, r_min=2., r_max=5., bins=100, thermalize=50):
+        self.decompress()
         rdf_list = [self.working_directory + '/./run_rdf.sh', 
                     self.working_directory,
                     str(self.input.temperature),
                     self.structure.get_chemical_symbols()[0], self.structure.get_chemical_symbols()[0],
-                    str(self.input.rdf_bins),
-                    str(self.input.rdf_r_min), str(self.input.rdf_r_max),
-                    str(self.input.rdf_thermalize)]
-        subprocess.check_call(rdf_list)            
+                    str(bins),
+                    str(r_min), str(r_max),
+                    str(thermalize)]
+        subprocess.check_call(rdf_list)
+        rdf_r, rdf_g_r = self.collect_rdf()
+        self.compress()
+        return rdf_r, rdf_g_r
+                        
+    def run_static(self):
+        subprocess.check_call([self.working_directory + '/./run_ipi.sh', self.working_directory, str(self.server.cores)])
         self.collect_output()
         self.to_hdf()
         

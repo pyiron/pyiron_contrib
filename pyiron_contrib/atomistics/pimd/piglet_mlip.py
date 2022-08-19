@@ -5,9 +5,10 @@
 from pyiron_atomistics.atomistics.job.atomistic import AtomisticGenericJob
 from pyiron_base.storage.datacontainer import DataContainer
 from pyiron_atomistics.lammps.potential import LammpsPotentialFile
-from pyiron_atomistics.lammps.base import Input
+from pyiron_contrib.atomistics.mlip.lammps import LammpsMlip, MlipInput
 
 import numpy as np
+import pandas as pd
 import xml.etree.ElementTree as ET
 import subprocess
 import os
@@ -20,16 +21,16 @@ __version__ = "0.0"
 __maintainer__ = "Raynol Dsouza"
 __email__ = "dsouza@mpie.de"
 __status__ = "development"
-__date__ = "Aug 16, 2022"
+__date__ = "Aug 19, 2022"
 
 
-class Piglet(AtomisticGenericJob):
+class PigletMlip(LammpsMlip):
     
     def __init__(self, project, job_name):
-        super(Piglet, self).__init__(project, job_name)
-        self.potential_input = Input()
-        self.input = DataContainer(table_name='inp')
-        self.output = DataContainer(table_name='out')
+        super(PigletMlip, self).__init__(project, job_name)
+        self.input = MlipInput()
+        self.custom_input = DataContainer(table_name='custom_inp')
+        self.custom_output = DataContainer(table_name='custom_out')
         self._templates_directory = None
         
     @property
@@ -42,7 +43,7 @@ class Piglet(AtomisticGenericJob):
     
     @property
     def potential(self):
-        return self.potential_input.potential.df
+        return self.input.potential.df
         
     @potential.setter
     def potential(self, potential_filename):
@@ -56,25 +57,25 @@ class Piglet(AtomisticGenericJob):
             potential = potential_filename
         else:
             raise TypeError("Potentials have to be strings or pandas dataframes.")
-        self.potential_input.potential.df = potential
+        self.input.potential.df = potential
         
     def calc_npt_md(self, temperature=300., pressure=101325e-9, n_beads=4, timestep=1., damping_timescale=100., 
                     n_ionic_steps=100, n_print=1, seed=32345, port=31415, A=None, C=None):
-        self.input.temperature = temperature
-        self.input.pressure = pressure
-        self.input.n_beads = n_beads
-        self.input.timestep = timestep
-        self.input.damping_timescale = damping_timescale
-        self.input.n_ionic_steps = n_ionic_steps
-        self.input.n_print = n_print
-        self.input.seed = seed
-        self.input.port = port
-        self.input.A = A
-        self.input.C = C
+        self.custom_input.temperature = temperature
+        self.custom_input.pressure = pressure
+        self.custom_input.n_beads = n_beads
+        self.custom_input.timestep = timestep
+        self.custom_input.damping_timescale = damping_timescale
+        self.custom_input.n_ionic_steps = n_ionic_steps
+        self.custom_input.n_print = n_print
+        self.custom_input.seed = seed
+        self.custom_input.port = port
+        self.custom_input.A = A
+        self.custom_input.C = C
         
     def write_potential(self):
-        self.potential_input.potential.write_file(file_name="potential.inp", cwd=self.working_directory)
-        self.potential_input.potential.copy_pot_files(self.working_directory)
+        self.input.potential.write_file(file_name="potential.inp", cwd=self.working_directory)
+        self.input.potential.copy_pot_files(self.working_directory)
         
     def write_init_xyz(self):
         filepath = self.working_directory + '/init.xyz'
@@ -106,7 +107,7 @@ class Piglet(AtomisticGenericJob):
                "read_data \t data.lmp\n" + \
                "mass \t 1 " + str(mass) + "\n\n" + \
                "include potential.inp\n\n" + \
-               "fix \t 1 all ipi " + self.job_name + " " + str(self.input.port) + " unix\n" + \
+               "fix \t 1 all ipi " + self.job_name + " " + str(self.custom_input.port) + " unix\n" + \
                "run \t 5000000"
         with open(filepath, 'w') as file:
             file.writelines(data)
@@ -116,21 +117,21 @@ class Piglet(AtomisticGenericJob):
         root = tree.getroot()
         filepath = self.working_directory + '/ipi_input.xml'
         for i in range(4):
-            root[0][i].attrib['stride'] = str(self.input.n_print)
-        root[1].text = str(self.input.n_ionic_steps)
-        root[2][0].text = str(self.input.seed)
+            root[0][i].attrib['stride'] = str(self.custom_input.n_print)
+        root[1].text = str(self.custom_input.n_ionic_steps)
+        root[2][0].text = str(self.custom_input.seed)
         root[3][0].text = self.job_name
-        root[4][0].attrib['nbeads'] = str(self.input.n_beads)
+        root[4][0].attrib['nbeads'] = str(self.custom_input.n_beads)
         root[4][0][0].text = 'init.xyz'
-        root[4][0][1].text = str(self.input.temperature)
-        root[4][2][0][0][0].text = str(self.input.damping_timescale)
+        root[4][0][1].text = str(self.custom_input.temperature)
+        root[4][2][0][0][0].text = str(self.custom_input.damping_timescale)
         for i in range(2):
-            root[4][2][0][1][i].attrib['shape'] = str((self.input.n_beads,9,9))
-        root[4][2][0][1][0].text = str(self.input.A)
-        root[4][2][0][1][1].text = str(self.input.C)
-        root[4][2][0][2].text = str(self.input.timestep)
-        root[4][3][0].text = str(self.input.temperature)
-        root[4][3][1].text = str(self.input.pressure)
+            root[4][2][0][1][i].attrib['shape'] = str((self.custom_input.n_beads,9,9))
+        root[4][2][0][1][0].text = str(self.custom_input.A)
+        root[4][2][0][1][1].text = str(self.custom_input.C)
+        root[4][2][0][2].text = str(self.custom_input.timestep)
+        root[4][3][0].text = str(self.custom_input.temperature)
+        root[4][3][1].text = str(self.custom_input.pressure)
         tree.write(filepath)
         
     @staticmethod
@@ -144,6 +145,7 @@ class Piglet(AtomisticGenericJob):
     def write_input(self):
         if not os.path.isdir(self.working_directory): 
             self.project_hdf5.create_working_directory()
+        super(PigletMlip, self).write_input()
         self.write_potential()
         self.write_init_xyz()
         self.write_data_lmp()
@@ -163,44 +165,59 @@ class Piglet(AtomisticGenericJob):
         return np.array([float(i) for i in rdf_r]), np.array([float(i) for i in rdf_g_r])
         
     def collect_props(self):
-        f=open(self.working_directory + '/ipi_out.out', "r")
+        f = open(self.working_directory + '/ipi_out.out', "r")
         lines=f.readlines()
-        self.output.time=[]
-        self.output.temperature=[]
-        self.output.en_kin=[]
-        self.output.en_pot=[]
-        self.output.volume=[]
-        self.output.pressure=[]
+        time=[]
+        temperature=[]
+        en_kin=[]
+        en_pot=[]
+        volume=[]
+        pressure=[]
         for x in lines:
             if not x.startswith('#'):
-                self.output.time.append(x.split()[1])
-                self.output.temperature.append(x.split()[2])
-                self.output.en_kin.append(x.split()[3])
-                self.output.en_pot.append(x.split()[4])
-                self.output.volume.append(x.split()[5])
-                self.output.pressure.append(x.split()[6])
+                time.append(x.split()[1])
+                temperature.append(x.split()[2])
+                en_kin.append(x.split()[3])
+                en_pot.append(x.split()[4])
+                volume.append(x.split()[5])
+                pressure.append(x.split()[6])
         f.close()
-        self.output.time = np.array([float(i) for i in self.output.time])
-        self.output.temperature = np.array([float(i) for i in self.output.temperature])
-        self.output.en_kin = np.array([float(i) for i in self.output.en_kin])
-        self.output.en_pot = np.array([float(i) for i in self.output.en_pot])
-        self.output.volume = np.array([float(i) for i in self.output.volume])
-        self.output.pressure = np.array([float(i) for i in self.output.pressure])
-        self.output.en_tot = self.output.en_pot + self.output.en_kin
+        self.custom_output.time = np.array([float(i) for i in time])
+        self.custom_output.temperature = np.array([float(i) for i in temperature])
+        self.custom_output.en_kin = np.array([float(i) for i in en_kin])
+        self.custom_output.en_pot = np.array([float(i) for i in en_pot])
+        self.custom_output.volume = np.array([float(i) for i in volume])
+        self.custom_output.pressure = np.array([float(i) for i in pressure])
+        self.custom_output.en_tot = self.custom_output.en_pot + self.custom_output.en_kin
+        
+    def collect_cells(self):
+        f = open(self.working_directory + '/ipi_out.pos_0.xyz')
+        lines=f.readlines()
+        abc = []
+        ABC = []
+        for x in lines:
+            if x.startswith("#"):
+                split_line = x.split()
+                abc.append([float(i) for i in split_line[2:5]])
+                ABC.append([float(i) for i in split_line[5:8]])
+        f.close()
+        self.custom_output.cell_abc = np.array(abc)
+        self.custom_output.cell_ABC = np.array(ABC)
         
     def collect_output(self):
         self.collect_props()
+        self.collect_cells()
         self.compress()
         
     def get_rdf(self, r_min=2., r_max=5., bins=100, thermalize=50):
         self.decompress()
         rdf_list = [self.working_directory + '/./run_rdf.sh', 
                     self.working_directory,
-                    str(self.input.temperature),
+                    str(self.custom_input.temperature),
                     self.structure.get_chemical_symbols()[0], self.structure.get_chemical_symbols()[0],
-                    str(bins),
-                    str(r_min), str(r_max),
-                    str(thermalize)]
+                    str(rdf_bins),
+                    str(rdf_r_min), str(rdf_r_max),
+                    str(rdf_thermalize)]
         subprocess.check_call(rdf_list)
         rdf_r, rdf_g_r = self.collect_rdf()
         self.compress()
@@ -212,15 +229,15 @@ class Piglet(AtomisticGenericJob):
         self.to_hdf()
         
     def to_hdf(self, hdf=None, group_name=None):
-        super(Piglet, self).to_hdf(hdf=hdf, group_name=group_name)
+        super(PigletMlip, self).to_hdf(hdf=hdf, group_name=group_name)
         self._structure_to_hdf()
-        self.input.templates_directory = self._templates_directory
-        self.input.to_hdf(self._hdf5)
-        self.output.to_hdf(self._hdf5)
+        self.custom_input.templates_directory = self._templates_directory
+        self.custom_input.to_hdf(self._hdf5)
+        self.custom_output.to_hdf(self._hdf5)
 
     def from_hdf(self, hdf=None, group_name=None):
-        super(Piglet, self).from_hdf(hdf=hdf, group_name=group_name)
+        super(PigletMlip, self).from_hdf(hdf=hdf, group_name=group_name)
         self._structure_from_hdf()
-        self.input.from_hdf(self._hdf5)
-        self._templates_directory = self.input.templates_directory
-        self.output.from_hdf(self._hdf5)
+        self.custom_input.from_hdf(self._hdf5)
+        self._templates_directory = self.custom_input.templates_directory
+        self.custom_output.from_hdf(self._hdf5)

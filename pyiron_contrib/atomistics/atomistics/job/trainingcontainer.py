@@ -39,9 +39,9 @@ import matplotlib.pyplot as plt
 
 from ase.atoms import Atoms as ASEAtoms
 
-from pyiron_contrib.atomistics.atomistics.job.structurestorage import StructureStorage
 from pyiron_atomistics.atomistics.structure.atoms import Atoms
 from pyiron_atomistics.atomistics.structure.has_structure import HasStructure
+from pyiron_atomistics.atomistics.structure.structurestorage import StructureStorage, StructurePlots
 from pyiron_atomistics.atomistics.structure.neighbors import NeighborsTrajectory
 from pyiron_base import GenericJob, DataContainer, deprecate
 
@@ -273,7 +273,7 @@ class TrainingContainer(GenericJob, HasStructure):
         """
         :class:`.TrainingPlots`: plotting interface
         """
-        return TrainingPlots(self._container)
+        return self._container.plot
 
     def iter(self, *arrays, wrap_atoms=True):
         """
@@ -290,159 +290,10 @@ class TrainingContainer(GenericJob, HasStructure):
         yield from self._container.iter(*arrays, wrap_atoms=wrap_atoms)
 
 
-class TrainingPlots:
+class TrainingPlots(StructurePlots):
     """
     Simple interface to plot various properties of the structures inside the given :class:`.TrainingContainer`.
     """
-
-    __slots__ = "_train"
-
-    def __init__(self, train):
-        self._train = train
-
-    def _calc_spacegroups(self, symprec=1e-3):
-        """
-        Calculate space groups of all structures.
-
-        Args:
-            symprec (float): symmetry precision given to spglib
-
-        Returns:
-            DataFrame: contains columns 'crystal_system' (str) and 'space_group' (int) for each structure
-        """
-
-        def get_crystal_system(num):
-            if num in range(1, 3):
-                return "triclinic"
-            elif num in range(3, 16):
-                return "monoclinic"
-            elif num in range(16, 75):
-                return "orthorombic"
-            elif num in range(75, 143):
-                return "trigonal"
-            elif num in range(143, 168):
-                return "tetragonal"
-            elif num in range(168, 195):
-                return "hexagonal"
-            elif num in range(195, 230):
-                return "cubic"
-
-        def extract(s):
-            spg = s.get_symmetry(symprec=symprec).spacegroup["Number"]
-            return {"space_group": spg, "crystal_system": get_crystal_system(spg)}
-
-        return pd.DataFrame(map(extract, self._train.iter_structures()))
-
-    def cell(self, angle_in_degrees=True):
-        """
-        Plot histograms of cell parameters.
-
-        Plotted are atomic volume, density, cell vector lengths and cell vector angles in separate subplots all on a
-        log-scale.
-
-        Args:
-            angle_in_degrees (bool): whether unit for angles is degree or radians
-
-        Returns:
-            `DataFrame`: contains the plotted information in the columns:
-                            - a: length of first vector
-                            - b: length of second vector
-                            - c: length of third vector
-                            - alpha: angle between first and second vector
-                            - beta: angle between second and third vector
-                            - gamma: angle between third and first vector
-                            - V: volume of the cell
-                            - N: number of atoms in the cell
-        """
-        N = self._train.get_array("length")
-        C = self._train.get_array("cell")
-
-        def get_angle(cell, idx=0):
-            return np.arccos(
-                np.dot(cell[idx], cell[(idx + 1) % 3])
-                / np.linalg.norm(cell[idx])
-                / np.linalg.norm(cell[(idx + 1) % 3])
-            )
-
-        def extract(n, c):
-            return {
-                "a": np.linalg.norm(c[0]),
-                "b": np.linalg.norm(c[1]),
-                "c": np.linalg.norm(c[2]),
-                "alpha": get_angle(c, 0),
-                "beta": get_angle(c, 1),
-                "gamma": get_angle(c, 2),
-            }
-
-        df = pd.DataFrame([extract(n, c) for n, c in zip(N, C)])
-        df["V"] = np.linalg.det(C)
-        df["N"] = N
-        if angle_in_degrees:
-            df["alpha"] = np.rad2deg(df["alpha"])
-            df["beta"] = np.rad2deg(df["beta"])
-            df["gamma"] = np.rad2deg(df["gamma"])
-
-        plt.subplot(1, 4, 1)
-        plt.title("Atomic Volume")
-        plt.hist(df.V / df.N, bins=20, log=True)
-        plt.xlabel(r"$V$ [$\AA^3$]")
-
-        plt.subplot(1, 4, 2)
-        plt.title("Density")
-        plt.hist(df.N / df.V, bins=20, log=True)
-        plt.xlabel(r"$\rho$ [$\AA^{-3}$]")
-
-        plt.subplot(1, 4, 3)
-        plt.title("Lattice Vector Lengths")
-        plt.hist([df.a, df.b, df.c], log=True)
-        plt.xlabel(r"$a,b,c$ [$\AA$]")
-
-        plt.subplot(1, 4, 4)
-        plt.title("Lattice Vector Angles")
-        plt.hist([df.alpha, df.beta, df.gamma], log=True)
-        if angle_in_degrees:
-            label = r"$\alpha,\beta,\gamma$ [°]"
-        else:
-            label = r"$\alpha,\beta,\gamma$ [rad]"
-        plt.xlabel(label)
-
-        return df
-
-    def spacegroups(self, symprec=1e-3):
-        """
-        Plot histograms of space groups and crystal systems.
-
-        Spacegroups and crystal systems are plotted in separate subplots.
-
-        Args:
-            symprec (float): precision of the symmetry search (passed to spglib)
-
-        Returns:
-            DataFrame: contains two columns "space_group", "crystal_system"
-                       for each structure in `train`
-        """
-
-        df = self._calc_spacegroups(symprec=symprec)
-        plt.subplot(1, 2, 1)
-        plt.hist(df.space_group, bins=230)
-        plt.xlabel("Space Group")
-
-        plt.subplot(1, 2, 2)
-        l, h = np.unique(df.crystal_system, return_counts=True)
-        sort_key = {
-            "triclinic": 1,
-            "monoclinic": 3,
-            "orthorombic": 16,
-            "trigonal": 75,
-            "tetragonal": 143,
-            "hexagonal": 168,
-            "cubic": 195,
-        }
-        I = np.argsort([sort_key[ll] for ll in l])
-        plt.bar(l[I], h[I])
-        plt.xlabel("Crystal System")
-        plt.xticks(rotation=35)
-        return df
 
     def energy_volume(self, crystal_systems=False):
         """
@@ -458,9 +309,9 @@ class TrainingPlots:
                        also contain space groups and crystal systems of each structure
         """
 
-        N = self._train.get_array("length")
-        E = self._train.get_array("energy") / N
-        C = self._train.get_array("cell")
+        N = self._store.get_array("length")
+        E = self._store.get_array("energy") / N
+        C = self._store.get_array("cell")
         V = np.linalg.det(C) / N
 
         df = pd.DataFrame({"V": V, "E": E})
@@ -478,63 +329,6 @@ class TrainingPlots:
 
         return df
 
-    def coordination(self, num_shells=4, log=True):
-        """
-        Plot histogram of coordination in neighbor shells.
-
-        Computes one histogram of the number of neighbors in each neighbor shell up to `num_shells` and then plots them
-        together.
-
-        Args:
-            num_shells (int): maximum shell to plot
-            log (float): plot histogram values on a log scale
-        """
-        if not self._train.has_array("shells"):
-            raise ValueError(
-                "TrainingContainer contains no neighbor information, call TrainingContainer.get_neighbors first!"
-            )
-        shells = self._train.get_array("shells")
-        shell_index = (
-            shells[np.newaxis, :, :]
-            == np.arange(1, num_shells + 1)[:, np.newaxis, np.newaxis]
-        )
-        neigh_count = shell_index.sum(axis=-1)
-        ticks = np.arange(neigh_count.min(), neigh_count.max() + 1)
-        plt.hist(
-            neigh_count.T,
-            bins=ticks - 0.5,
-            log=True,
-            label=[f"{i}." for i in range(1, num_shells + 1)],
-        )
-        plt.xticks(ticks)
-        plt.xlabel("Number of Neighbors")
-        plt.legend(title="Shell")
-        plt.title("Neighbor Coordination in Shells")
-
-    def shell_distances(self, num_shells=4):
-        """
-        Plot a violin plot of the neighbor distances in shells up to `num_shells`.
-
-        Args:
-            num_shells (int): maximum shell to plot
-        """
-        if not self._train.has_array("shells") or not self._train.has_array(
-            "distances"
-        ):
-            raise ValueError(
-                "TrainingContainer contains no neighbor information, call TrainingContainer.get_neighbors first!"
-            )
-        dists = self._train.get_array("distances")
-        R = dists.flatten()
-        shells = self._train.get_array("shells")
-        S = shells.ravel()
-        d = pd.DataFrame(
-            {"distance": R[S < num_shells + 1], "shells": S[S < num_shells + 1]}
-        )
-        sns.violinplot(y=d.shells, x=d.distance, scale="width", orient="h")
-        plt.xlabel(r"Distance [$\AA$]")
-        plt.ylabel("Shell")
-
     def forces(self, axis: Optional[int] = None):
         """
         Plot a histogram of all forces.
@@ -542,7 +336,7 @@ class TrainingPlots:
         Args:
             axis (int, optional): plot only forces along this axis, if not given plot all forces
         """
-        f = self._train.get_array("forces")
+        f = self._store.get_array("forces")
         if axis is not None:
             f = f[:, axis]
         else:
@@ -766,4 +560,6 @@ class TrainingStorage(StructureStorage):
         """
         :class:`.TrainingPlots`: plotting interface
         """
-        return TrainingPlots(self)
+        if self._plots is None:
+            self._plots = TrainingPlots(self)
+        return self._plots

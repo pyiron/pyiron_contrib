@@ -103,7 +103,7 @@ class MeamFit(GenericJob):
 
     def validate_ready_to_run(self):
         if self._calculation_dataframe.empty:
-            raise ValueError()   
+            raise ValueError("No training data added yet!")   
           
     def write_input(self):
         """

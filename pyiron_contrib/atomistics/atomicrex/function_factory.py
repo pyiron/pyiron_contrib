@@ -166,7 +166,7 @@ class FunctionFactory(PyironFactory):
 
     @staticmethod
     def x_pow_n_cutoff(
-        identifier, cutoff, h=1, N=4, species=["*"], is_screening_function=True
+        identifier, cutoff, h=1, N=4, species=["*", "*"], is_screening_function=True
     ):
         return XpowNCutoff(
             identifier=identifier,
@@ -246,6 +246,28 @@ class FunctionFactory(PyironFactory):
     @staticmethod
     def MishinCuF(identifier, F0, F2, q1, q2, q3, q4, Q1, Q2, species=["*"]):
         return MishinCuF(identifier, F0, F2, q1, q2, q3, q4, Q1, Q2, species)
+
+    @staticmethod
+    def extendedMishinCuF(
+        identifier, F0, F2, f3, f4, f5, f6, a3, a4, a5, a6, d3, d4, d5, species=["*"]
+    ):
+        return ExtendedMishinCuF(
+            identifier=identifier,
+            F0=F0,
+            F2=F2,
+            f3=f3,
+            f4=f4,
+            f5=f5,
+            f6=f6,
+            a3=a3,
+            a4=a4,
+            a5=a5,
+            a6=a6,
+            d3=d3,
+            d4=d4,
+            d5=d5,
+            species=species,
+        )
 
     @staticmethod
     def RsMinusRPowN(identifier, S, rs, N, species=["*", "*"], cutoff=None):
@@ -988,6 +1010,7 @@ class RsMinusRPowN(SpecialFunction):
         super().__init__(
             identifier, species=species, is_screening_function=is_screening_function
         )
+        self.cutoff = cutoff
         self.parameters.add_parameter(
             "S",
             start_val=S,
@@ -1185,6 +1208,96 @@ class MishinCuF(SpecialFunction):
 
     def _to_xml_element(self):
         return super()._to_xml_element(name="Mishin-Cu-F")
+
+
+class ExtendedMishinCuF(SpecialFunction):
+    def __init__(
+        self,
+        identifier=None,
+        F0=None,
+        F2=None,
+        f3=None,
+        f4=None,
+        f5=None,
+        f6=None,
+        a3=None,
+        a4=None,
+        a5=None,
+        a6=None,
+        d3=None,
+        d4=None,
+        d5=None,
+        species=["*"],
+    ):
+        super().__init__(identifier, species=species, is_screening_function=False)
+        self.parameters.add_parameter(
+            "F0",
+            start_val=F0,
+            enabled=True,
+        )
+        self.parameters.add_parameter(
+            "F2",
+            start_val=F2,
+            enabled=True,
+        )
+        self.parameters.add_parameter(
+            "f3",
+            start_val=f3,
+            enabled=True,
+        )
+        self.parameters.add_parameter(
+            "f4",
+            start_val=f4,
+            enabled=True,
+        )
+        self.parameters.add_parameter(
+            "f5",
+            start_val=f5,
+            enabled=True,
+        )
+        self.parameters.add_parameter(
+            "f6",
+            start_val=f6,
+            enabled=True,
+        )
+        self.parameters.add_parameter(
+            "a3",
+            start_val=a3,
+            enabled=True,
+        )
+        self.parameters.add_parameter(
+            "a4",
+            start_val=a4,
+            enabled=True,
+        )
+        self.parameters.add_parameter(
+            "a5",
+            start_val=a5,
+            enabled=True,
+        )
+        self.parameters.add_parameter(
+            "a6",
+            start_val=a6,
+            enabled=True,
+        )
+        self.parameters.add_parameter(
+            "d3",
+            start_val=d3,
+            enabled=True,
+        )
+        self.parameters.add_parameter(
+            "d4",
+            start_val=d4,
+            enabled=True,
+        )
+        self.parameters.add_parameter(
+            "d5",
+            start_val=d5,
+            enabled=True,
+        )
+
+    def _to_xml_element(self):
+        return super()._to_xml_element(name="Extended-Mishin-Cu-F")
 
 
 class UserFunction(DataContainer, BaseFunctionMixin):

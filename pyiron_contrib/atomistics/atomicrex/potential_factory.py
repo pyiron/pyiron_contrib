@@ -791,25 +791,37 @@ class EAMPotential(AbstractPotential, EAMlikeMixin):
             squeeze=False,
         )
         for i, (el, pot_dict) in enumerate(elements.items()):
-            for j, (pot, y) in enumerate(pot_dict.items()):
+            V_count = 0
+            rho_count = 0
+            for pot, y in pot_dict.items():
                 if pot == "F":
                     xdata = rho_values
                     xlabel = "$\\rho $ [a.u.]"
                     k = 0
-                    ylim = (-5, 5)
+                    ylim = (np.min(y) - 0.5, 5)
+                    ax[i * 3 + k, 0].plot(xdata, y)
+                    ax[i * 3 + k, 0].set(ylim=ylim, title=f"{el} {pot}", xlabel=xlabel)
                 elif "rho" in pot:
                     xdata = r_values
                     xlabel = "r [$\AA$]"
                     k = 1
-                    ylim = (-0.2, 1)
+                    ylim = (np.min(y) - 0.1, 1)
+                    ax[i * 3 + k, rho_count].plot(xdata, y)
+                    ax[i * 3 + k, rho_count].set(
+                        ylim=ylim, title=f"{el} {pot}", xlabel=xlabel
+                    )
+                    rho_count += 1
                 elif "V" in pot:
                     xdata = r_values[1:]
                     y = y[1:]
                     xlabel = "r [$\AA$]"
                     k = 2
-                    ylim = (-2, 2)
-                ax[i + k, 0].plot(xdata, y)
-                ax[i + k, 0].set(ylim=ylim, title=f"{el} {pot}", xlabel=xlabel)
+                    ylim = (np.min(y) - 0.1, 2)
+                    ax[i * 3 + k, V_count].plot(xdata, y)
+                    ax[i * 3 + k, V_count].set(
+                        ylim=ylim, title=f"{el} {pot}", xlabel=xlabel
+                    )
+                    V_count += 1
         return fig, ax
 
     def count_local_extrema(

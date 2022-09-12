@@ -143,6 +143,9 @@ class MeamFit(GenericJob):
         Raises:
             ValueError: if given job is a not a Vasp job
         """
+        job = self.project.load(job_id)
+        if job.__name__ != "Vasp":
+            raise ValueError("Training data must be from VASP jobs!")
         if time_step_end == -1:
             time_step_end = np.shape(self.project.inspect(int(job_id))['output/generic/cells'])[0]-1
         if int(job_id) in [int(job) for job in self._calculation_dataframe.index]:

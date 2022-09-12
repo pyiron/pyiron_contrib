@@ -93,7 +93,24 @@ class MeamFit(GenericJob):
     @random_seed.setter
     def random_seed(self, seed):
         self.input['SEED'] = seed
-
+        
+    @property
+    def publication(self):
+        return {
+            "MeamFit": [
+                {
+                    "title": "MEAMfit: A reference-free modified embedded atom method (RF-MEAM) energy and force-fitting code",
+                    "journal": "Computer Physics Communications",
+                    "volume": "196",
+                    "year": "2015",
+                    "doi": "10.1016/j.cpc.2015.05.016",
+                    "url": "https://doi.org/10.1016/j.cpc.2015.05.016",
+                    "author": ["Andrew Ian Duff", "M.W. Finnis", "Philippe Maugis", "Barend J. Thijsse", "Marcel H.F. Sluiter"],
+                },
+            ]
+        }
+      
+      
     def set_input_to_read_only(self):
         """
         This function enforces read-only mode for the input classes, but it has to be implement in the individual
@@ -137,8 +154,6 @@ class MeamFit(GenericJob):
                              Note that only the first two letters are in fact read in by MEAMfit, so that it is sufficient to
                              write ‘Fr’ or ‘Fo’ for the second and third cases respectively.  
             weight (list): default is [1.0, 0.0, 0.0].
-            
-            More information on these parameters are available in the MeamFit user manual- https://www.scd.stfc.ac.uk/Pages/MEAMfit-v2.aspx
 
         Raises:
             ValueError: if given job is a not a Vasp job

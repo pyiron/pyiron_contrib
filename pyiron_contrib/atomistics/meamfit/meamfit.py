@@ -161,11 +161,12 @@ class MeamFit(GenericJob):
 
     def _copy_vasprun_xml(self, cwd=None):
         for job_id in self._calculation_dataframe.index:
-            self.project.load(job_id).decompress()
+            job = self.project.load(job_id)
+            job.decompress()
             working_directory = self.project.get_job_working_directory(int(job_id))
             shutil.copyfile(posixpath.join(working_directory, 'vasprun.xml'),
                             posixpath.join(cwd, 'vasprun_' + str(int(job_id)) + '.xml'))
-            self.project.load(job_id).compress()
+            job.compress()
 
     @staticmethod
     def _write_calc_db(calculation_dataframe, file_name="fitdbse", cwd=None):

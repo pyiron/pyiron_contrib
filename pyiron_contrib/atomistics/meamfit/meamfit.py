@@ -123,6 +123,7 @@ class MeamFit(GenericJob):
     def add_job_to_fitting(self, job_id, time_step_start=0, time_step_end=-1, time_step_delta=10, quantity='E0',
                            weight=[1.0, 0.0, 0.0]):
         """
+        Add output of VASP jobs to training data.
 
         Args:
             job_id (int): job_id of the vasp MD job you want to use for potential fitting.
@@ -139,8 +140,8 @@ class MeamFit(GenericJob):
             
             More information on these parameters are available in the MeamFit user manual- https://www.scd.stfc.ac.uk/Pages/MEAMfit-v2.aspx
 
-        Returns:
-
+        Raises:
+            ValueError: if given job is a not a Vasp job
         """
         if time_step_end == -1:
             time_step_end = np.shape(self.project.inspect(int(job_id))['output/generic/cells'])[0]-1

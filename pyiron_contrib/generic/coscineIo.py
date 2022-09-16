@@ -93,6 +93,15 @@ class CoscineResource(StorageInterface):
         # Right now a coscine resource is flat.
         return []
 
+    def is_dir(self, item):
+        return False
+
+    def is_file(self, item):
+        if item in self.list_nodes():
+            return True
+        else:
+            return False
+
     def remove_file(self, item):
         file_obj = self._get_one_file_obj(item, error_msg=f"Multiple matches found for item = {item}, aborting remove!")
         if file_obj is not None:

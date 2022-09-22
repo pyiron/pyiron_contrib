@@ -403,7 +403,7 @@ class TrainingStorage(StructureStorage):
         pp = job["output/generic/stresses"]
         if pp is None:
             pp = job.output.pressures
-        if pp is not None:
+        if pp is not None and len(pp) > 0:
             stress = pp[iteration_step]
         else:
             stress = None

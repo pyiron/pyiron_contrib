@@ -42,7 +42,7 @@ from runnerase.storageclasses import (RunnerSymmetryFunctionValues,
                                       RunnerFitResults,
                                       RunnerWeights, RunnerScaling)
 from pyiron_base import ProjectHDFio
-from pyiron_base.interfaces.has_hdf import HasHDF
+from pyiron_base import HasHDF
 from pyiron_base import FlattenedStorage
 
 from .utils import pad, unpad

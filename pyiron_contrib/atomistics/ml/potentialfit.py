@@ -104,15 +104,15 @@ class PotentialFit(abc.ABC):
 
 class PotentialPlots:
     def __init__(self, training_data, predicted_data):
-        self.training_data = training_data
-        self.predicted_data = predicted_data
+        self._training_data = training_data
+        self._predicted_data = predicted_data
 
     def energy_scatter_histogram(self):
         """
         Plots correlation and (training) error histograms.
         """
-        energy_train = self.training_data["energy"] / self.training_data["length"]
-        energy_pred = self.predicted_data["energy"] / self.predicted_data["length"]
+        energy_train = self._training_data["energy"] / self._training_data["length"]
+        energy_pred = self._predicted_data["energy"] / self._predicted_data["length"]
         plt.subplot(1, 2, 1)
         plt.scatter(energy_train, energy_pred)
 
@@ -132,8 +132,8 @@ class PotentialPlots:
             axis (None, int): Whether to plot for an axis or norm
 
         """
-        force_train = self.training_data["forces"]
-        force_pred = self.predicted_data["forces"]
+        force_train = self._training_data["forces"]
+        force_pred = self._predicted_data["forces"]
 
         if axis is None:
             ft = np.linalg.norm(force_train, axis=1)

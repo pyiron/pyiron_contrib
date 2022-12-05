@@ -52,10 +52,10 @@ class TestTrainingContainer(TestWithCleanProject):
 
         container_from_hdf = self.project.load("test")
 
-        self.assertEqual(len(self.container._table), len(container_from_hdf._table),
+        self.assertEqual(len(self.container.to_pandas()), len(container_from_hdf.to_pandas()),
                          "Container has different number of structures after reading/writing.")
 
-        for i in range(len(self.container._table)):
+        for i in range(len(self.container.to_pandas())):
             self.assertEqual(self.container.get_structure(i), container_from_hdf.get_structure(i),
                              f"{i}th structure not the same after reading/writing.")
             self.assertTrue((self.container._container.get_array("energy", i) \

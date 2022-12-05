@@ -1,7 +1,7 @@
 import posixpath, os, time
 
 from scipy import optimize
-from pyiron_base.job.interactive import InteractiveBase
+from pyiron_base import InteractiveBase
 
 from pyiron_contrib.atomistics.atomicrex.general_input import ScipyAlgorithm
 from pyiron_contrib.atomistics.atomicrex.base import AtomicrexBase

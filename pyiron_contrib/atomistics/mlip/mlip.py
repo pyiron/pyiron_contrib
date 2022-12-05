@@ -112,6 +112,8 @@ class Mlip(GenericJob, PotentialFit):
                                     "pair_coeff * *\n"
                         ]]
             })
+        else:
+            raise ValueError(f"Potential only available after job is finished, not {self.status}!")
 
     @property
     def potential(self):
@@ -374,7 +376,7 @@ class Mlip(GenericJob, PotentialFit):
                     if job._container.has_array("stress"):
                         volume = np.abs(np.linalg.det(cell_lst[-1]))
                         stress_lst.append(job._container.get_array("stress", time_step) * volume)
-                        if np.isnan(stress_lst[-1]):
+                        if np.isnan(stress_lst[-1]).any():
                             stress_lst[-1] = None
                     track_lst.append(str(ham.job_id) + '_' + str(time_step))
                 continue

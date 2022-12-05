@@ -33,7 +33,7 @@ from runnerase.defaultoptions import DEFAULT_PARAMETERS
 from pyiron import Project
 from pyiron_base import ProjectHDFio, FlattenedStorage
 from pyiron_base import state, Executable, GenericJob, DataContainer
-from pyiron_base.generic.object import HasStorage
+from pyiron_base import HasStorage
 
 from pyiron_contrib.atomistics.ml.potentialfit import PotentialFit
 from pyiron_contrib.atomistics.atomistics.job import (TrainingContainer,

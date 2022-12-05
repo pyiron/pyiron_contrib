@@ -8,7 +8,7 @@ dependencies:
 - matplotlib =3.6.2
 - numpy =1.23.5
 - pyiron_base =0.5.30
-- pyiron_atomistics =0.2.58
+- pyiron_atomistics =0.2.60
 - pyparsing =3.0.9
 - scipy =1.9.3
 - seaborn =0.12.1

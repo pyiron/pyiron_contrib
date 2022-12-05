@@ -112,6 +112,8 @@ class Mlip(GenericJob, PotentialFit):
                                     "pair_coeff * *\n"
                         ]]
             })
+        else:
+            raise ValueError(f"Potential only available after job is finished, not {self.status}!")
 
     @property
     def potential(self):

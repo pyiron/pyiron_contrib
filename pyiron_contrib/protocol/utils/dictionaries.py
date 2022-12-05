@@ -7,7 +7,7 @@ import numpy as np
 from collections import OrderedDict
 from pyiron_contrib.protocol.utils.pointer import Pointer
 from pyiron_contrib.protocol.utils.misc import  LoggerMixin, fullname
-from pyiron.atomistics.structure.atoms import Atoms
+from pyiron_atomistics.atomistics.structure.atoms import Atoms
 
 """
 Classes to setup input and output dataflows for protocols
@@ -265,7 +265,7 @@ class IODictionary(dict, LoggerMixin):
                     # to_hdf will get called *before* protocols have run, so the pointers in these dictionaries
                     # won't be able to resolve. For now just let it not resolve and don't save it.
                     continue
-                except (RuntimeError, OSError):
+                except (RuntimeError, OSError, TypeError):
                     # if a "key" is initialized with a primitive value and the and the graph was already saved
                     # it might happen that the "key" already exists hdf5_server[key] but is of wrong HDF5 type
                     # e.g dataset instead of group. Thus the underlying library will raise an runtime error.

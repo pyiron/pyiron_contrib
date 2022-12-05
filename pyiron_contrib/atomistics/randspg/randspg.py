@@ -7,9 +7,11 @@ from __future__ import print_function
 import os
 import posixpath
 
-from pyiron.atomistics.structure.atoms import Atoms
-from pyiron_base import GenericParameters, GenericJob
-from pyiron.vasp.structure import read_atoms
+from pyiron_atomistics.atomistics.structure.structurestorage import StructureStorage
+from pyiron_atomistics.atomistics.structure.atoms import Atoms
+from pyiron_atomistics.atomistics.structure.has_structure import HasStructure
+from pyiron_base import GenericParameters, GenericJob, deprecate
+from pyiron_atomistics.vasp.structure import read_atoms
 
 __author__ = "Jan Janssen"
 __copyright__ = "Copyright 2020, Max-Planck-Institut für Eisenforschung GmbH - " \
@@ -21,7 +23,7 @@ __status__ = "development"
 __date__ = "Sep 1, 2017"
 
 
-class RandSpg(GenericJob):
+class RandSpg(GenericJob, HasStructure):
     """
     RandSpg is a program that generates random crystals with specific space groups.
     The user inputs a specific composition and space group to be generated. The
@@ -39,19 +41,32 @@ class RandSpg(GenericJob):
         super(RandSpg, self).__init__(project, job_name)
         self.__version__ = "0.1"
         self.__name__ = "RandSpg"
-        self._lst_of_struct = []
+        self._structure_storage = StructureStorage()
         self.input = ExampleInput()
         self._executable_activate()
 
     @property
     def list_of_structures(self):
-        return self._lst_of_struct
+        return list( (self._structure_storage.get_array("identifier", i), self._structure_storage.get_structure(i))
+                            for i in range(len(self._structure_storage)) )
 
+    @deprecate("Use get_structure()/iter_structures()/list_of_structures instead!")
     def list_structures(self):
         if self.status.finished:
-            return self._lst_of_struct
+            return self.list_of_structures
         else:
             return []
+
+
+    def _number_of_structures(self):
+        return self._structure_storage._number_of_structures()
+
+    def _translate_frame(self, frame):
+        return self._structure_storage._translate_frame(frame)
+
+    def _get_structure(self, frame, wrap_atoms=True):
+        return self._structure_storage._get_structure(frame=frame, wrap_atoms=wrap_atoms)
+
 
     def set_input_to_read_only(self):
         """
@@ -81,12 +96,15 @@ class RandSpg(GenericJob):
         Args:
             file_name (str): output.log - optional
         """
-        self._lst_of_struct = [[file_name.replace('-', '_'),
-                                read_atoms(filename=posixpath.join(self.working_directory, dir_name, file_name))]
-                               for file_name in os.listdir(posixpath.join(self.working_directory, dir_name))]
-        for structure_name, structure in self._lst_of_struct:
-            with self.project_hdf5.open("output/structures/" + structure_name) as h5:
-                structure.to_hdf(h5)
+        self._structure_storage = StructureStorage() # reset saved structures
+        dir_path = posixpath.join(self.working_directory, dir_name)
+        for file_name in os.listdir(dir_path):
+            self._structure_storage.add_structure(
+                    read_atoms(filename=posixpath.join(dir_path, file_name)),
+                    identifier=file_name.replace('-', '_')
+            )
+        with self.project_hdf5.open("output") as hdf5_output:
+            self._structure_storage.to_hdf(hdf5_output)
 
     def collect_logfiles(self):
         pass
@@ -114,12 +132,9 @@ class RandSpg(GenericJob):
         super(RandSpg, self).from_hdf(hdf=hdf, group_name=group_name)
         with self.project_hdf5.open("input") as hdf5_input:
             self.input.from_hdf(hdf5_input)
-        self._lst_of_struct = []
-        with self.project_hdf5.open("output/structures") as hdf5_output:
-            structure_names = hdf5_output.list_groups()
-        for group in structure_names:
-            with self.project_hdf5.open("output/structures/" + group) as hdf5_output:
-                self._lst_of_struct.append([group, Atoms().from_hdf(hdf5_output)])
+        if self.status.finished:
+            with self.project_hdf5.open("output") as hdf5_output:
+                self._structure_storage.from_hdf(hdf5_output)
 
 
 class ExampleInput(GenericParameters):
@@ -149,3 +164,18 @@ outputDir = randSpgOut
 verbosity = r
 '''
         self.load_string(input_str)
+
+    def write_file(self, file_name, cwd=None):
+        """
+        Write GenericParameters to input file
+
+        Args:
+            file_name (str): name of the file, either absolute (then cwd must be None) or relative
+            cwd (str): path name (default: None)
+        """
+        if cwd is not None:
+            file_name = posixpath.join(cwd, file_name)
+
+        with open(file_name, "w") as f:
+            for line in self.get_string_lst():
+                f.write(line.replace("(", "").replace(")", ""))

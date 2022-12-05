@@ -30,7 +30,6 @@ class IsGEq(BoolVertex):
     """
     Checks if an input value is greater than or equal to a target threshold. Vertex state switches from 'false' to
     'true' when the target exceeds the threshold.
-
     Input attributes:
         target (float/int): The value being checked. (Default is numpy infinity.)
         threshold (float/int): What it's being checked against. (Default is zero.)
@@ -79,6 +78,40 @@ class ModIsZero(BoolVertex):
 
     def command(self, target, mod):
         if target % mod == 0:
+            self.vertex_state = "true"
+        else:
+            self.vertex_state = "false"
+
+
+class AnyVertex(BoolVertex):
+    """
+    Checks if any of the vertices in the list are true, and prints a custom string for any vertex that is true.
+
+    Input attributes:
+        vertices (list): The list of vertices.
+        print_strings (list): The list of strings to print should the associated vertex be true.
+    """
+
+    def command(self, vertices, print_strings):
+        bool_list = []
+        for i in vertices:
+            if isinstance(i, PrimitiveVertex):
+                if i.vertex_state == "true":
+                    bool_list.append(True)
+                else:
+                    bool_list.append(False)
+            else:
+                raise TypeError(str(i) + ' is not an instance of PrimitiveVertex.')
+
+        print_condition = (len(print_strings) == len(vertices))
+
+        if np.any(bool_list):
+            if bool_list[0]:
+                if print_condition:
+                    print(print_strings[0])
+            elif bool_list[1]:
+                if print_condition:
+                    print(print_strings[1])
             self.vertex_state = "true"
         else:
             self.vertex_state = "false"

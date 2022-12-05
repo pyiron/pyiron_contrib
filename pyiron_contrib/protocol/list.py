@@ -6,10 +6,11 @@ from __future__ import print_function
 from pyiron_contrib.protocol.generic import Vertex, PrimitiveVertex, CompoundVertex
 from pyiron_contrib.protocol.utils import InputDictionary, Pointer
 import numpy as np
+import time
 from abc import abstractmethod
-from multiprocessing import Process, Queue
-from pyiron.vasp.interactive import VaspInteractive
-from pyiron.sphinx.interactive import SphinxInteractive
+from multiprocessing import Process, Manager
+from pyiron_atomistics.vasp.interactive import VaspInteractive
+from pyiron_atomistics.sphinx.interactive import SphinxInteractive
 
 """
 A command class for running multiple of the same node
@@ -147,18 +148,19 @@ class ListVertex(PrimitiveVertex):
 
 class ParallelList(ListVertex):
     """
-    A list of commands which are executed in in parallel. The current implementation uses multiprocessing, which creates
-    a new python instance and uses pickle to communicate data to it. (That means objects modified in the new processes
-    don't also modify the instance we have in the parent python instance!) This all creates some overhead, and so
-    parallel is not likely to be worth calling on most
+    A list of commands which are executed in in parallel. The current implementation uses multiprocessing.Pool.
 
     Attributes:
-        queue (multiprocessing.Queue): The queue used for collecting output from the subprocesses. (Instantiation and
-            closing are handled by default in `__init__` and `finish`.)
+        pool (multiprocessing.Pool): Define the number of workers that will be utilized to run the child jobs.
+            Instantiation and closing are handled by default in `__init__` and `finish`.
+
+        Note: It is best to set the number of workers to the number of cores so as to prevent larger computation
+            times due to subprocess communication between the large number of workers in a single core.
     """
-    def __init__(self, child_type):
+
+    def __init__(self, child_type, sleep_time=0):
         super(ParallelList, self).__init__(child_type)
-        self.queue = Queue()
+        self.sleep_time = sleep_time
 
     def command(self, n_children):
         """This controls how the commands are run and is about logistics."""
@@ -168,35 +170,46 @@ class ParallelList(ListVertex):
         for child in self.children:
             child.parallel_setup()
 
-        self.queue = Queue()
-        # TODO: Instead, check if the queue is open, if not open it (I know how to close, but need to look up opening)
+        start_time = time.time()
+        sleep_time = ~self.sleep_time
 
-        # Get all the commands running at once
+        all_child_output = Manager().dict()
+
         jobs = []
-        for n, child in enumerate(self.children):
-            job = Process(target=child.execute_parallel, args=(self.queue, n, child.input.resolve()))
-            jobs.append(job)
+        for i, child in enumerate(self.children):
+            job = Process(target=child.execute_parallel, args=(i, all_child_output))
             job.start()
+            time.sleep(sleep_time)
+            jobs.append(job)
 
-        # Wait for everything to finish
         for job in jobs:
             job.join()
-        # It works fine without this, but I don't fully understand why
-        # Since there's no significant cost to add the join, I thought it's safer to be explicit
+            time.sleep(sleep_time)
 
-        # And then grab their output
-        # (n.b. the queue might be disordered, but we've made sure we have access to child number)
-        for _ in jobs:
-            n, child_output = self.queue.get()
-            self.children[n].update_and_archive(child_output)
+        print(all_child_output.keys())
 
-        # Parse output as usual
-        output_data = self._extract_output_data_from_children()
+        ordered_child_output = dict.fromkeys(range(len(all_child_output)))
+        for i in range(len(all_child_output)):
+            ordered_child_output[i] = all_child_output[i]
+
+        output_keys = list(ordered_child_output[0].keys())  # Assumes that all the children are the same...
+        if len(output_keys) > 0:
+            output_data = {}
+            for key in output_keys:
+                values = []
+                for child in ordered_child_output.values():
+                    values.append(child[key])
+                output_data[key] = values
+        else:
+            output_data = None
+
+        stop_time = time.time()
+        print('Time elapsed :', stop_time - start_time)
+
         return output_data
 
     def finish(self):
         super(ParallelList, self).finish()
-        self.queue.close()
 
 
 class SerialList(ListVertex):

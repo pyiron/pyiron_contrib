@@ -89,8 +89,8 @@ class Minimize(CompoundVertex):
             g.calc_static,
             g.force_norm,
             g.max_force,
-            g.check_force, 'true',
             g.gradient_descent,
+            g.check_force, 'true',
             g.clock,
             g.check_steps
         )
@@ -103,29 +103,36 @@ class Minimize(CompoundVertex):
         gp = Pointer(self.graph)
         ip = Pointer(self.input)
 
-        g.calc_static.input.ref_job_full_path = ip.ref_job_full_path
-        g.calc_static.input.structure = ip.structure
-        g.calc_static.input.positions = gp.gradient_descent.output.positions[-1]
-
+        # check_steps
         g.check_steps.input.target = gp.clock.output.n_counts[-1]
         g.check_steps.input.threshold = ip.n_steps
 
+        # calc_static
+        g.calc_static.input.ref_job_full_path = ip.ref_job_full_path
+        g.calc_static.input.structure = ip.structure
+        g.calc_static.input.default.positions = ip.structure.positions
+        g.calc_static.input.positions = gp.gradient_descent.output.positions[-1]
+
+        # force_norm
         g.force_norm.input.x = gp.calc_static.output.forces[-1]
         g.force_norm.input.ord = 2
         g.force_norm.input.axis = -1
 
+        # max_force
         g.max_force.input.a = gp.force_norm.output.n[-1]
 
-        g.check_force.input.target = gp.max_force.output.amax[-1]
-        g.check_force.input.threshold = ip.f_tol
-
+        # gradient_descent
         g.gradient_descent.input.default.positions = ip.structure.positions
-        g.gradient_descent.input.forces = gp.calc_static.output.forces[-1]
         g.gradient_descent.input.positions = gp.gradient_descent.output.positions[-1]
+        g.gradient_descent.input.forces = gp.calc_static.output.forces[-1]
         g.gradient_descent.input.masses = ip.structure.get_masses
         g.gradient_descent.input.gamma0 = ip.gamma0
         g.gradient_descent.input.fix_com = ip.fix_com
         g.gradient_descent.input.use_adagrad = ip.use_adagrad
+
+        # check_force
+        g.check_force.input.target = gp.max_force.output.amax[-1]
+        g.check_force.input.threshold = ip.f_tol
 
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
 
@@ -139,5 +146,5 @@ class Minimize(CompoundVertex):
         }
 
 
-class ProtocolMinimize(Protocol, Minimize):
+class ProtoMinimGradDes(Protocol, Minimize):
     pass

@@ -4,22 +4,12 @@
 
 from __future__ import print_function
 from pyiron_contrib.protocol.generic import PrimitiveVertex
-from pyiron_contrib.protocol.utils import IODictionary
 import numpy as np
-from pyiron.atomistics.job.interactive import GenericInteractive
-from pyiron.lammps.lammps import LammpsInteractive
-from scipy.constants import physical_constants
-from ase.geometry import find_mic, get_distances  # TODO: Wrap things using pyiron functionality
-from pyiron import Project
-from pyiron_contrib.protocol.utils import ensure_iterable
-from os.path import split
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from scipy.linalg import toeplitz
 
 """
 Vertices whose present application extends only to finite temperature string-based protocols.
-
-TODO: Naming consistency among vertices, e.g. `all_centroid_positions` vs `centroid_pos_list`.
 """
 
 __author__ = "Raynol Dsouza, Liam Huber"
@@ -32,7 +22,7 @@ __status__ = "development"
 __date__ = "20 July, 2019"
 
 
-class StringDistances(PrimitiveVertex):
+class _StringDistances(PrimitiveVertex):
     """
     A parent class for vertices which care about the distance from an image to various centroids on the string.
     """
@@ -45,31 +35,27 @@ class StringDistances(PrimitiveVertex):
         pass
 
     @staticmethod
-    def check_closest_to_parent(positions, centroid_positions, all_centroid_positions, cell, pbc, eps):
+    def check_closest_to_parent(structure, positions, centroid_positions, all_centroid_positions, eps):
         """
         Checks which centroid the image is closest too, then measures whether or not that closest centroid is sufficiently
-        close to the image's parent centroid.
-
+            close to the image's parent centroid.
         Args:
+            structure (Atoms): The reference structure.
             positions (numpy.ndarray): Atomic positions of this image.
             centroid_positions (numpy.ndarray): The positions of the image's centroid.
             all_centroid_positions (list/numpy.ndarray): A list of positions for all centroids in the string.
-            cell (numpy.ndarray): The 3x3 cell vectors for pbcs.
-            pbc (numpy.ndarray): Three booleans declaring which dimensions have periodic boundary conditions for finding
-                the minimum distance convention.
             eps (float): The maximum distance between the closest centroid and the parent centroid to be considered a match
                 (i.e. no recentering necessary).
-
         Returns:
             (bool): Whether the image is closest to its own parent centroid.
         """
-        distances = [np.linalg.norm(find_mic(c_pos - positions, cell, pbc)[0]) for c_pos in all_centroid_positions]
+        distances = [np.linalg.norm(structure.find_mic(c_pos - positions)) for c_pos in all_centroid_positions]
         closest_centroid_positions = all_centroid_positions[np.argmin(distances)]
-        match_distance = np.linalg.norm(find_mic(closest_centroid_positions - centroid_positions, cell, pbc)[0])
+        match_distance = np.linalg.norm(structure.find_mic(closest_centroid_positions - centroid_positions))
         return match_distance < eps
 
 
-class StringRecenter(StringDistances):
+class StringRecenter(_StringDistances):
     """
     If not, the image's positions and forces are reset to match its centroid.
 
@@ -79,9 +65,7 @@ class StringRecenter(StringDistances):
         centroid_positions (numpy.ndarray): The positions of the image's centroid.
         centroid_forces (numpy.ndarray): The forces on the image's centroid.
         all_centroid_positions (list/numpy.ndarray): A list of positions for all centroids in the string.
-        cell (numpy.ndarray): The 3x3 cell vectors for pbcs.
-        pbc (numpy.ndarray): Three booleans declaring which dimensions have periodic boundary conditions for finding
-            the minimum distance convention.
+        structure (Atoms): The reference structure.
         eps (float): The maximum distance between the closest centroid and the parent centroid to be considered a match
             (i.e. no recentering necessary). (Default is 1e-6.)
 
@@ -90,8 +74,8 @@ class StringRecenter(StringDistances):
         forces (numpy.ndarray): Either the original forces passed in, or the centroid forces.
         recentered (bool): Whether or not the image got recentered.
     """
-    def command(self, positions, forces, centroid_positions, centroid_forces, all_centroid_positions, cell, pbc, eps):
-        if self.check_closest_to_parent(positions, centroid_positions, all_centroid_positions, cell, pbc, eps):
+    def command(self, structure, positions, forces, centroid_positions, centroid_forces, all_centroid_positions, eps):
+        if self.check_closest_to_parent(structure, positions, centroid_positions, all_centroid_positions, eps):
             return {
                 'positions': positions,
                 'forces': forces,
@@ -105,7 +89,7 @@ class StringRecenter(StringDistances):
             }
 
 
-class StringReflect(StringDistances):
+class StringReflect(_StringDistances):
     """
     If not, the image's positions and forces are reset to match its centroid.
 
@@ -115,15 +99,10 @@ class StringReflect(StringDistances):
         previous_positions (numpy.ndarray): Atomic positions of the image from the previous timestep.
         previous_velocities (numpy.ndarray): Atomic velocities of the image from the previous timestep.
         centroid_positions (numpy.ndarray): The positions of the image's centroid.
-        centroid_forces (numpy.ndarray): The forces on the image's centroid.
         all_centroid_positions (list/numpy.ndarray): A list of positions for all centroids in the string.
-        cell (numpy.ndarray): The 3x3 cell vectors for pbcs.
-        pbc (numpy.ndarray): Three booleans declaring which dimensions have periodic boundary conditions for finding
-            the minimum distance convention.
+        structure (Atoms): The reference structure.
         eps (float): The maximum distance between the closest centroid and the parent centroid to be considered a match
             (i.e. no recentering necessary). (Default is 1e-6.)
-        forces (numpy.ndarray): Forces corresponding to the input state. (Default is None.)
-        previous_forces (numpy.ndarray): Forces corresponding to the previous state. (Default is None.)
 
     Output attributes:
         positions (numpy.ndarray): Either the original positions passed in, or the previous ones.
@@ -132,23 +111,19 @@ class StringReflect(StringDistances):
     """
     def __init__(self, name=None):
         super(StringReflect, self).__init__(name=name)
-        self.input.default.forces = None
-        self.input.default.previous_forces = None
 
-    def command(self, positions, velocities, previous_positions, previous_velocities, centroid_positions,
-                all_centroid_positions, cell, pbc, eps, forces, previous_forces):
-        if self.check_closest_to_parent(positions, centroid_positions, all_centroid_positions, cell, pbc, eps):
+    def command(self, structure, positions, velocities, previous_positions, previous_velocities, centroid_positions,
+                all_centroid_positions, eps):
+        if self.check_closest_to_parent(structure, positions, centroid_positions, all_centroid_positions, eps):
             return {
                 'positions': positions,
                 'velocities': velocities,
-                'forces': forces,
                 'reflected': False
             }
         else:
             return {
                 'positions': previous_positions,
                 'velocities': -previous_velocities,
-                'forces': previous_forces,
                 'reflected': True
             }
 
@@ -158,13 +133,18 @@ class PositionsRunningAverage(PrimitiveVertex):
     Calculates the running average of input positions at each call.
 
     Input attributes:
-        positions_list (list/numpy.ndarray): The instantaneous position, which will be updated to the running average
-        running_average_list (list/numpy.ndarray): List of existing running averages
-        cell (numpy.ndarray): The cell of the structure
-        pbc (numpy.ndarray): Periodic boundary condition of the structure
+        positions (list/numpy.ndarray): The instantaneous position, which will be updated to the running average.
+        running_average_positions (list/numpy.ndarray): The running average of positions.
+        total_steps (int): The total number of times `SphereReflectionPerAtom` is called so far. (Default is 0.)
+        thermalization_steps (int): Number of steps the system is thermalized for to reach equilibrium. (Default is
+            10 steps.)
+        divisor (int): The divisor for the running average positions. Increments by 1, each time the vertex is
+            called. (Default is 1.)
+        structure (Atoms): The reference structure.
 
     Output attributes:
-        running_average_list (list/numpy.ndarray): The updated running average list
+        running_average_positions (list/numpy.ndarray): The updated running average list.
+        divisor (int): The updated divisor.
 
     TODO:
         Handle non-static cells, or at least catch them.
@@ -173,84 +153,108 @@ class PositionsRunningAverage(PrimitiveVertex):
 
     def __init__(self, name=None):
         super(PositionsRunningAverage, self).__init__(name=name)
-        self._divisor = 1
+        id_ = self.input.default
+        id_.total_steps = 0
+        id_.thermalization_steps = 10
+        id_.divisor = 1
 
-    def command(self, positions_list, running_average_list, relax_endpoints, cell, pbc):
-        # On the first step, divide by 2 to average two positions
-        self._divisor += 1
-        # How much of the current step to mix into the average
-        weight = 1. / self._divisor
-        running_average_list = np.array(running_average_list)  # Don't modify this input in place
-
-        for i, pos in enumerate(positions_list):
-            if (i == 0 or i == len(positions_list) - 1) and not relax_endpoints:
-                continue
-            else:
-                disp = find_mic(pos - running_average_list[i], cell, pbc)[0]
-                running_average_list[i] += weight * disp
-
-        return {
-            'running_average_list': running_average_list
-        }
+    def command(self, structure, positions, running_average_positions, total_steps, thermalization_steps, divisor):
+        total_steps += 1
+        if total_steps > thermalization_steps:
+            divisor += 1  # On the first step, divide by 2 to average two positions
+            weight = 1. / divisor  # How much of the current step to mix into the average
+            displacement = structure.find_mic(positions - running_average_positions)
+            new_running_average = running_average_positions + (weight * displacement)
+            return {
+                'running_average_positions': new_running_average,
+                'total_steps': total_steps,
+                'divisor': divisor,
+            }
+        else:
+            return {
+                'running_average_positions': running_average_positions,
+                'total_steps': total_steps,
+                'divisor': divisor,
+            }
 
 
 class CentroidsRunningAverageMix(PrimitiveVertex):
     """
     Mix in the running average of the positions to the centroid, moving the centroid towards that
-    running average by a fraction.
+        running average by a fraction.
 
     Input attributes:
         mixing_fraction (float): The fraction of the running average to mix into centroid (Default is 0.1)
         centroids_pos_list (list/numpy.ndarray): List of all the centroids along the string
         running_average_list (list/numpy.ndarray): List of running averages
-        cell (numpy.ndarray): The cell of the structure
-        pbc (numpy.ndarray): Periodic boundary condition of the structure
+        structure (Atoms): The reference structure.
+        relax_endpoints (bool): Whether or not to relax the endpoints of the string. (Default is False.)
 
     Output attributes:
         centroids_pos_list (list/numpy.ndarray): List centroids updated towards the running average
-
-    TODO:
-        Re-write Command base class(es) to better handle serial/list/parallel.
     """
 
     def __init__(self, name=None):
         super(CentroidsRunningAverageMix, self).__init__(name=name)
         self.input.default.mixing_fraction = 0.1
+        self.input.default.relax_endpoints = False
 
-    def command(self, mixing_fraction, centroids_pos_list, running_average_list, cell, pbc):
+    def command(self, structure, mixing_fraction, centroids_pos_list, running_average_positions, relax_endpoints):
+
         centroids_pos_list = np.array(centroids_pos_list)
-        for i, cent in enumerate(centroids_pos_list):
-            disp = find_mic(running_average_list[i] - cent, cell, pbc)[0]
-            update = mixing_fraction * disp
-            centroids_pos_list[i] += update
+        running_average_positions = np.array(running_average_positions)
+
+        updated_centroids = []
+
+        for i, (cent, avg) in enumerate(zip(centroids_pos_list, running_average_positions)):
+            if (i == 0 or i == (len(centroids_pos_list) - 1)) and not relax_endpoints:
+                updated_centroids.append(cent)
+            else:
+                displacement = structure.find_mic(avg - cent)
+                update = mixing_fraction * displacement
+                updated_centroids.append(cent + update)
 
         return {
-            'centroids_pos_list': centroids_pos_list
+            'centroids_pos_list': np.array(updated_centroids)
         }
 
 
 class CentroidsSmoothing(PrimitiveVertex):
     """
-    Global smoothing following Vanden-Eijnden and Venturoli (2009). The actual smoothing strength is the product of the
-    nominal smoothing strength (`kappa`), the number of images, and the mixing fraction (`dtau`).
+    Global / local smoothing following Vanden-Eijnden and Venturoli (2009). The actual smoothing strength is the
+        product of the nominal smoothing strength (`kappa`), the number of images, and the mixing fraction
+        (`dtau`).
 
     Input Attributes:
         kappa (float): Nominal smoothing strength.
         dtau (float): Mixing fraction (from updating the string towards the moving average of the image positions).
-        all_centroid_positions (list/numpy.ndarray): List of all the centroid positions along the string.
+        centroids_pos_list (list/numpy.ndarray): List of all the centroid positions along the string.
+        structure (Atoms): The reference structure.
+        smooth_style (string): Apply 'global' or 'local' smoothing. (Default is 'global'.)
 
     Output Attributes:
         all_centroid_positions (list/numpy.ndarray): List of smoothed centroid positions.
     """
-    def command(self, kappa, dtau, all_centroid_positions):
-        # Get the smoothing matrix
-        n_images = len(all_centroid_positions)
-        smoothing_strength = kappa * n_images * dtau
-        smoothing_matrix = self._get_smoothing_matrix(n_images, smoothing_strength)
-        smoothed_centroid_positions = np.tensordot(smoothing_matrix, np.array(all_centroid_positions), axes=1)
 
+    def __init__(self, name=None):
+        super(CentroidsSmoothing, self).__init__(name=name)
+        id_ = self.input.default
+        id_.kappa = 0.1
+        id_.dtau = 0.1
+        id_.smooth_style = 'global'
+
+    def command(self, structure, kappa, dtau, centroids_pos_list, smooth_style):
+        n_images = len(centroids_pos_list)
+        smoothing_strength = kappa * n_images * dtau
+        if smooth_style == 'global':
+            smoothing_matrix = self._get_smoothing_matrix(n_images, smoothing_strength)
+            smoothed_centroid_positions = np.tensordot(smoothing_matrix, np.array(centroids_pos_list), axes=1)
+        elif smooth_style == 'local':
+            smoothed_centroid_positions = self._locally_smoothed(smoothing_strength, centroids_pos_list)
+        else:
+            raise TypeError('Smoothing: choose style = "global" or "local"')
         return {
-            'all_centroid_positions': smoothed_centroid_positions
+            'centroids_pos_list': smoothed_centroid_positions
         }
 
     @staticmethod
@@ -259,8 +263,8 @@ class CentroidsSmoothing(PrimitiveVertex):
         A function that returns the smoothing matrix used in global smoothing.
 
         Attributes:
-            n_images (int): number of images
-            smoothing_strength (float): the smoothing penalty
+            n_images (int): Number of images
+            smoothing_strength (float): The smoothing penalty
 
         Returns:
             smoothing_matrix
@@ -275,6 +279,33 @@ class CentroidsSmoothing(PrimitiveVertex):
 
         return np.linalg.inv(smooth_mat_inv)
 
+    @staticmethod
+    def _locally_smoothed(structure, smoothing_strength, centroids_pos_list):
+        """
+        A function that applies local smoothing by taking into account immediate neighbors.
+
+        Attributes:
+            structure (Atoms): The reference structure.
+            smoothing_strength (float): The smoothing penalty
+            centroids_pos_list (list): The list of centroids
+
+        Returns:
+            smoothing_matrix
+        """
+        smoothed_centroid_positions = [centroids_pos_list[0]]
+        for i, cent in enumerate(centroids_pos_list[1:-1]):
+            left = centroids_pos_list[i]
+            right = centroids_pos_list[i+2]
+            disp_left = structure.find_mic(cent - left)
+            disp_right = structure.find_mic(right - cent)
+            switch = (1 + np.cos(np.pi * np.tensordot(disp_left, disp_right) / (
+                        np.linalg.norm(disp_left) * (np.linalg.norm(disp_right))))) / 2
+            r_star = smoothing_strength * switch * (disp_right - disp_left)
+            smoothed_centroid_positions.append(cent + r_star)
+        smoothed_centroid_positions.append(centroids_pos_list[-1])
+
+        return smoothed_centroid_positions
+
 
 class CentroidsReparameterization(PrimitiveVertex):
     """
@@ -283,8 +314,7 @@ class CentroidsReparameterization(PrimitiveVertex):
 
     Input attributes:
         centroids_pos_list (list/numpy.ndarray): List of all the centroids along the string
-        cell (numpy.ndarray): The cell of the structure
-        pbc (numpy.ndarray): Periodic boundary condition of the structure
+        structure (Atoms): The reference structure.
 
     Output attributes:
         centroids_pos_list (list/numpy.ndarray): List of equally spaced centroids
@@ -293,9 +323,10 @@ class CentroidsReparameterization(PrimitiveVertex):
     def __init__(self, name=None):
         super(CentroidsReparameterization, self).__init__(name=name)
 
-    def command(self, centroids_pos_list, cell, pbc):
+    def command(self, structure, centroids_pos_list):
         # How long is the piecewise parameterized path to begin with?
-        lengths = self._find_lengths(centroids_pos_list, cell, pbc)
+
+        lengths = self._find_lengths(centroids_pos_list, structure)
         length_tot = lengths[-1]
         length_per_frame = length_tot / (len(centroids_pos_list) - 1)
 
@@ -316,7 +347,7 @@ class CentroidsReparameterization(PrimitiveVertex):
             # Interpolate from the last position not in excess
             start = centroids_pos_list[highest_not_over]
             end = centroids_pos_list[highest_not_over + 1]
-            disp = find_mic(end - start, cell, pbc)[0]
+            disp = structure.find_mic(end - start)
             interp_dir = disp / np.linalg.norm(disp)
             interp_mag = length_target - lengths[highest_not_over]
 
@@ -331,14 +362,13 @@ class CentroidsReparameterization(PrimitiveVertex):
         }
 
     @staticmethod
-    def _find_lengths(a_list, cell, pbc):
+    def _find_lengths(a_list, structure):
         """
         Finds the cummulative distance from job to job.
 
         Attribute:
             a_list (list/numpy.ndarray): List of positions whose lengths are to be calculated
-            cell (numpy.ndarray): The cell of the structure
-            pbc (numpy.ndarray): Periodic boundary condition of the structure
+            structure (Atoms): The reference structure.
 
         Returns:
             lengths (list): Lengths of the positions in the list
@@ -347,115 +377,7 @@ class CentroidsReparameterization(PrimitiveVertex):
         lengths = [length_cummulative]
         # First length is zero, all other lengths are wrt the first position in the list
         for n_left, term in enumerate(a_list[1:]):
-            disp = find_mic(term - a_list[n_left], cell, pbc)[0]
+            disp = structure.find_mic(term - a_list[n_left])
             length_cummulative += np.linalg.norm(disp)
             lengths.append(length_cummulative)
         return lengths
-
-
-class MilestoningVertex(PrimitiveVertex):
-    """
-    Checks whether positions are closest to its own centroid. If not, reverses the velocities, and resets the
-        positions and forces to the values from the previous step. Logs total reflections, reflections off edges
-        and time spent at each edge
-
-    Input attributes:
-        positions_list (list/numpy.ndarray): List of current positions
-        velocities_list (list/numpy.ndarray): List of current velocities
-        forces_list (list/numpy.ndarray): List of current forces
-        previous_positions_list (list/numpy.ndarray): List of previous positions
-        prev_velocities_list (list/numpy.ndarray): List of previous velocities
-        prev_forces_list (list/numpy.ndarray): List of previous forces
-        centroids_pos_list (list/numpy.ndarraymile.graph.milestone): List of all the centroids along the string
-        thermalization_steps (int): Number of steps after which to start tracking reflections.
-        cell (numpy.ndarray): The cell of the structure
-        pbc (numpy.ndarray): Periodic boundary condition of the structure
-
-    Output attributes:
-        positions_list (list/numpy.ndarray): The modified positions
-        velocities_list (list/numpy.ndarray): The modified velocities
-        forces_list (list/numpy.ndarray): The modified forces
-        reflections_matrix (numpy.ndarray): The reflections matrix
-        edge_reflections_matrix (numpy.ndarray): The edge reflections matrix
-        edge_time_matrix (numpy.ndarray): The edge time matrix
-    """
-
-    def __init__(self, name=None):
-        super(MilestoningVertex, self).__init__(name=name)
-        # initialize matrices to be tracked
-        self.tracker_list = None
-        self.reflections_matrix = None
-        self.edge_reflections_matrix = None
-        self.edge_time_matrix = None
-
-    def command(self, positions_list, velocities_list, forces_list, prev_positions_list, prev_velocities_list,
-                prev_forces_list, all_centroid_positions, thermalization_steps, cell, pbc):
-        n_images = len(all_centroid_positions)
-        n_edges = int(n_images * (n_images - 1) / 2)
-        current_step = self.archive.clock
-
-        reflected_positions = []
-        reflected_velocities = []
-        reflected_forces = []
-
-        if current_step == 0:
-            # form the matrices
-            self.tracker_list = [[None, None] for _ in np.arange(n_images)]
-            self.reflections_matrix = np.zeros((n_images, n_images))
-            self.edge_reflections_matrix = np.array([np.zeros((n_edges, n_edges)) for _ in np.arange(n_images)])
-            self.edge_time_matrix = np.array([np.zeros(n_edges) for _ in np.arange(n_images)])
-
-        # Find distance between positions and each of the centroids
-        for n, (pos, cent) in enumerate(zip(positions_list, all_centroid_positions)):
-            closest_centroid_id = self.get_closest_centroid_index(pos, all_centroid_positions, cell, pbc)
-            tracker = self.tracker_list[n]
-
-            if closest_centroid_id == n:
-                # Return current positions, velocities and forces
-                reflected_positions.append(positions_list[n])
-                reflected_velocities.append(velocities_list[n])
-                reflected_forces.append(forces_list[n])
-
-                if current_step >= thermalization_steps:
-                    # Start reflection tracking
-                    if tracker[1] is not None:  # If no reflections, increment time
-                        self.edge_time_matrix[n][tracker[1]] += 1
-                    # End reflection tracking
-            else:
-                # Update previous positions, velocities and forces, if positions are not closest to parent centroid
-                reflected_positions.append(prev_positions_list[n])
-                reflected_velocities.append(-prev_velocities_list[n])
-                reflected_forces.append(prev_forces_list[n])
-
-                if current_step >= thermalization_steps:
-                    # Start reflection tracking
-                    self.reflections_matrix[n, closest_centroid_id] += 1  # Save the reflection
-                    indices = np.zeros((n_images, n_images))  # images x images
-                    indices[n, closest_centroid_id] = 1  # Record the edge
-                    ind = np.tril(indices) + np.triu(indices).T  # Convert to triangular matrix
-                    # Record the index of the edge (N_j)
-                    n_j = int(np.nonzero(ind[np.tril_indices(n_images, k=-1)])[0][0])
-
-                    if tracker[1] is None:
-                        tracker[1] = n_j  # Initialize N_j
-                    elif tracker[1] == n_j:
-                        self.edge_time_matrix[n][n_j] += 1
-                    else:
-                        tracker[0] = tracker[1]  # If reflecting off a different edge, change N_j to N_i
-                        tracker[1] = n_j  # Set new N_j
-                        self.edge_reflections_matrix[n][tracker[0], tracker[1]] += 1
-                        # End reflection tracking
-
-        return {
-            'positions_list': reflected_positions,
-            'velocities_list': reflected_velocities,
-            'forces_list': reflected_forces,
-            'reflections_matrix': self.reflections_matrix,
-            'edge_reflections_matrix': self.edge_reflections_matrix,
-            'edge_time_matrix': self.edge_time_matrix
-        }
-
-    @staticmethod
-    def get_closest_centroid_index(positions, all_centroid_positions, cell, pbc):
-        distances = [np.linalg.norm(find_mic(c_pos - positions, cell, pbc)[0]) for c_pos in all_centroid_positions]
-        return np.argmin(distances)

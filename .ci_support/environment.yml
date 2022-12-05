@@ -1,13 +1,18 @@
 channels:
-  - conda-forge
+- conda-forge
 dependencies:
-  - ase =3.19
-  - coveralls
-  - coverage
-  - codacy-coverage
-  - matplotlib =3.2.1
-  - numpy =1.19.1
-  - pyiron =0.3.6
-  - scipy =1.5.2
-  - seaborn =0.11.0
-  - scikit-image =0.17.2
+- ase =3.22.1
+- coveralls
+- coverage
+- codacy-coverage
+- matplotlib =3.6.1
+- numpy =1.23.4
+- pyiron_base =0.5.26
+- pyiron_atomistics =0.2.58
+- pyparsing =3.0.9
+- scipy =1.9.3
+- seaborn =0.12.0
+- scikit-image =0.19.3
+- randspg =0.0.1
+- boto3 =1.24.96
+- moto =4.0.8

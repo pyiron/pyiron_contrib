@@ -67,7 +67,7 @@ def print_tree(current_node, indent='', last='downup', name='root', file=sys.std
 
     # print the "up" branch
     for childname, child in up:
-        next_last = 'up' if up.index((childname, child)) is 0 else ''
+        next_last = 'up' if up.index((childname, child)) == 0 else ''
         next_indent = '{0}{1}{2}'.format(indent, ' ' if 'up' in last else '│', ' ' * len(name))
         print_tree(child, next_indent, next_last, name=childname, file=file)
 

@@ -3,7 +3,7 @@
 # Distributed under the terms of "New BSD License", see the LICENSE file.
 
 from pyiron_contrib.protocol.utils.misc import LoggerMixin, ensure_iterable, Registry
-from pyiron.atomistics.structure.atoms import Atoms
+from pyiron_atomistics.atomistics.structure.atoms import Atoms
 import numpy as np
 import logging
 

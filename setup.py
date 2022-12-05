@@ -2,11 +2,12 @@
 Setuptools based setup module
 """
 from setuptools import setup, find_packages
+import versioneer
 
 
 setup(
     name='pyiron_contrib',
-    version='0.0.1',
+    version=versioneer.get_version(),
     description='Repository for user-generated plugins to the pyiron IDE.',
     long_description='http://pyiron.org',
 
@@ -21,23 +22,37 @@ setup(
         'License :: OSI Approved :: BSD License',
         'Intended Audience :: Science/Research',
         'Operating System :: OS Independent',
-        'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.4',
-        'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
-        'Programming Language :: Python :: 3.8'
+        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9'
     ],
 
     keywords='pyiron',
     packages=find_packages(exclude=["*tests*"]),
-    install_requires=[
-        'ase>=3.19.1',
-        'matplotlib>=3.2.1',
-        'numpy>=1.19.1',
-        'pyiron>=0.3.6',
-        'scipy>=1.5.2',
-        'seaborn>=0.11.0',
-        'scikit-image>=0.17.2',
-    ]
+    install_requires=[        
+        'matplotlib==3.6.1',
+        'numpy==1.23.4',
+        'pyiron_base==0.5.26',
+        'scipy==1.9.3',
+        'seaborn==0.12.0',
+        'pyparsing==3.0.9'
+    ],
+    extras_require={
+        'atomistic': [
+            'ase==3.22.1',
+            'pyiron_atomistics==0.2.58',
+        ],
+        'fenics': [
+            'fenics==2019.1.0',
+            'mshr==2019.1.0',
+        ],
+        'image': ['scikit-image==0.19.3'],
+        'generic': [
+            'boto3==1.24.96', 
+            'moto==4.0.8'
+        ],
+    },
+    cmdclass=versioneer.get_cmdclass(),
+    
 )

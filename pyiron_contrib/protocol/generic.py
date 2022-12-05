@@ -1,8 +1,8 @@
-from __future__ import print_function
 # coding: utf-8
 # Copyright (c) Max-Planck-Institut für Eisenforschung GmbH - Computational Materials Design (CM) Department
 # Distributed under the terms of "New BSD License", see the LICENSE file.
 
+from __future__ import print_function
 import sys
 from pyiron_base import GenericJob
 from pyiron_contrib.protocol.utils import IODictionary, InputDictionary, LoggerMixin, Event, EventHandler, \
@@ -333,14 +333,13 @@ class PrimitiveVertex(Vertex):
         """The command method controls the physics"""
         pass
 
-    def execute_parallel(self, queue, n, input_dict):
+    def execute_parallel(self, n, return_dict):
         """How to execute in parallel when there's a list of these vertices together."""
-        output_data = self.command(**input_dict)
-        queue.put((n, output_data))
-        # Note: The output needs to be explicitly collected and archived later if this is used in place of `execute`
+        output_data = self.command(**self.input.resolve())
+        return_dict[n] = output_data
 
 
-class CompoundVertex(Vertex): #, PyironJobTypeRegistry):
+class CompoundVertex(Vertex):
     """
     Vertices which contain a graph and produce output only after traversing their graph to its exit point.
 
@@ -436,10 +435,10 @@ class CompoundVertex(Vertex): #, PyironJobTypeRegistry):
         self.graph.active_vertex = self.graph.restarting_vertex
         self.update_and_archive(self.get_output())
 
-    def execute_parallel(self, queue, n, input):
+    def execute_parallel(self, n, all_child_output):
         """How to execute in parallel when there's a list of these vertices together."""
         self.execute()
-        queue.put((n, self.get_output()))
+        all_child_output[n] = self.get_output()
 
     def set_graph_archive_clock(self, clock, recursive=False):
         for _, vertex in self.graph.vertices.items():
@@ -455,9 +454,8 @@ class CompoundVertex(Vertex): #, PyironJobTypeRegistry):
             hdf (ProjectHDFio): HDF5 group object.
             group_name (str): HDF5 subgroup name - optional
         """
-        with hdf.open(self.vertex_name) as graph_hdf:
-            self.graph.to_hdf(hdf=graph_hdf, group_name="graph")
         super(CompoundVertex, self).to_hdf(hdf=hdf, group_name=group_name)
+        self.graph.to_hdf(hdf=hdf, group_name="graph")
 
     def from_hdf(self, hdf=None, group_name=None):
         """
@@ -467,8 +465,9 @@ class CompoundVertex(Vertex): #, PyironJobTypeRegistry):
             hdf (ProjectHDFio): HDF5 group object - optional
             group_name (str): HDF5 subgroup name - optional
         """
-        super(CompoundVertex, self).from_hdf(hdf=hdf, group_name=group_name)
-        self.graph.from_hdf(hdf=hdf, group_name="graph")
+        super(CompoundVertex, self).from_hdf(hdf=hdf, group_name=group_name or self.vertex_name)
+        with hdf.open(self.vertex_name) as hdf5_server:
+            self.graph.from_hdf(hdf=hdf5_server, group_name="graph")
         self.define_information_flow()  # Rewire pointers
 
     def visualize(self, execution=True, dataflow=True):
@@ -618,7 +617,6 @@ class Protocol(CompoundVertex, GenericJob):
     """
     A parent class for compound vertices which are being instantiated as regular pyiron jobs, i.e. the highest level
     graph in their context.
-
     Example: if `X` inherits from `CompoundVertex` and performs the desired logic, then
     ```
     class ProtocolX(Protocol, X):
@@ -634,20 +632,21 @@ class Protocol(CompoundVertex, GenericJob):
 
     def execute(self):
         super(Protocol, self).execute()
-        self.protocol_finished.fire()
 
     def run_static(self):
         """If this CompoundVertex is the highest level, it can be run as a regular pyiron job."""
         self.status.running = True
         self.execute()
         self.status.collect = True  # Assume modal for now
+        self.protocol_finished.fire()
         self.run()  # This is an artifact of inheriting from GenericJob, to get all that run functionality
 
-    def run(self, run_again=False, repair=False, debug=False, run_mode=None, continue_run=False):
+    def run(self, delete_existing_job=False, repair=False, debug=False, run_mode=None, continue_run=False):
         """A wrapper for the run which allows us to simply keep going with a new variable `continue_run`"""
         if continue_run:
             self.status.created = True
-        super(CompoundVertex, self).run(run_again=run_again, repair=repair, debug=debug, run_mode=run_mode)
+        super(CompoundVertex, self).run(delete_existing_job=delete_existing_job, repair=repair, debug=debug,
+                                        run_mode=run_mode)
 
     def collect_output(self):
         # Dear Reader: This feels like a hack, but it works. Sincerely, -Liam
@@ -661,27 +660,24 @@ class Protocol(CompoundVertex, GenericJob):
     def to_hdf(self, hdf=None, group_name=None):
         """
         Store the Protocol in an HDF5 file.
-
         Args:
             hdf (ProjectHDFio): HDF5 group object - optional
             group_name (str): HDF5 subgroup name - optional
         """
         if hdf is None:
             hdf = self.project_hdf5
-        self.graph.to_hdf(hdf=hdf, group_name="graph")
         super(CompoundVertex, self).to_hdf(hdf=hdf, group_name=group_name)
 
     def from_hdf(self, hdf=None, group_name=None):
         """
         Load the Protocol from an HDF5 file.
-
         Args:
             hdf (ProjectHDFio): HDF5 group object - optional
             group_name (str): HDF5 subgroup name - optional
         """
         if hdf is None:
             hdf = self.project_hdf5
-        super(Protocol, self).from_hdf(hdf=hdf, group_name=group_name)
+        super(CompoundVertex, self).from_hdf(hdf=hdf, group_name=group_name)
 
 
 class Graph(dict, LoggerMixin):

@@ -63,8 +63,8 @@ def _make_potential_parser():
             + pp.IndentedBlock(
                     radial_func_types \
                             + pp.IndentedBlock(radial_func_coeffs + NL)[1, ...]
-              )
-            )[1, ...]
+              )[1, ...]
+            )
 
     radial_funcs = radial_funcs.set_results_name("funcs")
     radial_funcs = pp.ungroup(radial_funcs).set_results_name("funcs")

@@ -8,7 +8,7 @@ from pyiron_contrib import Project
 from pyiron_contrib.RDM.storagejob import StorageJob
 from pyiron_contrib.generic.s3io import FileS3IO
 from pyiron_base._tests import TestWithCleanProject
-from pyiron_base.generic.filedata import FileDataTemplate
+from pyiron_base import FileDataTemplate
 
 full_bucket = "full_bucket"
 io_bucket = "io_bucket"

@@ -4,8 +4,9 @@
 
 """Pyiron interface to atomicrex"""
 import numpy as np
+import pandas as pd
 
-from pyiron_base import state, GenericJob, Executable
+from pyiron_base import state, GenericJob, Executable, FlattenedStorage
 
 from pyiron_contrib.atomistics.atomicrex.general_input import (
     GeneralARInput,
@@ -15,16 +16,14 @@ from pyiron_contrib.atomistics.atomicrex.structure_list import ARStructureContai
 from pyiron_contrib.atomistics.atomicrex.potential_factory import ARPotFactory
 from pyiron_contrib.atomistics.atomicrex.output import Output
 from pyiron_contrib.atomistics.atomicrex.function_factory import FunctionFactory
+from pyiron_contrib.atomistics.ml.potentialfit import PotentialFit
+from pyiron_contrib.atomistics.atomistics.job.trainingcontainer import (
+    TrainingContainer,
+    TrainingStorage,
+)
 
 
-## Class defined for future addition of other codes
-## Not sure which functionality (if any) can be extracted yet, but a similar pattern is followed in other pyiron modules
-class PotentialFittingBase(GenericJob):
-    def __init__(self, project, job_name):
-        super().__init__(project, job_name)
-
-
-class AtomicrexBase(PotentialFittingBase):
+class AtomicrexBase(GenericJob, PotentialFit):
     __version__ = "0.1.0"
     __hdf_version__ = "0.1.0"
     """Class to set up and run atomicrex jobs"""
@@ -217,7 +216,7 @@ class AtomicrexBase(PotentialFittingBase):
         """
         if directory is None:
             directory = self.working_directory
-        self.input._write_xml_file(directory=directory)
+        self.input._write_xml_file(directory=directory, job=self)
         self.potential.write_xml_file(directory=directory)
         self.structures.write_xml_file(directory=directory)
 
@@ -248,8 +247,7 @@ class AtomicrexBase(PotentialFittingBase):
     # instead of the potential_as_pd_df function
     @property
     def lammps_potential(self):
-        pot = self.potential_as_pd_df()
-        return pot
+        return self.potential_as_pd_df()
 
     def potential_as_pd_df(self):
         """
@@ -257,6 +255,26 @@ class AtomicrexBase(PotentialFittingBase):
         which can be used for lammps calculations.
         """
         return self.potential._potential_as_pd_df(job=self)
+
+    #### PotentialFit methods
+    def _add_training_data(self, container: TrainingContainer) -> None:
+        self.structures.add_training_data(container)
+
+    def _get_training_data(self) -> TrainingStorage:
+        return self.structures.get_training_data()
+
+    def _get_predicted_data(self) -> FlattenedStorage:
+        return self.structures.get_predicted_data()
+
+    def get_lammps_potential(self) -> pd.DataFrame:
+        """
+        Return a pyiron compatible dataframe that defines a potential to be used with a Lammps job (or subclass
+        thereof).
+
+        Returns:
+            DataFrame: contains potential information to be used with a Lammps job.
+        """
+        return self.potential_as_pd_df()
 
 
 class Factories:

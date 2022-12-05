@@ -52,8 +52,12 @@ def readcfg(f):
                     if cfg.forces is not None:
                         cfg.forces[i, :] = vals[5:8]
             elif line.startswith('ENERGY'):
-                line = f.readline()
-                cfg.energy = float(line.strip())
+                items = line.split()
+                if len(items) == 1:
+                    line = f.readline()
+                    cfg.energy = float(line.strip())
+                else:
+                    cfg.energy = float(items[-1])
             elif line.startswith('PLUSSTRESS'):
                 line = f.readline()
                 vals = line.strip().split()

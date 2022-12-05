@@ -4,14 +4,18 @@
 
 from __future__ import print_function
 from itertools import islice
+import numbers
 import numpy as np
 import os
 import pandas as pd
 import posixpath
 import scipy.constants
-from pyiron_base import Settings, GenericParameters, GenericJob, Executable
-from pyiron_atomistics import ase_to_pyiron
+from pyiron_atomistics.atomistics.structure.structurestorage import StructureStorage
+from pyiron_base import state, GenericParameters, GenericJob, Executable, FlattenedStorage
+from pyiron_atomistics import ase_to_pyiron, Atoms
+from pyiron_contrib.atomistics.ml.potentialfit import PotentialFit
 from pyiron_contrib.atomistics.mlip.cfgs import savecfgs, loadcfgs, Cfg
+from pyiron_contrib.atomistics.mlip.potential import MtpPotential
 
 __author__ = "Jan Janssen"
 __copyright__ = "Copyright 2020, Max-Planck-Institut für Eisenforschung GmbH - " \
@@ -22,21 +26,19 @@ __email__ = "janssen@mpie.de"
 __status__ = "development"
 __date__ = "Sep 1, 2017"
 
-s = Settings()
-
 
 gpa_to_ev_ang = 1e22 / scipy.constants.physical_constants['joule-electron volt relationship'][0]
 
-
-class Mlip(GenericJob):
+class Mlip(GenericJob, PotentialFit):
     def __init__(self, project, job_name):
         super(Mlip, self).__init__(project, job_name)
-        self.__version__ = None
+        self.__version__ = '0.1.0'
         self.__name__ = "Mlip"
         self._executable_activate()
         self._job_dict = {}
         self.input = MlipParameter()
         self._command_line = CommandLine()
+        self._potential = MtpPotential()
 
     def _executable_activate(self, enforce=False):
         if self._executable is None or enforce:
@@ -44,12 +46,13 @@ class Mlip(GenericJob):
                 self._executable = Executable(
                     codename=self.__name__,
                     module=self.__module__.split(".")[-2],
-                    path_binary_codes=s.resource_paths,
+                    path_binary_codes=state.settings.resource_paths,
                 )
             else:
                 self._executable = Executable(
-                    codename=self.__name__, path_binary_codes=s.resource_paths
+                    codename=self.__name__, path_binary_codes=state.settings.resource_paths
                 )
+
     @property
     def calculation_dataframe(self):
         job_id_lst, time_step_start_lst, time_step_end_lst, time_step_delta_lst = self._job_dict_lst(self._job_dict)
@@ -64,6 +67,60 @@ class Mlip(GenericJob):
         states = os.path.join(self.working_directory, 'state.mvs')
         if os.path.exists(pot) and os.path.exists(states):
             return [pot, states]
+
+    def _get_elements(self):
+        """
+        Return elements in training in insertion order, i.e. elements seen earlier get lower indices.
+        """
+        elements = []
+        for job_id in self._job_dict:
+            j = self.project.inspect(job_id)
+            if j["NAME"] == "TrainingContainer":
+                candidates = j.to_object().get_elements()
+            else:
+                candidates = j["input/structure/species"]
+            for e in candidates:
+                if e not in elements:
+                    elements.append(e)
+        return elements
+
+    def potential_dataframe(self, elements=None):
+        """
+        :class:`pandas.DataFrame`: potential dataframe for lammps jobs
+
+        .. attention::
+
+            The `elements` argument must be given for in any case for non-unary alloys, as the scrapping code from the
+            training data is currently broken!
+
+        Args:
+            elements (list of str, optional): name of elements in this potential in the order of their indices in pyiron
+                                              structures, if not given use elements seen in training data
+        """
+        if elements is None:
+            elements = self.input["species"]
+            if elements is None:
+                elements = self._get_elements() # AAAH
+
+        if self.status.finished:
+            return pd.DataFrame({
+                        "Name": ["".join(elements)],
+                        "Filename": [self.potential_files],
+                        "Model": ["Custom"],
+                        "Species": [elements],
+                        "Config": [["pair_style mlip mlip.ini\n",
+                                    "pair_coeff * *\n"
+                        ]]
+            })
+        else:
+            raise ValueError(f"Potential only available after job is finished, not {self.status}!")
+
+    @property
+    def potential(self):
+        if self.status.finished and self._potential is not None:
+            return self._potential
+        else:
+            raise ValueError("potential only available on successfully finished jobs")
 
     def set_input_to_read_only(self):
         """
@@ -86,7 +143,9 @@ class Mlip(GenericJob):
                 for f in self._restart_file_list
             ] + list(self._restart_file_dict.values())
         if 'testing.cfg' not in restart_file_lst:
-            species_count = self._write_test_set(file_name='testing.cfg', cwd=self.working_directory)
+            species = self._write_test_set(file_name='testing.cfg', cwd=self.working_directory)
+            species_count = len(species)
+            self.input['species'] = species
         elif self.input['filepath'] != 'auto':
             species_count = 0
         else: 
@@ -101,6 +160,20 @@ class Mlip(GenericJob):
         self._command_line[0] = self._command_line[0].replace('stress_auto', str(self.input['stress-weight']))
         self._command_line[0] = self._command_line[0].replace('iteration_auto', str(int(self.input['iteration'])))
         self._command_line.write_file(file_name='mlip.sh', cwd=self.working_directory)
+
+        species = np.array(species)
+        input_store = StructureStorage()
+        input_store.add_array('energy', dtype=np.float64, shape=(), per='chunk')
+        input_store.add_array('forces', dtype=np.float64, shape=(3,), per='element')
+        input_store.add_array('stress', dtype=np.float64, shape=(6,), per='chunk')
+        for cfg in loadcfgs(os.path.join(self.working_directory, "training.cfg")):
+            struct = Atoms(symbols=species[np.cast[np.int64](cfg.types)], positions=cfg.pos, cell=cfg.lat, pbc=[True]*3) # HACK for pbc
+            input_store.add_structure(struct, identifier=cfg.desc,
+                                      energy=cfg.energy, forces=cfg.forces, stress=cfg.stresses
+            )
+
+        with self.project_hdf5.open('input') as hdf5_input:
+            input_store.to_hdf(hdf=hdf5_input, group_name="training_data")
 
     def collect_logfiles(self):
         pass
@@ -121,6 +194,30 @@ class Mlip(GenericJob):
             _, _, _, _, _, _, grades_lst, job_id_grades_lst, timestep_grades_lst = read_cgfs(file_name)
         else:
             grades_lst, job_id_grades_lst, timestep_grades_lst = [], [], []
+        try:
+            self._potential.load(os.path.join(self.working_directory, "Trained.mtp_"))
+        except:
+            self.logger.warn('Failed to parse potential file! job.potential will not be available.')
+            self._potential = None
+
+        training_store = FlattenedStorage()
+        training_store.add_array('energy', dtype=np.float64, shape=(), per='chunk')
+        training_store.add_array('forces', dtype=np.float64, shape=(3,), per='element')
+        training_store.add_array('stress', dtype=np.float64, shape=(6,), per='chunk')
+        for cfg in loadcfgs(os.path.join(self.working_directory, "training_efs.cfg")):
+            training_store.add_chunk(len(cfg.pos), identifier=cfg.desc,
+                    energy=cfg.energy, forces=cfg.forces, stress=cfg.stresses
+            )
+
+        testing_store = FlattenedStorage()
+        testing_store.add_array('energy', dtype=np.float64, shape=(), per='chunk')
+        testing_store.add_array('forces', dtype=np.float64, shape=(3,), per='element')
+        testing_store.add_array('stress', dtype=np.float64, shape=(6,), per='chunk')
+        for cfg in loadcfgs(os.path.join(self.working_directory, "testing_efs.cfg")):
+            testing_store.add_chunk(len(cfg.pos), identifier=cfg.desc,
+                    energy=cfg.energy, forces=cfg.forces, stress=cfg.stresses
+            )
+
         with self.project_hdf5.open('output') as hdf5_output:
             hdf5_output['grades'] = grades_lst
             hdf5_output['job_id'] = job_id_grades_lst
@@ -129,6 +226,10 @@ class Mlip(GenericJob):
             hdf5_output['timestep_diff'] = timestep_diff_lst
             hdf5_output['job_id_new'] = job_id_new_training_lst
             hdf5_output['timestep_new'] = timestep_new_training_lst
+            if self._potential is not None:
+                self._potential.to_hdf(hdf=hdf5_output)
+            training_store.to_hdf(hdf=hdf5_output, group_name="training_efs")
+            testing_store.to_hdf(hdf=hdf5_output, group_name="testing_efs")
 
     def get_structure(self, iteration_step=-1):
         job = self.project.load(self['output/job_id_diff'][iteration_step])
@@ -160,10 +261,17 @@ class Mlip(GenericJob):
                     time_step_end=end,
                     time_step_delta=delta
                 )
+        if self.status.finished:
+            with self._hdf5.open("output") as hdf_output:
+                if "potential" in hdf_output.list_groups():
+                    self._potential.from_hdf(hdf=hdf_output)
 
     def get_suggested_number_of_configuration(self, species_count=None, multiplication_factor=2.0):
         if self.input['filepath'] == 'auto':
-            source = self._find_potential(self.input['potential'])
+            potential = self.input['potential']
+            if isinstance(potential, numbers.Integral):
+                potential = f"{potential:02}g.mtp"
+            source = self._find_potential(potential)
         else:
             source = self.input['filepath']
         with open(source) as f:
@@ -214,7 +322,10 @@ class Mlip(GenericJob):
         if cwd is not None:
             file_name = posixpath.join(cwd, file_name)
         if self.input['filepath'] == 'auto':
-            source = self._find_potential(self.input['potential'])
+            potential = self.input['potential']
+            if isinstance(potential, numbers.Integral):
+                potential = f"{potential:02}g.mtp"
+            source = self._find_potential(potential)
         else:
             source = self.input['filepath']
         with open(source) as f:
@@ -234,10 +345,11 @@ class Mlip(GenericJob):
         return np.array([stresses[0][0], stresses[1][1], stresses[2][2],
                          stresses[1][2], stresses[0][1], stresses[0][2]]) * gpa_to_ev_ang
 
-    def _write_configurations(self, file_name='training.cfg', cwd=None, respect_step=True, return_max_index=False):
+    def _write_configurations(self, file_name='training.cfg', cwd=None, respect_step=True):
         if cwd is not None:
             file_name = posixpath.join(cwd, file_name)
         indices_lst, position_lst, forces_lst, cell_lst, energy_lst, track_lst, stress_lst = [], [], [], [], [], [], []
+        all_species = set()
         for job_id, value in self._job_dict.items():
             ham = self.project.inspect(job_id)
             if respect_step:
@@ -250,19 +362,29 @@ class Mlip(GenericJob):
             # HACK: until the training container has a proper HDF5 interface
             if ham.__name__ == "TrainingContainer":
                 job = ham.to_object()
-                pd = job.to_pandas()
-                for time_step, (name, atoms, energy, forces, _) in islice(enumerate(pd.itertuples(index=False)),
-                                                                          start, end, delta):
-                    atoms = ase_to_pyiron(atoms)
-                    indices_lst.append(atoms.indices)
-                    position_lst.append(atoms.positions)
-                    forces_lst.append(forces)
-                    cell_lst.append(atoms.cell)
-                    energy_lst.append(energy)
-                    track_lst.append(str(ham.job_id) + "_" + str(time_step))
+                all_species.update(job.get_elements())
+                symbol_map = {s: i for i, s in enumerate(sorted(set(all_species)))}
+                if end is None:
+                    end = job.number_of_structures
+                for time_step in range(start, end, delta):
+                    symbols = job._container.get_array("symbols", time_step)
+                    indices_lst.append([symbol_map[s] for s in symbols])
+                    position_lst.append(job._container.get_array("positions", time_step))
+                    forces_lst.append(job._container.get_array("forces", time_step))
+                    cell_lst.append(job._container.get_array("cell", time_step))
+                    energy_lst.append(job._container.get_array("energy", time_step))
+                    if job._container.has_array("stress"):
+                        volume = np.abs(np.linalg.det(cell_lst[-1]))
+                        stress_lst.append(job._container.get_array("stress", time_step) * volume)
+                        if np.isnan(stress_lst[-1]).any():
+                            stress_lst[-1] = None
+                    track_lst.append(str(ham.job_id) + '_' + str(time_step))
                 continue
             original_dict = {el: ind for ind, el in enumerate(sorted(ham['input/structure/species']))}
             species_dict = {ind: original_dict[el] for ind, el in enumerate(ham['input/structure/species'])}
+            # HACK: this does not preserve element order, but the old code is broken for structures with different
+            # species anyway
+            all_species.update(ham['input/structure/species'])
             if ham.__name__ in ['Vasp', 'ThermoIntDftEam', 'ThermoIntDftMtp', 'ThermoIntVasp']:
                 if len(ham['output/outcar/stresses']) != 0:
                     for position, forces, cell, energy, stresses, volume in zip(ham['output/generic/positions'][start:end:delta],
@@ -329,19 +451,10 @@ class Mlip(GenericJob):
                   energy_lst=energy_lst,
                   track_lst=track_lst,
                   stress_lst=stress_lst)
-        if return_max_index:
-            total_lst = []
-            for ind_lst in indices_lst:
-                if isinstance(ind_lst, list):
-                    total_lst += ind_lst
-                elif isinstance(ind_lst, np.ndarray):
-                    total_lst += ind_lst.tolist()
-                else:
-                    raise TypeError()
-            return np.max(total_lst) + 1
+        return list(all_species)
 
     def _write_test_set(self, file_name='testing.cfg', cwd=None):
-        return self._write_configurations(file_name=file_name, cwd=cwd, respect_step=False, return_max_index=True)
+        return self._write_configurations(file_name=file_name, cwd=cwd, respect_step=False)
 
     def _write_training_set(self, file_name='training.cfg', cwd=None):
         self._write_configurations(file_name=file_name, cwd=cwd, respect_step=True)
@@ -359,13 +472,28 @@ class Mlip(GenericJob):
 
     @staticmethod
     def _find_potential(potential_name):
-        for resource_path in s.resource_paths:
+        for resource_path in state.settings.resource_paths:
             if os.path.exists(os.path.join(resource_path, 'mlip', 'potentials', 'templates')):
                 resource_path = os.path.join(resource_path, 'mlip', 'potentials', 'templates')
             if 'potentials' in resource_path and \
                     os.path.exists(os.path.join(resource_path, potential_name)):
                 return os.path.join(resource_path, potential_name)
         raise ValueError('Potential not found!')
+
+
+    # PotentialFit Implementation
+    def _add_training_data(self, container):
+        self.add_job_to_fitting(container.id, 0, container.number_of_structures - 1, 1)
+
+    def _get_training_data(self):
+        # TODO/BUG: only works after input is written for now, instead this should go over _job_
+        return self["input/training_data"].to_object()
+
+    def _get_predicted_data(self):
+        return self["output/training_efs"].to_object()
+
+    def get_lammps_potential(self):
+        return self.potential_dataframe()
 
 
 class MlipParameter(GenericParameters):
@@ -407,6 +535,10 @@ $MLP_COMMAND_PARALLEL train --energy-weight=energy_auto --force-weight=force_aut
             file_content = '''\
 $MLP_COMMAND_PARALLEL train --energy-weight=energy_auto --force-weight=force_auto --stress-weight=stress_auto --max-iter=iteration_auto start.mtp training.cfg > training.log
 $MLP_COMMAND_SERIAL calc-grade Trained.mtp_ training.cfg testing.cfg grades.cfg --mvs-filename=state.mvs > grading.log
+$MLP_COMMAND_SERIAL calc-errors Trained.mtp_ training.cfg > training.errors
+$MLP_COMMAND_SERIAL calc-errors Trained.mtp_ testing.cfg > testing.errors
+$MLP_COMMAND_SERIAL calc-efs Trained.mtp_ training.cfg training_efs.cfg
+$MLP_COMMAND_SERIAL calc-efs Trained.mtp_ testing.cfg testing_efs.cfg
 $MLP_COMMAND_SERIAL select-add Trained.mtp_ training.cfg testing.cfg diff.cfg > select.log
 cp training.cfg training_new.cfg 
 cat diff.cfg >> training_new.cfg

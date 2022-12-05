@@ -1,4 +1,6 @@
-name: Pip check
+# This workflow is used to test, if the documentation can build
+
+name: Docs
 
 on:
   push:
@@ -8,7 +10,9 @@ on:
 
 jobs:
   build:
+
     runs-on: ubuntu-latest
+
     steps:
     - uses: actions/checkout@v2
     - uses: conda-incubator/setup-miniconda@v2
@@ -22,5 +26,12 @@ jobs:
     - name: Setup
       shell: bash -l {0}
       run: |
+        python .ci_support/pyironconfig.py
         pip install --no-deps .
-        pip check
+        conda env update --name test --file docs/environment.yml
+    - name: Documentation
+      shell: bash -l {0}
+      run: |
+        mkdir public_html; cd docs
+        sphinx-build -b html ./ ../public_html || exit 1;
+        cd ..

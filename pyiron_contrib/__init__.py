@@ -45,7 +45,8 @@ JOB_CLASS_DICT['Atomicrex'] = 'pyiron_contrib.atomistics.atomicrex.atomicrex_job
 JOB_CLASS_DICT['StructureMasterInt'] = 'pyiron_contrib.atomistics.atomistics.job.structurelistmasterinteractive'
 JOB_CLASS_DICT['StorageJob'] = 'pyiron_contrib.RDM.storagejob'
 JOB_CLASS_DICT['MlipDescriptors'] = 'pyiron_contrib.atomistics.mlip.mlipdescriptors'
-
+JOB_CLASS_DICT['PacemakerJob'] = 'pyiron_contrib.atomistics.pacemaker.job'
+JOB_CLASS_DICT['MeamFit'] = 'pyiron_contrib.atomistics.meamfit.meamfit'
 
 from ._version import get_versions
 

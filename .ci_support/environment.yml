@@ -5,14 +5,14 @@ dependencies:
 - coveralls
 - coverage
 - codacy-coverage
-- matplotlib =3.6.0
-- numpy =1.23.3
-- pyiron_base =0.5.24
-- pyiron_atomistics =0.2.57
+- matplotlib =3.6.2
+- numpy =1.23.5
+- pyiron_base =0.5.30
+- pyiron_atomistics =0.2.61
 - pyparsing =3.0.9
-- scipy =1.9.1
-- seaborn =0.12.0
+- scipy =1.9.3
+- seaborn =0.12.1
 - scikit-image =0.19.3
 - randspg =0.0.1
-- boto3 =1.24.84
-- moto =4.0.6
+- boto3 =1.26.27
+- moto =4.0.11

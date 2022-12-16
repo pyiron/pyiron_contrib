@@ -385,6 +385,53 @@ class TrainingStorage(StructureStorage):
             ]
         return self._table_cache
 
+    def include_jobpath(self, jobpath, iteration_step=-1):
+        """
+        Add structure, energy, forces and pressures from an inspected job.
+
+        Args:
+            jobpath (:class:`.JobPath`): job path to take structure from
+            iteration_step (int, optional): if job has multiple steps, this selects which to add
+        """
+
+        energy = jobpath["output/generic/energy_pot"][iteration_step]
+        ff = jobpath["output/generic/forces"]
+        if ff is not None:
+            forces = ff[iteration_step]
+        else:
+            forces = None
+
+        pp = jobpath["output/generic/stresses"]
+        if pp is None:
+            pp = jobpath["output/generic/pressures"]
+        if pp is not None and len(pp) > 0:
+            stress = pp[iteration_step]
+        else:
+            stress = None
+        if stress is not None:
+            stress = np.asarray(stress)
+            if stress.shape == (3, 3):
+                stress = np.array(
+                    [
+                        stress[0, 0],
+                        stress[1, 1],
+                        stress[2, 2],
+                        stress[1, 2],
+                        stress[0, 2],
+                        stress[0, 1],
+                    ]
+                )
+        structure = jobpath["input/structure"].to_object()
+        structure.positions[:] = jobpath["output/generic/positions"][iteration_step]
+        structure.cell.array[:] = jobpath["output/generic/cells"][iteration_step]
+        self.include_structure(
+            structure,
+            energy=energy,
+            forces=forces,
+            stress=stress,
+            name=job.name,
+        )
+
     def include_job(self, job, iteration_step=-1):
         """
         Add structure, energy and forces from job.

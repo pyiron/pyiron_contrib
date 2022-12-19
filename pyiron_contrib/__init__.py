@@ -47,6 +47,8 @@ JOB_CLASS_DICT['StorageJob'] = 'pyiron_contrib.RDM.storagejob'
 JOB_CLASS_DICT['PacemakerJob'] = 'pyiron_contrib.atomistics.pacemaker.job'
 JOB_CLASS_DICT['MeamFit'] = 'pyiron_contrib.atomistics.meamfit.meamfit'
 JOB_CLASS_DICT['QuantumEspresso'] = 'pyiron_contrib.atomistics.quantumespresso.asejob'
+JOB_CLASS_DICT['Cp2kJob'] = 'pyiron_contrib.atomistics.cp2k.job'
+
 
 from ._version import get_versions
 

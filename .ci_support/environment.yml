@@ -16,3 +16,4 @@ dependencies:
 - randspg =0.0.1
 - boto3 =1.26.32
 - moto =4.0.12
+- pycp2k =0.2.2

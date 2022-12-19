@@ -50,7 +50,7 @@ setup(
         'image': ['scikit-image==0.19.3'],
         'generic': [
             'boto3==1.26.32', 
-            'moto==4.0.11'
+            'moto==4.0.12'
         ],
     },
     cmdclass=versioneer.get_cmdclass(),

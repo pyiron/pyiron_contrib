@@ -15,4 +15,4 @@ dependencies:
 - scikit-image =0.19.3
 - randspg =0.0.1
 - boto3 =1.26.32
-- moto =4.0.11
+- moto =4.0.12

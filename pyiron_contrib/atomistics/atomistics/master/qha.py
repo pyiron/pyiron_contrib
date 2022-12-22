@@ -555,6 +555,7 @@ class Thermodynamics:
             strain ((n_snapshots, n_atoms, 3)-np.ndarray): List of strain values
             nu ((n_snapshots, 3 * n_atoms)-np.ndarray): Vibrational frequencies
             E ((n_snapshots,)-ndarray): Force free energy values
+            volume (float): Volume
         """
         self.strain = strain
         self.nu = nu

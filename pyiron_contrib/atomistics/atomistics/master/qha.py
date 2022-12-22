@@ -154,9 +154,10 @@ class Hessian:
             structure (pyiron_atomistics.structure.atoms.Atoms): Structure
             dx (float): Displacement (in distance unit)
             symprec (float): Symmetry search precision
-            include_zero_displacement (bool): Whether to include zero displacement, which is not
-                required to get the force constants, but increases the precision, especially if
-                the initial positions are not the relaxed structure.
+            include_zero_displacement (bool): Whether to include zero
+                displacement, which is not required to get the force constants,
+                but increases the precision, especially if the initial
+                positions are not the relaxed structure.
         """
         self.structure = structure.copy()
         self._symmetry = None
@@ -327,8 +328,8 @@ class QHAJobGenerator(JobGenerator):
 
 class QuasiHarmonicApproximation(AtomisticParallelMaster):
     """
-    Launch Quasi Harmonic Approximation jobs to calculate free energies and derived thermodynamic
-    quantities.
+    Launch Quasi Harmonic Approximation jobs to calculate free energies and
+    derived thermodynamic quantities.
 
 
     Example:
@@ -341,18 +342,25 @@ class QuasiHarmonicApproximation(AtomisticParallelMaster):
 
     Important differences to the existing `QuasiHarmonicJob`:
 
-    - It does not do an internal multiplication of the structure, i.e. the input structure
-        directly defines the interaction range. For this reason, you might be interested to make
-        sure that the structure is large enough.
-    - The minimum energy of each of the strained structures is estimated using the formula:
-        `U = U_0 + 0.5 * \sum_i forces_i * (dx_i - dX_i)`
-        where `dx_i` are the internally generated displacement field, `U` is the potential energy,
-        `forces_i` are the forces and `U_0` and `dX_i` are fitting parameters. The same formula
-        also estimates the correct force-free positions and therefore the correct displacement
-        field for the given strain.
+    - It does not do an internal multiplication of the structure, i.e. the
+        input structure directly defines the interaction range. For this
+        reason, you might be interested to make sure that the structure is
+        large enough.
+    - The minimum energy of each of the strained structures is estimated using
+        the formula:
+
+        .. math::
+
+            U = U_0 + 0.5 * \sum_i forces_i * (dx_i - dX_i)
+
+        where :math:`dx_i` are the internally generated displacement field,
+        :math:`U` is the potential energy, :math:`forces_i` are the forces and
+        :math:`U_0` and :math:`dX_i` are fitting parameters. The same formula
+        also estimates the correct force-free positions and therefore the
+        correct displacement field for the given strain.
     - If you don't need a volume or pressure dependence, you can set
-        `self.input['num_points'] = 1`, in which case all values are returned for the given
-        volume of the reference structure.
+        `self.input['num_points'] = 1`, in which case all values are returned
+        for the given volume of the reference structure.
     """
 
     def __init__(self, project, job_name):

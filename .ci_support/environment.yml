@@ -11,7 +11,7 @@ dependencies:
 - pyiron_atomistics =0.2.61
 - pyparsing =3.0.9
 - scipy =1.9.3
-- seaborn =0.12.1
+- seaborn =0.12.2
 - scikit-image =0.19.3
 - randspg =0.0.1
 - boto3 =1.26.41

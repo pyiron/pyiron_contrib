@@ -35,7 +35,7 @@ setup(
         'numpy==1.24.1',
         'pyiron_base==0.5.30',
         'scipy==1.9.3',
-        'seaborn==0.12.1',
+        'seaborn==0.12.2',
         'pyparsing==3.0.9'
     ],
     extras_require={

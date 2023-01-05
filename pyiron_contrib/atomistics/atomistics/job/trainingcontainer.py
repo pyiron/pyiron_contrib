@@ -330,6 +330,21 @@ class TrainingPlots(StructurePlots):
 
         return df
 
+    def energy_distance(self, num_neighbors=None):
+        """
+        Plot energy vs minimum nearest neighbor distance in the structure.
+
+        Args:
+            num_neighbors (int): maximum number of neighbors to caluclate, when 'distances' are not defined in storage
+                                 the default is the value from the previous call or 36
+        """
+
+        N = self._store.get_array("length")
+        E = self._store.get_array("energy") / N
+        neigh = self._calc_neighbors(num_neighbors=num_neighbors)
+        D = np.array([d.min() for d in np.split(neigh['distances'][:, 0], N.cumsum())[:-1]])
+        plt.scatter(D, E, marker='.')
+
     def forces(self, axis: Optional[int] = None):
         """
         Plot a histogram of all forces.

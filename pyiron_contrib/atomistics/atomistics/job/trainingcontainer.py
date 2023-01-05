@@ -385,7 +385,7 @@ class TrainingStorage(StructureStorage):
             ]
         return self._table_cache
 
-    def include_job(self, jobpath, iteration_step=-1):
+    def include_job(self, job, iteration_step=-1):
         """
         Add structure, energy, forces and pressures from an inspected or loaded job.
 
@@ -394,22 +394,22 @@ class TrainingStorage(StructureStorage):
         Forces and stresses are only added if present in the output.
 
         Args:
-            jobpath (:class:`.JobPath`, :class:`.AtomisticGenericJob`): job (path) to take structure from
+            job (:class:`.JobPath`, :class:`.AtomisticGenericJob`): job (path) to take structure from
             iteration_step (int, optional): if job has multiple steps, this selects which to add
         """
 
         kwargs = {
-                "energy": jobpath["output/generic/energy_pot"][iteration_step],
+                "energy": job["output/generic/energy_pot"][iteration_step],
         }
-        ff = jobpath["output/generic/forces"]
+        ff = job["output/generic/forces"]
         if ff is not None:
             kwargs["forces"] = ff[iteration_step]
 
         # HACK: VASP work-around, current contents of pressures are meaningless, correct values are in
         # output/generic/stresses
-        pp = jobpath["output/generic/stresses"]
+        pp = job["output/generic/stresses"]
         if pp is None:
-            pp = jobpath["output/generic/pressures"]
+            pp = job["output/generic/pressures"]
         if pp is not None and len(pp) > 0:
             stress = np.asarray(pp[iteration_step])
             if stress.shape == (3, 3):
@@ -425,21 +425,25 @@ class TrainingStorage(StructureStorage):
                 )
             kwargs["stress"] = stress
 
-        indices = jobpath["output/generic/indices"][iteration_step]
-        cell = jobpath["output/generic/cells"][iteration_step]
-        positions = jobpath["output/generic/positions"][iteration_step]
-        if len(indices) == len(jobpath["input/structure/indices"]):
-            structure = jobpath["input/structure"].to_object()
+        ii = job["output/generic/indices"]
+        if ii is not None:
+            indices = ii[iteration_step]
+        else:
+            indices = job["input/structure/indices"]
+        cell = job["output/generic/cells"][iteration_step]
+        positions = job["output/generic/positions"][iteration_step]
+        if len(indices) == len(job["input/structure/indices"]):
+            structure = job["input/structure"].to_object()
             structure.positions[:] = positions
             structure.cell.array[:] = cell
             structure.indices[:] = indices
         else:
             structure = Atoms(
-                    species=jobpath["input/structure/species"],
+                    species=job["input/structure/species"],
                     indices=indices,
                     positions=positions,
                     cell=cell,
-                    pbc=jobpath["input/structure/cell/pbc"]
+                    pbc=job["input/structure/cell/pbc"]
             )
 
         self.add_structure(

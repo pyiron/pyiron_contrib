@@ -388,29 +388,31 @@ class TrainingStorage(StructureStorage):
 
     def include_job(self, job, iteration_step=-1):
         """
-        Add structure, energy and forces from job.
+        Add structure, energy, forces and pressures from an inspected or loaded job.
+
+        The job must be an atomistic job.
+
+        Forces and stresses are only added if present in the output.
 
         Args:
-            job (:class:`.AtomisticGenericJob`): job to take structure from
+            job (:class:`.JobPath`, :class:`.AtomisticGenericJob`): job (path) to take structure from
             iteration_step (int, optional): if job has multiple steps, this selects which to add
         """
-        energy = job.output.energy_pot[iteration_step]
-        ff = job.output.forces
+
+        kwargs = {
+                "energy": job["output/generic/energy_pot"][iteration_step],
+        }
+        ff = job["output/generic/forces"]
         if ff is not None:
-            forces = ff[iteration_step]
-        else:
-            forces = None
+            kwargs["forces"] = ff[iteration_step]
+
         # HACK: VASP work-around, current contents of pressures are meaningless, correct values are in
         # output/generic/stresses
         pp = job["output/generic/stresses"]
         if pp is None:
-            pp = job.output.pressures
+            pp = job["output/generic/pressures"]
         if pp is not None and len(pp) > 0:
-            stress = pp[iteration_step]
-        else:
-            stress = None
-        if stress is not None:
-            stress = np.asarray(stress)
+            stress = np.asarray(pp[iteration_step])
             if stress.shape == (3, 3):
                 stress = np.array(
                     [
@@ -422,12 +424,33 @@ class TrainingStorage(StructureStorage):
                         stress[0, 1],
                     ]
                 )
-        self.include_structure(
-            job.get_structure(iteration_step=iteration_step),
-            energy=energy,
-            forces=forces,
-            stress=stress,
-            name=job.name,
+            kwargs["stress"] = stress
+
+        ii = job["output/generic/indices"]
+        if ii is not None:
+            indices = ii[iteration_step]
+        else:
+            indices = job["input/structure/indices"]
+        cell = job["output/generic/cells"][iteration_step]
+        positions = job["output/generic/positions"][iteration_step]
+        if len(indices) == len(job["input/structure/indices"]):
+            structure = job["input/structure"].to_object()
+            structure.positions[:] = positions
+            structure.cell.array[:] = cell
+            structure.indices[:] = indices
+        else:
+            structure = Atoms(
+                    species=job["input/structure/species"],
+                    indices=indices,
+                    positions=positions,
+                    cell=cell,
+                    pbc=job["input/structure/cell/pbc"]
+            )
+
+        self.add_structure(
+            structure,
+            identifier=job.name,
+            **kwargs
         )
 
     @deprecate("Use add_structure instead")

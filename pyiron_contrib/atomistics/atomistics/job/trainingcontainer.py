@@ -208,6 +208,7 @@ class TrainingContainer(GenericJob, HasStructure):
         pass
 
     def run_static(self):
+        self.status.running = True
         if self.input.save_neighbors:
             self.get_neighbors()
             self.to_hdf()

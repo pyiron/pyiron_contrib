@@ -10,7 +10,7 @@ dependencies:
 - pyiron_base =0.5.30
 - pyiron_atomistics =0.2.61
 - pyparsing =3.0.9
-- scipy =1.9.3
+- scipy =1.10.0
 - seaborn =0.12.2
 - scikit-image =0.19.3
 - randspg =0.0.1

@@ -2,9 +2,10 @@
 # Copyright (c) Max-Planck-Institut für Eisenforschung GmbH - Computational Materials Design (CM) Department
 # Distributed under the terms of "New BSD License", see the LICENSE file.
 
+from pyiron_atomistics.lammps.interactive import LammpsInteractive
+from pyiron_atomistics.lammps.base import Input
 from pyiron_base.storage.datacontainer import DataContainer
 from pyiron_atomistics.lammps.potential import LammpsPotentialFile
-from pyiron_atomistics.lammps.interactive import LammpsInteractive
 
 import numpy as np
 import pandas as pd
@@ -23,9 +24,9 @@ __date__ = "Jan 18, 2023"
 
 class PIMDCore(LammpsInteractive):
 
-    def __init__(self, project, job_name, input):
+    def __init__(self, project, job_name):
         super().__init__(project, job_name)
-        self.input = input
+        self.input = Input()
         self.custom_input = DataContainer(table_name='pimd_input')
         self.custom_output = DataContainer(table_name='pimd_output')
         self._templates_directory = None

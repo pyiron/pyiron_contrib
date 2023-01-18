@@ -2,8 +2,6 @@
 # Copyright (c) Max-Planck-Institut für Eisenforschung GmbH - Computational Materials Design (CM) Department
 # Distributed under the terms of "New BSD License", see the LICENSE file.
 
-from pyiron_atomistics.lammps.base import Input
-from pyiron_contrib.atomistics.mlip.lammps import MlipInput
 from pyiron_contrib.atomistics.pimd.pimd_core import PIMDCore
 
 import xml.etree.ElementTree as ET
@@ -21,7 +19,7 @@ __date__ = "Jan 18, 2023"
 class Piglet(PIMDCore):
     
     def __init__(self, project, job_name):
-        super(Piglet, self).__init__(project, job_name, input=Input())
+        super(Piglet, self).__init__(project, job_name)
         
     def calc_npt_md(self, temperature=300., pressure=101325e-9, n_beads=4, timestep=1., damping_timescale=100., 
                     n_ionic_steps=100, n_print=1, seed=32345, port=31415, A=None, C=None):
@@ -58,8 +56,3 @@ class Piglet(PIMDCore):
         root[4][3][0].text = str(self.custom_input.temperature)
         root[4][3][1].text = str(self.custom_input.pressure)
         tree.write(filepath)
-
-class PigletMlip(Piglet):
-
-    def __init__(self, project, job_name):
-        super(Piglet, self).__init__(project, job_name, input=MlipInput())

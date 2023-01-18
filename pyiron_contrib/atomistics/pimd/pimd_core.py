@@ -121,6 +121,7 @@ class PIMDCore(LammpsInteractive):
             [self.working_directory + '/./run_ipi.sh', self.working_directory, str(self.server.cores)])
         self.collect_output()
         self.to_hdf()
+        self.compress()
 
     def collect_props(self):
         f = open(self.working_directory + '/ipi_out.out', "r")
@@ -146,7 +147,7 @@ class PIMDCore(LammpsInteractive):
         self.custom_output.energy_pot = np.array([float(i) for i in energy_pot])
         self.custom_output.volume = np.array([float(i) for i in volume])
         self.custom_output.pressure = np.array([float(i) for i in pressure])
-        self.custom_output.en_tot = self.custom_output.en_pot + self.custom_output.en_kin
+        self.custom_output.energy_tot = self.custom_output.energy_pot + self.custom_output.energy_kin
 
     def collect_cells(self):
         f = open(self.working_directory + '/ipi_out.pos_0.xyz')
@@ -178,6 +179,7 @@ class PIMDCore(LammpsInteractive):
         return np.array([float(i) for i in rdf_r]), np.array([float(i) for i in rdf_g_r])
 
     def get_rdf(self, r_min=2., r_max=5., bins=100, thermalize=50):
+        self.decompress()
         copy(self._templates_directory + '/run_rdf.sh', self.working_directory + '/run_rdf.sh')
         rdf_list = [self.working_directory + '/./run_rdf.sh',
                     self.working_directory,
@@ -188,6 +190,7 @@ class PIMDCore(LammpsInteractive):
                     str(thermalize)]
         subprocess.check_call(rdf_list)
         rdf_r, rdf_g_r = self.collect_rdf()
+        self.compress()
         return rdf_r, rdf_g_r
 
     def to_hdf(self, hdf=None, group_name=None):

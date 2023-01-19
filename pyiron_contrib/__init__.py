@@ -47,6 +47,9 @@ JOB_CLASS_DICT['StorageJob'] = 'pyiron_contrib.RDM.storagejob'
 JOB_CLASS_DICT['PacemakerJob'] = 'pyiron_contrib.atomistics.pacemaker.job'
 JOB_CLASS_DICT['MeamFit'] = 'pyiron_contrib.atomistics.meamfit.meamfit'
 JOB_CLASS_DICT['Cp2kJob'] = 'pyiron_contrib.atomistics.cp2k.job'
+JOB_CLASS_DICT['PiMD'] = 'pyiron_contrib.atomistics.ipi.ipi_jobs'
+JOB_CLASS_DICT['GleMD'] = 'pyiron_contrib.atomistics.ipi.ipi_jobs'
+JOB_CLASS_DICT['PigletMD'] = 'pyiron_contrib.atomistics.ipi.ipi_jobs'
 
 
 from ._version import get_versions

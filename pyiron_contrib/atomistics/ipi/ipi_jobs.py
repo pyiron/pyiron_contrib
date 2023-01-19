@@ -7,6 +7,7 @@ from pyiron_contrib.atomistics.ipi.ipi_core import IPiCore
 
 import xml.etree.ElementTree as ET
 import random
+from shutil import copy
 
 __author__ = "Raynol Dsouza"
 __copyright__ = "Copyright 2022, Max-Planck-Institut für Eisenforschung GmbH " \
@@ -40,10 +41,13 @@ class PiMD(IPiCore):
         self.custom_input.seed = seed
         self.custom_input.port = port
 
+    def write_template_file(self):
+        copy(self._templates_directory + '/pimd_template.xml', self.working_directory + '/pimd_template.xml')
+
     def ipi_write_helper(self, xml_filename):
         if not isinstance(xml_filename, str):
             raise "template must be an xml filename string!"
-        tree = ET.parse(self._templates_directory + '/' + xml_filename)
+        tree = ET.parse(self.working_directory + '/' + xml_filename)
         root = tree.getroot()
         filepath = self.working_directory + '/ipi_input.xml'
         root[0][0].attrib['stride'] = str(self.custom_input.prop_n_print)
@@ -79,6 +83,9 @@ class GleMD(PiMD):
         self.custom_input.A = A
         self.custom_input.C = C
 
+    def write_template_file(self):
+        copy(self._templates_directory + '/gle_template.xml', self.working_directory + '/gle_template.xml')
+
     def write_ipi_xml(self):
         tree, root, filepath = self.ipi_write_helper('gle_template.xml')
         root[4][0].attrib['nbeads'] = str(1)
@@ -95,6 +102,9 @@ class PigletMD(PiMD):
         super(PigletMD, self).calc_npt_md(A=None, C=None, *args, **kwargs)
         self.custom_input.A = A
         self.custom_input.C = C
+
+    def write_template_file(self):
+        copy(self._templates_directory + '/piglet_template.xml', self.working_directory + '/piglet_template.xml')
 
     def write_ipi_xml(self):
         tree, root, filepath = self.ipi_write_helper('piglet_template.xml')

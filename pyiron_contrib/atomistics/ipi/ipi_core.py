@@ -86,6 +86,10 @@ class IPiCore(LammpsInteractive):
 
     def write_shell_scripts(self):
         copy(self._templates_directory + '/run_ipi.sh', self.working_directory + '/run_ipi.sh')
+        copy(self._templates_directory + '/run_rdf.sh', self.working_directory + '/run_rdf.sh')
+
+    def write_template_file(self):
+        pass
 
     def write_input(self):
         if not isdir(self.working_directory):
@@ -95,8 +99,9 @@ class IPiCore(LammpsInteractive):
         self.write_init_xyz()
         self.write_data_lmp()
         self.write_input_lmp()
-        self.write_ipi_xml()
         self.write_shell_scripts()
+        self.write_template_file()
+        self.write_ipi_xml()
 
     def run_static(self):
         subprocess.check_call(
@@ -162,7 +167,6 @@ class IPiCore(LammpsInteractive):
 
     def get_rdf(self, r_min=2., r_max=5., bins=100, thermalize=50):
         self.decompress()
-        copy(self._templates_directory + '/run_rdf.sh', self.working_directory + '/run_rdf.sh')
         rdf_list = [self.working_directory + '/./run_rdf.sh',
                     self.working_directory,
                     str(self.custom_input.temperature),

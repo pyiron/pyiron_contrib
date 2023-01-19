@@ -5,8 +5,8 @@ import warnings
 
 from pyiron_contrib.atomistics.ipi.ipi_core import IPiCore
 
-import xml.etree.ElementTree as ET
-import random
+from xml.etree import ElementTree
+from numpy import random
 from shutil import copy
 
 __author__ = "Raynol Dsouza"
@@ -47,7 +47,7 @@ class PiMD(IPiCore):
     def ipi_write_helper(self, xml_filename):
         if not isinstance(xml_filename, str):
             raise "template must be an xml filename string!"
-        tree = ET.parse(self.working_directory + '/' + xml_filename)
+        tree = ElementTree.parse(self.working_directory + '/' + xml_filename)
         root = tree.getroot()
         filepath = self.working_directory + '/ipi_input.xml'
         root[0][0].attrib['stride'] = str(self.custom_input.prop_n_print)
@@ -77,7 +77,7 @@ class GleMD(PiMD):
         super(GleMD, self).__init__(project, job_name)
 
     def calc_npt_md(self, A=None, C=None, n_beads=1, *args, **kwargs):
-        super(GleMD, self).calc_npt_md(A=None, C=None, *args, **kwargs)
+        super(GleMD, self).calc_npt_md(A=None, C=None, n_beads=1, *args, **kwargs)
         if self.custom_input.n_beads != 1:
             warnings.warn("For GLE, the number of n_beads == 1. Setting n_beads to 1.")
         self.custom_input.A = A

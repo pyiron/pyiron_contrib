@@ -5,10 +5,8 @@
 from pyiron_atomistics.lammps.interactive import LammpsInteractive
 from pyiron_atomistics.lammps.base import Input
 from pyiron_base.storage.datacontainer import DataContainer
-from pyiron_atomistics.lammps.potential import LammpsPotentialFile
 
 import numpy as np
-import pandas as pd
 import subprocess
 from shutil import copy
 from os.path import isdir
@@ -22,7 +20,7 @@ __email__ = "dsouza@mpie.de"
 __status__ = "development"
 __date__ = "Jan 18, 2023"
 
-class PIMDCore(LammpsInteractive):
+class IPiCore(LammpsInteractive):
 
     def __init__(self, project, job_name):
         super().__init__(project, job_name)
@@ -40,23 +38,6 @@ class PIMDCore(LammpsInteractive):
         if not isinstance(templates_directory, str):
             raise TypeError('templates_directory must be a str!')
         self._templates_directory = templates_directory
-
-    @property
-    def potential(self):
-        return self.input.potential.df
-
-    @potential.setter
-    def potential(self, potential_filename):
-        if isinstance(potential_filename, str):
-            if ".lmp" in potential_filename:
-                potential_filename = potential_filename.split(".lmp")[0]
-            potential_db = LammpsPotentialFile()
-            potential = potential_db.find_by_name(potential_filename)
-        elif isinstance(potential_filename, pd.DataFrame):
-            potential = potential_filename
-        else:
-            raise TypeError("Potentials have to be strings or pandas dataframes.")
-        self.input.potential.df = potential
 
     def calc_npt_md(self):
         pass
@@ -109,7 +90,7 @@ class PIMDCore(LammpsInteractive):
     def write_input(self):
         if not isdir(self.working_directory):
             self.project_hdf5.create_working_directory()
-        super(PIMDCore, self).write_input()
+        super(IPiCore, self).write_input()
         self.write_potential()
         self.write_init_xyz()
         self.write_data_lmp()
@@ -195,14 +176,14 @@ class PIMDCore(LammpsInteractive):
         return rdf_r, rdf_g_r
 
     def to_hdf(self, hdf=None, group_name=None):
-        super(PIMDCore, self).to_hdf(hdf=hdf, group_name=group_name)
+        super(IPiCore, self).to_hdf(hdf=hdf, group_name=group_name)
         self._structure_to_hdf()
         self.custom_input.templates_directory = self._templates_directory
         self.custom_input.to_hdf(self._hdf5)
         self.custom_output.to_hdf(self._hdf5)
 
     def from_hdf(self, hdf=None, group_name=None):
-        super(PIMDCore, self).from_hdf(hdf=hdf, group_name=group_name)
+        super(IPiCore, self).from_hdf(hdf=hdf, group_name=group_name)
         self._structure_from_hdf()
         self.custom_input.from_hdf(self._hdf5)
         self._templates_directory = self.custom_input.templates_directory

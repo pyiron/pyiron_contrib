@@ -6,7 +6,7 @@ import warnings
 from pyiron_contrib.atomistics.ipi.ipi_core import IPiCore
 
 from xml.etree import ElementTree
-from numpy import random
+import random
 from shutil import copy
 
 __author__ = "Raynol Dsouza"

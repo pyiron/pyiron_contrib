@@ -108,6 +108,7 @@ class IPiCore(LammpsInteractive):
             [self.working_directory + '/./run_ipi.sh', self.working_directory, str(self.server.cores)])
         self.collect_output()
         self.to_hdf()
+        self.status.finished = True
         self.compress()
 
     def collect_props(self):
@@ -137,7 +138,8 @@ class IPiCore(LammpsInteractive):
         self.custom_output.energy_tot = self.custom_output.energy_pot + self.custom_output.energy_kin
 
     def collect_cells(self):
-        f = open(self.working_directory + '/ipi_out.pos_0.xyz')
+        digits = "{0:0" + str(len(str(self.custom_input.n_beads))) + "}"
+        f = open(self.working_directory + '/ipi_out.pos_' + digits.format(0) + '.xyz')
         lines = f.readlines()
         abc = []
         ABC = []

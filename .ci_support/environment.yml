@@ -6,7 +6,7 @@ dependencies:
 - coverage
 - codacy-coverage
 - matplotlib =3.6.3
-- numpy =1.24.1
+- numpy =1.24.2
 - pyiron_base =0.5.31
 - pyiron_atomistics =0.2.62
 - pyparsing =3.0.9
@@ -15,5 +15,6 @@ dependencies:
 - scikit-image =0.19.3
 - randspg =0.0.1
 - boto3 =1.26.54
-- moto =4.1.0
+- moto =4.1.2
 - pycp2k =0.2.2
+- sqlalchemy <2

@@ -17,4 +17,3 @@ dependencies:
 - boto3 =1.26.65
 - moto =4.1.2
 - pycp2k =0.2.2
-- sqlalchemy <2

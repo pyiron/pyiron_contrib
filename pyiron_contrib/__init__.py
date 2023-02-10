@@ -50,6 +50,9 @@ JOB_CLASS_DICT['Cp2kJob'] = 'pyiron_contrib.atomistics.cp2k.job'
 JOB_CLASS_DICT['PiMD'] = 'pyiron_contrib.atomistics.ipi.ipi_jobs'
 JOB_CLASS_DICT['GleMD'] = 'pyiron_contrib.atomistics.ipi.ipi_jobs'
 JOB_CLASS_DICT['PigletMD'] = 'pyiron_contrib.atomistics.ipi.ipi_jobs'
+JOB_CLASS_DICT['LammpsInteractiveWithoutOutput'] = 'pyiron_contrib.nofiles.lammps'
+JOB_CLASS_DICT['SQSJobWithoutOutput'] = 'pyiron_contrib.nofiles.sqs'
+JOB_CLASS_DICT['ElasticMatrixJobWithoutFiles'] = 'pyiron_contrib.nofiles.elastic'
 
 
 from ._version import get_versions

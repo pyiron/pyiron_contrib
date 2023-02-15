@@ -47,7 +47,7 @@ def get_vibrational_frequencies(structure, hessian):
 
 
 class Displacements:
-    """Creationg of displacement field."""
+    """Creation of displacement field."""
     def __init__(self, structure, symprec=1.0e-2, include_zero=True, second_order=True):
         """
         Displacement field

@@ -54,6 +54,7 @@ JOB_CLASS_DICT['LammpsInteractiveWithoutOutput'] = 'pyiron_contrib.nofiles.lammp
 JOB_CLASS_DICT['SQSJobWithoutOutput'] = 'pyiron_contrib.nofiles.sqs'
 JOB_CLASS_DICT['ElasticMatrixJobWithoutFiles'] = 'pyiron_contrib.nofiles.elastic'
 JOB_CLASS_DICT['MurnaghanWithoutFiles'] = 'pyiron_contrib.nofiles.murn'
+JOB_CLASS_DICT['PhonopyJobWithoutFiles'] = 'pyiron_contrib.nofiles.phonopy'
 
 
 from ._version import get_versions

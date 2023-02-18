@@ -1,7 +1,8 @@
 import numpy as np
-import pyiron_contrib
+from pyiron_contrib.nofiles.lammps import LammpsInteractiveWithoutOutput
+from pyiron_contrib.nofiles.elastic import ElasticMatrixJobWithoutFiles
+from pyiron_contrib.nofiles.sqs import SQSJobWithoutOutput
 from pyiron_atomistics import Project, ase_to_pyiron, pyiron_to_ase
-from mpi4py import MPI
 
 
 def generate_sqs_structures(input_parameter):
@@ -10,7 +11,7 @@ def generate_sqs_structures(input_parameter):
     # calculation
     if len(mole_fraction_dict) > 1:
         project = Project(working_directory)
-        job = project.create_job(project.job_type.SQSJobWithoutOutput, "sqs_" + str(i))
+        job = project.create_job(SQSJobWithoutOutput, "sqs_" + str(i))
         job._interactive_disable_log_file = True
         job.structure = ase_to_pyiron(structure_template)
         job.input['mole_fractions'] = mole_fraction_dict
@@ -32,7 +33,7 @@ def minimize_structure_with_lammps(input_parameter):
 
     # calculation
     project = Project(working_directory)
-    lmp_mini1 = project.create_job(project.job_type.LammpsInteractiveWithoutOutput, "lmp_mini_" + str(i),
+    lmp_mini1 = project.create_job(LammpsInteractiveWithoutOutput, "lmp_mini_" + str(i),
                                    delete_existing_job=True)
     lmp_mini1.structure = ase_to_pyiron(structure_next)
     lmp_mini1.potential = potential
@@ -52,7 +53,7 @@ def get_elastic_constants(input_para):
 
     # Elastic constants
     project = Project(working_directory)
-    lmp_elastic = project.create_job(project.job_type.LammpsInteractiveWithoutOutput, "lmp_elastic_" + str(i),
+    lmp_elastic = project.create_job(LammpsInteractiveWithoutOutput, "lmp_elastic_" + str(i),
                                      delete_existing_job=True)
     lmp_elastic.structure = ase_to_pyiron(structure)
     lmp_elastic.potential = potential
@@ -60,7 +61,7 @@ def get_elastic_constants(input_para):
     lmp_elastic.interactive_mpi_communicator = MPI.COMM_SELF
     lmp_elastic.server.run_mode.interactive = True
     lmp_elastic._interactive_disable_log_file = True  # disable lammps.log
-    elastic = lmp_elastic.create_job(project.job_type.ElasticMatrixJobWithoutFiles, "elastic_" + str(i),
+    elastic = lmp_elastic.create_job(ElasticMatrixJobWithoutFiles, "elastic_" + str(i),
                                      delete_existing_job=True)
     elastic._interactive_disable_log_file = True  # disable lammps.log
     elastic.run()

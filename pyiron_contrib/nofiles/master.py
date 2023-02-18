@@ -30,7 +30,7 @@ def minimize_structure_with_lammps(input_parameter):
     i, structure_next, potential, working_directory = input_parameter
 
     # import
-    from pyiron_atomistics import Project
+    from pyiron_atomistics import Project, ase_to_pyiron, pyiron_to_ase
     from pyiron_contrib.nofiles.lammps import LammpsInteractiveWithoutOutput
     from mpi4py import MPI
 
@@ -55,7 +55,7 @@ def get_elastic_constants(input_para):
     i, structure, element_lst, potential, working_directory = input_para
 
     # import
-    from pyiron_atomistics import Project
+    from pyiron_atomistics import Project, ase_to_pyiron
     from pyiron_contrib.nofiles.lammps import LammpsInteractiveWithoutOutput
     from pyiron_contrib.nofiles.elastic import ElasticMatrixJobWithoutFiles
     from mpi4py import MPI

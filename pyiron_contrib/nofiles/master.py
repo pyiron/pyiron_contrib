@@ -1,12 +1,10 @@
-import numpy as np
-from pyiron_contrib.nofiles.lammps import LammpsInteractiveWithoutOutput
-from pyiron_contrib.nofiles.elastic import ElasticMatrixJobWithoutFiles
-from pyiron_contrib.nofiles.sqs import SQSJobWithoutOutput
-from pyiron_atomistics import Project, ase_to_pyiron, pyiron_to_ase
-
-
 def generate_sqs_structures(input_parameter):
     i, mole_fraction_dict, structure_template, working_directory = input_parameter
+
+    # import
+    import numpy as np
+    from pyiron_atomistics import Project, ase_to_pyiron, pyiron_to_ase
+    from pyiron_contrib.nofiles.sqs import SQSJobWithoutOutput
 
     # calculation
     if len(mole_fraction_dict) > 1:
@@ -31,6 +29,11 @@ def generate_sqs_structures(input_parameter):
 def minimize_structure_with_lammps(input_parameter):
     i, structure_next, potential, working_directory = input_parameter
 
+    # import
+    from pyiron_atomistics import Project
+    from pyiron_contrib.nofiles.lammps import LammpsInteractiveWithoutOutput
+    from mpi4py import MPI
+
     # calculation
     project = Project(working_directory)
     lmp_mini1 = project.create_job(LammpsInteractiveWithoutOutput, "lmp_mini_" + str(i),
@@ -50,6 +53,12 @@ def minimize_structure_with_lammps(input_parameter):
 
 def get_elastic_constants(input_para):
     i, structure, element_lst, potential, working_directory = input_para
+
+    # import
+    from pyiron_atomistics import Project
+    from pyiron_contrib.nofiles.lammps import LammpsInteractiveWithoutOutput
+    from pyiron_contrib.nofiles.elastic import ElasticMatrixJobWithoutFiles
+    from mpi4py import MPI
 
     # Elastic constants
     project = Project(working_directory)
@@ -105,6 +114,12 @@ def get_elastic_constants(input_para):
 
 def combined_function(input_parameter):
     i, mole_fraction_dict, structure_template, element_lst, potential, working_directory = input_parameter
+
+    # import
+    from pyiron_contrib.nofiles.master import \
+        generate_sqs_structures, \
+        minimize_structure_with_lammps, \
+        get_elastic_constants
 
     # calculation
     structure_next = generate_sqs_structures(

@@ -12,7 +12,16 @@ class LammpsInteractiveWithoutOutput(LammpsInteractive):
     def __init__(self, project, job_name):
         super(LammpsInteractiveWithoutOutput, self).__init__(project, job_name)
         self._interactive_disable_log_file = False
+        self._interactive_mpi_communicator = None
 
+    @property
+    def interactive_mpi_communicator(self):
+        return self._interactive_mpi_communicator
+
+    @interactive_mpi_communicator.setter
+    def interactive_mpi_communicator(self, comm):
+        self._interactive_mpi_communicator = comm
+        
     def to_hdf(self, hdf=None, group_name=None):
         """
 
@@ -40,11 +49,13 @@ class LammpsInteractiveWithoutOutput(LammpsInteractive):
                 self._log_file = os.path.join(self.working_directory, "log.lammps")
             if not self._interactive_disable_log_file:
                 self._interactive_library = lammps(
-                    cmdargs=["-screen", "none", "-log", self._log_file]
+                    cmdargs=["-screen", "none", "-log", self._log_file],
+                    comm=self._interactive_mpi_communicator
                 )
             else:
                 self._interactive_library = lammps(
-                    cmdargs=["-screen", "none", "-log", "none"]
+                    cmdargs=["-screen", "none", "-log", "none"],
+                    comm=self._interactive_mpi_communicator
                 )
         else:
             self._interactive_library = LammpsLibrary(

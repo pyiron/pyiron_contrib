@@ -460,11 +460,6 @@ class TrainingStorage(StructureStorage):
                 pbc=[pbc],
                 **kwargs
         )
-        # self.add_structure(
-        #     structure,
-        #     identifier=job.name,
-        #     **kwargs
-        # )
 
     @deprecate("Use add_structure instead")
     def include_structure(

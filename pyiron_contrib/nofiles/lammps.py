@@ -12,7 +12,7 @@ class LammpsInteractiveWithoutOutput(LammpsInteractive):
     def __init__(self, project, job_name):
         super(LammpsInteractiveWithoutOutput, self).__init__(project, job_name)
         self._interactive_disable_log_file = False
-        
+
     def to_hdf(self, hdf=None, group_name=None):
         """
 

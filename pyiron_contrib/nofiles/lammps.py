@@ -40,11 +40,13 @@ class LammpsInteractiveWithoutOutput(LammpsInteractive):
                 self._log_file = os.path.join(self.working_directory, "log.lammps")
             if not self._interactive_disable_log_file:
                 self._interactive_library = lammps(
-                    cmdargs=["-screen", "none", "-log", self._log_file]
+                    cmdargs=["-screen", "none", "-log", self._log_file],
+                    comm=self._interactive_mpi_communicator
                 )
             else:
                 self._interactive_library = lammps(
-                    cmdargs=["-screen", "none", "-log", "none"]
+                    cmdargs=["-screen", "none", "-log", "none"],
+                    comm=self._interactive_mpi_communicator
                 )
         else:
             self._interactive_library = LammpsLibrary(

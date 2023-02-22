@@ -55,6 +55,10 @@ JOB_CLASS_DICT['SQSJobWithoutOutput'] = 'pyiron_contrib.nofiles.sqs'
 JOB_CLASS_DICT['ElasticMatrixJobWithoutFiles'] = 'pyiron_contrib.nofiles.elastic'
 JOB_CLASS_DICT['MurnaghanWithoutFiles'] = 'pyiron_contrib.nofiles.murn'
 JOB_CLASS_DICT['PhonopyJobWithoutFiles'] = 'pyiron_contrib.nofiles.phonopy'
+JOB_CLASS_DICT['SQSMasterMPI'] = 'pyiron_contrib.nofiles.master'
+JOB_CLASS_DICT['LAMMPSMinimizeMPI'] = 'pyiron_contrib.nofiles.master'
+JOB_CLASS_DICT['LAMMPSElasticMPI'] = 'pyiron_contrib.nofiles.master'
+JOB_CLASS_DICT['LAMMPSMinimizeElasticMPI'] = 'pyiron_contrib.nofiles.master'
 
 
 from ._version import get_versions

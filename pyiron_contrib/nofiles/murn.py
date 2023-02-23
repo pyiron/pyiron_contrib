@@ -9,6 +9,16 @@ class MurnaghanWithoutFiles(Murnaghan):
         super(MurnaghanWithoutFiles, self).__init__(project, job_name)
         self._interactive_disable_log_file = False
 
+    @property
+    def child_project(self):
+        """
+        :class:`.Project`: project which holds the created child jobs
+        """
+        if not self._interactive_disable_log_file:
+            return super(MurnaghanWithoutFiles, self).child_project
+        else:
+            return self.project
+
     def to_hdf(self, hdf=None, group_name=None):
         """
         Args:

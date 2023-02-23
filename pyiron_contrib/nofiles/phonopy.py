@@ -3,6 +3,16 @@ from pyiron_atomistics.atomistics.master.phonopy import PhonopyJob
 
 
 class PhonopyJobWithoutFiles(PhonopyJob):
+    @property
+    def child_project(self):
+        """
+        :class:`.Project`: project which holds the created child jobs
+        """
+        if self.data_storage_enabled:
+            return super(PhonopyJobWithoutFiles, self).child_project
+        else:
+            return self.project
+
     def _run_if_collect(self):
         """
         Internal helper function the run if collect function is called when the job status is 'collect'. It collects

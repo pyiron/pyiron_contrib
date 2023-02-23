@@ -3,6 +3,16 @@ from pyiron_gpl.elastic.elastic import ElasticMatrixJob
 
 
 class ElasticMatrixJobWithoutFiles(ElasticMatrixJob):
+    @property
+    def child_project(self):
+        """
+        :class:`.Project`: project which holds the created child jobs
+        """
+        if self.data_storage_enabled:
+            return super(ElasticMatrixJobWithoutFiles, self).child_project
+        else:
+            return self.project
+
     def collect_output(self):
         if not self._data:
             self.from_hdf()

@@ -5,15 +5,9 @@ from pyiron_atomistics.atomistics.master.murnaghan import Murnaghan
 
 
 class MurnaghanWithoutFiles(Murnaghan):
-    @property
-    def child_project(self):
-        """
-        :class:`.Project`: project which holds the created child jobs
-        """
-        if self.data_storage_enabled:
-            return super(MurnaghanWithoutFiles, self).child_project
-        else:
-            return self.project
+    def __init__(self, project, job_name):
+        super(MurnaghanWithoutFiles, self).__init__(project, job_name)
+        self._data_storage_disabled_implemented = True
 
     def _fit_eos_general(self, vol_erg_dic=None, fittype="birchmurnaghan"):
         self._set_fit_module(vol_erg_dic=vol_erg_dic)

@@ -11,6 +11,7 @@ class AtomisticStructureMasterNoFiles(AtomisticGenericJob):
         super(AtomisticStructureMasterNoFiles, self).__init__(project, job_name)
         self._lst_of_struct = []
         self._python_only_job = True
+        self._data_storage_disabled_implemented = True
 
     @property
     def list_of_structures(self):
@@ -31,6 +32,7 @@ class GenericStructureMasterNoFiles(GenericJob):
         super(GenericStructureMasterNoFiles, self).__init__(project, job_name)
         self._lst_of_struct = []
         self._python_only_job = True
+        self._data_storage_disabled_implemented = True
 
     @property
     def list_of_structures(self):

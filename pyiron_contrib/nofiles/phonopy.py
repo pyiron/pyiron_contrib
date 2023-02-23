@@ -3,24 +3,6 @@ from pyiron_atomistics.atomistics.master.phonopy import PhonopyJob
 
 
 class PhonopyJobWithoutFiles(PhonopyJob):
-    def __init__(self, project, job_name):
-        super(PhonopyJobWithoutFiles, self).__init__(project, job_name)
-        self._interactive_disable_log_file = False
-
-    def to_hdf(self, hdf=None, group_name=None):
-        """
-        Args:
-            hdf:
-            group_name:
-        Returns:
-        """
-        if not self._interactive_disable_log_file:
-            super(PhonopyJobWithoutFiles, self).to_hdf(hdf=hdf, group_name=group_name)
-
-    def refresh_job_status(self):
-        if not self._interactive_disable_log_file:
-            super(PhonopyJobWithoutFiles).refresh_job_status()
-
     def _run_if_collect(self):
         """
         Internal helper function the run if collect function is called when the job status is 'collect'. It collects
@@ -28,7 +10,7 @@ class PhonopyJobWithoutFiles(PhonopyJob):
         status is set to 'finished'.
         """
 
-        if not self._interactive_disable_log_file:
+        if self.data_storage_enabled:
             super(PhonopyJobWithoutFiles)._run_if_collect()
         else:
             self._logger.info(
@@ -46,7 +28,7 @@ class PhonopyJobWithoutFiles(PhonopyJob):
         """
         Returns:
         """
-        if self.ref_job.server.run_mode.interactive and self._interactive_disable_log_file:
+        if self.ref_job.server.run_mode.interactive and not self.data_storage_enabled:
             forces_lst = self.ref_job.output.forces
         elif self.ref_job.server.run_mode.interactive:
             forces_lst = self.project_hdf5.inspect(self.child_ids[0])[
@@ -67,7 +49,7 @@ class PhonopyJobWithoutFiles(PhonopyJob):
         self.phonopy.run_total_dos()
         dos_dict = self.phonopy.get_total_dos_dict()
 
-        if not self._interactive_disable_log_file:
+        if self.data_storage_enabled:
             self.to_hdf()
             with self.project_hdf5.open("output") as hdf5_out:
                 hdf5_out["dos_total"] = dos_dict["total_dos"]
@@ -95,7 +77,7 @@ class PhonopyJobWithoutFiles(PhonopyJob):
             self.server.cores = job.server.cores
         if job.job_name not in self._job_name_lst:
             self._job_name_lst.append(job.job_name)
-            if not self._interactive_disable_log_file:
+            if self.data_storage_enabled:
                 self._child_job_update_hdf(parent_job=self, child_job=job)
 
     def pop(self, i=-1):
@@ -111,7 +93,7 @@ class PhonopyJobWithoutFiles(PhonopyJob):
             self._load_job_from_cache(job_name_to_return)
         )
         del self._job_name_lst[i]
-        if not self._interactive_disable_log_file:
+        if self.data_storage_enabled:
             with self.project_hdf5.open("input") as hdf5_input:
                 hdf5_input["job_list"] = self._job_name_lst
             job_to_return.relocate_hdf5()
@@ -141,7 +123,7 @@ class PhonopyJobWithoutFiles(PhonopyJob):
             axis = ax
         if axis is None:
             _, axis = plt.subplots(1, 1)
-        if not self._interactive_disable_log_file:
+        if self.data_storage_enabled:
             axis.plot(
                 self["output/dos_energies"], self["output/dos_total"], *args, **kwargs
             )

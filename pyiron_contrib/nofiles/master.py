@@ -1,68 +1,16 @@
 import pandas
 from pympipool import Pool
-from pyiron_base import DataContainer, GenericJob
+from pyiron_base import DataContainer, GenericJob, to_hdf_decorator
 from pyiron_atomistics.project import Project
 from pyiron_atomistics.atomistics.structure.atoms import Atoms, pyiron_to_ase, ase_to_pyiron
 from pyiron_atomistics.atomistics.job.atomistic import AtomisticGenericJob
 
 
-class GenericJobNoFiles(GenericJob):
-    def __init__(self, project, job_name):
-        super(GenericJobNoFiles, self).__init__(project, job_name)
-
-        # internal variables
-        self._python_only_job = True
-        self._interactive_disable_log_file = False
-
-    def refresh_job_status(self):
-        if not self._interactive_disable_log_file:
-            super(GenericJobNoFiles, self).refresh_job_status()
-
-    def to_hdf(self, hdf=None, group_name=None):
-        """
-
-        Args:
-            hdf:
-            group_name:
-
-        Returns:
-
-        """
-        if not self._interactive_disable_log_file:
-            super(GenericJobNoFiles, self).to_hdf(hdf=hdf, group_name=group_name)
-
-
-class AtomisticGenericJobNoFiles(AtomisticGenericJob):
-    def __init__(self, project, job_name):
-        super(AtomisticGenericJobNoFiles, self).__init__(project, job_name)
-
-        # internal variables
-        self._python_only_job = True
-        self._interactive_disable_log_file = False
-
-    def refresh_job_status(self):
-        if not self._interactive_disable_log_file:
-            super(AtomisticGenericJobNoFiles, self).refresh_job_status()
-
-    def to_hdf(self, hdf=None, group_name=None):
-        """
-
-        Args:
-            hdf:
-            group_name:
-
-        Returns:
-
-        """
-        if not self._interactive_disable_log_file:
-            super(AtomisticGenericJobNoFiles, self).to_hdf(hdf=hdf, group_name=group_name)
-            self._structure_to_hdf()
-
-
-class AtomisticStructureMasterNoFiles(AtomisticGenericJobNoFiles):
+class AtomisticStructureMasterNoFiles(AtomisticGenericJob):
     def __init__(self, project, job_name):
         super(AtomisticStructureMasterNoFiles, self).__init__(project, job_name)
         self._lst_of_struct = []
+        self._python_only_job = True
 
     @property
     def list_of_structures(self):
@@ -78,10 +26,11 @@ class AtomisticStructureMasterNoFiles(AtomisticGenericJobNoFiles):
                 self._lst_of_struct.append(Atoms().from_hdf(hdf5_output))
 
 
-class GenericStructureMasterNoFiles(GenericJobNoFiles):
+class GenericStructureMasterNoFiles(GenericJob):
     def __init__(self, project, job_name):
         super(GenericStructureMasterNoFiles, self).__init__(project, job_name)
         self._lst_of_struct = []
+        self._python_only_job = True
 
     @property
     def list_of_structures(self):
@@ -105,6 +54,7 @@ class SQSMasterMPI(AtomisticStructureMasterNoFiles):
         self.input = DataContainer(table_name="custom_dict")
         self.input.mole_fraction_dict_lst = []
 
+    @to_hdf_decorator
     def to_hdf(self, hdf=None, group_name=None):
         """
 
@@ -115,10 +65,9 @@ class SQSMasterMPI(AtomisticStructureMasterNoFiles):
         Returns:
 
         """
-        if not self._interactive_disable_log_file:
-            super(SQSMasterMPI, self).to_hdf(hdf=hdf, group_name=group_name)
-            with self.project_hdf5.open("input") as h5in:
-                self.input.to_hdf(h5in)
+        super(SQSMasterMPI, self).to_hdf(hdf=hdf, group_name=group_name)
+        with self.project_hdf5.open("input") as h5in:
+            self.input.to_hdf(h5in)
 
     def run_static(self):
         self.project_hdf5.create_working_directory()
@@ -130,7 +79,7 @@ class SQSMasterMPI(AtomisticStructureMasterNoFiles):
             list_of_structures = p.map(function=generate_sqs_structures, lst=input_para_lst)
             self._lst_of_struct = [ase_to_pyiron(s) for s in list_of_structures]
 
-        if not self._interactive_disable_log_file:
+        if self.data_storage_enabled:
             for i, structure in enumerate(self._lst_of_struct):
                 with self.project_hdf5.open("output/structures/structure_" + str(i)) as h5:
                     structure.to_hdf(h5)
@@ -155,6 +104,7 @@ class LAMMPSMinimizeMPI(GenericStructureMasterNoFiles):
     def structure_lst(self, structure_lst):
         self._structure_lst = structure_lst
 
+    @to_hdf_decorator
     def to_hdf(self, hdf=None, group_name=None):
         """
 
@@ -165,13 +115,12 @@ class LAMMPSMinimizeMPI(GenericStructureMasterNoFiles):
         Returns:
 
         """
-        if not self._interactive_disable_log_file:
-            super(LAMMPSMinimizeMPI, self).to_hdf(hdf=hdf, group_name=group_name)
-            with self.project_hdf5.open("input") as h5in:
-                self.input.to_hdf(h5in)
-            with self.project_hdf5.open("input/structures") as hdf5_input:
-                for ind, struct in enumerate(self.structure_lst):
-                    struct.to_hdf(hdf=hdf5_input, group_name="s_" + str(ind))
+        super(LAMMPSMinimizeMPI, self).to_hdf(hdf=hdf, group_name=group_name)
+        with self.project_hdf5.open("input") as h5in:
+            self.input.to_hdf(h5in)
+        with self.project_hdf5.open("input/structures") as hdf5_input:
+            for ind, struct in enumerate(self.structure_lst):
+                struct.to_hdf(hdf=hdf5_input, group_name="s_" + str(ind))
 
     def run_static(self):
         self.project_hdf5.create_working_directory()
@@ -183,7 +132,7 @@ class LAMMPSMinimizeMPI(GenericStructureMasterNoFiles):
             list_of_structures = p.map(function=minimize_structure_with_lammps, lst=input_para_lst)
             self._lst_of_struct = [ase_to_pyiron(s) for s in list_of_structures]
 
-        if not self._interactive_disable_log_file:
+        if self.data_storage_enabled:
             for i, structure in enumerate(self._lst_of_struct):
                 with self.project_hdf5.open("output/structures/structure_" + str(i)) as h5:
                     structure.to_hdf(h5)
@@ -191,7 +140,7 @@ class LAMMPSMinimizeMPI(GenericStructureMasterNoFiles):
             self.project.db.item_update(self._runtime(), self.job_id)
 
 
-class LAMMPSElasticMPI(GenericJobNoFiles):
+class LAMMPSElasticMPI(GenericJob):
     def __init__(self, project, job_name):
         super(LAMMPSElasticMPI, self).__init__(project, job_name)
 
@@ -201,6 +150,7 @@ class LAMMPSElasticMPI(GenericJobNoFiles):
         self.input.element_lst = []
         self._structure_lst = []
         self._results_df = None
+        self._python_only_job = True
 
     @property
     def structure_lst(self):
@@ -214,6 +164,7 @@ class LAMMPSElasticMPI(GenericJobNoFiles):
     def results(self):
         return self._results_df
 
+    @to_hdf_decorator
     def to_hdf(self, hdf=None, group_name=None):
         """
 
@@ -224,13 +175,12 @@ class LAMMPSElasticMPI(GenericJobNoFiles):
         Returns:
 
         """
-        if not self._interactive_disable_log_file:
-            super(LAMMPSElasticMPI, self).to_hdf(hdf=hdf, group_name=group_name)
-            with self.project_hdf5.open("input") as h5in:
-                self.input.to_hdf(h5in)
-            with self.project_hdf5.open("input/structures") as hdf5_input:
-                for ind, struct in enumerate(self.structure_lst):
-                    struct.to_hdf(hdf=hdf5_input, group_name="s_" + str(ind))
+        super(LAMMPSElasticMPI, self).to_hdf(hdf=hdf, group_name=group_name)
+        with self.project_hdf5.open("input") as h5in:
+            self.input.to_hdf(h5in)
+        with self.project_hdf5.open("input/structures") as hdf5_input:
+            for ind, struct in enumerate(self.structure_lst):
+                struct.to_hdf(hdf=hdf5_input, group_name="s_" + str(ind))
 
     def run_static(self):
         self.project_hdf5.create_working_directory()
@@ -273,7 +223,7 @@ class LAMMPSElasticMPI(GenericJobNoFiles):
             "C66": c66_lst
         })
 
-        if not self._interactive_disable_log_file:
+        if self.data_storage_enabled:
             self._results_df.to_hdf(self.project_hdf5._file_name, self.job_name + "/output/df")
 
     def from_hdf(self, hdf=None, group_name=None):
@@ -297,6 +247,7 @@ class LAMMPSMinimizeElasticMPI(AtomisticStructureMasterNoFiles):
     def results(self):
         return self._results_df
 
+    @to_hdf_decorator
     def to_hdf(self, hdf=None, group_name=None):
         """
 
@@ -354,7 +305,7 @@ class LAMMPSMinimizeElasticMPI(AtomisticStructureMasterNoFiles):
             "C66": c66_lst
         })
 
-        if not self._interactive_disable_log_file:
+        if self.data_storage_enabled:
             self._results_df.to_hdf(self.project_hdf5._file_name, self.job_name + "/output/df")
 
     def from_hdf(self, hdf=None, group_name=None):

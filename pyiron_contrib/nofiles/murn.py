@@ -5,41 +5,13 @@ from pyiron_atomistics.atomistics.master.murnaghan import Murnaghan
 
 
 class MurnaghanWithoutFiles(Murnaghan):
-    def __init__(self, project, job_name):
-        super(MurnaghanWithoutFiles, self).__init__(project, job_name)
-        self._interactive_disable_log_file = False
-
-    def to_hdf(self, hdf=None, group_name=None):
-        """
-        Args:
-            hdf:
-            group_name:
-        Returns:
-        """
-        if not self._interactive_disable_log_file:
-            super(MurnaghanWithoutFiles, self).to_hdf(hdf=hdf, group_name=group_name)
-
-    def refresh_job_status(self):
-        if not self._interactive_disable_log_file:
-            super(MurnaghanWithoutFiles).refresh_job_status()
-
-    def _store_fit_in_hdf(self, fit_dict):
-        # implemented in https://github.com/pyiron/pyiron_atomistics/pull/960
-        with self.project_hdf5.open("input") as hdf5_input:
-            self.input.to_hdf(hdf5_input)
-        with self.project_hdf5.open("output") as hdf5:
-            hdf5["equilibrium_energy"] = fit_dict["energy_eq"]
-            hdf5["equilibrium_volume"] = fit_dict["volume_eq"]
-            hdf5["equilibrium_bulk_modulus"] = fit_dict["bulkmodul_eq"]
-            hdf5["equilibrium_b_prime"] = fit_dict["b_prime_eq"]
-        self._final_struct_to_hdf()
 
     def _fit_eos_general(self, vol_erg_dic=None, fittype="birchmurnaghan"):
         self._set_fit_module(vol_erg_dic=vol_erg_dic)
         fit_dict = self.fit_module.fit_eos_general(fittype=fittype)
         self.input["fit_type"] = fit_dict["fit_type"]
         self.input["fit_order"] = 0
-        if not self._interactive_disable_log_file:
+        if self.data_storage_enabled:
             self._store_fit_in_hdf(fit_dict=fit_dict)
         self.fit_dict = fit_dict
         return fit_dict
@@ -49,7 +21,7 @@ class MurnaghanWithoutFiles(Murnaghan):
         fit_dict = self.fit_module.fit_polynomial(fit_order=fit_order)
         if fit_dict is None:
             self._logger.warning("Minimum could not be found!")
-        elif not self._interactive_disable_log_file:
+        elif self.data_storage_enabled:
             self.input["fit_type"] = fit_dict["fit_type"]
             self.input["fit_order"] = fit_dict["fit_order"]
             if not self._interactive_disable_log_file:
@@ -58,7 +30,7 @@ class MurnaghanWithoutFiles(Murnaghan):
         return fit_dict
 
     def collect_output(self):
-        if not self._interactive_disable_log_file:
+        if self.data_storage_enabled:
             super(MurnaghanWithoutFiles).collect_output()
         elif self.ref_job.server.run_mode.interactive:
             erg_lst = self.ref_job.output.energy_pot.copy()
@@ -81,7 +53,7 @@ class MurnaghanWithoutFiles(Murnaghan):
         status is set to 'finished'.
         """
 
-        if not self._interactive_disable_log_file:
+        if self.data_storage_enabled:
             super(MurnaghanWithoutFiles)._run_if_collect()
         else:
             self._logger.info(
@@ -110,7 +82,7 @@ class MurnaghanWithoutFiles(Murnaghan):
             self.server.cores = job.server.cores
         if job.job_name not in self._job_name_lst:
             self._job_name_lst.append(job.job_name)
-            if not self._interactive_disable_log_file:
+            if self.data_storage_enabled:
                 self._child_job_update_hdf(parent_job=self, child_job=job)
 
     def pop(self, i=-1):
@@ -126,7 +98,7 @@ class MurnaghanWithoutFiles(Murnaghan):
             self._load_job_from_cache(job_name_to_return)
         )
         del self._job_name_lst[i]
-        if not self._interactive_disable_log_file:
+        if self.data_storage_enabled:
             with self.project_hdf5.open("input") as hdf5_input:
                 hdf5_input["job_list"] = self._job_name_lst
             job_to_return.relocate_hdf5()
@@ -148,7 +120,7 @@ class MurnaghanWithoutFiles(Murnaghan):
             pandas.Dataframe: output as dataframe
         """
         # TODO: The output to pandas function should no longer be required
-        if not self._interactive_disable_log_file:
+        if self.data_storage_enabled:
             super(MurnaghanWithoutFiles, self).output_to_pandas(sort_by=sort_by, h5_path=h5_path)
         else:
             df = pandas.DataFrame(self._output)

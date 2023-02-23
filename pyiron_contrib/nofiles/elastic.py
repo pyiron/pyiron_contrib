@@ -3,27 +3,6 @@ from pyiron_gpl.elastic.elastic import ElasticMatrixJob
 
 
 class ElasticMatrixJobWithoutFiles(ElasticMatrixJob):
-    def __init__(self, project, job_name):
-        super(ElasticMatrixJobWithoutFiles, self).__init__(project, job_name)
-        self._interactive_disable_log_file = False
-
-    def to_hdf(self, hdf=None, group_name=None):
-        """
-
-        Args:
-            hdf:
-            group_name:
-
-        Returns:
-
-        """
-        if not self._interactive_disable_log_file:
-            super(ElasticMatrixJobWithoutFiles, self).to_hdf(hdf=hdf, group_name=group_name)
-
-    def refresh_job_status(self):
-        if not self._interactive_disable_log_file:
-            super(ElasticMatrixJobWithoutFiles).refresh_job_status()
-
     def collect_output(self):
         if not self._data:
             self.from_hdf()
@@ -31,13 +10,13 @@ class ElasticMatrixJobWithoutFiles(ElasticMatrixJob):
 
         energies = {}
         self._data["id"] = []
-        if self.server.run_mode.interactive and not self._interactive_disable_log_file:
+        if self.server.run_mode.interactive and self.data_storage_enabled:
             child_id = self.child_ids[0]
             self._data["id"].append(child_id)
             child_job = self.project_hdf5.inspect(child_id)
             energies = {job_name: energy for job_name, energy in zip(self.structure_dict.keys(),
                                                                      child_job["output/generic/energy_tot"])}
-        elif self.server.run_mode.interactive and self._interactive_disable_log_file:
+        elif self.server.run_mode.interactive and not self.data_storage_enabled:
             energies = {job_name: energy for job_name, energy in zip(self.structure_dict.keys(),
                                                                      self.ref_job.interactive_cache["energy_tot"])}
         else:
@@ -49,7 +28,7 @@ class ElasticMatrixJobWithoutFiles(ElasticMatrixJob):
 
         self.property_calculator.analyse_structures(energies)
         self._data.update(self.property_calculator._data)
-        if not self._interactive_disable_log_file:
+        if self.data_storage_enabled:
             self.to_hdf()
 
     def append(self, job):
@@ -68,7 +47,7 @@ class ElasticMatrixJobWithoutFiles(ElasticMatrixJob):
             self.server.cores = job.server.cores
         if job.job_name not in self._job_name_lst:
             self._job_name_lst.append(job.job_name)
-            if not self._interactive_disable_log_file:
+            if self.data_storage_enabled:
                 self._child_job_update_hdf(parent_job=self, child_job=job)
 
     def pop(self, i=-1):
@@ -86,7 +65,7 @@ class ElasticMatrixJobWithoutFiles(ElasticMatrixJob):
             self._load_job_from_cache(job_name_to_return)
         )
         del self._job_name_lst[i]
-        if not self._interactive_disable_log_file:
+        if self.data_storage_enabled:
             with self.project_hdf5.open("input") as hdf5_input:
                 hdf5_input["job_list"] = self._job_name_lst
             job_to_return.relocate_hdf5()
@@ -103,7 +82,7 @@ class ElasticMatrixJobWithoutFiles(ElasticMatrixJob):
         status is set to 'finished'.
         """
 
-        if not self._interactive_disable_log_file:
+        if self.data_storage_enabled:
             super(ElasticMatrixJobWithoutFiles)._run_if_collect()
         else:
             self._logger.info(

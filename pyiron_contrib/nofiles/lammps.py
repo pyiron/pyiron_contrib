@@ -1,38 +1,20 @@
 import os
 import importlib
 from pyiron_atomistics.lammps.interactive import LammpsInteractive
+from pyiron_contrib.nofiles.wrapper import wrap_without_files
 
 try:  # mpi4py is only supported on Linux and Mac Os X
     from pylammpsmpi import LammpsLibrary
 except ImportError:
     pass
 
+LammpsInteractiveWithoutOutputBase = wrap_without_files(
+        LammpsInteractive, "LammpsInteractiveWithoutOutputBase",
+        LammpsInteractive.interactive_flush,
+        LammpsInteractive.interactive_close
+)
 
-class LammpsInteractiveWithoutOutput(LammpsInteractive):
-    def __init__(self, project, job_name):
-        super(LammpsInteractiveWithoutOutput, self).__init__(project, job_name)
-        self._interactive_disable_log_file = False
-
-    def to_hdf(self, hdf=None, group_name=None):
-        """
-
-        Args:
-            hdf:
-            group_name:
-
-        Returns:
-
-        """
-        if not self._interactive_disable_log_file:
-            super(LammpsInteractiveWithoutOutput, self).to_hdf(
-                hdf=hdf, group_name=group_name
-            )
-
-    def interactive_flush(self, path="interactive", include_last_step=False):
-        if not self._interactive_disable_log_file:
-            super(LammpsInteractiveWithoutOutput, self).interactive_flush(
-                path=path, include_last_step=include_last_step
-            )
+class LammpsInteractiveWithoutOutput(LammpsInteractiveWithoutOutputBase):
 
     def interactive_initialize_interface(self):
         if not self._interactive_disable_log_file:
@@ -61,11 +43,3 @@ class LammpsInteractiveWithoutOutput(LammpsInteractive):
             )
         self._reset_interactive_run_command()
         self.interactive_structure_setter(self.structure)
-
-    def interactive_close(self):
-        if not self._interactive_disable_log_file:
-            super(LammpsInteractiveWithoutOutput).interactive_close()
-
-    def refresh_job_status(self):
-        if not self._interactive_disable_log_file:
-            super(LammpsInteractiveWithoutOutput).refresh_job_status()

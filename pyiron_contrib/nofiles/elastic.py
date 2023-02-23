@@ -28,7 +28,9 @@ class ElasticMatrixJobWithoutFiles(ElasticMatrixJob):
 
         """
         if not self._interactive_disable_log_file:
-            super(ElasticMatrixJobWithoutFiles, self).to_hdf(hdf=hdf, group_name=group_name)
+            super(ElasticMatrixJobWithoutFiles, self).to_hdf(
+                hdf=hdf, group_name=group_name
+            )
 
     def refresh_job_status(self):
         if not self._interactive_disable_log_file:
@@ -45,11 +47,20 @@ class ElasticMatrixJobWithoutFiles(ElasticMatrixJob):
             child_id = self.child_ids[0]
             self._data["id"].append(child_id)
             child_job = self.project_hdf5.inspect(child_id)
-            energies = {job_name: energy for job_name, energy in zip(self.structure_dict.keys(),
-                                                                     child_job["output/generic/energy_tot"])}
+            energies = {
+                job_name: energy
+                for job_name, energy in zip(
+                    self.structure_dict.keys(), child_job["output/generic/energy_tot"]
+                )
+            }
         elif self.server.run_mode.interactive and self._interactive_disable_log_file:
-            energies = {job_name: energy for job_name, energy in zip(self.structure_dict.keys(),
-                                                                     self.ref_job.interactive_cache["energy_tot"])}
+            energies = {
+                job_name: energy
+                for job_name, energy in zip(
+                    self.structure_dict.keys(),
+                    self.ref_job.interactive_cache["energy_tot"],
+                )
+            }
         else:
             for job_id in self.child_ids:
                 ham = self.project_hdf5.inspect(job_id)

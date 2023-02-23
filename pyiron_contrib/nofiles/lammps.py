@@ -24,12 +24,15 @@ class LammpsInteractiveWithoutOutput(LammpsInteractive):
 
         """
         if not self._interactive_disable_log_file:
-            super(LammpsInteractiveWithoutOutput, self).to_hdf(hdf=hdf, group_name=group_name)
+            super(LammpsInteractiveWithoutOutput, self).to_hdf(
+                hdf=hdf, group_name=group_name
+            )
 
     def interactive_flush(self, path="interactive", include_last_step=False):
         if not self._interactive_disable_log_file:
-            super(LammpsInteractiveWithoutOutput, self).interactive_flush(path=path,
-                                                                          include_last_step=include_last_step)
+            super(LammpsInteractiveWithoutOutput, self).interactive_flush(
+                path=path, include_last_step=include_last_step
+            )
 
     def interactive_initialize_interface(self):
         if not self._interactive_disable_log_file:
@@ -41,12 +44,12 @@ class LammpsInteractiveWithoutOutput(LammpsInteractive):
             if not self._interactive_disable_log_file:
                 self._interactive_library = lammps(
                     cmdargs=["-screen", "none", "-log", self._log_file],
-                    comm=self._interactive_mpi_communicator
+                    comm=self._interactive_mpi_communicator,
                 )
             else:
                 self._interactive_library = lammps(
                     cmdargs=["-screen", "none", "-log", "none"],
-                    comm=self._interactive_mpi_communicator
+                    comm=self._interactive_mpi_communicator,
                 )
         else:
             self._interactive_library = LammpsLibrary(

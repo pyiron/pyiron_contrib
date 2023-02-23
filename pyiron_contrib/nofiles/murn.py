@@ -159,7 +159,9 @@ class MurnaghanWithoutFiles(Murnaghan):
         """
         # TODO: The output to pandas function should no longer be required
         if not self._interactive_disable_log_file:
-            super(MurnaghanWithoutFiles, self).output_to_pandas(sort_by=sort_by, h5_path=h5_path)
+            super(MurnaghanWithoutFiles, self).output_to_pandas(
+                sort_by=sort_by, h5_path=h5_path
+            )
         else:
             df = pandas.DataFrame(self._output)
             if sort_by is not None:

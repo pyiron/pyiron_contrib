@@ -56,7 +56,10 @@ class PhonopyJobWithoutFiles(PhonopyJob):
         """
         Returns:
         """
-        if self.ref_job.server.run_mode.interactive and self._interactive_disable_log_file:
+        if (
+            self.ref_job.server.run_mode.interactive
+            and self._interactive_disable_log_file
+        ):
             forces_lst = self.ref_job.output.forces
         elif self.ref_job.server.run_mode.interactive:
             forces_lst = self.project_hdf5.inspect(self.child_ids[0])[
@@ -84,7 +87,9 @@ class PhonopyJobWithoutFiles(PhonopyJob):
                 hdf5_out["dos_energies"] = dos_dict["frequency_points"]
                 hdf5_out["qpoints"] = mesh_dict["qpoints"]
                 hdf5_out["supercell_matrix"] = self._phonopy_supercell_matrix()
-                hdf5_out["displacement_dataset"] = self.phonopy.get_displacement_dataset()
+                hdf5_out[
+                    "displacement_dataset"
+                ] = self.phonopy.get_displacement_dataset()
                 hdf5_out[
                     "dynamical_matrix"
                 ] = self.phonopy.dynamical_matrix.get_dynamical_matrix()

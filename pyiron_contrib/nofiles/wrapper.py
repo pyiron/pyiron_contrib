@@ -23,14 +23,6 @@ def wrap_without_files(cls, name, *methods):
         self._interactive_disable_log_file = False
         super(cls, self).__init__(project=project, job_name=job_name)
 
-    @property
-    @wraps(cls.child_project)
-    def child_project(self):
-        if not self._interactive_disable_log_file:
-            return super(cls, self).child_project
-        else:
-            return self.project
-
     @wraps(cls.to_hdf)
     def to_hdf(self, *args, **kwargs):
         if not self._interactive_disable_log_file:
@@ -44,9 +36,19 @@ def wrap_without_files(cls, name, *methods):
     body = {
         '__init__': init,
         'to_hdf': to_hdf,
-        'child_project': child_project,
         'refresh_job_status': refresh_job_status
     }
+
+    if hasattr(cls, 'child_project'): # isinstance(cls, GenericMaster)
+        @property
+        @wraps(cls.child_project)
+        def child_project(self):
+            if not self._interactive_disable_log_file:
+                return super(cls, self).child_project
+            else:
+                return self.project
+
+        body['child_project'] = child_project
 
     def wrap_meth(meth):
         """Return a method that calls its super() only if the flag is not set."""

@@ -58,7 +58,7 @@ def wrap_without_files(cls, name, *methods):
                 return getattr(
                         super(cls, self),
                         meth.__name__
-                )(self, *args, **kwargs)
+                )(*args, **kwargs)
         return wrapper
 
     for meth in methods:

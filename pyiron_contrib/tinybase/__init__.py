@@ -1,104 +1,22 @@
 import abc
 import enum
-from typing import Union
+from typing import Optional
 
 from pyiron_base.interfaces.object import HasStorage
 
-class RunMachine:
+from .executor import (
+        ForegroundExecutor,
+        BackgroundExecutor
+)
 
-    class Code(enum.Enum):
-        INIT = 'init'
-        RUNNING = 'running'
-        FINISHED = 'finished'
+def make_storage_mapping(name):
+    def fget(self):
+        return self.storage[name]
 
-    def __init__(self, initial_state):
-        self._state = RunMachine.Code(initial_state)
-        self._callbacks = {}
-        self._data = {} # state variables associated with each state
+    def fset(self, value):
+        self.storage[name] = value
 
-    def on(self, state: Union[str, Code], callback):
-        if isinstance(state, str):
-            state = RunMachine.Code(state)
-        self._callbacks[state] = callback
-
-    def goto(self, state: Union[str, Code], **kwargs):
-        if isinstance(state, str):
-            state = RunMachine.Code(state)
-        self._state = state
-        self._data = {}
-        self._data.update(kwargs)
-
-    def step(self, state: Union[str, Code, None] = None, **kwargs):
-        if state is not None:
-            self.goto(state, **kwargs)
-        self._callbacks.get(self._state, lambda: pass)()
-
-class Executor(abc.ABC):
-
-    def __init__(self):
-        self._run_machine = RunMachine("init")
-
-    def run(self):
-        self._run_machine.step()
-
-class SingleExecutor(Executor, abc.ABC):
-
-    def __init__(self, node):
-        super().__init__()
-        self._node = node
-
-    @property
-    def node(self):
-        return self._node
-
-class ForegroundExecutor(SingleExecutor):
-
-    def __init__(self, node):
-        super().__init__(node=node)
-        self._run_machine.on("init", self.run_init)
-
-    def run_init(self):
-        self._run_machine.goto("running")
-
-        try:
-            ret = self.node.execute()
-        except Exception as e:
-            ret = ReturnStatus("aborted", msg=e)
-
-        self._run_machine.goto("finished", status=ret)
-
-from threading import Thread
-
-class BackgroundExecutor(SingleExecutor):
-
-    def __init__(self, node):
-        super().__init__(node=node)
-        self._run_machine = RunMachine("init")
-        self._run_machine.on("init", self.run_init)
-        self._run_machine.on("running", self.run_running)
-        self._thread = None
-
-    def run_init(self):
-        self._run_machine.goto("running")
-
-        node = self.node
-        class NodeThread(Thread):
-            def run(self):
-                try:
-                    self.ret = node.execute()
-                except Exception as e:
-                    self.ret = ReturnStatus("aborted", msg=e)
-
-
-        self._thread = NodeThread()
-        self._thread.start()
-
-    def run_running(self):
-        self._thread.join(timeout=0)
-        if not self._thread.is_alive():
-            self._run_machine.goto("finished", status=self._thread.ret)
-        else:
-            print("Node is still running!")
+    return property(fget=fget, fset=fset)
 
 class AbstractInput(HasStorage, abc.ABC):
     pass
@@ -129,6 +47,9 @@ class ReturnStatus:
         return f"ReturnStatus({self.code}, {self.msg})"
     def __str__(self):
         return f"{self.code}({self.msg})"
+
+    def is_done(self):
+        return self.code == self.Code.DONE
 
 class AbstractNode(abc.ABC):
 
@@ -161,8 +82,17 @@ class AbstractNode(abc.ABC):
         return self._output
 
     @abc.abstractmethod
-    def execute(self) -> ReturnStatus:
+    def _execute(self) -> Optional[ReturnStatus]:
         pass
+
+    def execute(self) -> ReturnStatus:
+        try:
+            ret = self._execute()
+            if ret is None:
+                ret = ReturnStatus("done")
+        except Exception as e:
+            ret = ReturnStatus("aborted", msg=e)
+        return ret
 
     def run(self, how='foreground'):
         exe = self._executors[how](node=self)

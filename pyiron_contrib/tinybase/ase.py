@@ -3,18 +3,10 @@ from . import StructureInput
 from . import AbstractOutput
 from . import AbstractNode
 from . import ReturnStatus
+from . import make_storage_mapping
 
 import numpy as np
 import matplotlib.pyplot as plt
-
-def make_storage_mapping(name):
-    def fget(self):
-        return self.storage[name]
-
-    def fset(self, value):
-        self.storage[name] = value
-
-    return property(fget=fget, fset=fset)
 
 
 class AseInput(StructureInput):
@@ -39,9 +31,7 @@ class AseNode(AbstractNode):
     def _get_output(self):
         return EnergyOutput()
 
-    def execute(self):
+    def _execute(self):
         structure = self.input.structure
         structure.calc = self.input.calculator
         self.output.energy_pot = structure.get_potential_energy()
-        return ReturnStatus("done")
-

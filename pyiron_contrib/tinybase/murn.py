@@ -3,6 +3,7 @@ from . import StructureInput
 from . import AbstractOutput
 from . import AbstractNode
 from . import ReturnStatus
+from . import make_storage_mapping
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -39,18 +40,25 @@ class MurnaghanNode(AbstractNode):
     def _get_output(self):
         return MurnaghanOutput()
 
-    def execute(self):
+    def _execute(self):
         cell = self.input.structure.get_cell()
         node = self.input.node
         energy = []
         volume = []
+        returns = []
         for s in self.input.strains:
             structure = self.input.structure.copy()
             structure.set_cell(cell * s, scale_atoms=True)
             node.input.structure = structure
-            node.execute()
-            energy.append(node.output.energy_pot)
-            volume.append(structure.get_volume()/len(structure))
+            ret = node.execute()
+            returns.append(ret)
+            if ret.is_done():
+                energy.append(node.output.energy_pot)
+                volume.append(structure.get_volume()/len(structure))
         self.output.energies = np.array(energy)
         self.output.volumes = np.array(volume)
-        return ReturnStatus('done')
+        errors = [ret for ret in returns if not ret.is_done()]
+        if len(errors) == 0:
+            return ReturnStatus('done')
+        else:
+            return ReturnStatus('aborted', msg=errors)

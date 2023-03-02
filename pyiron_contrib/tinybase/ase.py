@@ -30,7 +30,7 @@ class EnergyOutput(AbstractOutput):
 class AseStaticNode(AbstractNode):
 
     def _get_input(self):
-        return AseInput()
+        return AseStaticInput()
 
     def _get_output(self):
         return EnergyOutput()

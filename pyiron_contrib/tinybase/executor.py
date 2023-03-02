@@ -14,6 +14,10 @@ class RunMachine:
         self._callbacks = {}
         self._data = {} # state variables associated with each state
 
+    @property
+    def state(self):
+        return self._state
+
     def on(self, state: Union[str, Code], callback):
         if isinstance(state, str):
             state = RunMachine.Code(state)
@@ -115,3 +119,32 @@ class SerialListExecutor(ListExecutor):
             returns.append(node.execute())
 
         self._run_machine.goto("finished", status=returns)
+
+class BackgroundListExecutor(ListExecutor):
+
+    def __init__(self, nodes):
+        super().__init__(nodes=nodes)
+        self._run_machine.on("init", self.run_init)
+        self._run_machine.on("running", self.run_running)
+        self._exes = []
+
+    def run_init(self):
+        self._run_machine.goto("running")
+
+        for node in self.nodes:
+            exe = BackgroundExecutor(node)
+            exe.run()
+            self._exes.append(exe)
+
+    def run_running(self):
+
+        still_running = False
+        for exe in self._exes:
+            exe.run()
+            still_running |= exe._run_machine.state != RunMachine.Code.FINISHED
+
+        if not still_running:
+            self._run_machine.goto(
+                    "finished",
+                    status=[exe._run_machine._data["status"] for exe in self._exes]
+            )

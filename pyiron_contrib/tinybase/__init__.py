@@ -6,7 +6,10 @@ from pyiron_base.interfaces.object import HasStorage
 
 from .executor import (
         ForegroundExecutor,
-        BackgroundExecutor
+        BackgroundExecutor,
+        ListExecutor,
+        SerialListExecutor,
+        BackgroundListExecutor
 )
 
 def make_storage_mapping(name):
@@ -97,4 +100,48 @@ class AbstractNode(abc.ABC):
     def run(self, how='foreground'):
         exe = self._executors[how](node=self)
         exe.run()
+        return exe
+
+class ListNode(AbstractNode, abc.ABC):
+
+    _executors = {
+            'foreground': SerialListExecutor,
+            'background': BackgroundListExecutor
+    }
+
+    def __init__(self):
+        super().__init__()
+        self._nodes = None
+
+    @abc.abstractmethod
+    def _create_nodes(self):
+        pass
+
+    @property
+    def nodes(self):
+        if self._nodes is None:
+            self._nodes = self._create_nodes()
+        return self._nodes
+
+    @abc.abstractmethod
+    def _extract_output(self, step, node, ret):
+        pass
+
+    # If our own execute is called we act like a normal node, executing child nodes and then process their output
+    def _execute(self):
+        for i, node in enumerate(self.nodes):
+            ret = node.execute()
+            self._extract_output(i, node, ret)
+
+    # If called via run by the user directly we can also dispatch to a list executor
+    def run(self, how='foreground'):
+        Exe = self._executors[how]
+        if issubclass(Exe, ListExecutor):
+            exe = Exe(self.nodes)
+            exe.run()
+            # for i, (node, ret) in enumerate(zip(exe.nodes, exe._run_machine._data['status'])):
+            #     self._extract_output(i, node, ret)
+        else:
+            exe = Exe(self)
+            exe.run()
         return exe

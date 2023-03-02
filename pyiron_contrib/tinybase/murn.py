@@ -1,36 +1,33 @@
-from . import AbstractInput
-from . import StructureInput
-from . import AbstractOutput
+from .container import (
+            StructureInput,
+            make_storage_mapping,
+            AbstractOutput
+)
 from . import AbstractNode, ListNode
 from . import ReturnStatus
-from . import make_storage_mapping
 
 from copy import deepcopy
 
 import numpy as np
 import matplotlib.pyplot as plt
 
-class MurnaghanInput(StructureInput):
-    def __init__(self):
-        super().__init__()
-        self.storage.strains = None
-        self.storage.node = None
+MurnaghanInputBase = StructureInput.from_attributes(
+        "MurnaghanInputBase",
+        "strains",
+        "node"
+)
 
-    strains = make_storage_mapping('strains')
-    node = make_storage_mapping('node')
-
+class MurnaghanInput(MurnaghanInputBase):
     def set_strain_range(self, range, steps):
         self.strains = (1 + np.linspace(-range, range, steps))**(1/3)
 
-class MurnaghanOutput(AbstractOutput):
-    def __init__(self):
-        super().__init__()
-        self.storage.volumes = []
-        self.storage.energies = []
+MurnaghanOutputBase = AbstractOutput.from_attributes(
+        "MurnaghanInputBase",
+        volumes=[],
+        energies=[]
+)
 
-    volumes = make_storage_mapping('volumes')
-    energies = make_storage_mapping('energies')
-
+class MurnaghanOutput(MurnaghanInputBase):
     def plot(self):
         plt.plot(self.volumes, self.energies)
 

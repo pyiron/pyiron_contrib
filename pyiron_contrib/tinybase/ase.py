@@ -1,31 +1,27 @@
-from . import AbstractInput
-from . import StructureInput
-from . import AbstractOutput
+from .container import (
+            AbstractInput,
+            StructureInput,
+            MDInput,
+            make_storage_mapping,
+            EnergyOutput,
+            MDOutput
+)
 from . import AbstractNode
-from . import ReturnStatus
-from . import make_storage_mapping
 
 import numpy as np
 import matplotlib.pyplot as plt
 
-from pyiron_atomistics.atomistics.structure.has_structure import HasStructure
+from ase.md.langevin import Langevin
+from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
+from ase import units
 
-class AseInput(AbstractInput):
-    def __init__(self):
-        super().__init__()
-        self.storage.calculator = None
 
-    calculator = make_storage_mapping('calculator')
+AseInput = AbstractInput.from_attributes('AseInput', 'calculator')
+
 
 class AseStaticInput(AseInput, StructureInput):
     pass
 
-class EnergyOutput(AbstractOutput):
-    def __init__(self):
-        super().__init__()
-        self.storage.energy_pot = None
-
-    energy_pot = make_storage_mapping('energy_pot')
 
 class AseStaticNode(AbstractNode):
 
@@ -41,51 +37,8 @@ class AseStaticNode(AbstractNode):
         self.output.energy_pot = structure.get_potential_energy()
 
 
-class MDInput(StructureInput):
-    def __init__(self):
-        super().__init__()
-        self.storage.steps = None
-        self.storage.timestep = None
-        self.storage.temperature = None
-        self.storage.output_steps = None
-
-    steps = make_storage_mapping('steps')
-    timestep = make_storage_mapping('timestep')
-    temperature = make_storage_mapping('temperature')
-    output_steps = make_storage_mapping('output_steps')
-
-class MDOutput(AbstractOutput, HasStructure):
-    def __init__(self):
-        super().__init__()
-
-        self.storage.pot_energies = []
-        self.storage.kin_energies = []
-        self.storage.forces = []
-        self.storage.structures = []
-
-    pot_energies = make_storage_mapping("pot_energies")
-    kin_energies = make_storage_mapping("kin_energies")
-    forces = make_storage_mapping("forces")
-    structures = make_storage_mapping("structures")
-
-    def plot_energies(self):
-        plt.plot(self.pot_energies - np.min(self.pot_energies), label='pot')
-        plt.plot(self.kin_energies, label='kin')
-        plt.legend()
-
-    def _number_of_structures(self):
-        return len(self.structures)
-
-    def _get_structure(self, frame, wrap_atoms=True):
-        return self.structures[frame]
-
-
 class AseMDInput(AseInput, MDInput):
     pass
-
-from ase.md.langevin import Langevin
-from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
-from ase import units
 
 class AseMDNode(AbstractNode):
 

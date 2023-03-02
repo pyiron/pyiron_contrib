@@ -4,6 +4,7 @@ from typing import Optional
 
 from pyiron_base.interfaces.object import HasStorage
 
+from .container import AbstractInput, AbstractOutput
 from .executor import (
         ForegroundExecutor,
         BackgroundExecutor,
@@ -11,28 +12,6 @@ from .executor import (
         SerialListExecutor,
         BackgroundListExecutor
 )
-
-def make_storage_mapping(name):
-    def fget(self):
-        return self.storage[name]
-
-    def fset(self, value):
-        self.storage[name] = value
-
-    return property(fget=fget, fset=fset)
-
-class AbstractInput(HasStorage, abc.ABC):
-    pass
-
-class StructureInput(AbstractInput):
-    def __init__(self):
-        super().__init__()
-        self.storage.structure = None
-
-    structure = make_storage_mapping('structure')
-
-class AbstractOutput(HasStorage, abc.ABC):
-    pass
 
 class ReturnStatus:
 

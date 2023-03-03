@@ -117,9 +117,11 @@ class ListNode(AbstractNode, abc.ABC):
         Exe = self._executors[how]
         if issubclass(Exe, ListExecutor):
             exe = Exe(self.nodes)
+            exe._run_machine.observe("finished",
+                    lambda data: [self._extract_output(i, n, r)
+                                    for i, (n, r) in enumerate(zip(self.nodes, data['status']))]
+            )
             exe.run()
-            # for i, (node, ret) in enumerate(zip(exe.nodes, exe._run_machine._data['status'])):
-            #     self._extract_output(i, node, ret)
         else:
             exe = Exe(self)
             exe.run()

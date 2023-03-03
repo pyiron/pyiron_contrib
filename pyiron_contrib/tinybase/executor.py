@@ -3,11 +3,15 @@ import enum
 from collections import defaultdict
 from typing import Union
 
+import logging
+
 class RunMachine:
 
     class Code(enum.Enum):
         INIT = 'init'
+        READY = 'ready'
         RUNNING = 'running'
+        COLLECT = 'collect'
         FINISHED = 'finished'
 
     def __init__(self, initial_state):
@@ -46,114 +50,73 @@ class RunMachine:
 
 class Executor(abc.ABC):
 
-    def __init__(self):
-        self._run_machine = RunMachine("init")
-
-    def run(self):
-        self._run_machine.step()
-
-class SingleExecutor(Executor, abc.ABC):
-
-    def __init__(self, node):
-        super().__init__()
-        self._node = node
-
-    @property
-    def node(self):
-        return self._node
-
-class ForegroundExecutor(SingleExecutor):
-
-    def __init__(self, node):
-        super().__init__(node=node)
-        self._run_machine.on("init", self.run_init)
-
-    def run_init(self):
-        self._run_machine.goto("running")
-
-        ret = self.node.execute()
-
-        self._run_machine.goto("finished", status=ret)
-
-from threading import Thread
-
-class BackgroundExecutor(SingleExecutor):
-
-    def __init__(self, node):
-        super().__init__(node=node)
-        self._run_machine = RunMachine("init")
-        self._run_machine.on("init", self.run_init)
-        self._run_machine.on("running", self.run_running)
-        self._thread = None
-
-    def run_init(self):
-        self._run_machine.goto("running")
-
-        node = self.node
-        class NodeThread(Thread):
-            def run(self):
-                self.ret = node.execute()
-
-        self._thread = NodeThread()
-        self._thread.start()
-
-    def run_running(self):
-        self._thread.join(timeout=0)
-        if not self._thread.is_alive():
-            self._run_machine.goto("finished", status=self._thread.ret)
-        else:
-            print("Node is still running!")
-
-class ListExecutor(Executor, abc.ABC):
-
     def __init__(self, nodes):
-        super().__init__()
         self._nodes = nodes
+        self._run_machine = RunMachine("init")
+        self._run_machine.on("init", self._run_init)
+        # exists mostly to let downstream code hook into it, e.g. to write input files and such
+        self._run_machine.on("ready", self._run_ready)
+        self._run_machine.on("running", self._run_running)
+        # exists mostly to let downstream code hook into it, e.g. to read output files and such
+        self._run_machine.on("collect", self._run_collect)
+        self._run_machine.on("finished", self._run_finished)
 
     @property
     def nodes(self):
         return self._nodes
 
-class SerialListExecutor(ListExecutor):
+    def _run_init(self):
+        if all(node.check_ready() for node in self.nodes):
+            self._run_machine.step("ready")
+        else:
+            logging.info("Node is not ready yet!")
+
+    def _run_ready(self):
+        self._run_machine.step("running")
+
+    def _run_running(self):
+        ret = [node.execute() for node in self.nodes]
+        self._run_machine.step("collect", status=ret)
+
+    def _run_collect(self):
+        self._run_machine.step("finished",
+                status=self._run_machine._data["status"],
+                output=[node.output for node in self.nodes]
+        )
+
+    def _run_finished(self):
+        pass
+
+    def run(self):
+        self._run_machine.step()
+
+
+from threading import Thread
+
+class BackgroundExecutor(Executor):
 
     def __init__(self, nodes):
         super().__init__(nodes=nodes)
-        self._run_machine.on("init", self.run_init)
+        self._threads = {}
+        self._returns = {}
 
-    def run_init(self):
-        self._run_machine.goto("running")
+    def _run_running(self):
 
-        returns = []
-        for node in self.nodes:
-            returns.append(node.execute())
-
-        self._run_machine.goto("finished", status=returns)
-
-class BackgroundListExecutor(ListExecutor):
-
-    def __init__(self, nodes):
-        super().__init__(nodes=nodes)
-        self._run_machine.on("init", self.run_init)
-        self._run_machine.on("running", self.run_running)
-        self._exes = []
-
-    def run_init(self):
-        self._run_machine.goto("running")
-
-        for node in self.nodes:
-            exe = BackgroundExecutor(node)
-            exe.run()
-            self._exes.append(exe)
-
-    def run_running(self):
+        def exec_node(node):
+            self._returns[node] = node.execute()
 
         still_running = False
-        for exe in self._exes:
-            exe.run()
-            still_running |= exe._run_machine.state != RunMachine.Code.FINISHED
-
-        if not still_running:
-            self._run_machine.goto(
-                    "finished",
-                    status=[exe._run_machine._data["status"] for exe in self._exes]
-            )
+        for node in self.nodes:
+            if node not in self._threads:
+                thread = self._threads[node] = Thread(target=exec_node, args=(node,))
+                thread.start()
+                still_running = True
+            else:
+                thread = self._threads[node]
+                thread.join(timeout=0)
+                still_running |= thread.is_alive()
+        if still_running:
+            logging.info("Some nodes are still executing!")
+        else:
+            # how to ensure ordering?  dict remembers insertion order, so maybe ok for now
+            self._run_machine.step("collect", status=list(self._returns.values()))

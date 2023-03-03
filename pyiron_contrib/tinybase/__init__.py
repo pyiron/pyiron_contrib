@@ -6,11 +6,8 @@ from pyiron_base.interfaces.object import HasStorage
 
 from .container import AbstractInput, AbstractOutput
 from .executor import (
-        ForegroundExecutor,
+        Executor,
         BackgroundExecutor,
-        ListExecutor,
-        SerialListExecutor,
-        BackgroundListExecutor
 )
 
 class ReturnStatus:
@@ -36,7 +33,7 @@ class ReturnStatus:
 class AbstractNode(abc.ABC):
 
     _executors = {
-            'foreground': ForegroundExecutor,
+            'foreground': Executor,
             'background': BackgroundExecutor
     }
 
@@ -63,6 +60,9 @@ class AbstractNode(abc.ABC):
             self._output = self._get_output()
         return self._output
 
+    def check_ready(self):
+        return True
+
     @abc.abstractmethod
     def _execute(self) -> Optional[ReturnStatus]:
         pass
@@ -77,7 +77,7 @@ class AbstractNode(abc.ABC):
         return ret
 
     def run(self, how='foreground'):
-        exe = self._executors[how](node=self)
+        exe = self._executors[how](nodes=[self])
         exe.run()
         return exe
 
@@ -101,8 +101,8 @@ class FunctionNode(AbstractNode):
 class ListNode(AbstractNode, abc.ABC):
 
     _executors = {
-            'foreground': SerialListExecutor,
-            'background': BackgroundListExecutor
+            'foreground': Executor,
+            'background': BackgroundExecutor
     }
 
     def __init__(self):
@@ -131,15 +131,10 @@ class ListNode(AbstractNode, abc.ABC):
 
     # If called via run by the user directly we can also dispatch to a list executor
     def run(self, how='foreground'):
-        Exe = self._executors[how]
-        if issubclass(Exe, ListExecutor):
-            exe = Exe(self.nodes)
-            exe._run_machine.observe("finished",
-                    lambda data: [self._extract_output(i, n, r)
-                                    for i, (n, r) in enumerate(zip(self.nodes, data['status']))]
-            )
-            exe.run()
-        else:
-            exe = Exe(self)
-            exe.run()
+        exe = self._executors[how](self.nodes)
+        exe._run_machine.observe("collect",
+                lambda data: [self._extract_output(i, n, r)
+                                for i, (n, r) in enumerate(zip(self.nodes, data['status']))]
+        )
+        exe.run()
         return exe

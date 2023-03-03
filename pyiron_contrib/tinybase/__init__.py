@@ -8,6 +8,7 @@ from .container import AbstractInput, AbstractOutput
 from .executor import (
         Executor,
         BackgroundExecutor,
+        ProcessExecutor
 )
 
 class ReturnStatus:
@@ -102,7 +103,8 @@ class ListNode(AbstractNode, abc.ABC):
 
     _executors = {
             'foreground': Executor,
-            'background': BackgroundExecutor
+            'background': BackgroundExecutor,
+            'process': ProcessExecutor
     }
 
     def __init__(self):

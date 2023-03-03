@@ -120,3 +120,61 @@ class BackgroundExecutor(Executor):
         else:
             # how to ensure ordering?  dict remembers insertion order, so maybe ok for now
             self._run_machine.step("collect", status=list(self._returns.values()))
+
+from concurrent.futures import ProcessPoolExecutor
+
+def run_node(node):
+    ret = node.execute()
+    return ret, node.output
+
+class ProcessExecutor(Executor):
+
+    def __init__(self, nodes, processes=None):
+        super().__init__(nodes=nodes)
+        self._processes = processes if processes is not None else 4
+        self._pool = None
+        self._futures = {}
+        self._returns = {}
+
+    def _run_running(self):
+
+        if self._pool is None:
+            self._pool = ProcessPoolExecutor(max_workers=self._processes)
+        pool = self._pool
+
+        still_running = False
+        for node in self.nodes:
+            if node not in self._futures:
+                self._futures[node] = pool.submit(run_node, node)
+                still_running = True
+            else:
+                future = self._futures[node]
+                if future.done():
+                    # TODO breaks API
+                    ret, output = future.result(timeout=0)
+                    node._output = output
+                    self._returns[node] = ret
+                else:
+                    still_running = True
+
+        if still_running:
+            logging.info("Some nodes are still executing!")
+        else:
+            pool.shutdown()
+            # how to ensure ordering?  dict remembers insertion order, so maybe ok for now
+            self._run_machine.step("collect", status=list(self._returns.values()))
+
+
+
+
+class HdfExecutor(Executor):
+
+    def __init__(self):
+        self._run_machine.observe("running", self._save_input)
+        self._run_machine.observe("finished", self._save_output)
+
+    def _save_input(self, data):
+        self.node.input.to_hdf(self._hdf) # where's that coming from?
+
+    def _save_output(self, data):
+        self.node.output.to_hdf(self._hdf) # where's that coming from?

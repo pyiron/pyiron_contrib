@@ -1,5 +1,6 @@
 import abc
 import enum
+from collections import defaultdict
 from typing import Union
 
 class RunMachine:
@@ -12,6 +13,7 @@ class RunMachine:
     def __init__(self, initial_state):
         self._state = RunMachine.Code(initial_state)
         self._callbacks = {}
+        self._observers = defaultdict(list)
         self._data = {} # state variables associated with each state
 
     @property
@@ -23,12 +25,19 @@ class RunMachine:
             state = RunMachine.Code(state)
         self._callbacks[state] = callback
 
+    def observe(self, state: Union[str, Code], callback):
+        if isinstance(state, str):
+            state = RunMachine.Code(state)
+        self._observers[state].append(callback)
+
     def goto(self, state: Union[str, Code], **kwargs):
         if isinstance(state, str):
             state = RunMachine.Code(state)
         self._state = state
         self._data = {}
         self._data.update(kwargs)
+        for obs in self._observers[state]:
+            obs(self._data)
 
     def step(self, state: Union[str, Code, None] = None, **kwargs):
         if state is not None:

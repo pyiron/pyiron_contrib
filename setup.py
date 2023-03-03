@@ -53,6 +53,10 @@ setup(
             'boto3==1.26.74', 
             'moto==4.1.3'
         ],
+        'workflow': [
+            'python>=3.10',
+            'typeguard==2.13.3'
+        ]
     },
     cmdclass=versioneer.get_cmdclass(),
     

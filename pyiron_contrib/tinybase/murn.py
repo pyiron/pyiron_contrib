@@ -22,12 +22,12 @@ class MurnaghanInput(MurnaghanInputBase):
         self.strains = (1 + np.linspace(-range, range, steps))**(1/3)
 
 MurnaghanOutputBase = AbstractOutput.from_attributes(
-        "MurnaghanInputBase",
-        volumes=[],
-        energies=[]
+        "MurnaghanOutputBase",
+        volumes=list,
+        energies=list
 )
 
-class MurnaghanOutput(MurnaghanInputBase):
+class MurnaghanOutput(MurnaghanOutputBase):
     def plot(self):
         plt.plot(self.volumes, self.energies)
 

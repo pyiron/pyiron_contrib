@@ -8,13 +8,13 @@ from pyiron_atomistics.atomistics.structure.has_structure import HasStructure
 import numpy as np
 import matplotlib.pyplot as plt
 
-def make_storage_mapping(name, default=None):
+def make_storage_mapping(name, default=lambda: None):
     def fget(self):
         try:
             return self.storage[name]
         except KeyError:
-            self.storage[name] = default
-            return default
+            self.storage[name] = default()
+            return self.storage[name]
 
     def fset(self, value):
         self.storage[name] = value
@@ -62,10 +62,10 @@ EnergyOutput = AbstractOutput.from_attributes(
 
 MDOutputBase = AbstractOutput.from_attributes(
         "MDOutputBase",
-        pot_energies=[],
-        kin_energies=[],
-        forces=[],
-        structures=[],
+        pot_energies=list,
+        kin_energies=list,
+        forces=list,
+        structures=list,
 )
 
 class MDOutput(HasStructure, MDOutputBase):

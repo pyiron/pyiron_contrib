@@ -81,6 +81,23 @@ class AbstractNode(abc.ABC):
         exe.run()
         return exe
 
+FunctionInput = AbstractInput.from_attributes("FunctionInput", args=list, kwargs=dict)
+FunctionOutput = AbstractOutput.from_attributes("FunctionOutput", "result")
+class FunctionNode(AbstractNode):
+
+    def __init__(self, function):
+        super().__init__()
+        self._function = function
+
+    def _get_input(self):
+        return FunctionInput()
+
+    def _get_output(self):
+        return FunctionOutput()
+
+    def _execute(self):
+        self.output.result = self._function(*self.input.args, **self.input.kwargs)
+
 class ListNode(AbstractNode, abc.ABC):
 
     _executors = {

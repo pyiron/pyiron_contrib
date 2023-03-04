@@ -37,38 +37,7 @@ class MurnaghanOutput(MurnaghanOutputBase):
     def plot(self):
         plt.plot(self.volumes, self.energies)
 
-class MurnaghanNode(AbstractNode):
-
-    def _get_input(self):
-        return MurnaghanInput()
-
-    def _get_output(self):
-        return MurnaghanOutput()
-
-    def _execute(self):
-        cell = self.input.structure.get_cell()
-        node = self.input.node
-        energy = []
-        volume = []
-        returns = []
-        for s in self.input.strains:
-            structure = self.input.structure.copy()
-            structure.set_cell(cell * s, scale_atoms=True)
-            node.input.structure = structure
-            ret = node.execute()
-            returns.append(ret)
-            if ret.is_done():
-                energy.append(node.output.energy_pot)
-                volume.append(structure.get_volume())
-        self.output.energies = np.array(energy)
-        self.output.volumes = np.array(volume)
-        errors = [ret for ret in returns if not ret.is_done()]
-        if len(errors) == 0:
-            return ReturnStatus('done')
-        else:
-            return ReturnStatus('aborted', msg=errors)
-
-class ListMurnaghanNode(ListNode):
+class MurnaghanNode(ListNode):
 
     def _get_input(self):
         return MurnaghanInput()

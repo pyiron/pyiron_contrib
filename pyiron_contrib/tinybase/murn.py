@@ -1,6 +1,5 @@
 from .container import (
             StructureInput,
-            make_storage_mapping,
             AbstractOutput
 )
 from . import AbstractNode, ListNode
@@ -18,6 +17,13 @@ MurnaghanInputBase = StructureInput.from_attributes(
 )
 
 class MurnaghanInput(MurnaghanInputBase):
+    def check_ready(self):
+        structure_ready = self.structure is not None
+        strain_ready = len(self.strains) > 0
+        node = self.node
+        node.input.structure = self.structure
+        return structure_ready and strain_ready and node.input.check_ready()
+
     def set_strain_range(self, range, steps):
         self.strains = (1 + np.linspace(-range, range, steps))**(1/3)
 

@@ -2,7 +2,6 @@ from .container import (
             AbstractInput,
             StructureInput,
             MDInput,
-            make_storage_mapping,
             EnergyOutput,
             MDOutput
 )

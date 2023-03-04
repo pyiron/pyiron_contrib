@@ -88,7 +88,7 @@ class Executor(abc.ABC):
         return self._nodes
 
     def _run_init(self):
-        if all(node.check_ready() for node in self.nodes):
+        if all(node.input.check_ready() for node in self.nodes):
             self._run_machine.step("ready")
         else:
             logging.info("Node is not ready yet!")

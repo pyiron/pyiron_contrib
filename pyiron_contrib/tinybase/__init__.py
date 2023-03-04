@@ -35,7 +35,8 @@ class AbstractNode(abc.ABC):
 
     _executors = {
             'foreground': Executor,
-            'background': BackgroundExecutor
+            'background': BackgroundExecutor,
+            'process': ProcessExecutor
     }
 
     def __init__(self):

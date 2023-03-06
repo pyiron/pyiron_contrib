@@ -1,6 +1,7 @@
 """Generic Input Base Clases"""
 
 import abc
+import sys
 
 from pyiron_base.interfaces.object import HasStorage
 from pyiron_atomistics.atomistics.structure.has_structure import HasStructure
@@ -101,13 +102,16 @@ class AbstractContainer(HasStorage, abc.ABC):
         Args:
             name (str): name of the new class
             *attrs (str): names of the new attributes
-            module (str, optional): the module path where this class is defined; you cannot pickle instances of classes
-            defined by this function, if you do not provide this as __name__
+            module (str, optional): the module path where this class is defined; on CPython this is automagically filled
+                    in, in other python implementations you need to manually provide this value as __name__ when you
+                    call this method for the resulting class to be picklable.
             **default_attrs (str): names and defaults of new attributes
         """
         body = {a: StorageAttribute() for a in attrs}
         body.update({a: StorageAttribute().default(d) for a, d in default_attrs.items()})
         T = type(name, (cls,), body)
+        if module is None:
+            module = sys._getframe(1).f_globals['__name__']
         T.__module__ = module
         return T
 
@@ -116,7 +120,7 @@ class AbstractInput(AbstractContainer, abc.ABC):
     def check_ready(self):
         return True
 
-StructureInput = AbstractInput.from_attributes("StructureInput", "structure", module=__name__)
+StructureInput = AbstractInput.from_attributes("StructureInput", "structure")
 
 MDInput = AbstractInput.from_attributes(
         "MDInput",
@@ -124,7 +128,6 @@ MDInput = AbstractInput.from_attributes(
         "timestep",
         "temperature",
         "output_steps",
-        module=__name__
 )
 
 
@@ -134,7 +137,6 @@ class AbstractOutput(AbstractContainer, abc.ABC):
 EnergyOutput = AbstractOutput.from_attributes(
         "EnergyOutput",
         "energy_pot",
-        module=__name__
 )
 
 MDOutputBase = AbstractOutput.from_attributes(

@@ -84,9 +84,7 @@ MinimizeInput = AbstractInput.from_attributes(
 
 class AseMinimizeInput(AseInput, StructureInput, MinimizeInput):
 
-    """My first experimental docstring"""
     algo = StorageAttribute().type(str).default('LBFGS')
-    """My second experimental docstring"""
     minimizer_kwargs = StorageAttribute().type(dict).default(dict)
 
     def lbfgs(self, damping=None, alpha=None):
@@ -107,7 +105,7 @@ class AseMinimizeInput(AseInput, StructureInput, MinimizeInput):
                 'LBFGS': LBFGS,
                 'FIRE': FIRE,
                 'GPMIN': GPMin
-        }[self.algo](structure, **self.minimizer_kwargs)
+        }.get(self.algo, default='LBFGS')(structure, **self.minimizer_kwargs)
 
 
 class AseMinimizeNode(AbstractNode):

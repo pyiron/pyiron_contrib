@@ -49,7 +49,8 @@ class RunMachine:
             self.goto(state, **kwargs)
         self._callbacks.get(self._state, lambda: None)()
 
-class Executor(abc.ABC):
+
+class Executor:
 
     def __init__(self, nodes):
         self._nodes = nodes
@@ -111,6 +112,15 @@ class Executor(abc.ABC):
 
     def run(self):
         self._run_machine.step()
+
+    def wait(self, until="finished", sleep=0.1):
+        """
+        Sleep until specified state of the run state machine is reached.
+        """
+        until = RunMachine.Code(until)
+        while until != self._run_machine.state:
+            time.sleep(sleep)
+
 
 from concurrent.futures import (
         ThreadPoolExecutor,

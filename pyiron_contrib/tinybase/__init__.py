@@ -40,7 +40,7 @@ class AbstractNode(abc.ABC):
     }
 
     def __init__(self):
-        self._input, self._output = None, None
+        self._input = None
 
     @abc.abstractmethod
     def _get_input(self) -> AbstractInput:
@@ -56,27 +56,19 @@ class AbstractNode(abc.ABC):
     def _get_output(self) -> AbstractOutput:
         pass
 
-    @property
-    def output(self) -> AbstractOutput:
-        if self._output is None:
-            self._output = self._get_output()
-        return self._output
-
-    def check_ready(self):
-        return True
-
     @abc.abstractmethod
-    def _execute(self) -> Optional[ReturnStatus]:
+    def _execute(self, output) -> Optional[ReturnStatus]:
         pass
 
     def execute(self) -> ReturnStatus:
+        output = self._get_output()
         try:
-            ret = self._execute()
+            ret = self._execute(output)
             if ret is None:
                 ret = ReturnStatus("done")
         except Exception as e:
             ret = ReturnStatus("aborted", msg=e)
-        return ret
+        return ret, output
 
     def run(self, how='foreground'):
         exe = self._executors[how](nodes=[self])
@@ -97,8 +89,8 @@ class FunctionNode(AbstractNode):
     def _get_output(self):
         return FunctionOutput()
 
-    def _execute(self):
-        self.output.result = self._function(*self.input.args, **self.input.kwargs)
+    def _execute(self, output):
+        output.result = self._function(*self.input.args, **self.input.kwargs)
 
 MasterInput = AbstractInput.from_attributes(
         "MasterInput",
@@ -117,17 +109,17 @@ class ListNode(AbstractNode, abc.ABC):
         super().__init__()
 
     @abc.abstractmethod
-    def _extract_output(self, step, node, ret):
+    def _extract_output(self, output, step, node, ret, node_output):
         pass
 
-    def _execute(self):
+    def _execute(self, output):
         nodes = self.input._create_nodes()
         exe = self.input.child_executor(nodes)
         exe.run()
         exe.wait()
 
-        for i, (node, ret) in enumerate(zip(nodes, exe._run_machine._data["status"])):
-            self._extract_output(i, node, ret)
+        for i, (node, ret, node_output) in enumerate(zip(nodes, exe.status, exe.output)):
+            self._extract_output(output, i, node, ret, node_output)
 
 SeriesInputBase = AbstractInput.from_attributes(
         "SeriesInputBase",
@@ -178,24 +170,26 @@ class SeriesNode(AbstractNode):
     def _get_output(self):
         return self.input.nodes[-1]._get_output()
 
-    def _execute(self):
+    def _execute(self, output):
         Exe = self.input.child_executor
 
-        first = self.input.nodes[0]
-        exe = Exe([first])
+        exe = Exe(self.input.nodes[:1])
         exe.run()
         exe.wait()
+        ret = exe.status[0]
+        if not ret.is_done():
+            return ReturnStatus("aborted", ret)
 
-        prev = first
         for node, connection in zip(self.input.nodes[1:], self.input.connections):
-            connection(node.input, prev.output)
+            connection(node.input, exe.output[0])
             exe = Exe([node])
             exe.run()
             exe.wait()
-            ret = exe._run_machine._data["status"][0]
-            if ret is not None and not ret.is_done():
+            ret = exe.status[0]
+            if not ret.is_done():
                 return ReturnStatus("aborted", ret)
 
+        output.transfer(exe.output[0])
 
 
 class TinyJob(abc.ABC):

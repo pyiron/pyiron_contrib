@@ -34,10 +34,10 @@ class AseStaticNode(AbstractNode):
     def _get_output(self):
         return EnergyOutput()
 
-    def _execute(self):
+    def _execute(self, output):
         structure = self.input.structure
         structure.calc = self.input.calculator
-        self.output.energy_pot = structure.get_potential_energy()
+        output.energy_pot = structure.get_potential_energy()
 
 
 class AseMDInput(AseInput, MDInput):
@@ -51,7 +51,7 @@ class AseMDNode(AbstractNode):
     def _get_output(self):
         return MDOutput()
 
-    def _execute(self):
+    def _execute(self, output):
         structure = self.input.structure.copy()
         structure.calc = self.input.calculator
 
@@ -66,10 +66,10 @@ class AseMDNode(AbstractNode):
         )
 
         def parse():
-            self.output.structures.append(structure.copy())
-            self.output.pot_energies.append(structure.get_potential_energy())
-            self.output.kin_energies.append(structure.get_kinetic_energy())
-            self.output.forces.append(structure.get_forces())
+            output.structures.append(structure.copy())
+            output.pot_energies.append(structure.get_potential_energy())
+            output.kin_energies.append(structure.get_kinetic_energy())
+            output.forces.append(structure.get_forces())
 
         parse()
         dyn.attach(parse, interval=self.input.steps // self.input.output_steps)
@@ -118,25 +118,26 @@ class AseMinimizeNode(AbstractNode):
     def _get_output(self):
         return MDOutput()
 
-    def _execute(self):
+    def _execute(self, output):
         structure = self.input.structure.copy()
         structure.calc = self.input.calculator
 
         opt = self.input.get_ase_optimizer(structure)
 
         def parse():
-            self.output.structures.append(structure.copy())
-            self.output.pot_energies.append(structure.get_potential_energy())
-            self.output.kin_energies.append(structure.get_kinetic_energy())
-            self.output.forces.append(structure.get_forces())
+            output.structures.append(structure.copy())
+            output.pot_energies.append(structure.get_potential_energy())
+            output.kin_energies.append(structure.get_kinetic_energy())
+            output.forces.append(structure.get_forces())
 
         opt.attach(parse, interval=self.input.output_steps)
         opt.run(fmax=self.input.ionic_force_tolerance, steps=self.input.max_steps)
         parse()
 
-        max_force = abs(self.output.forces[-1]).max()
-        if max_force > self.input.ionic_force_tolerance:
+        max_force = abs(output.forces[-1]).max()
+        force_tolerance = self.input.ionic_force_tolerance
+        if max_force > force_tolerance:
             return ReturnStatus(
                     "not_converged",
-                    f"force in last step ({max_force}) is larger than tolerance ({self.input.ionic_force_tolerance})!"
+                    f"force in last step ({max_force}) is larger than tolerance ({force_tolerance})!"
             )

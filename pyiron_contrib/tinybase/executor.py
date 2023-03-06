@@ -98,13 +98,13 @@ class Executor:
         self._run_machine.step("running")
 
     def _run_running(self):
-        ret = [node.execute() for node in self.nodes]
-        self._run_machine.step("collect", status=ret)
+        status, output = zip(*[node.execute() for node in self.nodes])
+        self._run_machine.step("collect", status=status, output=output)
 
     def _run_collect(self):
         self._run_machine.step("finished",
-                status=self._run_machine._data["status"],
-                output=[node.output for node in self.nodes]
+                status=self.status,
+                output=self.output,
         )
 
     def _run_finished(self):
@@ -121,6 +121,14 @@ class Executor:
         while until != self._run_machine.state:
             time.sleep(sleep)
 
+    @property
+    def status(self):
+        return self._run_machine._data["status"]
+
+    @property
+    def output(self):
+        return self._run_machine._data["output"]
+
 
 from concurrent.futures import (
         ThreadPoolExecutor,
@@ -130,8 +138,7 @@ from concurrent.futures import (
 from threading import Lock
 
 def run_node(node):
-    ret = node.execute()
-    return ret, node.output
+    return node.execute()
 
 class FuturesExecutor(Executor, abc.ABC):
 
@@ -147,18 +154,17 @@ class FuturesExecutor(Executor, abc.ABC):
         self._max_tasks = max_tasks if max_tasks is not None else 4
         self._done = 0
         self._futures = {}
-        self._returns = {}
+        self._status = {}
+        self._output = {}
+        self._index = {}
         self._lock = Lock()
 
-    def _process_future(self, future=None):
-        for node, _f in self._futures.items():
-            if _f == future: break
-        else:
-            assert False, "This should never happen!"
+    def _process_future(self, future):
+        node = self._futures[future]
 
-        ret, output = future.result(timeout=0)
-        node._output = output
-        self._returns[node] = ret
+        status, output = future.result(timeout=0)
+        self._status[node] = status
+        self._output[node] = output
         with self._lock:
             self._done += 1
         self._check_finish()
@@ -166,15 +172,21 @@ class FuturesExecutor(Executor, abc.ABC):
     def _check_finish(self, log=False):
         with self._lock:
             if self._done == len(self.nodes):
-                # how to ensure ordering?  dict remembers insertion order, so maybe ok for now
-                self._run_machine.step("collect", status=list(self._returns.values()))
+                status = [self._status[n] for n in sorted(self.nodes, key=lambda n: self._index[n])]
+                output = [self._output[n] for n in sorted(self.nodes, key=lambda n: self._index[n])]
+                self._run_machine.step("collect",
+                        status=status,
+                        output=output,
+                )
 
     def _run_running(self):
         if len(self._futures) < len(self.nodes):
             pool = self._FuturePoolExecutor(max_workers=self._max_tasks)
             try:
-                for node in self.nodes:
-                    future = self._futures[node] = pool.submit(run_node, node)
+                for i, node in enumerate(self.nodes):
+                    future = pool.submit(run_node, node)
+                    self._futures[future] = node
+                    self._index[node] = i
                     future.add_done_callback(self._process_future)
             finally:
                 # with statement doesn't allow me to put wait=False, so I gotta do it here with try/finally.

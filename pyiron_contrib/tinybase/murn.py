@@ -73,11 +73,18 @@ class MurnaghanNode(ListNode):
     def _get_output(self):
         return MurnaghanOutput()
 
-    def _execute(self):
-        self.output.base_structure = self.input.structure
-        return super()._execute()
+    def _execute(self, output):
+        output.base_structure = self.input.structure
+        ret = super()._execute(output)
+        I = np.argsort(output.volumes)
+        output.volumes = output.volumes[I]
+        output.energies = output.energies[I]
 
-    def _extract_output(self, i, node, ret):
+    def _extract_output(self, output, i, node, ret, node_output):
+        if len(output.energies) == 0:
+            output.energies = np.zeros(len(self.input.strains))
+        if len(output.volumes) == 0:
+            output.volumes = np.zeros(len(self.input.strains))
         if ret.is_done():
-            self.output.energies.append(node.output.energy_pot)
-            self.output.volumes.append(node.input.structure.get_volume())
+            output.energies[i] = node_output.energy_pot
+            output.volumes[i] = node.input.structure.get_volume()

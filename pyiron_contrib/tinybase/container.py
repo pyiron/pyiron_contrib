@@ -111,9 +111,19 @@ class AbstractContainer(HasStorage, abc.ABC):
         body.update({a: StorageAttribute().default(d) for a, d in default_attrs.items()})
         T = type(name, (cls,), body)
         if module is None:
+            # this is also how cpython does it for namedtuple
             module = sys._getframe(1).f_globals['__name__']
         T.__module__ = module
         return T
+
+    def transfer(self, other):
+        """
+        Copy the contents of another 
+        """
+        if isinstance(self, other.__class__):
+            self.storage.update(other.storage)
+        else:
+            raise TypeError("Must pass a superclass to transfer from!")
 
 
 class AbstractInput(AbstractContainer, abc.ABC):

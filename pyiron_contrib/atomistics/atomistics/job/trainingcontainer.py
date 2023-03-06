@@ -446,26 +446,19 @@ class TrainingStorage(StructureStorage):
             indices = ii[iteration_step]
         else:
             indices = job["input/structure/indices"]
+        species=np.asarray(job["input/structure/species"])
         cell = job["output/generic/cells"][iteration_step]
         positions = job["output/generic/positions"][iteration_step]
-        if len(indices) == len(job["input/structure/indices"]):
-            structure = job["input/structure"].to_object()
-            structure.positions[:] = positions
-            structure.cell.array[:] = cell
-            structure.indices[:] = indices
-        else:
-            structure = Atoms(
-                    species=job["input/structure/species"],
-                    indices=indices,
-                    positions=positions,
-                    cell=cell,
-                    pbc=job["input/structure/cell/pbc"]
-            )
+        pbc=job["input/structure/cell/pbc"]
 
-        self.add_structure(
-            structure,
-            identifier=job.name,
-            **kwargs
+        self.add_chunk(
+                len(indices),
+                identifier=job.name,
+                symbols=species[indices],
+                positions=positions,
+                cell=[cell],
+                pbc=[pbc],
+                **kwargs
         )
 
     @deprecate("Use add_structure instead")

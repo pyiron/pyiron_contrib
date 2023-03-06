@@ -157,7 +157,7 @@ MDOutputBase = AbstractOutput.from_attributes(
         structures=list,
 )
 
-class MDOutput(HasStructure, MDOutputBase):
+class MDOutput(HasStructure, MDOutputBase, EnergyOutput):
 
     def plot_energies(self):
         plt.plot(self.pot_energies - np.min(self.pot_energies), label='pot')
@@ -169,3 +169,8 @@ class MDOutput(HasStructure, MDOutputBase):
 
     def _get_structure(self, frame, wrap_atoms=True):
         return self.structures[frame]
+
+    # TODO: how to make sure this is generally conforming?
+    @property
+    def energy_pot(self):
+        return self.pot_energies[-1]

@@ -1,10 +1,11 @@
 import abc
+from copy import deepcopy
 import enum
-from typing import Optional
+from typing import Optional, Callable
 
 from pyiron_base.interfaces.object import HasStorage
 
-from .container import AbstractInput, AbstractOutput
+from .container import AbstractInput, AbstractOutput, StorageAttribute
 from .executor import (
         Executor,
         BackgroundExecutor,
@@ -190,6 +191,116 @@ class SeriesNode(AbstractNode):
                 return ReturnStatus("aborted", ret)
 
         output.transfer(exe.output[0])
+
+LoopInputBase = AbstractInput.from_attributes(
+        "LoopInput",
+        "control",
+        trace=bool,
+)
+
+class LoopControl(HasStorage):
+    def __init__(self, condition, restart):
+        super().__init__()
+        self._condition = condition
+        self._restart = restart
+
+    scratch = StorageAttribute().default(dict)
+
+    def condition(self, node: AbstractNode, output: AbstractNode):
+        """
+        Whether to terminate the loop or not.
+
+        Args:
+            node (AbstractNode): the loop body
+            output (AbstractOutput): output of the loop body
+
+        Args:
+            bool: True to terminate the loop; False to keep it running
+        """
+        return self._condition(node, output, self.scratch)
+
+    def restart(self, output: AbstractOutput, input: AbstractInput):
+        """
+        Setup the input of the next loop body.
+
+        Args:
+            output (AbstractOutput): output of the previous loop body
+            input (AbstractInput): input of the next loop body
+        """
+        self._restart(output, input, self.scratch)
+
+class RepeatLoopControl(LoopControl):
+    def __init__(self, steps, restart=lambda *_: None):
+        super().__init__(condition=self._count_steps, restart=restart)
+        self._steps = steps
+
+    def _count_steps(self, scratch={}):
+        c = scratch.get('counter', 0)
+        c += 1
+        scratch['counter'] = c
+        return c >= steps
+
+
+class LoopInput(LoopInputBase, MasterInput):
+    """
+    Input for :class:`~.LoopNode`.
+
+    Attributes:
+        node (:class:`~.AbstractNode`): the loop body
+        control (:class:`.LoopControl`): encapsulates control flow of the loop
+    """
+
+    def repeat(self, steps: int, restart: Optional[Callable[[AbstractOutput, AbstractInput, dict], None]] = None):
+        """
+        Set up a loop control that loops for steps and calls restart in between.
+
+        If restart is not given don't do anything to input of the loop body.
+        """
+        if restart is not None:
+            self.control = RepeatLoopControl(steps, restart)
+        else:
+            self.control = RepeatLoopControl(steps)
+
+    def control_with(
+            self,
+            condition: Callable[[AbstractNode, AbstractOutput, dict], bool],
+            restart: Callable[[AbstractOutput, AbstractInput, dict], None]
+    ):
+        """
+        Set up a loop control that uses the callables for control flow.
+
+        Args:
+            condition (function): takes the loop body, its output and a persistant dict
+            restart (function): takes the output of the last loop body, the input of the next one and a persistant dict
+        """
+        self.control = LoopControl(condition, restart)
+
+class LoopNode(AbstractNode):
+    """
+    Generic node to loop over a given input node.
+    """
+
+    def _get_input(self):
+        return LoopInput()
+
+    def _get_output(self):
+        return self.input.node._get_output()
+
+    def _execute(self, output):
+        node = deepcopy(self.input.node)
+        control = deepcopy(self.input.control)
+        scratch = {}
+        while True:
+            exe = self.input.child_executor([node])
+            exe.run()
+            ret = exe.status[-1]
+            out = exe.output[-1]
+            if not ret.is_done():
+                return ReturnStatus("aborted", ret)
+            if control.condition(node, out):
+                break
+            control.restart(out, node.input)
+        output.transfer(out)
 
 
 class TinyJob(abc.ABC):

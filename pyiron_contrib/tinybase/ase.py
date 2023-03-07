@@ -1,4 +1,4 @@
-from .container import (
+from pyiron_contrib.tinybase.container import (
             AbstractInput,
             StorageAttribute,
             StructureInput,
@@ -6,7 +6,7 @@ from .container import (
             EnergyOutput,
             MDOutput
 )
-from . import AbstractNode, ReturnStatus
+from pyiron_contrib.tinybase.node import AbstractNode, ReturnStatus
 
 import numpy as np
 import matplotlib.pyplot as plt

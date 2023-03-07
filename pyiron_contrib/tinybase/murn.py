@@ -1,9 +1,13 @@
-from .container import (
+from pyiron_contrib.tinybase.container import (
             AbstractOutput,
             StructureInput,
 )
-from . import AbstractNode, ListNode, ListInput
-from . import ReturnStatus
+from pyiron_contrib.tinybase.node import (
+            AbstractNode,
+            ListNode,
+            ListInput,
+            ReturnStatus
+)
 
 from copy import deepcopy
 

@@ -96,16 +96,18 @@ class AseMinimizeInput(AseInput, StructureInput, MinimizeInput):
 
     def fire(self):
         self.algo = 'FIRE'
+        self.minimizer_kwargs = {}
 
     def gpmin(self):
         self.algo = 'GPMIN'
+        self.minimizer_kwargs = {}
 
     def get_ase_optimizer(self, structure):
         return {
                 'LBFGS': LBFGS,
                 'FIRE': FIRE,
                 'GPMIN': GPMin
-        }.get(self.algo, default='LBFGS')(structure, **self.minimizer_kwargs)
+        }.get(self.algo)(structure, **self.minimizer_kwargs)
 
 
 class AseMinimizeNode(AbstractNode):

@@ -234,11 +234,11 @@ class RepeatLoopControl(LoopControl):
         super().__init__(condition=self._count_steps, restart=restart)
         self._steps = steps
 
-    def _count_steps(self, scratch={}):
+    def _count_steps(self, output, input, scratch={}):
         c = scratch.get('counter', 0)
         c += 1
         scratch['counter'] = c
-        return c >= steps
+        return c >= self._steps
 
 
 class LoopInput(LoopInputBase, MasterInput):

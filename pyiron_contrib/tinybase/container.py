@@ -95,7 +95,7 @@ class StorageAttribute:
 class AbstractContainer(HasStorage, abc.ABC):
     # TODO: this should go into HasStorage, exists here only to give one location to define from_ methods
     @classmethod
-    def from_attributes(cls, name, *attrs, module=None, **default_attrs):
+    def from_attributes(cls, name, *attrs, module=None, bases=(), **default_attrs):
         """
         Create a new sub class with given attributes.
 
@@ -105,11 +105,12 @@ class AbstractContainer(HasStorage, abc.ABC):
             module (str, optional): the module path where this class is defined; on CPython this is automagically filled
                     in, in other python implementations you need to manually provide this value as __name__ when you
                     call this method for the resulting class to be picklable.
+            bases (list of type): additional base classes
             **default_attrs (str): names and defaults of new attributes
         """
         body = {a: StorageAttribute() for a in attrs}
         body.update({a: StorageAttribute().default(d) for a, d in default_attrs.items()})
-        T = type(name, (cls,), body)
+        T = type(name, bases + (cls,), body)
         if module is None:
             # this is also how cpython does it for namedtuple
             module = sys._getframe(1).f_globals['__name__']

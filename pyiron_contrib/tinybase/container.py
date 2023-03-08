@@ -3,6 +3,8 @@
 import abc
 import sys
 
+from pyiron_contrib.tinybase.storage import HasHDFAdapaterMixin
+
 from pyiron_base.interfaces.object import HasStorage
 from pyiron_atomistics.atomistics.structure.has_structure import HasStructure
 
@@ -92,7 +94,7 @@ class StorageAttribute:
     def doc(self, text):
         self.__doc__ = text
 
-class AbstractContainer(HasStorage, abc.ABC):
+class AbstractContainer(HasStorage, HasHDFAdapaterMixin, abc.ABC):
     # TODO: this should go into HasStorage, exists here only to give one location to define from_ methods
     @classmethod
     def from_attributes(cls, name, *attrs, module=None, bases=(), **default_attrs):

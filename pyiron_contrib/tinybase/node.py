@@ -5,6 +5,7 @@ from typing import Optional, Callable
 
 from pyiron_base.interfaces.object import HasStorage
 
+from pyiron_contrib.tinybase.storage import Storable, pickle_dump
 from .container import AbstractInput, AbstractOutput, StorageAttribute
 from .executor import (
         Executor,
@@ -32,7 +33,7 @@ class ReturnStatus:
     def is_done(self):
         return self.code == self.Code.DONE
 
-class AbstractNode(abc.ABC):
+class AbstractNode(Storable, abc.ABC):
 
     _executors = {
             'foreground': Executor,
@@ -75,6 +76,19 @@ class AbstractNode(abc.ABC):
         exe = self._executors[how](nodes=[self])
         exe.run()
         return exe
+
+    # Storable Impl'
+    # We might even avoid this by deriving from HasStorage and put _input in there
+    def _store(self, storage):
+        # right now not all ASE objects can be stored in HDF, so let's just pickle for now
+        storage["input"] = pickle_dump(self.input)
+        # self.input.store(storage, "input")
+
+    @classmethod
+    def _restore(cls, storage, version):
+        node = cls()
+        node._input = pickle_load(storage["input"])
+        return node
 
 FunctionInput = AbstractInput.from_attributes("FunctionInput", args=list, kwargs=dict)
 FunctionOutput = AbstractOutput.from_attributes("FunctionOutput", "result")
@@ -301,37 +315,3 @@ class LoopNode(AbstractNode):
                 break
             control.restart(out, node.input)
         output.transfer(out)
-
-
-class TinyJob(abc.ABC):
-
-    _executors = {
-            'foreground': Executor,
-            'background': BackgroundExecutor,
-            'process': ProcessExecutor
-    }
-
-    def __init__(self, project, job_name):
-        self._project = project
-        self._name = job_name
-
-    @abc.abstractmethod
-    def _get_node(self):
-        pass
-
-    @property
-    def input(self):
-        return self._node.input
-
-    @property
-    def output(self):
-        return self._node.output
-
-    def run(self, how='foreground'):
-        exe = self._executor = self._executors[how](nodes=[self._node])
-        exe._run_machine.observe("ready", self.save_input)
-        exe._run_machine.observe("collect", self.save_output)
-        exe.run()
-        return exe
-
-

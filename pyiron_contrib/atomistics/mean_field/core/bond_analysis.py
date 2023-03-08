@@ -380,8 +380,10 @@ class StaticBondAnalysis(_BondAnalysisParent):
                                           self.output.per_shell_bond_indexed_neighbor_list)
 
     def run_static(self):
+        self.status.running = True
         self.analyze_bonds()
         self.to_hdf()
+        self.status.finished = True
 
 
 class MDBondAnalysis(_BondAnalysisParent):
@@ -420,13 +422,9 @@ class MDBondAnalysis(_BondAnalysisParent):
         Check if necessary inputs are provided, and everything is in order for the computation to run.
         """          
         if self.input.md_job is not None:
-            self._md_trajectory = self.input.md_job.output.unwrapped_positions[self.input.thermalize_snapshots:]
-            self._md_cells = self.input.md_job.output.cells[self.input.thermalize_snapshots:]
-        elif self.input.md_trajectory is not None:
-            self._md_trajectory = self.input.md_trajectory
-            if self.input.md_cells is None:
-                self._md_cells = np.array([self.input.structure.cell.array]*len(self._md_trajectory))
-        else:
+            self.input.md_trajectory = self.input.md_job.output.unwrapped_positions[self.input.thermalize_snapshots:]
+            self.input.md_cells = self.input.md_job.output.cells[self.input.thermalize_snapshots:]
+        elif self.input.md_trajectory is None:
             raise AttributeError('Either <job>.input.md_job or <job>.input.md_trajectory must be set')
             
         static = StaticBondAnalysis(project=self.project_hdf5, job_name=self.job_name + '_static')
@@ -434,36 +432,61 @@ class MDBondAnalysis(_BondAnalysisParent):
         static.analyze_bonds()
         self.output = static.output
 
-    def _get_xyz_bond_vectors(self, per_atom=False, return_out=False):
+    def get_xyz_bond_vectors(self, per_atom=False):
         """
         Use the 'bond relations' list to obtain the MD bond vectors for each shell.
         """
-        self.output.per_shell_xyz_bond_vectors = []
+        cell = np.mean(self.input.md_cells, axis=0)
+        per_shell_xyz_bond_vectors = []
         for i, br_per_s in enumerate(self.output.per_shell_bond_relations):
             per_shell = []
             for bond in br_per_s:
-                bond_vectors = self._md_trajectory[:, bond[:, 1] - 1] - self._md_trajectory[:, bond[:, 0] - 1]
+                bond_vectors = self.input.md_trajectory[:, bond[:, 1] - 1] - self.input.md_trajectory[:, bond[:, 0] - 1]
                 bond_vectors_mic = []
                 for j, snapshot in enumerate(bond_vectors):
-                    bond_vectors_mic.append(self._find_mic(self._md_cells[j], snapshot))
+                    bond_vectors_mic.append(self._find_mic(cell, snapshot))
                 if per_atom:
                     per_shell.append(np.array(bond_vectors_mic))
                 else:
                     per_shell.append(np.array(bond_vectors_mic).reshape(-1, 3))
-            self.output.per_shell_xyz_bond_vectors.append(np.array(per_shell))
-        if return_out:
-            return self.output.per_shell_xyz_bond_vectors
+            per_shell_xyz_bond_vectors.append(np.array(per_shell))
+        return per_shell_xyz_bond_vectors
 
-    def _get_long_t1_t2_bond_vectors(self):
+    def get_l_t1_t2_bond_vectors(self, per_atom=False, return_xyz=False):
         """
         Convert the MD bond vectors from cartesian [x, y, z] axes to [longitudinal, transverse1 and transverse2] axes,
             using the transformation matrices for each bond in each shell.
         """
-        self.output.per_shell_long_t1_t2_bond_vectors = []
+        per_shell_xyz_bond_vectors = self.get_xyz_bond_vectors(per_atom=per_atom)
+        per_shell_l_t1_t2_bond_vectors = []
         for shell in np.arange(self.input.n_shells):
             per_shell = []
             for i, transform in enumerate(self.output.per_shell_transformation_matrices[shell]):
-                bond_vectors = self.output.per_shell_xyz_bond_vectors[shell][i]
+                bond_vectors = per_shell_xyz_bond_vectors[shell][i]
+                transformed_vectors = np.dot(bond_vectors, transform.T)
+                # the next 4 lines are an exception for HCP!
+                if np.any(transformed_vectors[:, 0] < 0.):
+                    for j, vec in enumerate(transformed_vectors):
+                        if vec[0] < 0.:
+                            transformed_vectors[j] = -vec
+                per_shell.append(transformed_vectors)
+            per_shell_l_t1_t2_bond_vectors.append(np.array(per_shell))
+        if return_xyz:
+            return per_shell_l_t1_t2_bond_vectors, per_shell_xyz_bond_vectors
+        else:
+            return per_shell_l_t1_t2_bond_vectors
+            
+    def get_r_t1_t2_bond_vectors(self, per_atom=False, return_xyz=False):
+        """
+        Convert the MD bond vectors from cartesian [x, y, z] axes to [radial, transverse1 and transverse2] axes,
+            using the transformation matrices for each bond in each shell.
+        """
+        per_shell_xyz_bond_vectors = self.get_xyz_bond_vectors(per_atom=per_atom)
+        per_shell_r_t1_t2_bond_vectors = []
+        for shell in np.arange(self.input.n_shells):
+            per_shell = []
+            for i, transform in enumerate(self.output.per_shell_transformation_matrices[shell]):
+                bond_vectors = per_shell_xyz_bond_vectors[shell][i]
                 transformed_vectors = np.dot(bond_vectors, transform.T)
                 transformed_vectors[:, 0] = np.linalg.norm(bond_vectors, axis=-1)
                 # the next 4 lines are an exception for HCP!
@@ -472,93 +495,113 @@ class MDBondAnalysis(_BondAnalysisParent):
                         if vec[0] < 0.:
                             transformed_vectors[j] = -vec
                 per_shell.append(transformed_vectors)
-            self.output.per_shell_long_t1_t2_bond_vectors.append(np.array(per_shell))
+            per_shell_r_t1_t2_bond_vectors.append(np.array(per_shell))
+        if return_xyz:
+            return per_shell_r_t1_t2_bond_vectors, per_shell_xyz_bond_vectors
+        else:
+            return per_shell_r_t1_t2_bond_vectors 
 
-    @staticmethod
-    def _cartesian_to_cylindrical(vector):
-        """
-        Helper method for get_md_cylindrical_long_t1_t2.
-        """
-        if len(vector.shape) == 1:
-            vector = np.array([vector])
-        r = np.linalg.norm(vector[:, -2:], axis=1)
-        phi = np.arctan2(vector[:, 2], vector[:, 1])
-        return np.array([vector[:, 0], r, phi]).T
+#     @staticmethod
+#     def _cartesian_to_cylindrical(vector):
+#         """
+#         Helper method for get_md_cylindrical_long_t1_t2.
+#         """
+#         if len(vector.shape) == 1:
+#             vector = np.array([vector])
+#         r = np.linalg.norm(vector[:, -2:], axis=1)
+#         phi = np.arctan2(vector[:, 2], vector[:, 1])
+#         return np.array([vector[:, 0], r, phi]).T
 
-    def _get_long_r_phi_bond_vectors(self):
-        """
-        Convert the [longitudinal, transverse1 and transverse2] which are cartesian axes to cylindrical axes
-            [longitudinal, r and phi].
-        """
-        self.output.per_shell_long_r_phi_bond_vectors = []
-        for shell in self.output.per_shell_long_t1_t2_bond_vectors:
-            per_bond = []
-            for bond in shell:
-                per_bond.append(self._cartesian_to_cylindrical(bond))
-            self.output.per_shell_long_r_phi_bond_vectors.append(np.array(per_bond))
+#     def _get_long_r_phi_bond_vectors(self):
+#         """
+#         Convert the [longitudinal, transverse1 and transverse2] which are cartesian axes to cylindrical axes
+#             [longitudinal, r and phi].
+#         """
+#         self.output.per_shell_long_r_phi_bond_vectors = []
+#         for shell in self.output.per_shell_long_t1_t2_bond_vectors:
+#             per_bond = []
+#             for bond in shell:
+#                 per_bond.append(self._cartesian_to_cylindrical(bond))
+#             self.output.per_shell_long_r_phi_bond_vectors.append(np.array(per_bond))
 
     def run_static(self):
-        self._get_xyz_bond_vectors()
-        self._get_long_t1_t2_bond_vectors()
-        #self._get_long_r_phi_bond_vectors()
+        self.status.running = True
         self.to_hdf()
+        self.status.finished = True
 
     def get_1d_histogram_xyz(self, shell=0, bond=None, n_bins=20, d_range=None, density=True, axis=0,
                              moment=True):
-        return self.histogram.get_per_shell_1d_histogram(self.output.per_shell_xyz_bond_vectors, shell=shell, bond=bond,
+        per_shell_xyz_bond_vectors = self.get_xyz_bond_vectors()
+        return self.histogram.get_per_shell_1d_histogram(per_shell_xyz_bond_vectors, shell=shell, bond=bond,
                                                          n_bins=n_bins, d_range=d_range, density=density, axis=axis,
                                                          moment=moment)
 
-    def get_1d_histogram_long_t1_t2(self, shell=0, bond=None, n_bins=20, d_range=None, density=True, axis=0,
+    def get_1d_histogram_l_t1_t2(self, shell=0, bond=None, n_bins=20, d_range=None, density=True, axis=0,
                                     moment=True):
-        return self.histogram.get_per_shell_1d_histogram(self.output.per_shell_long_t1_t2_bond_vectors, shell=shell,
+        per_shell_l_t1_t2_bond_vectors = self.get_l_t1_t2_bond_vectors()
+        return self.histogram.get_per_shell_1d_histogram(per_shell_l_t1_t2_bond_vectors, shell=shell,
+                                                         bond=bond, n_bins=n_bins, d_range=d_range, density=density,
+                                                         axis=axis, moment=moment)
+    
+    def get_1d_histogram_r_t1_t2(self, shell=0, bond=None, n_bins=20, d_range=None, density=True, axis=0,
+                                    moment=True):
+        per_shell_r_t1_t2_bond_vectors = self.get_r_t1_t2_bond_vectors()
+        return self.histogram.get_per_shell_1d_histogram(per_shell_r_t1_t2_bond_vectors, shell=shell,
                                                          bond=bond, n_bins=n_bins, d_range=d_range, density=density,
                                                          axis=axis, moment=moment)
 
-    def get_1d_histogram_long_r_phi(self, shell=0, bond=None, n_bins=20, d_range=None, density=True, axis=0,
-                                    moment=True):
-        return self.histogram.get_per_shell_1d_histogram(self.output.per_shell_long_r_phi_bond_vectors, shell=shell,
-                                                         bond=bond, n_bins=n_bins, d_range=d_range, density=density,
-                                                         axis=axis, moment=moment)
+#     def get_1d_histogram_long_r_phi(self, shell=0, bond=None, n_bins=20, d_range=None, density=True, axis=0,
+#                                     moment=True):
+#         return self.histogram.get_per_shell_1d_histogram(self.output.per_shell_long_r_phi_bond_vectors, shell=shell,
+#                                                          bond=bond, n_bins=n_bins, d_range=d_range, density=density,
+#                                                          axis=axis, moment=moment)
 
     def get_3d_histogram_xyz(self, shell=0, bond=None, n_bins=20, d_range=None, density=True):
-        return self.histogram.get_per_shell_3d_histogram(self.output.per_shell_xyz_bond_vectors, supp_data=None, shell=shell, bond=bond,
+        per_shell_xyz_bond_vectors = self.get_xyz_bond_vectors()
+        return self.histogram.get_per_shell_3d_histogram(per_shell_xyz_bond_vectors, supp_data=None, shell=shell, bond=bond,
                                                          n_bins=n_bins, d_range=d_range, density=density)
 
-    def get_3d_histogram_long_t1_t2(self, shell=0, bond=None, n_bins=20, d_range=None, density=True):
-        return self.histogram.get_per_shell_3d_histogram(self.output.per_shell_long_t1_t2_bond_vectors, 
-                                                         supp_data=self.output.per_shell_xyz_bond_vectors, shell=shell,
+    def get_3d_histogram_l_t1_t2(self, shell=0, bond=None, n_bins=20, d_range=None, density=True):
+        per_shell_l_t1_t2_bond_vectors, per_shell_xyz_bond_vectors = self.get_l_t1_t2_bond_vectors(return_xyz=True)
+        return self.histogram.get_per_shell_3d_histogram(per_shell_l_t1_t2_bond_vectors, 
+                                                         supp_data=per_shell_xyz_bond_vectors, shell=shell,
+                                                         bond=bond, n_bins=n_bins, d_range=d_range, density=density)
+    
+    def get_3d_histogram_r_t1_t2(self, shell=0, bond=None, n_bins=20, d_range=None, density=True):
+        per_shell_r_t1_t2_bond_vectors, per_shell_xyz_bond_vectors = self.get_r_t1_t2_bond_vectors(return_xyz=True)
+        return self.histogram.get_per_shell_3d_histogram(per_shell_r_t1_t2_bond_vectors, 
+                                                         supp_data=per_shell_xyz_bond_vectors, shell=shell,
                                                          bond=bond, n_bins=n_bins, d_range=d_range, density=density)
 
-    def get_3d_histogram_long_r_phi(self, shell=0, bond=None, n_bins=20, d_range=None, density=True):
-        return self.histogram.get_per_shell_3d_histogram(self.output.per_shell_long_r_phi_bond_vectors, shell=shell, supp_data=None,
-                                                         bond=bond, n_bins=n_bins, d_range=d_range, density=density)
+#     def get_3d_histogram_long_r_phi(self, shell=0, bond=None, n_bins=20, d_range=None, density=True):
+#         return self.histogram.get_per_shell_3d_histogram(self.output.per_shell_long_r_phi_bond_vectors, shell=shell, supp_data=None,
+#                                                          bond=bond, n_bins=n_bins, d_range=d_range, density=density)
 
-    def get_potential_long_r_phi(self, temperature=300., shell=0, bond=None, n_bins=20, d_range=None, density=True):
-        pd, bins = self.get_3d_histogram_long_r_phi(shell=shell, bond=bond, n_bins=n_bins, d_range=d_range,
-                                                    density=density)
-        r_bins = bins[1][0, :, 0]
-        delta_r = (r_bins[1] - r_bins[0]) / 2
-        mean_over_phi_pd = pd.mean(axis=-1)
-        # since in cylindrical coordinates, the pd of r needs to be divided by the bins,
-        mean_over_phi_pd /= np.outer(np.ones(n_bins), r_bins + delta_r)
-        mean_over_phi_pd /= mean_over_phi_pd.sum()
-        potential = -KB * temperature * np.log(mean_over_phi_pd + 1e-10)
-        potential = potential.T
-        return potential - potential.min(), np.meshgrid(bins[0][:, 0, 0], bins[1][0, :, 0])
+#     def get_potential_long_r_phi(self, temperature=300., shell=0, bond=None, n_bins=20, d_range=None, density=True):
+#         pd, bins = self.get_3d_histogram_long_r_phi(shell=shell, bond=bond, n_bins=n_bins, d_range=d_range,
+#                                                     density=density)
+#         r_bins = bins[1][0, :, 0]
+#         delta_r = (r_bins[1] - r_bins[0]) / 2
+#         mean_over_phi_pd = pd.mean(axis=-1)
+#         # since in cylindrical coordinates, the pd of r needs to be divided by the bins,
+#         mean_over_phi_pd /= np.outer(np.ones(n_bins), r_bins + delta_r)
+#         mean_over_phi_pd /= mean_over_phi_pd.sum()
+#         potential = -KB * temperature * np.log(mean_over_phi_pd + 1e-10)
+#         potential = potential.T
+#         return potential - potential.min(), np.meshgrid(bins[0][:, 0, 0], bins[1][0, :, 0])
 
-    def get_potential_long_t1_t2(self, temperature=300., shell=0, bond=None, n_bins=20, d_range=None, density=True,
-                                 mean_over_final_axis=False):
-        pd, bins = self.get_3d_histogram_long_t1_t2(shell=shell, bond=bond, n_bins=n_bins, d_range=d_range,
-                                                    density=density)
-        if mean_over_final_axis:
-            pd = pd.mean(axis=-1)
-        pd /= pd.sum()
-        potential = -KB * temperature * np.log(pd + 1e-10)
-        if mean_over_final_axis:
-            return (potential - potential.min()).T, np.meshgrid(bins[0][:, 0, 0], bins[1][0, :, 0])
-        else:
-            return potential - potential.min(), bins
+#     def get_potential_long_t1_t2(self, temperature=300., shell=0, bond=None, n_bins=20, d_range=None, density=True,
+#                                  mean_over_final_axis=False):
+#         pd, bins = self.get_3d_histogram_long_t1_t2(shell=shell, bond=bond, n_bins=n_bins, d_range=d_range,
+#                                                     density=density)
+#         if mean_over_final_axis:
+#             pd = pd.mean(axis=-1)
+#         pd /= pd.sum()
+#         potential = -KB * temperature * np.log(pd + 1e-10)
+#         if mean_over_final_axis:
+#             return (potential - potential.min()).T, np.meshgrid(bins[0][:, 0, 0], bins[1][0, :, 0])
+#         else:
+#             return potential - potential.min(), bins
 
 
     @staticmethod
@@ -579,7 +622,8 @@ class MDBondAnalysis(_BondAnalysisParent):
             raise ValueError("choose between long, t1, and t2")
 
     def _get_correlations(self, shell, bond_x, bond_y, axis_x, axis_y, n_bins):
-        all_bonds = self.output.per_shell_long_t1_t2_bond_vectors[shell]
+        per_shell_r_t1_t2_bond_vectors = self.get_l_t1_t2_bond_vectors()
+        all_bonds = per_shell_r_t1_t2_bond_vectors[shell]
         n_bonds = len(all_bonds)
         if (bond_x >= n_bonds) or (bond_y >= n_bonds):
             raise ValueError("there are only {} bonds in shell {}".format(n_bonds, shell))
@@ -676,7 +720,7 @@ class _Histograms(object):
         else:
             return rho/rho.sum(), self._get_bin_centers(bins=bins)
 
-    def get_per_shell_3d_histogram(self, bond_representation, supp_data=None, shell=0, bond=None, n_bins=20, d_range=True,
+    def get_per_shell_3d_histogram(self, bond_representation, supp_data=None, shell=0, bond=None, n_bins=20, d_range=None,
                                    density=True):
         """
         Get the 3d-histograms of data:
@@ -695,7 +739,7 @@ class _Histograms(object):
         """
         required_data = bond_representation[shell]
         required_data = self._check_histogram_bonds(required_data=required_data, bond=bond, shell=shell)
-        rho, bins = np.histogramdd(required_data, bins=n_bins, density=density)
+        rho, bins = np.histogramdd(required_data, bins=n_bins, range=d_range, density=density)
         rho /= rho.sum()
         bins = self._get_bin_centers(bins=bins)
         bins_3d = np.meshgrid(bins[0], bins[1], bins[2], indexing='ij')

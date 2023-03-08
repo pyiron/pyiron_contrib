@@ -1,6 +1,7 @@
 import os
 import importlib
 from pyiron_atomistics.lammps.interactive import LammpsInteractive
+from pyiron_base import state
 
 try:  # mpi4py is only supported on Linux and Mac Os X
     from pylammpsmpi import LammpsLibrary
@@ -10,6 +11,12 @@ except ImportError:
 
 class LammpsInteractiveWithoutOutput(LammpsInteractive):
     def __init__(self, project, job_name):
+        if not state.database.database_is_disabled:
+            raise RuntimeError(
+                "To run a `Without` job, the database must first be disabled. Please "
+                "`from pyiron_base import state; "
+                "state.update({'disable_database': True})`, and try again."
+            )
         super().__init__(project, job_name)
         self._interactive_disable_log_file = False
 

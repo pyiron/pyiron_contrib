@@ -1,6 +1,6 @@
 import pandas
 from pympipool import Pool
-from pyiron_base import DataContainer, GenericJob
+from pyiron_base import DataContainer, GenericJob, state
 from pyiron_atomistics.project import Project
 from pyiron_atomistics.atomistics.structure.atoms import (
     Atoms,
@@ -12,6 +12,12 @@ from pyiron_atomistics.atomistics.job.atomistic import AtomisticGenericJob
 
 class GenericJobNoFiles(GenericJob):
     def __init__(self, project, job_name):
+        if not state.database.database_is_disabled:
+            raise RuntimeError(
+                "To run a `Without` job, the database must first be disabled. Please "
+                "`from pyiron_base import state; "
+                "state.update({'disable_database': True})`, and try again."
+            )
         super(GenericJobNoFiles, self).__init__(project, job_name)
 
         # internal variables

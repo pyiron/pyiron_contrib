@@ -1,11 +1,17 @@
 import pandas
 import numpy as np
-from pyiron_base import GenericMaster
+from pyiron_base import GenericMaster, state
 from pyiron_atomistics.atomistics.master.murnaghan import Murnaghan
 
 
 class MurnaghanWithoutFiles(Murnaghan):
     def __init__(self, project, job_name):
+        if not state.database.database_is_disabled:
+            raise RuntimeError(
+                "To run a `Without` job, the database must first be disabled. Please "
+                "`from pyiron_base import state; "
+                "state.update({'disable_database': True})`, and try again."
+            )
         super(MurnaghanWithoutFiles, self).__init__(project, job_name)
         self._interactive_disable_log_file = False
 

@@ -22,7 +22,7 @@ class GenericJobNoFiles(GenericJob):
 
         # internal variables
         self._python_only_job = True
-        self._interactive_disable_log_file = False
+        self._interactive_disable_log_file = True
 
     def refresh_job_status(self):
         if not self._interactive_disable_log_file:

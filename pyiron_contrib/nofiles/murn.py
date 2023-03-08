@@ -13,7 +13,7 @@ class MurnaghanWithoutFiles(Murnaghan):
                 "state.update({'disable_database': True})`, and try again."
             )
         super(MurnaghanWithoutFiles, self).__init__(project, job_name)
-        self._interactive_disable_log_file = False
+        self._interactive_disable_log_file = True
 
     @property
     def child_project(self):

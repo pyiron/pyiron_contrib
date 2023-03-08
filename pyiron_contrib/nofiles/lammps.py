@@ -18,7 +18,7 @@ class LammpsInteractiveWithoutOutput(LammpsInteractive):
                 "state.update({'disable_database': True})`, and try again."
             )
         super().__init__(project, job_name)
-        self._interactive_disable_log_file = False
+        self._interactive_disable_log_file = True
 
     def to_hdf(self, hdf=None, group_name=None):
         """

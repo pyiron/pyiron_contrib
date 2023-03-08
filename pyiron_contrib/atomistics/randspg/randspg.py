@@ -44,6 +44,7 @@ class RandSpg(GenericJob, HasStructure):
         self._structure_storage = StructureStorage()
         self.input = ExampleInput()
         self._executable_activate()
+        self._compress_by_default = True
 
     @property
     def list_of_structures(self):

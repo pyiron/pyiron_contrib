@@ -79,10 +79,7 @@ class MurnaghanNode(ListNode):
 
     def _execute(self, output):
         output.base_structure = self.input.structure
-        ret = super()._execute(output)
-        I = np.argsort(output.volumes)
-        output.volumes = output.volumes[I]
-        output.energies = output.energies[I]
+        return super()._execute(output)
 
     def _extract_output(self, output, i, node, ret, node_output):
         if len(output.energies) == 0:

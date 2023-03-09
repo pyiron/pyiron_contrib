@@ -2,6 +2,7 @@ import abc
 import importlib
 from typing import Any, Union, Optional
 
+from pyiron_base import DataContainer
 from pyiron_contrib.tinybase import __version__ as base__version__
 
 import pickle
@@ -190,6 +191,48 @@ class ProjectHDFioStorageAdapter(GenericStorage):
     def name(self):
         return self._hdf.name
 
+class DataContainerAdapter(GenericStorage):
+    """
+    Provides in memory location to store objects.
+    """
+
+    def __init__(self, project, cont: DataContainer, name):
+        self._project = project
+        self._cont = cont
+        self._name = name
+
+    def __getitem__(self, item: str) -> Union["GenericStorage", Any]:
+        v = self._cont[item]
+        if isinstance(v, DataContainer):
+            return self.__class__(self._project, v, item)
+        else:
+            return v
+
+    def __setitem__(self, item: str, value: Any):
+        self._cont[item] = value
+
+    def create_group(self, name):
+        if name not in self._cont:
+            d = self._cont.create_group(name)
+        else:
+            d = self._cont[name]
+        return self.__class__(self._project, d, name)
+
+
+    def list_nodes(self):
+        return self._cont.list_nodes()
+
+    def list_groups(self):
+        return self._cont.list_groups()
+
+    @property
+    def project(self):
+        return self._project
+
+    @property
+    def name(self):
+        return self._name
+
 # DESIGN: equivalent of HasHDF but with generalized language
 class Storable(abc.ABC):
     """
@@ -262,3 +305,4 @@ class HasHDFAdapaterMixin(Storable):
         obj = cls(**kw)
         obj._from_hdf(storage, version)
         return obj
+

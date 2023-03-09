@@ -16,6 +16,7 @@ from sqlalchemy.exc import (
 )
 from sqlalchemy.orm import declarative_base, relationship
 from sqlalchemy.orm import Session
+from sqlalchemy.pool import StaticPool
 
 import pandas as pd
 
@@ -103,15 +104,22 @@ class TinyDB(GenericDatabase):
     def __init__(self, path, echo=False):
         self._path = path
         self._echo = echo
-        engine = self.get_engine()
-        Base.metadata.create_all(engine)
-        Base.metadata.reflect(engine, extend_existing=True)
+        kwargs = {}
+        if path in (":memory:", ""):
+            # this allows to access the same DB from the different threads in one process
+            # it's necessary for an in memory database, otherwise all threads see different dbs
+            kwargs["poolclass"] = StaticPool
+            kwargs["connect_args"] = {'check_same_thread':False}
+        self._engine = create_engine(f"sqlite:///{self._path}", echo=self._echo, **kwargs)
+        Base.metadata.create_all(self.engine)
+        Base.metadata.reflect(self.engine, extend_existing=True)
 
-    def get_engine(self):
-        return create_engine(f"sqlite:///{self._path}", echo=self._echo)
+    @property
+    def engine(self):
+        return self._engine
 
     def add_item(self, entry: DatabaseEntry) -> int:
-        with Session(self.get_engine()) as session:
+        with Session(self.engine) as session:
             project = session.query(Project).where(Project.location==entry.project).one_or_none()
             if project is None:
                 project = Project(location=entry.project)
@@ -137,7 +145,7 @@ class TinyDB(GenericDatabase):
         return job_id
 
     def update_status(self, job_id, status):
-        with Session(self.get_engine()) as session:
+        with Session(self.engine) as session:
             try:
                 s = session.query(JobStatus).select_from(Job).where(
                         Job.id == job_id,
@@ -158,7 +166,7 @@ class TinyDB(GenericDatabase):
         )
 
     def get_item(self, job_id: int) -> DatabaseEntry:
-        with Session(self.get_engine()) as session:
+        with Session(self.engine) as session:
             job_data = session.query(
                     Job.__table__, Project.location, JobStatus.status, JobType.type
             ).select_from(
@@ -175,7 +183,7 @@ class TinyDB(GenericDatabase):
             return self._row_to_entry(job_data)
 
     def get_item_id(self, job_name: str, project_id: int) -> Optional[int]:
-        with Session(self.get_engine()) as session:
+        with Session(self.engine) as session:
             try:
                 return session.query(Job.id).where(
                         Job.name == job_name,
@@ -185,7 +193,7 @@ class TinyDB(GenericDatabase):
                 return None
 
     def get_project_id(self, location: str) -> Optional[int]:
-        with Session(self.get_engine()) as session:
+        with Session(self.engine) as session:
             try:
                 return session.query(Project.id).where(Project.location == location).one().id
             # FIXME: MultipleResultsFound should be reraised because it indicates a broken database
@@ -195,14 +203,14 @@ class TinyDB(GenericDatabase):
     def remove_item(self, job_id: int) -> DatabaseEntry:
         # FIXME: probably a bit inefficient, because it makes two connections to the DB
         entry = self.get_item(job_id)
-        with Session(self.get_engine()) as session:
+        with Session(self.engine) as session:
             job = session.get(Job, job_id)
             session.delete(job)
             session.commit()
         return entry
 
     def job_table(self) -> pd.DataFrame:
-        with Session(self.get_engine()) as session:
+        with Session(self.engine) as session:
             query = session.query(
                     Job.__table__, Project.location, JobStatus.status, JobType.type
             ).select_from(

@@ -1,8 +1,8 @@
 import abc
 import os.path
 
-from pyiron_base import Project
-from pyiron_contrib.tinybase.storage import GenericStorage, ProjectHDFioStorageAdapter
+from pyiron_base import Project, DataContainer
+from pyiron_contrib.tinybase.storage import GenericStorage, ProjectHDFioStorageAdapter, DataContainerAdapter
 from pyiron_contrib.tinybase.database import TinyDB, GenericDatabase
 
 class ProjectInterface(abc.ABC):
@@ -53,6 +53,22 @@ class ProjectInterface(abc.ABC):
     def name(self):
         pass
 
+    def job_table(self):
+        return self.database.job_table()
+
+    def get_job_id(self, name):
+        project_id = self.database.get_project_id(self.path)
+        return self.database.get_item_id(name, project_id)
+
+    def remove(self, job_id):
+        entry = self.database.remove_item(job_id)
+        if entry.project == self.path:
+            pr = self
+        else:
+            pr = self.open_location(entry.project)
+        pr.remove_storage(entry.name)
+
+
 class ProjectAdapter(ProjectInterface):
 
     def __init__(self, project):
@@ -75,10 +91,6 @@ class ProjectAdapter(ProjectInterface):
     def remove_storage(self, name):
         self._project.create_hdf(self._project.path, name).remove_file()
 
-    def remove(self, job_id):
-        entry = self.database.remove_item(job_id)
-        self.remove_storage(entry.name)
-
     def _get_database(self):
         if self._database is None:
             self._database = TinyDB(os.path.join(self._project.path, "pyiron.db"))
@@ -92,9 +104,38 @@ class ProjectAdapter(ProjectInterface):
     def path(self):
         return self._project.path
 
-    def job_table(self):
-        return self.database.job_table()
+class InMemoryProject(ProjectInterface):
 
-    def get_job_id(self, name):
-        project_id = self.database.get_project_id(self.path)
-        return self.database.get_item_id(name, project_id)
+    def __init__(self, location, db=None, storage=None):
+        if db is None:
+            db = TinyDB(":memory:")
+        self._db = db
+        self._location = location
+        if storage is None:
+            storage = {}
+        self._storage = storage
+        if location not in storage:
+            self._storage[location] = DataContainer()
+
+    def open_location(self, location):
+        return self.__class__(location, db=self.database, storage=self._storage)
+
+    def create_storage(self, name) -> GenericStorage:
+        return DataContainerAdapter(self, self._storage[self._location], "/").create_group(name)
+
+    def exists_storage(self, name) -> bool:
+        return name in self._storage[self._location].list_groups()
+
+    def remove_storage(self, name):
+        self._storage[self._location].pop(name)
+
+    def _get_database(self) -> GenericDatabase:
+        return self._db
+
+    @property
+    def path(self):
+        return self._location
+
+    @property
+    def name(self):
+        return os.path.basename(self.path)

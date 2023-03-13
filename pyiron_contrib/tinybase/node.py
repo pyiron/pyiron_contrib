@@ -14,6 +14,9 @@ from .executor import (
 )
 
 class ReturnStatus:
+    """
+    Status of the calculation.
+    """
 
     class Code(enum.Enum):
         DONE = "done"
@@ -30,10 +33,19 @@ class ReturnStatus:
     def __str__(self):
         return f"{self.code}({self.msg})"
 
-    def is_done(self):
+    def is_done(self) -> True:
+        """
+        Returns True if calculation was successful.
+        """
         return self.code == self.Code.DONE
 
 class AbstractNode(Storable, abc.ABC):
+    """
+    Basic unit of calculations.
+
+    Subclasses must implement :meth:`._get_input()`, :meth:`._get_output()` and :meth:`._execute()` and generally supply
+    their own :class:`.AbstractInput` and :class:`.AbstractOutput`.
+    """
 
     _executors = {
             'foreground': Executor,
@@ -46,6 +58,11 @@ class AbstractNode(Storable, abc.ABC):
 
     @abc.abstractmethod
     def _get_input(self) -> AbstractInput:
+        """
+        Return an instance of the input class.
+
+        This is called once per life time of the node object on first access to :attr:`.input` and then saved.
+        """
         pass
 
     @property
@@ -56,10 +73,29 @@ class AbstractNode(Storable, abc.ABC):
 
     @abc.abstractmethod
     def _get_output(self) -> AbstractOutput:
+        """
+        Return an instance of the output class.
+
+        This is called every time :meth:`.execute()` is called.
+        """
         pass
 
     @abc.abstractmethod
     def _execute(self, output) -> Optional[ReturnStatus]:
+        """
+        Run the calculation.
+
+        Every time this method is called a new instance of the output is created and passed as the argument.  This
+        method should populate it.
+
+        If no value is returned from the method, a return status of DONE is assumed implicitly.
+
+        Args:
+            output (:class:`.AbstractOutput`): instance returned by :meth:`._get_output()`.
+
+        Returns:
+            :class:`.ReturnStatus`: optional
+        """
         pass
 
     def execute(self) -> ReturnStatus:
@@ -93,6 +129,12 @@ class AbstractNode(Storable, abc.ABC):
 FunctionInput = AbstractInput.from_attributes("FunctionInput", args=list, kwargs=dict)
 FunctionOutput = AbstractOutput.from_attributes("FunctionOutput", "result")
 class FunctionNode(AbstractNode):
+    """
+    A node that wraps a generic function.
+
+    The given function is called with :attr:`.FunctionInput.args` and :attr:`.FunctionInput.kwargs` as `*args` and
+    `**kwargs` respectively.  The return value is set to :attr:`.FunctionOutput.result`.
+    """
 
     def __init__(self, function):
         super().__init__()
@@ -113,18 +155,44 @@ MasterInput = AbstractInput.from_attributes(
 )
 
 class ListInput(MasterInput, abc.ABC):
+    """
+    The input of :class:`.ListNode`.
+
+    To use it overload :meth:`._create_nodes()` here and subclass :class:`.ListNode` as well.
+    """
 
     @abc.abstractmethod
     def _create_nodes(self):
+        """
+        Return a list of nodes to execute.
+
+        This is called once by :class:`.ListNode.execute`.
+        """
         pass
 
 class ListNode(AbstractNode, abc.ABC):
+    """
+    A node that executes other nodes in parallel.
+
+    To use it overload :meth:`._extract_output` here and subclass :class:`.ListInput` as well.
+    """
 
     def __init__(self):
         super().__init__()
 
     @abc.abstractmethod
     def _extract_output(self, output, step, node, ret, node_output):
+        """
+        Extract the output of each node.
+
+        Args:
+            output (:class:`.AbstractOutput`): output of this node to populate
+            step (int): index of the node to extract the output from, corresponds to the index of the node in the list
+                        returned by :meth:`.ListInput._create_nodes()`.
+            node (:class:`.AbstractNode`): node to extract the output from, you can use this to extract parts of the input as well
+            ret (:class:`.ReturnStatus`): the return status of the execution of the node
+            node_output (:class:`.AbstractOutput`): the output of the node to extract
+        """
         pass
 
     def _execute(self, output):
@@ -143,6 +211,19 @@ SeriesInputBase = AbstractInput.from_attributes(
 )
 
 class SeriesInput(SeriesInputBase, MasterInput):
+    """
+    Keeps a list of nodes and their connection functions to run sequentially.
+
+    The number of added nodes must be equal to the number of connections plus one.  It's recommended to set up this
+    input with :meth:`.first()` and :meth:`.then()` which can be composed in a builder pattern.  The connection
+    functions take as arguments the output of the last node and the input of the next node.  You may call
+    :meth:`.then()` any number of times.
+
+    >>> node = SeriesNode()
+    >>> def transfer(input, output):
+    ...     input.my_param = output.my_result
+    >>> node.input.first(MyNode()).then(MyNode(), transfer)
+    """
     def check_ready(self):
         return len(self.nodes) == len(connections) + 1
 
@@ -178,6 +259,12 @@ class SeriesInput(SeriesInputBase, MasterInput):
         return self
 
 class SeriesNode(AbstractNode):
+    """
+    Executes a series of nodes sequentially.
+
+    Its input specifies the nodes to execute and functions (:attr:`.SeriesInput.connections`) to move input from one
+    output to the next input in the series.
+    """
 
     def _get_input(self):
         return SeriesInput()

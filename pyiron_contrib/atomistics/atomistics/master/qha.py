@@ -270,6 +270,7 @@ class Hessian:
                 structure=self.structure,
                 include_zero=self.include_zero_displacement,
                 second_order=self.second_order,
+                symprec=self._symprec
             ).displacements
             * self.dx
         )
@@ -401,6 +402,7 @@ class QuasiHarmonicApproximation(AtomisticParallelMaster):
                 self.structure,
                 include_zero_displacement=self.input["include_zero_displacement"],
                 second_order=self.input["second_order"],
+                symprec=self.input["symprec"],
             )
         return self._hessian
 

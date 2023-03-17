@@ -60,7 +60,7 @@ class CoscineFileData(FileDataTemplate):
         self._coscine_object.download(path=path)
 
     def _get_metadata(self):
-        form = CoscineMetadata(self._coscine_object.form())
+        form = CoscineMetadata(self._coscine_object.MetadataForm())
         return form
 
     def _set_metadata(self, metadata):

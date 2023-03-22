@@ -1,6 +1,7 @@
 # coding: utf-8
 # Copyright (c) Max-Planck-Institut für Eisenforschung GmbH - Computational Materials Design (CM) Department
 # Distributed under the terms of "New BSD License", see the LICENSE file.
+from dateutil import parser
 import os.path
 import io
 import warnings
@@ -215,7 +216,7 @@ class CoscineResource(StorageInterface):
         if generated_metadata is None:
             raise ValueError("metadata is not valid")
         form, _ = self._get_form_from_dict(generated_metadata)
-        return {key: val for key, val in form.items()}
+        return {key: val.raw() for key, val in form.items()}
 
     def validate_metadata(self, metadata, raise_error=True):
         encountered_error = None
@@ -267,9 +268,9 @@ class CoscineProject(HasGroups):
         else:
             self._client = project
 
-        if self._client.verbose:
+        if self._client.settings.verbose:
             print("Silenced client!")
-            self._client.verbose = False
+            self._client.settings.verbose = False
         self._path = None
 
     @staticmethod
@@ -333,3 +334,51 @@ class CoscineProject(HasGroups):
             return self.__class__(self._client.project(key))
         else:
             raise KeyError(key)
+
+    def create_group(
+        self,
+        project_name,
+        display_name=None,
+        project_description=None,
+        principal_investigators=None,
+        project_start=None,
+        project_end=None,
+        discipline=None,
+        participating_organizations=None,
+        project_keywords=None,
+        metadata_visibility=None,
+        grant_id=None,
+    ):
+        if project_name in self.list_all():
+            raise ValueError("The name is already in this project!")
+        update_dict = {
+            "Project Name": project_name,
+            "Display Name": display_name,
+            "Project Description": project_description,
+            "Principal Investigators": principal_investigators,
+            "Project Start": project_start,
+            "Project End": project_end,
+            "Discipline": discipline,
+            "Participating Organizations": participating_organizations,
+            "Project Keywords": project_keywords,
+            "Metadata Visibility": metadata_visibility,
+            "Grant ID": grant_id,
+        }
+        for key, val in update_dict.items():
+            if val is None:
+                del update_dict[key]
+
+        if 'Display Name' not in update_dict:
+            update_dict['Display Name'] = project_name
+
+        for key in ['Project Start', 'Project End']:
+            if isinstance(update_dict[key], str):
+                update_dict[key] = parser.parse(update_dict[key])
+
+        form = self._client.project_form() if self._project is None else self._project.form()
+        form.fill(update_dict)
+        form.generate()
+        if self._project is None:
+            self._client.create_project(form)
+        else:
+            self._project.create_subproject(form)

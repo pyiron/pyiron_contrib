@@ -33,7 +33,7 @@ setup(
     install_requires=[        
         'matplotlib==3.7.1',
         'numpy==1.24.2',
-        'pyiron_base==0.5.33',
+        'pyiron_base==0.5.34',
         'scipy==1.10.1',
         'seaborn==0.12.2',
         'pyparsing==3.0.9'
@@ -50,7 +50,7 @@ setup(
         ],
         'image': ['scikit-image==0.19.3'],
         'generic': [
-            'boto3==1.26.89', 
+            'boto3==1.26.99', 
             'moto==4.1.6'
         ],
         'workflow': [

@@ -37,7 +37,7 @@ class CoscineMetadata(coscine.resource.MetadataForm, MetaDataTemplate):
         result = {}
         for key, value in self.items():
             if len(str(value)) > 0:
-                result[key] = value
+                result[key] = value.raw()
         return result
 
     def __repr__(self):
@@ -55,14 +55,19 @@ class CoscineFileData(FileDataTemplate):
     @property
     def data(self):
         if self._data is None:
-            self._data = self._coscine_object.content()
+            return "Data not yet loaded! Call `load_data` to load"
         return load_file(io.BytesIO(self._data), filetype=self.filetype)
+
+    def load_data(self, force_update=False):
+        if self._data is None or force_update:
+            self._data = self._coscine_object.content()
 
     def download(self, path="./"):
         self._coscine_object.download(path=path)
 
     def _get_metadata(self):
         form = CoscineMetadata(self._coscine_object.form())
+        form.parse(self._coscine_object.metadata(force_update=True))
         return form
 
     def _set_metadata(self, metadata):
@@ -73,7 +78,7 @@ def _list_filter(list_to_filter, **kwargs):
     """Return entry in list matching all attributes."""
 
     def filter_func(item):
-        for key, value in kwargs:
+        for key, value in kwargs.items():
             if getattr(item, key) != value:
                 return False
         return True
@@ -103,6 +108,17 @@ class CoscineResource(StorageInterface):
             raise ValueError(
                 f"Unknown resource type {type(resource)}, supported types !"
             )
+
+    def __repr__(self):
+        """
+        Human readable string representation of the project object
+
+        Returns:
+            str: string representation
+        """
+        return str(
+            self.list_all()
+        )
 
     def _list_nodes(self):
         return [obj.name for obj in self._resource.objects()]
@@ -139,7 +155,7 @@ class CoscineResource(StorageInterface):
         if item not in self.list_nodes():
             return None
 
-        objects = self._resource.objects(Name=item)
+        objects = _list_filter(self._resource.objects(), name=item)
         if len(objects) == 1:
             return objects[0]
         elif len(objects) > 1:
@@ -255,7 +271,7 @@ class CoscineProject(HasGroups):
         """
         project(coscine.project/coscine.client/str):
         """
-        self._project = None
+        self._project: coscine.Project = None
         if isinstance(project, str) and os.path.isfile(project):
             with open(project) as f:
                 token = f.read()
@@ -293,6 +309,17 @@ class CoscineProject(HasGroups):
     @property
     def verbose(self):
         return self._client.settings.verbose
+
+    def __repr__(self):
+        """
+        Human readable string representation of the project object
+
+        Returns:
+            str: string representation
+        """
+        return str(
+            self.list_all()
+        )
 
     @verbose.setter
     def verbose(self, val):

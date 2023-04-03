@@ -362,6 +362,14 @@ class CoscineProject(HasGroups):
         else:
             raise KeyError(key)
 
+    def upload_jobs(self, list_of_jobs):
+        pass #ToDo
+
+    def create_node(self, form):
+        if self._project is None:
+            raise RuntimeError("At the top level, new resources cannot be created. Switch to a project")
+        self._project.create_resource(form)
+
     def create_group(
         self,
         project_name,

@@ -1,6 +1,8 @@
 # coding: utf-8
 # Copyright (c) Max-Planck-Institut für Eisenforschung GmbH - Computational Materials Design (CM) Department
 # Distributed under the terms of "New BSD License", see the LICENSE file.
+from getpass import getpass
+
 from dateutil import parser
 import os.path
 import io
@@ -8,7 +10,7 @@ import warnings
 
 import pandas as pd
 
-from pyiron_base import ImportAlarm
+from pyiron_base import ImportAlarm, state
 from pyiron_base.interfaces.has_groups import HasGroups
 from pyiron_contrib.generic.filedata import StorageInterface
 from pyiron_contrib.generic.filedata import (
@@ -87,27 +89,48 @@ def _list_filter(list_to_filter, **kwargs):
 
 
 class CoscineResource(StorageInterface):
-    def __init__(self, resource: Union[coscine.Resource, dict, "CoscineResource"]):
+    def __init__(self, resource: Union[coscine.Resource, dict, "CoscineResource"], parent_path=None):
         """Giving access to a CoScInE Resource to receive or upload files
 
         Args:
             resource (coscine.Resource/dict): Either directly provide a coscine.Resource or a dictionary with
                 token, project_id, and resource_id to directly connect to the respective resource.
         """
+        super().__init__()
         if isinstance(resource, coscine.Resource):
             self._resource = resource
         elif isinstance(resource, dict):
-            client = coscine.Client(resource["token"])
+            token = resource.pop('token', None)
+            client, _ = CoscineConnect(token)
             pr = _list_filter(
                 client.projects(toplevel=False), id=resource["project_id"]
             )[0]
             self._resource = _list_filter(pr.resources(), id=resource["resource_id"])[0]
         elif isinstance(resource, self.__class__):
             self._resource = resource._resource
+            self._path = resource._path
+            return
         else:
-            raise ValueError(
-                f"Unknown resource type {type(resource)}, supported types !"
+            raise TypeError(
+                f"Unknown resource type {type(resource)}!"
             )
+
+        self._path = self._construct_path(parent_path)
+
+    def _construct_path(self, parent_path):
+        if parent_path is None:
+            return self._resource.project.display_name + '/' + self._resource.display_name
+        elif isinstance(parent_path, str) and parent_path.endswith(self._resource.project.display_name):
+            return parent_path + '/' + self._resource.display_name
+        elif isinstance(parent_path, list) and len(parent_path) > 0 and parent_path[-1] == self._resource.project.display_name:
+            return '/'.join(parent_path + [self._resource.display_name])
+        else:
+            state.logger.warn('Provided parent path does not contain the parent. Fallback to Project_name/Resource_name')
+            return self._resource.project.display_name + '/' + self._resource.display_name
+
+    @property
+    def connection_info(self):
+        return {'project_id': self._resource.project.id, 'resource_id': self._resource.id}
 
     def __repr__(self):
         """
@@ -266,37 +289,65 @@ class CoscineResource(StorageInterface):
             return result_meta_data
 
 
-class CoscineProject(HasGroups):
-    def __init__(self, project: Union[coscine.Project, coscine.Client, str]):
+class CoscineConnect:
+    def __init__(self, token: Union[coscine.Project, coscine.FileObject, coscine.Resource, coscine.Client, str, None]):
         """
-        project(coscine.project/coscine.client/str):
+        project(coscine.project/coscine.client/str/None):
         """
-        self._project: coscine.Project = None
-        if isinstance(project, str) and os.path.isfile(project):
-            with open(project) as f:
+        self._object = None
+        if token is None:
+            try:
+                token = state.settings.credentials['COSCINE']['TOKEN']
+            except KeyError:
+                token = getpass()
+            self._client = self._connect_client(token)
+        if isinstance(token, str) and os.path.isfile(token):
+            with open(token) as f:
                 token = f.read()
             self._client = self._connect_client(token)
-        elif isinstance(project, str):
-            self._client = self._connect_client(project)
-        elif hasattr(project, "client"):
-            self._project = project
-            self._client = project.client
+        elif isinstance(token, str):
+            self._client = self._connect_client(token)
+        elif hasattr(token, "client"):
+            self._object = token
+            self._client = token.client
         else:
-            self._client = project
+            self._client = token
 
         if self._client.settings.verbose:
-            print("Silenced client!")
             self._client.settings.verbose = False
-        self._path = None
 
     @staticmethod
-    def _connect_client(token):
+    def _connect_client(token: str):
         client = coscine.Client(token)
         try:
             client.projects()
         except (PermissionError, RuntimeError, ConnectionError) as e:
             raise ValueError("Error connecting to CoScInE with provided token.") from e
         return client
+
+    @classmethod
+    def get_client_and_object(cls, token):
+        self = cls(token)
+        return self._client, self._object
+
+
+class CoscineProject(HasGroups):
+    def __init__(self, project: Union[coscine.Project, coscine.Client, str, None], parent_path=None):
+        """
+        project(coscine.project/coscine.client/str/None):
+        parent_path
+        """
+        self._path = None
+        self._client, self._project = CoscineConnect.get_client_and_object(project)
+        if self._project is not None:
+            self._path = parent_path + [project.display_name]
+
+    @property
+    def path(self):
+        """A convenience path representation (human readable)"""
+        if self._path is None:
+            return ""
+        return '/'.join(self._path)
 
     @property
     def read_only(self):
@@ -339,19 +390,19 @@ class CoscineProject(HasGroups):
 
     def __getitem__(self, key):
         if key in self.list_nodes():  # This implies project is not None
-            return CoscineResource(self._project.resource(key))
+            return CoscineResource(self._project.resource(key), self._path)
         return self.get_group(key)
 
     def get_node(self, key):
         if key in self.list_nodes():
-            return self._project.resource(key)
+            return CoscineResource(self._project.resource(key), self._path)
         else:
             return KeyError(key)
 
     def get_group(self, key):
         if key in self.list_groups() and self._project is not None:
             try:
-                return self.__class__(self._project.subproject(display_name=key))
+                return self.__class__(self._project.subproject(display_name=key), parent_path=self.path)
             except IndexError:
                 warnings.warn("More than one project matches - returning first match!")
                 for _pr in self._project.subprojects():

@@ -145,7 +145,7 @@ class FileData(FileDataTemplate):
 class StorageInterface(HasGroups, ABC):
     """File handling in different storage interfaces"""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self):
         self._path = None
 
     @property

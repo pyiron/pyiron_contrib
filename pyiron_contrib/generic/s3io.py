@@ -154,7 +154,7 @@ class FileS3IO(StorageInterface):
 
     Attributes:
         s3_path: absolute path (starting with '/') inside the bucket, interpreting '/' as the directory separator.
-        bucket_info: dict with name and endpoint of the bucket.
+        connection_info: dict with name and endpoint of the bucket.
     """
 
     @property
@@ -188,7 +188,8 @@ class FileS3IO(StorageInterface):
             bucket : ""
             }
         """
-        super().__init__(path=path)
+        super().__init__()
+        self._path = path
         self.history = [path]
         if isinstance(config, S3ioConnect):
             self._s3io = config
@@ -236,11 +237,21 @@ class FileS3IO(StorageInterface):
         return self._s3_path[1:]
 
     @property
-    def bucket_info(self):
+    def connection_info(self):
         return {
+            "s3_path": self.s3_path,
             "bucket_name": self._bucket.name,
             "endpoint_url": self._s3io.endpoint_url,
         }
+
+    @classmethod
+    def from_dict(cls, connection_dict: dict):
+        path = connection_dict.get('s3_path', '/')
+        config = {
+            'bucket': connection_dict.get('bucket_name', None),
+            'endpoint':  connection_dict.get('endpoint_url', None)
+        }
+        cls(config, path)
 
     def _list_groups(self):
         """

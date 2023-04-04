@@ -50,12 +50,12 @@ setup(
         ],
         'image': ['scikit-image==0.19.3'],
         'generic': [
-            'boto3==1.26.99', 
+            'boto3==1.26.104', 
             'moto==4.1.6'
         ],
         'workflow': [
             'python>=3.10',
-            'typeguard==2.13.3'
+            'typeguard==3.0.2'
         ]
     },
     cmdclass=versioneer.get_cmdclass(),

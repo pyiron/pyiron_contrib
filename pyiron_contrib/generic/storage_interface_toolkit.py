@@ -25,7 +25,7 @@ class StorageInterfaceConnector:
         if project is None:
             return
 
-        if 'StorageIterface' in project.data:
+        if 'StorageInterface' in project.data:
             self._data = project.data.StorageInterface
         else:
             self._data = {}
@@ -42,7 +42,7 @@ class StorageInterfaceConnector:
         return self
 
     def _connect_storages(self):
-        for key, info_dict in self._data:
+        for key, info_dict in self._data.items():
             if info_dict['type'] == str(CoscineResource):
                 self[key] = CoscineResource(info_dict['info'])
             elif info_dict['type'] == str(FileS3IO):
@@ -75,12 +75,13 @@ class StorageInterfaceFactory(Toolkit):
                                             'info': storage_interface.connection_info}
         try:
             new = StorageInterfaceConnector.from_dict(info_dict)
-        except ValueError:
-            warnings.warn("Credential information insufficient to auto-connect - storage interface not saved!")
+        except ValueError as e:
+            raise ValueError("Credential information insufficient to auto-connect - storage interface not saved!") from e
         else:
             if 'StorageInterface' not in self._project.data:
                 self._project.data.create_group('StorageInterface')
             self._project.data.StorageInterface[storage_name] = info_dict
+            self._project.data.write()
             if self._storage_interface is None:
                 self._storage_interface = new
             else:

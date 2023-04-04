@@ -101,7 +101,7 @@ class CoscineResource(StorageInterface):
             self._resource = resource
         elif isinstance(resource, dict):
             token = resource.pop('token', None)
-            client, _ = CoscineConnect(token)
+            client, _ = CoscineConnect.get_client_and_object(token)
             pr = _list_filter(
                 client.projects(toplevel=False), id=resource["project_id"]
             )[0]
@@ -332,11 +332,12 @@ class CoscineConnect:
 
 
 class CoscineProject(HasGroups):
-    def __init__(self, project: Union[coscine.Project, coscine.Client, str, None], parent_path=None):
+    def __init__(self, project: Union[coscine.Project, coscine.Client, str, None] = None, parent_path=None):
         """
         project(coscine.project/coscine.client/str/None):
         parent_path
         """
+        parent_path = [] if parent_path is None else parent_path
         self._path = None
         self._client, self._project = CoscineConnect.get_client_and_object(project)
         if self._project is not None:

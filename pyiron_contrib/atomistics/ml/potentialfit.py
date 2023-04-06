@@ -153,7 +153,7 @@ class PotentialPlots:
                     x=x, y=0.5, s=text,
                     transform=trafo,
                     rotation='vertical',
-                    horizontal_alignment='center',
+                    horizontalalignment='center',
                     path_effects=[withStroke(linewidth=4, foreground='w')],
             )
 

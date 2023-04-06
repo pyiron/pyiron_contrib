@@ -25,41 +25,61 @@ class StorageInterfaceConnector:
         if project is None:
             return
 
-        if 'StorageInterface' in project.data:
-            self._data = project.data.StorageInterface
+        if "StorageInterface" in project.data:
+            self._data = project.data.StorageInterface.copy()
         else:
             self._data = {}
-
-        self._connect_storages()
 
     @classmethod
     def from_dict(cls, info_dict):
         self = cls(None)
-        name = info_dict.get('name', 'new')
+        name = info_dict.get("name", "new")
         self._data = {name: info_dict}
-        self._connect_storages()
+        self._connect_storage(name)
 
         return self
 
-    def _connect_storages(self):
-        for key, info_dict in self._data.items():
-            if info_dict['type'] == str(CoscineResource):
-                self[key] = CoscineResource(info_dict['info'])
-            elif info_dict['type'] == str(FileS3IO):
-                self[key] = FileS3IO.from_dict(info_dict['info'])
+    def _connect_storage(self, name):
+        info_dict = self._data[name]
+        if info_dict["type"] == str(CoscineResource):
+            self._store[name] = CoscineResource(info_dict["info"])
+        elif info_dict["type"] == str(FileS3IO):
+            self._store[name] = FileS3IO.from_dict(info_dict["info"])
 
-    def __setitem__(self, key, value):
+    def connect_all_storages(self):
+        for key in self._data:
+            self._connect_storage(key)
+
+    def attach_temporary(self, key, value, data_dict):
         self._store[key] = value
+        self._data[key] = data_dict
 
     def __getitem__(self, item):
+        if item not in self._store and item in self._data:
+            self._connect_storage(item)
+        elif item not in self._store:
+            raise KeyError(item)
         return self._store[item]
 
+    @property
+    def info(self):
+        result = {}
+        for key in self._data:
+            if key in self._store:
+                result[key] = {'type': self._data[key]['type'], 'connected': True}
+            else:
+                result[key] = {'type': self._data[key]['type'], 'connected': False}
+        return result
+
     def __repr__(self):
-        return f"Storage Access for {list(self._store.keys())}."
+        result = []
+        for key, value in self.info.items():
+            conn = 'connected' if value['connected'] else 'inactive'
+            result.append(f"{key}({value['type']}, {conn})")
+        return f"Storage Access for {result}."
 
 
 class StorageInterfaceFactory(Toolkit):
-
     def __init__(self, project):
         super().__init__(project)
         self._creator = StorageInterfaceCreator()
@@ -70,22 +90,26 @@ class StorageInterfaceFactory(Toolkit):
         return self._creator
 
     def attach(self, storage_name, storage_interface):
-        info_dict = {'name': storage_name,
-                     'type': str(type(storage_interface)),
-                                            'info': storage_interface.connection_info}
+        info_dict = {
+            "name": storage_name,
+            "type": str(type(storage_interface)),
+            "info": storage_interface.connection_info,
+        }
         try:
             new = StorageInterfaceConnector.from_dict(info_dict)
         except ValueError as e:
-            raise ValueError("Credential information insufficient to auto-connect - storage interface not saved!") from e
+            raise ValueError(
+                "Credential information insufficient to auto-connect - storage interface not saved!"
+            ) from e
         else:
-            if 'StorageInterface' not in self._project.data:
-                self._project.data.create_group('StorageInterface')
+            if "StorageInterface" not in self._project.data:
+                self._project.data.create_group("StorageInterface")
             self._project.data.StorageInterface[storage_name] = info_dict
             self._project.data.write()
             if self._storage_interface is None:
                 self._storage_interface = new
             else:
-                self._storage_interface[storage_name] = new[storage_name]
+                self._storage_interface.attach_temporary(storage_name, new[storage_name], info_dict)
 
     @property
     def storage(self):

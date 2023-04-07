@@ -20,6 +20,12 @@ class StorageInterfaceCreator:
 
 
 class StorageInterfaceConnector:
+
+    _known_storage_classes = {
+        str(CoscineResource): "coscine",
+        str(FileS3IO): 's3'
+    }
+
     def __init__(self, project):
         self._store = {}
         if project is None:
@@ -75,7 +81,9 @@ class StorageInterfaceConnector:
         result = []
         for key, value in self.info.items():
             conn = 'connected' if value['connected'] else 'inactive'
-            result.append(f"{key}({value['type']}, {conn})")
+            storage_class = value['type']
+            storage_type = self._known_storage_classes[storage_class] if storage_class in self._known_storage_classes else storage_class
+            result.append(f"{key}({storage_type}, {conn})")
         return f"Storage Access for {result}."
 
 

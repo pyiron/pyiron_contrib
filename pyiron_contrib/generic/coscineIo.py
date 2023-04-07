@@ -10,6 +10,7 @@ import warnings
 
 import pandas as pd
 
+import pyiron_base
 from pyiron_base import ImportAlarm, state
 from pyiron_base.interfaces.has_groups import HasGroups
 from pyiron_contrib.generic.filedata import StorageInterface
@@ -88,8 +89,16 @@ def _list_filter(list_to_filter, **kwargs):
     return list(filter(filter_func, list_to_filter))
 
 
+class Job2CoscineMetadataConverter:
+    pass  # ToDo:
+
+
 class CoscineResource(StorageInterface):
-    def __init__(self, resource: Union[coscine.Resource, dict, "CoscineResource"], parent_path=None):
+    def __init__(
+        self,
+        resource: Union[coscine.Resource, dict, "CoscineResource"],
+        parent_path=None,
+    ):
         """Giving access to a CoScInE Resource to receive or upload files
 
         Args:
@@ -100,7 +109,7 @@ class CoscineResource(StorageInterface):
         if isinstance(resource, coscine.Resource):
             self._resource = resource
         elif isinstance(resource, dict):
-            token = resource.pop('token', None)
+            token = resource.pop("token", None)
             client, _ = CoscineConnect.get_client_and_object(token)
             pr = _list_filter(
                 client.projects(toplevel=False), id=resource["project_id"]
@@ -111,26 +120,39 @@ class CoscineResource(StorageInterface):
             self._path = resource._path
             return
         else:
-            raise TypeError(
-                f"Unknown resource type {type(resource)}!"
-            )
+            raise TypeError(f"Unknown resource type {type(resource)}!")
 
         self._path = self._construct_path(parent_path)
 
     def _construct_path(self, parent_path):
         if parent_path is None:
-            return self._resource.project.display_name + '/' + self._resource.display_name
-        elif isinstance(parent_path, str) and parent_path.endswith(self._resource.project.display_name):
-            return parent_path + '/' + self._resource.display_name
-        elif isinstance(parent_path, list) and len(parent_path) > 0 and parent_path[-1] == self._resource.project.display_name:
-            return '/'.join(parent_path + [self._resource.display_name])
+            return (
+                self._resource.project.display_name + "/" + self._resource.display_name
+            )
+        elif isinstance(parent_path, str) and parent_path.endswith(
+            self._resource.project.display_name
+        ):
+            return parent_path + "/" + self._resource.display_name
+        elif (
+            isinstance(parent_path, list)
+            and len(parent_path) > 0
+            and parent_path[-1] == self._resource.project.display_name
+        ):
+            return "/".join(parent_path + [self._resource.display_name])
         else:
-            state.logger.warn('Provided parent path does not contain the parent. Fallback to Project_name/Resource_name')
-            return self._resource.project.display_name + '/' + self._resource.display_name
+            state.logger.warn(
+                "Provided parent path does not contain the parent. Fallback to Project_name/Resource_name"
+            )
+            return (
+                self._resource.project.display_name + "/" + self._resource.display_name
+            )
 
     @property
     def connection_info(self):
-        return {'project_id': self._resource.project.id, 'resource_id': self._resource.id}
+        return {
+            "project_id": self._resource.project.id,
+            "resource_id": self._resource.id,
+        }
 
     def __repr__(self):
         """
@@ -139,9 +161,7 @@ class CoscineResource(StorageInterface):
         Returns:
             str: string representation
         """
-        return str(
-            self.list_all()
-        )
+        return str(self.list_all())
 
     def _list_nodes(self):
         return [obj.name for obj in self._resource.objects()]
@@ -159,6 +179,14 @@ class CoscineResource(StorageInterface):
         else:
             return False
 
+    @property
+    def resource(self) -> coscine.Resource:
+        return self._resource
+
+    @property
+    def resource_type(self):
+        return self.resource.profile
+
     def remove_file(self, item):
         file_obj = self._get_one_file_obj(
             item,
@@ -173,6 +201,15 @@ class CoscineResource(StorageInterface):
         _meta_data = self.validate_metadata(metadata)
         filename = filename or os.path.basename(file)
         self._resource.upload(filename, file, _meta_data)
+
+    def upload_job(self, job: pyiron_base.GenericJob, form=None):
+        """Upload a pyiron job to this CoScInE resource
+
+        Args:
+            job: job object from pyiron
+            form: optional metadata form, required if the metadata mapping between job and resource type is unknown.
+        """
+        job_file = job.project_hdf5.file_name
 
     def _get_one_file_obj(self, item, error_msg) -> Union[coscine.FileObject, None]:
         if item not in self.list_nodes():
@@ -290,14 +327,24 @@ class CoscineResource(StorageInterface):
 
 
 class CoscineConnect:
-    def __init__(self, token: Union[coscine.Project, coscine.FileObject, coscine.Resource, coscine.Client, str, None]):
+    def __init__(
+        self,
+        token: Union[
+            coscine.Project,
+            coscine.FileObject,
+            coscine.Resource,
+            coscine.Client,
+            str,
+            None,
+        ],
+    ):
         """
         project(coscine.project/coscine.client/str/None):
         """
         self._object = None
         if token is None:
             try:
-                token = state.settings.credentials['COSCINE']['TOKEN']
+                token = state.settings.credentials["COSCINE"]["TOKEN"]
             except KeyError:
                 token = getpass()
             self._client = self._connect_client(token)
@@ -332,7 +379,11 @@ class CoscineConnect:
 
 
 class CoscineProject(HasGroups):
-    def __init__(self, project: Union[coscine.Project, coscine.Client, str, None] = None, parent_path=None):
+    def __init__(
+        self,
+        project: Union[coscine.Project, coscine.Client, str, None] = None,
+        parent_path=None,
+    ):
         """
         project(coscine.project/coscine.client/str/None):
         parent_path
@@ -348,7 +399,7 @@ class CoscineProject(HasGroups):
         """A convenience path representation (human readable)"""
         if self._path is None:
             return ""
-        return '/'.join(self._path)
+        return "/".join(self._path)
 
     @property
     def read_only(self):
@@ -369,9 +420,7 @@ class CoscineProject(HasGroups):
         Returns:
             str: string representation
         """
-        return str(
-            self.list_all()
-        )
+        return str(self.list_all())
 
     @verbose.setter
     def verbose(self, val):
@@ -403,7 +452,9 @@ class CoscineProject(HasGroups):
     def get_group(self, key):
         if key in self.list_groups() and self._project is not None:
             try:
-                return self.__class__(self._project.subproject(display_name=key), parent_path=self.path)
+                return self.__class__(
+                    self._project.subproject(display_name=key), parent_path=self.path
+                )
             except IndexError:
                 warnings.warn("More than one project matches - returning first match!")
                 for _pr in self._project.subprojects():
@@ -415,11 +466,13 @@ class CoscineProject(HasGroups):
             raise KeyError(key)
 
     def upload_jobs(self, list_of_jobs):
-        pass #ToDo
+        pass  # ToDo
 
     def create_node(self, form):
         if self._project is None:
-            raise RuntimeError("At the top level, new resources cannot be created. Switch to a project")
+            raise RuntimeError(
+                "At the top level, new resources cannot be created. Switch to a project"
+            )
         self._project.create_resource(form)
 
     def create_group(
@@ -455,14 +508,18 @@ class CoscineProject(HasGroups):
             if val is None:
                 del update_dict[key]
 
-        if 'Display Name' not in update_dict:
-            update_dict['Display Name'] = project_name
+        if "Display Name" not in update_dict:
+            update_dict["Display Name"] = project_name
 
-        for key in ['Project Start', 'Project End']:
+        for key in ["Project Start", "Project End"]:
             if isinstance(update_dict[key], str):
                 update_dict[key] = parser.parse(update_dict[key])
 
-        form = self._client.project_form() if self._project is None else self._project.form()
+        form = (
+            self._client.project_form()
+            if self._project is None
+            else self._project.form()
+        )
         form.fill(update_dict)
         form.generate()
         if self._project is None:

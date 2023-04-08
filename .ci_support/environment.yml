@@ -5,15 +5,16 @@ dependencies:
 - coveralls
 - coverage
 - codacy-coverage
-- matplotlib =3.6.3
+- matplotlib =3.7.1
 - numpy =1.24.2
-- pyiron_base =0.5.31
-- pyiron_atomistics =0.2.62
+- pyiron_base =0.5.34
+- pyiron_atomistics =0.2.64
 - pyparsing =3.0.9
-- scipy =1.10.0
+- scipy =1.10.1
 - seaborn =0.12.2
-- scikit-image =0.19.3
+- scikit-image =0.20.0
 - randspg =0.0.1
-- boto3 =1.26.65
-- moto =4.1.2
+- boto3 =1.26.104
+- moto =4.1.6
 - pycp2k =0.2.2
+- typeguard =3.0.2

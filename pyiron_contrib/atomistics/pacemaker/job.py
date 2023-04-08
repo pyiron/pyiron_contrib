@@ -287,7 +287,7 @@ class PacemakerJob(GenericJob, PotentialFit):
         predicted_data_fs.add_array('energy', dtype=np.float64, shape=(), per='chunk')
         predicted_data_fs.add_array('energy_true', dtype=np.float64, shape=(), per='chunk')
 
-        predicted_data_fs.add_array('number_of_atoms', dtype=np.int, shape=(), per='chunk')
+        predicted_data_fs.add_array('number_of_atoms', dtype=np.int64, shape=(), per='chunk')
 
         predicted_data_fs.add_array('forces', dtype=np.float64, shape=(3,), per='element')
         predicted_data_fs.add_array('forces_true', dtype=np.float64, shape=(3,), per='element')

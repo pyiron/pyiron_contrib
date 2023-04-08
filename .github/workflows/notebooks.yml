@@ -8,7 +8,6 @@ on:
 
 jobs:
   build-notebooks:
-    needs: commit-updated-env
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -17,5 +16,5 @@ jobs:
           python-version: '3.10'
           env-prefix: /usr/share/miniconda3/envs/my-env
           env-label: linux-64-py-3-10
-          env-files: .ci_support/environment.yml
+          env-files: .ci_support/environment.yml .ci_support/environment-notebooks.yml
           exclusion-file: .ci_support/exclude

@@ -380,7 +380,7 @@ class CoscineConnect:
         if token is None:
             try:
                 token = state.settings.credentials["COSCINE"]["TOKEN"]
-            except KeyError:
+            except (KeyError, AttributeError):
                 token = getpass(prompt="Coscine token: ")
             self._client = self._connect_client(token)
         if isinstance(token, str) and os.path.isfile(token):

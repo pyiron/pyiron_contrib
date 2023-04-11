@@ -1,6 +1,7 @@
 # coding: utf-8
 # Copyright (c) Max-Planck-Institut für Eisenforschung GmbH - Computational Materials Design (CM) Department
 # Distributed under the terms of "New BSD License", see the LICENSE file.
+import datetime
 from getpass import getpass
 
 from dateutil import parser
@@ -46,6 +47,16 @@ class CoscineMetadata(coscine.resource.MetadataForm, MetaDataTemplate):
     def __repr__(self):
         return self.__str__()
 
+    def __setitem__(self, key, value):
+        try:
+            super().__setitem__(key, value)
+        except TypeError as e:
+            val = parser.parse(value)
+            try:
+                super().__setitem__(key, val)
+            except TypeError:
+                raise e
+
 
 class CoscineFileData(FileDataTemplate):
     def __init__(self, coscine_object: coscine.FileObject):
@@ -59,11 +70,20 @@ class CoscineFileData(FileDataTemplate):
     def data(self):
         if self._data is None:
             return "Data not yet loaded! Call `load_data` to load"
+        if isinstance(self._data, str):
+            return load_file(self._data, filetype=self.filetype)
         return load_file(io.BytesIO(self._data), filetype=self.filetype)
 
     def load_data(self, force_update=False):
         if self._data is None or force_update:
-            self._data = self._coscine_object.content()
+            if self.filetype in ["h5", "hdf"]:
+                tmp_dir = os.path.join(os.curdir, "coscine_downloaded_h5")
+                if not os.path.exists(tmp_dir):
+                    os.mkdir(tmp_dir)
+                self.download(tmp_dir)
+                self._data = os.path.abspath(os.path.join(tmp_dir, self._filename))
+            else:
+                self._data = self._coscine_object.content()
 
     def download(self, path="./"):
         self._coscine_object.download(path=path)
@@ -210,6 +230,17 @@ class CoscineResource(StorageInterface):
             form: optional metadata form, required if the metadata mapping between job and resource type is unknown.
         """
         job_file = job.project_hdf5.file_name
+        user = job.project_hdf5["server"]["user"]
+        now = datetime.datetime.today()
+        id = job.name
+
+        if form is None:
+            form = self.metadata_template
+            form["ID"] = id
+            form["User"] = user
+            form["Date"] = now
+
+        self.upload_file(job_file, form)
 
     def _get_one_file_obj(self, item, error_msg) -> Union[coscine.FileObject, None]:
         if item not in self.list_nodes():
@@ -263,7 +294,7 @@ class CoscineResource(StorageInterface):
 
     @property
     def metadata_template(self) -> CoscineMetadata:
-        return CoscineMetadata(self._resource.MetadataForm())
+        return CoscineMetadata(self._resource.metadata_form())
 
     @property
     def requires_metadata(self):
@@ -304,9 +335,13 @@ class CoscineResource(StorageInterface):
         elif metadata is None:
             return None
         elif isinstance(metadata, coscine.resource.MetadataForm):
+            if not isinstance(metadata, CoscineMetadata):
+                meta = CoscineMetadata(metadata)
+            else:
+                meta = metadata
             metadata_form = self.metadata_template
             metadata_form.clear()
-            metadata_form.fill({k: v for k, v in metadata.items()})
+            metadata_form.fill(meta.to_dict())
         else:
             metadata_form, encountered_error = self._get_form_from_dict(metadata)
 
@@ -319,7 +354,7 @@ class CoscineResource(StorageInterface):
                     f"{encountered_error}"
                 ) from e
             elif raise_error:
-                raise ValueError(f"The provided meta data is not valid") from e
+                raise e
             else:
                 return None
         else:
@@ -346,7 +381,7 @@ class CoscineConnect:
             try:
                 token = state.settings.credentials["COSCINE"]["TOKEN"]
             except KeyError:
-                token = getpass()
+                token = getpass(prompt="Coscine token: ")
             self._client = self._connect_client(token)
         if isinstance(token, str) and os.path.isfile(token):
             with open(token) as f:

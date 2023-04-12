@@ -5,6 +5,7 @@ from pyiron_base import ImportAlarm
 
 try:
     from pyiron_contrib.generic.coscineIo import CoscineProject, CoscineResource
+
     import_alarm = ImportAlarm()
 except ImportError:
     import_alarm = ImportAlarm("Connecting to CoScInE requires the coscine package.")
@@ -17,6 +18,7 @@ except ImportError:
     class CoscineResource:
         def __init__(self, *args, **kwargs):
             raise ImportError("Interacting with coscine requires the coscine package")
+
 
 from pyiron_contrib.generic.s3io import FileS3IO
 

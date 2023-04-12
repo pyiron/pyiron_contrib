@@ -118,7 +118,7 @@ class StorageJob(GenericJob):
         self._storage_type.storage_type = 's3'
         self._storage_type_store.create_group("s3_config")
         self._storage_type_store.s3_config.config = config
-        self._storage_type_store.s3_config.bucket_info = self._external_storage.bucket_info
+        self._storage_type_store.s3_config.bucket_info = self._external_storage.connection_info
         self._storage_type_store.s3_config.bucket_name = bucket_name
 
     def _list_groups(self):
@@ -270,10 +270,10 @@ class StorageJob(GenericJob):
             )
         except Exception as e:
             raise RuntimeError("Could not restore connection to the S3 storage.") from e
-        if self._storage_type_store.s3_config.bucket_info == external_storage.bucket_info:
+        if self._storage_type_store.s3_config.bucket_info == external_storage.connection_info:
             self._external_storage = external_storage
         else:
-            raise RuntimeError(f"New and saved s3 storage do not match! Got {external_storage.bucket_info}"
+            raise RuntimeError(f"New and saved s3 storage do not match! Got {external_storage.connection_info}"
                                f" but expected {self._storage_type_store.s3_config.bucket_info}.")
 
     def from_hdf(self, hdf=None, group_name=None):

@@ -294,7 +294,7 @@ class StorageJob(GenericJob):
         else:
             raise RuntimeError(
                 f"New and saved s3 storage do not match! Got {external_storage.connection_info}"
-                f" but expected {self._storage_type_store.s3_config.bucket_info}."
+                f" but expected {self._storage_type_store.s3_config.connection_info}."
             )
 
     def from_hdf(self, hdf=None, group_name=None):

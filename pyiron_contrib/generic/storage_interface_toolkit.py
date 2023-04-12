@@ -9,7 +9,6 @@ try:
     import_alarm = ImportAlarm()
 except ImportError:
     import_alarm = ImportAlarm("Connecting to CoScInE requires the coscine package.")
-    import_alarm.warn_if_failed()
 
     class CoscineProject:
         def __init__(self, *args, **kwargs):
@@ -24,6 +23,7 @@ from pyiron_contrib.generic.s3io import FileS3IO
 
 
 class StorageInterfaceCreator:
+    @import_alarm
     def __init__(self):
         pass
 
@@ -40,6 +40,7 @@ class StorageInterfaceConnector:
 
     _known_storage_classes = {str(CoscineResource): "coscine", str(FileS3IO): "s3"}
 
+    @import_alarm
     def __init__(self, project):
         self._store = {}
         if project is None:
@@ -108,11 +109,13 @@ class StorageInterfaceConnector:
 class StorageInterfaceFactory(Toolkit):
     def __init__(self, project):
         super().__init__(project)
-        self._creator = StorageInterfaceCreator()
+        self._creator = None
         self._storage_interface = None
 
     @property
     def create(self):
+        if self._creator is None:
+            self._creator = StorageInterfaceCreator()
         return self._creator
 
     def attach(self, storage_name, storage_interface):

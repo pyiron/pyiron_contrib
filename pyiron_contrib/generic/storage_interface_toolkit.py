@@ -1,8 +1,23 @@
 import warnings
 
 from pyiron_base import Toolkit
+from pyiron_base import ImportAlarm
 
-from pyiron_contrib.generic.coscineIo import CoscineProject, CoscineResource
+try:
+    from pyiron_contrib.generic.coscineIo import CoscineProject, CoscineResource
+    import_alarm = ImportAlarm()
+except ImportError:
+    import_alarm = ImportAlarm("Connecting to CoScInE requires the coscine package.")
+    import_alarm.warn_if_failed()
+
+    class CoscineProject:
+        def __init__(self, *args, **kwargs):
+            raise ImportError("Interacting with coscine requires the coscine package")
+
+    class CoscineResource:
+        def __init__(self, *args, **kwargs):
+            raise ImportError("Interacting with coscine requires the coscine package")
+
 from pyiron_contrib.generic.s3io import FileS3IO
 
 

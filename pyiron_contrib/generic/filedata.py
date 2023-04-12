@@ -13,11 +13,20 @@ from pathlib import Path
 import pandas as pd
 
 from pyiron_base import GenericJob, state
-from pyiron_base import FileDataTemplate as BaseFileDataTemplate, load_file, FileData as FileDataBase
+from pyiron_base import (
+    FileDataTemplate as BaseFileDataTemplate,
+    load_file,
+    FileData as FileDataBase,
+)
 from pyiron_base import HasGroups
 
-import ipywidgets as widgets
-from IPython.display import display
+try:
+    import ipywidgets as widgets
+    from IPython.display import display
+
+    gui_elements_imported = True
+except ImportError:
+    gui_elements_imported = False
 
 __author__ = "Niklas Siemer"
 __copyright__ = (
@@ -37,7 +46,12 @@ class MetaDataTemplate(ABC):
         """Provide a dict representation of the meta data."""
 
     def _repr_html_(self):
-        df = pd.DataFrame({"Metadata": list(self.to_dict().keys()), "  ": list(self.to_dict().values())})
+        df = pd.DataFrame(
+            {
+                "Metadata": list(self.to_dict().keys()),
+                "  ": list(self.to_dict().values()),
+            }
+        )
         df.set_index("Metadata", inplace=True)
         df[df.isnull()] = ""
         return df._repr_html_()
@@ -59,13 +73,14 @@ class MetaData(MetaDataTemplate):
 class FileDataTemplate(BaseFileDataTemplate, ABC):
     def __init__(self):
         self._metadata = None
-        self._output = widgets.Output()
-        self._box = widgets.VBox([self._output])
+        if gui_elements_imported:
+            self._output = widgets.Output()
+            self._box = widgets.VBox([self._output])
 
     @staticmethod
     def _get_filetype_from_filename(filename):
         filetype = os.path.splitext(filename)[1]
-        if filetype == '' or filetype == '.':
+        if filetype == "" or filetype == ".":
             filetype = None
         else:
             filetype = filetype[1:]
@@ -88,28 +103,31 @@ class FileDataTemplate(BaseFileDataTemplate, ABC):
     def metadata(self, metadata):
         self._set_metadata(metadata)
 
-    @property
-    def gui(self):
-        self._output.clear_output()
-        with self._output:
-            display(self.data, self.metadata)
-        return self._box
+    if gui_elements_imported:
 
-    def _ipython_display_(self):
-        display(self.gui)
+        @property
+        def gui(self):
+            self._output.clear_output()
+            with self._output:
+                display(self.data, self.metadata)
+            return self._box
+
+        def _ipython_display_(self):
+            display(self.gui)
 
 
 class FileData(FileDataTemplate):
     """FileData stores an instance of a data file, e.g. a single Image from a measurement."""
+
     def __init__(self, file, data=None, metadata=None, filetype=None):
         """FileData class to store data and associated metadata.
 
-            Args:
-                file (str): path to the data file (if data is None) or filename associated with the data.
-                data (object/None): object containing data
-                metadata (dict/DataContainer): Dictionary of metadata associated with the data
-                filetype (str): File extension associated with the type data,
-                                If provided this overwrites the assumption based on the extension of the filename.
+        Args:
+            file (str): path to the data file (if data is None) or filename associated with the data.
+            data (object/None): object containing data
+            metadata (dict/DataContainer): Dictionary of metadata associated with the data
+            filetype (str): File extension associated with the type data,
+                            If provided this overwrites the assumption based on the extension of the filename.
         """
         super().__init__()
         if data is None:
@@ -258,7 +276,9 @@ class LocalFileStorage(StorageInterface):
             raise KeyError(f"No such file or directory: '{item}' in '{self._path}'")
 
     def validate_metadata(self, metadata, raise_error=True):
-        state.logger.warn("Storing metadata for LocalStorage is currently handled only on the job level.")
+        state.logger.warn(
+            "Storing metadata for LocalStorage is currently handled only on the job level."
+        )
         return metadata
 
     def put(self, file, filepath=None, overwrite=False):
@@ -276,12 +296,12 @@ class LocalFileStorage(StorageInterface):
             # Expecting file to be a file handle
             if filepath.is_dir():
                 filepath = filepath.joinpath(file.name)
-            shutil.copyfileobj(file, filepath.open('wb'))
+            shutil.copyfileobj(file, filepath.open("wb"))
 
     def remove_file(self, filename, missing_ok=False):
         file = self._join_path(filename)
         if file.is_dir():
-            raise ValueError(f'{filename} is a directory but expected a file.')
+            raise ValueError(f"{filename} is a directory but expected a file.")
         file.unlink(missing_ok=missing_ok)
 
 
@@ -294,7 +314,7 @@ class JobFileStorage(LocalFileStorage):
         self._path = new_path
 
     def __init__(self, working_directory):
-        super().__init__(path='.', root_path=working_directory)
+        super().__init__(path=".", root_path=working_directory)
 
     def _join_path(self, item):
         new_path = super()._join_path(item)
@@ -303,9 +323,10 @@ class JobFileStorage(LocalFileStorage):
 
     def _validate_path(self, path):
         rel_path = os.path.relpath(path, self._root_path)
-        if rel_path.startswith('..'):
-            raise ValueError(f'New path not within the jobs working directory {self._root_path}')
+        if rel_path.startswith(".."):
+            raise ValueError(
+                f"New path not within the jobs working directory {self._root_path}"
+            )
 
     def setup_storage(self):
         os.mkdir(self._root_path)
-

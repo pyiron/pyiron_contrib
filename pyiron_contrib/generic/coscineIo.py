@@ -30,32 +30,36 @@ except ImportError:
     import_alarm = ImportAlarm("Connecting to CoScInE requires the coscine package.")
     import_alarm.warn_if_failed()
 
+    class CoscineMetadata:
+        def __init__(self, *args, **kwargs):
+            raise ImportError('Interacting with the coscine interface requires the coscine package!')
+else:
 
-class CoscineMetadata(coscine.resource.MetadataForm, MetaDataTemplate):
-    """Add a proper representation to the coscine version"""
+    class CoscineMetadata(coscine.resource.MetadataForm, MetaDataTemplate):
+        """Add a proper representation to the coscine version"""
 
-    def __init__(self, meta_data_form: coscine.resource.MetadataForm):
-        super().__init__(client=meta_data_form.client, graph=meta_data_form.profile)
+        def __init__(self, meta_data_form: coscine.resource.MetadataForm):
+            super().__init__(client=meta_data_form.client, graph=meta_data_form.profile)
 
-    def to_dict(self):
-        result = {}
-        for key, value in self.items():
-            if len(str(value)) > 0:
-                result[key] = value.raw()
-        return result
+        def to_dict(self):
+            result = {}
+            for key, value in self.items():
+                if len(str(value)) > 0:
+                    result[key] = value.raw()
+            return result
 
-    def __repr__(self):
-        return self.__str__()
+        def __repr__(self):
+            return self.__str__()
 
-    def __setitem__(self, key, value):
-        try:
-            super().__setitem__(key, value)
-        except TypeError as e:
-            val = parser.parse(value)
+        def __setitem__(self, key, value):
             try:
-                super().__setitem__(key, val)
-            except TypeError:
-                raise e
+                super().__setitem__(key, value)
+            except TypeError as e:
+                val = parser.parse(value)
+                try:
+                    super().__setitem__(key, val)
+                except TypeError:
+                    raise e
 
 
 class CoscineFileData(FileDataTemplate):

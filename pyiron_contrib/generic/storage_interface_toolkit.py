@@ -21,10 +21,7 @@ class StorageInterfaceCreator:
 
 class StorageInterfaceConnector:
 
-    _known_storage_classes = {
-        str(CoscineResource): "coscine",
-        str(FileS3IO): 's3'
-    }
+    _known_storage_classes = {str(CoscineResource): "coscine", str(FileS3IO): "s3"}
 
     def __init__(self, project):
         self._store = {}
@@ -72,17 +69,21 @@ class StorageInterfaceConnector:
         result = {}
         for key in self._data:
             if key in self._store:
-                result[key] = {'type': self._data[key]['type'], 'connected': True}
+                result[key] = {"type": self._data[key]["type"], "connected": True}
             else:
-                result[key] = {'type': self._data[key]['type'], 'connected': False}
+                result[key] = {"type": self._data[key]["type"], "connected": False}
         return result
 
     def __repr__(self):
         result = []
         for key, value in self.info.items():
-            conn = 'connected' if value['connected'] else 'inactive'
-            storage_class = value['type']
-            storage_type = self._known_storage_classes[storage_class] if storage_class in self._known_storage_classes else storage_class
+            conn = "connected" if value["connected"] else "inactive"
+            storage_class = value["type"]
+            storage_type = (
+                self._known_storage_classes[storage_class]
+                if storage_class in self._known_storage_classes
+                else storage_class
+            )
             result.append(f"{key}({storage_type}, {conn})")
         return f"Storage Access for {result}."
 
@@ -117,7 +118,9 @@ class StorageInterfaceFactory(Toolkit):
             if self._storage_interface is None:
                 self._storage_interface = new
             else:
-                self._storage_interface.attach_temporary(storage_name, new[storage_name], info_dict)
+                self._storage_interface.attach_temporary(
+                    storage_name, new[storage_name], info_dict
+                )
 
     @property
     def storage(self):

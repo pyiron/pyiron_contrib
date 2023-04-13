@@ -34,8 +34,10 @@ class CoscineMetadata(coscine.resource.MetadataForm, MetaDataTemplate):
     def to_dict(self):
         result = {}
         for key, value in self.items():
-            if len(str(value)) > 0:
+            if len(str(value)) > 0 and not self.is_controlled(key):
                 result[key] = value.raw()
+            elif len(str(value)) > 0:
+                result[key] = str(value)
         return result
 
     def __repr__(self):
@@ -73,7 +75,7 @@ class CoscineFileData(FileDataTemplate):
         if self._data is None or force_update:
             if (
                 "Software IDs" in self.metadata
-                and self.metadata["Software IDs"].lower().startswith("pyiron")
+                and self.metadata["Software IDs"].raw().lower().startswith("pyiron")
                 and self.filetype in ["h5", "hdf"]
             ):
                 tmp_dir = os.path.join(os.curdir, "coscine_downloaded_h5")
@@ -81,9 +83,9 @@ class CoscineFileData(FileDataTemplate):
                     os.mkdir(tmp_dir)
                 self.download(tmp_dir)
                 file_name = os.path.abspath(os.path.join(tmp_dir, self._filename))
-                if len(self.metadata["External/alias ID"]) > 0:
+                if len(self.metadata["External/alias ID"].raw()) > 0:
                     new_name = os.path.abspath(
-                        os.path.join(tmp_dir, self.metadata["External/alias ID"])
+                        os.path.join(tmp_dir, self.metadata["External/alias ID"].raw())
                     )
                     os.rename(file_name, new_name)
                     file_name = new_name
@@ -134,7 +136,7 @@ class Job2CoscineMetadataConverter:
         now = datetime.datetime.today()
 
         self._form["ID"] = job.name
-        self._form["External/alias ID"] = job.id
+        self._form["External/alias ID"] = str(job.id)
         self._form["User"] = user
         self._form["Date"] = now
 

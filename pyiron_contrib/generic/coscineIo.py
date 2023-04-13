@@ -12,7 +12,7 @@ import warnings
 import pandas as pd
 
 import pyiron_base
-from pyiron_base import state
+from pyiron_base import state, ProjectHDFio
 from pyiron_base.interfaces.has_groups import HasGroups
 from pyiron_contrib.generic.filedata import StorageInterface
 from pyiron_contrib.generic.filedata import (
@@ -63,19 +63,31 @@ class CoscineFileData(FileDataTemplate):
     @property
     def data(self):
         if self._data is None:
-            return "Data not yet loaded! Call `load_data` to load"
+            self.load_data()
+            # return "Data not yet loaded! Call `load_data` to load"
         if isinstance(self._data, str):
             return load_file(self._data, filetype=self.filetype)
         return load_file(io.BytesIO(self._data), filetype=self.filetype)
 
     def load_data(self, force_update=False):
         if self._data is None or force_update:
-            if self.filetype in ["h5", "hdf"]:
+            if (
+                "Software IDs" in self.metadata
+                and self.metadata["Software IDs"].lower().startswith("pyiron")
+                and self.filetype in ["h5", "hdf"]
+            ):
                 tmp_dir = os.path.join(os.curdir, "coscine_downloaded_h5")
                 if not os.path.exists(tmp_dir):
                     os.mkdir(tmp_dir)
                 self.download(tmp_dir)
-                self._data = os.path.abspath(os.path.join(tmp_dir, self._filename))
+                file_name = os.path.abspath(os.path.join(tmp_dir, self._filename))
+                if len(self.metadata["External/alias ID"]) > 0:
+                    new_name = os.path.abspath(
+                        os.path.join(tmp_dir, self.metadata["External/alias ID"])
+                    )
+                    os.rename(file_name, new_name)
+                    file_name = new_name
+                self._data = file_name
             else:
                 self._data = self._coscine_object.content()
 
@@ -104,7 +116,53 @@ def _list_filter(list_to_filter, **kwargs):
 
 
 class Job2CoscineMetadataConverter:
-    pass  # ToDo:
+
+    _known_profiles = [
+        "https://purl.org/coscine/ap/sfb1394/AtomisticSimulation/",
+        "https://purl.org/coscine/ap/sfb1394/AtomisticSimulationMD/",
+    ]
+
+    def __init__(self, job, form):
+        form_profile = form.profile.target()
+        if "sfb1394" not in form_profile:
+            raise ValueError("Unknown form, not a SFB1394 one.")
+
+        self._job = job
+        self._form = form
+
+        user = job.project_hdf5["server"]["user"]
+        now = datetime.datetime.today()
+
+        self._form["ID"] = job.name
+        self._form["External/alias ID"] = job.id
+        self._form["User"] = user
+        self._form["Date"] = now
+
+        if form_profile in self._known_profiles:
+            self._form["Software IDs"] = "pyiron"
+            self._parse_db_entry()
+            self._parse_server()
+
+    def _parse_server(self):
+        self._form["Computer name"] = self._job.server._host
+        self._form["Cores"] = str(self._job.server.cores)
+
+    def _parse_db_entry(self):
+        db = self._job.database_entry
+        self._form["Status"] = db.status
+        self._form["Submission time"] = db.timestart
+        self._form["Stop time"] = db.timestop
+        self._form["Simulation type"] = db.hamilton
+        self._form["Runtime [h]"] = str(db.totalcputime / 3600.0)
+
+    @property
+    def form(self):
+        return self._form
+
+    @classmethod
+    def extract(cls, job, form):
+        self = cls(job, form)
+        return self.form
 
 
 class CoscineResource(StorageInterface):
@@ -216,25 +274,46 @@ class CoscineResource(StorageInterface):
         filename = filename or os.path.basename(file)
         self._resource.upload(filename, file, _meta_data)
 
-    def upload_job(self, job: pyiron_base.GenericJob, form=None):
+    def upload_job(
+        self, job: pyiron_base.GenericJob, form=None, update_form=False, dois=None
+    ):
         """Upload a pyiron job to this CoScInE resource
 
         Args:
             job: job object from pyiron
             form: optional metadata form, required if the metadata mapping between job and resource type is unknown.
+            update_form(bool): If true update given form, else use as is.
+            dois(str): Optional DOI of papers from this data, overwrites doi in form!
         """
         job_file = job.project_hdf5.file_name
-        user = job.project_hdf5["server"]["user"]
-        now = datetime.datetime.today()
-        id = job.name
 
         if form is None:
-            form = self.metadata_template
-            form["ID"] = id
-            form["User"] = user
-            form["Date"] = now
+            form = Job2CoscineMetadataConverter.extract(job, self.metadata_template)
+        elif update_form:
+            form = Job2CoscineMetadataConverter.extract(job, form)
+
+        if dois is not None:
+            form["DOIs"] = dois
 
         self.upload_file(job_file, form)
+
+    def load_job(self, project, name):
+        """Load job using the provided project instance.
+
+        Careful, this job is not saved, and if it is, it would not be in the database!
+
+        Args:
+            project: a pyiron Project instance
+            name: the name of the file to load
+        """
+        file = self[name]
+        file_data = file.data
+        if isinstance(file._data, str):
+            path = "/" + file_data.keys()[0]
+            job = ProjectHDFio(project, file._data, path).to_object()
+            return job
+        else:
+            raise ValueError(f"{name} does not seem to be a pyiron job hdf file!")
 
     def _get_one_file_obj(self, item, error_msg) -> Union[coscine.FileObject, None]:
         if item not in self.list_nodes():

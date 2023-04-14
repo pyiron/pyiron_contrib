@@ -2,9 +2,9 @@ from pyiron_contrib.tinybase.container import (
             AbstractOutput,
             StructureInput,
 )
-from pyiron_contrib.tinybase.node import (
-            AbstractNode,
-            ListNode,
+from pyiron_contrib.tinybase.task import (
+            AbstractTask,
+            ListTask,
             ListInput,
             ReturnStatus
 )
@@ -21,29 +21,29 @@ from pyiron_atomistics.atomistics.structure.has_structure import HasStructure
 MurnaghanInputBase = StructureInput.from_attributes(
         "MurnaghanInputBase",
         "strains",
-        "node"
+        "task"
 )
 
 class MurnaghanInput(MurnaghanInputBase, ListInput):
     def check_ready(self):
         structure_ready = self.structure is not None
         strain_ready = len(self.strains) > 0
-        node = self.node
-        node.input.structure = self.structure
-        return structure_ready and strain_ready and node.input.check_ready()
+        task = self.task
+        task.input.structure = self.structure
+        return structure_ready and strain_ready and task.input.check_ready()
 
     def set_strain_range(self, range, steps):
         self.strains = (1 + np.linspace(-range, range, steps))**(1/3)
 
-    def _create_nodes(self):
+    def _create_tasks(self):
         cell = self.structure.get_cell()
-        nodes = []
+        tasks = []
         for s in self.strains:
-            n = deepcopy(self.node)
+            n = deepcopy(self.task)
             n.input.structure = self.structure.copy()
             n.input.structure.set_cell(cell * s, scale_atoms=True)
-            nodes.append(n)
-        return nodes
+            tasks.append(n)
+        return tasks
 
 MurnaghanOutputBase = AbstractOutput.from_attributes(
         "MurnaghanOutputBase",
@@ -69,7 +69,7 @@ class MurnaghanOutput(MurnaghanOutputBase, HasStructure):
         s.set_cell(s.get_cell() * (self.equilibrium_volume/s.get_volume())**(1/3))
         return s
 
-class MurnaghanNode(ListNode):
+class MurnaghanTask(ListTask):
 
     def _get_input(self):
         return MurnaghanInput()
@@ -87,5 +87,5 @@ class MurnaghanNode(ListNode):
         if len(output.volumes) == 0:
             output.volumes = np.zeros(len(self.input.strains))
         if ret.is_done():
-            output.energies[step] = node_output.energy_pot
-            output.volumes[step] = node.input.structure.get_volume()
+            output.energies[step] = task_output.energy_pot
+            output.volumes[step] = task.input.structure.get_volume()

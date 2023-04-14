@@ -2,7 +2,7 @@ import abc
 import logging
 from typing import Optional
 
-from pyiron_contrib.tinybase.node import AbstractNode
+from pyiron_contrib.tinybase.task import AbstractTask
 from pyiron_contrib.tinybase.storage import (
         Storable,
         GenericStorage,
@@ -23,24 +23,26 @@ from pyiron_base.state import state
 
 class TinyJob(Storable, abc.ABC):
     """
-    A tiny job unifies an executor, a node and its output.
+    A tiny job unifies an executor, a task and its output.
 
-    The job adds the node to the database and persists its input and output in a storage location.
+    The job adds the task to the database and persists its input and output in a storage location.
 
-    The input of the node is available from :attr:`~.input`. After the job has finished the output of the node can be
+    The input of the task is available from :attr:`~.input`. After the job has
+    finished the output of the task can be
     accessed from :attr:`~.output` and the data written to storage from :attr:`.~storage`.
 
-    This is an abstracat base class that works with any execution node without specifying it.  To create specialized
-    jobs you can derive from it and overload :meth:`._get_node()` to return an instance of the node, e.g.
+    This is an abstracat base class that works with any execution task without specifying it.  To create specialized
+    jobs you can derive from it and overload :meth:`._get_task()` to return an
+    instance of the task, e.g.
 
-    >>> from somewhere import MyNode
+    >>> from somewhere import MyTask
     >>> class MyJob(TinyJob):
-    ...     def _get_node(self):
-    ...         return MyNode()
+    ...     def _get_task(self):
+    ...         return MyTask()
 
-    The return value of :meth:`._get_node()` is persisted during the life time of the job.
+    The return value of :meth:`._get_task()` is persisted during the life time of the job.
 
-    You can use :class:`.GenericTinyJob` to dynamically specify which node the job should execute.
+    You can use :class:`.GenericTinyJob` to dynamically specify which task the job should execute.
     """
 
     _executors = {
@@ -54,8 +56,9 @@ class TinyJob(Storable, abc.ABC):
         Create a new job.
 
         If the given `job_name` is already present in the `project` it is reloaded.  No checks are performed that the
-        node type of the already present job and the current one match.  This is also not always necessary, e.g. when
-        reloading a :class:`.GenericTinyJob` it will automatically read the correct node from storage.
+        task type of the already present job and the current one match.  This is also not always necessary, e.g. when
+        reloading a :class:`.GenericTinyJob` it will automatically read the
+        correct task from storage.
 
         Args:
             project (:class:`.ProjectInterface`): the project the job should live in
@@ -65,7 +68,7 @@ class TinyJob(Storable, abc.ABC):
             project = ProjectAdapter(project)
         self._project = project
         self._name = job_name
-        self._node = None
+        self._task = None
         self._output = None
         self._storage = None
         self._executor = None
@@ -93,27 +96,27 @@ class TinyJob(Storable, abc.ABC):
         return self._project
 
     @abc.abstractmethod
-    def _get_node(self) -> AbstractNode:
+    def _get_task(self) -> AbstractTask:
         """
-        Return an instance of the :class:`.AbstractNode`.
+        Return an instance of the :class:`.AbstractTask`.
 
-        The value return from here is saved automatically in :prop:`.node`.
+        The value return from here is saved automatically in :prop:`.task`.
         """
         pass
 
     @property
-    def node(self):
-        if self._node is None:
-            self._node = self._get_node()
-        return self._node
+    def task(self):
+        if self._task is None:
+            self._task = self._get_task()
+        return self._task
 
     @property
     def jobtype(self):
-        return self.node.__class__.__name__
+        return self.task.__class__.__name__
 
     @property
     def input(self):
-        return self.node.input
+        return self.task.input
 
     @property
     def output(self):
@@ -151,10 +154,10 @@ class TinyJob(Storable, abc.ABC):
             how (string): specifies which executor to use
 
         Returns:
-            :class:`.Executor`: the executor that is running the node or nothing.
+            :class:`.Executor`: the executor that is running the task or nothing.
         """
         if self._id is None or self.project.database.get_item(self.id).status == "ready":
-            exe = self._executor = self._executors[how](nodes=[self.node])
+            exe = self._executor = self._executors[how](tasks=[self.task])
             self._setup_executor_callbacks()
             exe.run()
             return exe
@@ -192,7 +195,7 @@ class TinyJob(Storable, abc.ABC):
     def _store(self, storage):
         # preferred solution, but not everything that can be pickled can go into HDF atm
         # self._executor.output[-1].store(storage, "output")
-        storage["node"] = pickle_dump(self.node)
+        storage["task"] = pickle_dump(self.task)
         if self._output is not None:
             storage["output"] = pickle_dump(self._output)
 
@@ -208,8 +211,9 @@ class TinyJob(Storable, abc.ABC):
         self._update_id()
         if storage is None:
             storage = self.storage
-        self._node = pickle_load(storage["node"])
-        # this would be correct, but since we pickle output and put it into a HDF node it doesn't appear here yet!
+        self._task = pickle_load(storage["task"])
+        # this would be correct, but since we pickle output and put it into a
+        # HDF task it doesn't appear here yet!
         # if "output" in storage.list_groups():
         if "output" in storage.list_nodes():
             self._output = pickle_load(storage["output"])
@@ -222,32 +226,32 @@ class TinyJob(Storable, abc.ABC):
 
 
 # I'm not perfectly happy with this, but three thoughts led to this class:
-# 1. I want to be able to set any node on a tiny job with subclassing, to make the prototyping new jobs in the notebook
+# 1. I want to be able to set any task on a tiny job with subclassing, to make the prototyping new jobs in the notebook
 #    easy
-# 2. I do *not* want people to accidently change the node instance/class while the job is running
+# 2. I do *not* want people to accidently change the task instance/class while the job is running
 class GenericTinyJob(TinyJob):
     """
-    A generic tiny job is a tiny job that allows to set any node class after instantiating it.
+    A generic tiny job is a tiny job that allows to set any task class after instantiating it.
 
-    Set a node class via :attr:`.node_class`, e.g.
+    Set a task class via :attr:`.task_class`, e.g.
 
-    >>> from somewhere import MyNode
+    >>> from somewhere import MyTask
     >>> job = GenericTinyJob(Project(...), "myjob")
-    >>> job.node_class = MyNode
-    >>> isinstance(job.input, type(MyNode.input))
+    >>> job.task_class = MyTask
+    >>> isinstance(job.input, type(MyTask.input))
     True
     """
     def __init__(self, project, job_name):
         super().__init__(project=project, job_name=job_name)
-        self._node_class = None
+        self._task_class = None
 
     @property
-    def node_class(self):
-        return self._node_class
+    def task_class(self):
+        return self._task_class
 
-    @node_class.setter
-    def node_class(self, cls):
-        self._node_class = cls
+    @task_class.setter
+    def task_class(self, cls):
+        self._task_class = cls
 
-    def _get_node(self):
-        return self.node_class()
+    def _get_task(self):
+        return self.task_class()

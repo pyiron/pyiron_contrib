@@ -6,7 +6,7 @@ from pyiron_contrib.tinybase.container import (
             EnergyOutput,
             MDOutput
 )
-from pyiron_contrib.tinybase.node import AbstractNode, ReturnStatus
+from pyiron_contrib.tinybase.task import AbstractTask, ReturnStatus
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -26,7 +26,7 @@ class AseStaticInput(AseInput, StructureInput):
     pass
 
 
-class AseStaticNode(AbstractNode):
+class AseStaticTask(AbstractTask):
 
     def _get_input(self):
         return AseStaticInput()
@@ -43,7 +43,7 @@ class AseStaticNode(AbstractNode):
 class AseMDInput(AseInput, MDInput):
     pass
 
-class AseMDNode(AbstractNode):
+class AseMDTask(AbstractTask):
 
     def _get_input(self):
         return AseMDInput()
@@ -110,7 +110,7 @@ class AseMinimizeInput(AseInput, StructureInput, MinimizeInput):
         }.get(self.algo)(structure, **self.minimizer_kwargs)
 
 
-class AseMinimizeNode(AbstractNode):
+class AseMinimizeTask(AbstractTask):
 
     def _get_input(self):
         return AseMinimizeInput()

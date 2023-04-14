@@ -52,8 +52,8 @@ class RunMachine:
 
 class Executor:
 
-    def __init__(self, nodes):
-        self._nodes = nodes
+    def __init__(self, tasks):
+        self._tasks = tasks
         self._run_machine = RunMachine("init")
 
         # Set up basic flow
@@ -85,20 +85,20 @@ class Executor:
         self._collect_time = self._finished_start - self._collect_start
 
     @property
-    def nodes(self):
-        return self._nodes
+    def tasks(self):
+        return self._tasks
 
     def _run_init(self):
-        if all(node.input.check_ready() for node in self.nodes):
+        if all(task.input.check_ready() for task in self.tasks):
             self._run_machine.step("ready")
         else:
-            logging.info("Node is not ready yet!")
+            logging.info("Task is not ready yet!")
 
     def _run_ready(self):
         self._run_machine.step("running")
 
     def _run_running(self):
-        status, output = zip(*[node.execute() for node in self.nodes])
+        status, output = zip(*[task.execute() for task in self.tasks])
         self._run_machine.step("collect", status=status, output=output)
 
     def _run_collect(self):
@@ -137,8 +137,8 @@ from concurrent.futures import (
 )
 from threading import Lock
 
-def run_node(node):
-    return node.execute()
+def run_task(task):
+    return task.execute()
 
 class FuturesExecutor(Executor, abc.ABC):
 
@@ -149,8 +149,8 @@ class FuturesExecutor(Executor, abc.ABC):
         if cls._FuturePoolExecutor is None:
             raise TypeError(f"Subclass {cls} of FuturesExecutor does not define 'FuturePoolExecutor'!")
 
-    def __init__(self, nodes, max_tasks=None):
-        super().__init__(nodes=nodes)
+    def __init__(self, tasks, max_tasks=None):
+        super().__init__(tasks=tasks)
         self._max_tasks = max_tasks if max_tasks is not None else 4
         self._done = 0
         self._futures = {}
@@ -160,39 +160,39 @@ class FuturesExecutor(Executor, abc.ABC):
         self._lock = Lock()
 
     def _process_future(self, future):
-        node = self._futures[future]
+        task = self._futures[future]
 
         status, output = future.result(timeout=0)
-        self._status[node] = status
-        self._output[node] = output
+        self._status[task] = status
+        self._output[task] = output
         with self._lock:
             self._done += 1
         self._check_finish()
 
     def _check_finish(self, log=False):
         with self._lock:
-            if self._done == len(self.nodes):
-                status = [self._status[n] for n in sorted(self.nodes, key=lambda n: self._index[n])]
-                output = [self._output[n] for n in sorted(self.nodes, key=lambda n: self._index[n])]
+            if self._done == len(self.tasks):
+                status = [self._status[n] for n in sorted(self.tasks, key=lambda n: self._index[n])]
+                output = [self._output[n] for n in sorted(self.tasks, key=lambda n: self._index[n])]
                 self._run_machine.step("collect",
                         status=status,
                         output=output,
                 )
 
     def _run_running(self):
-        if len(self._futures) < len(self.nodes):
+        if len(self._futures) < len(self.tasks):
             pool = self._FuturePoolExecutor(max_workers=self._max_tasks)
             try:
-                for i, node in enumerate(self.nodes):
-                    future = pool.submit(run_node, node)
-                    self._futures[future] = node
-                    self._index[node] = i
+                for i, task in enumerate(self.tasks):
+                    future = pool.submit(run_task, task)
+                    self._futures[future] = task
+                    self._index[task] = i
                     future.add_done_callback(self._process_future)
             finally:
                 # with statement doesn't allow me to put wait=False, so I gotta do it here with try/finally.
                 pool.shutdown(wait=False)
         else:
-            logging.info("Some nodes are still executing!")
+            logging.info("Some tasks are still executing!")
 
 class BackgroundExecutor(FuturesExecutor):
     _FuturePoolExecutor = ThreadPoolExecutor

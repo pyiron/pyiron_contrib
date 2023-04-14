@@ -39,7 +39,7 @@ class ReturnStatus:
         """
         return self.code == self.Code.DONE
 
-class AbstractNode(Storable, abc.ABC):
+class AbstractTask(Storable, abc.ABC):
     """
     Basic unit of calculations.
 
@@ -61,7 +61,7 @@ class AbstractNode(Storable, abc.ABC):
         """
         Return an instance of the input class.
 
-        This is called once per life time of the node object on first access to :attr:`.input` and then saved.
+        This is called once per life time of the task object on first access to :attr:`.input` and then saved.
         """
         pass
 
@@ -109,7 +109,7 @@ class AbstractNode(Storable, abc.ABC):
         return ret, output
 
     def run(self, how='foreground'):
-        exe = self._executors[how](nodes=[self])
+        exe = self._executors[how](tasks=[self])
         exe.run()
         return exe
 
@@ -122,15 +122,15 @@ class AbstractNode(Storable, abc.ABC):
 
     @classmethod
     def _restore(cls, storage, version):
-        node = cls()
-        node._input = pickle_load(storage["input"])
-        return node
+        task = cls()
+        task._input = pickle_load(storage["input"])
+        return task
 
 FunctionInput = AbstractInput.from_attributes("FunctionInput", args=list, kwargs=dict)
 FunctionOutput = AbstractOutput.from_attributes("FunctionOutput", "result")
-class FunctionNode(AbstractNode):
+class FunctionTask(AbstractTask):
     """
-    A node that wraps a generic function.
+    A task that wraps a generic function.
 
     The given function is called with :attr:`.FunctionInput.args` and :attr:`.FunctionInput.kwargs` as `*args` and
     `**kwargs` respectively.  The return value is set to :attr:`.FunctionOutput.result`.
@@ -158,21 +158,21 @@ class ListInput(MasterInput, abc.ABC):
     """
     The input of :class:`.ListNode`.
 
-    To use it overload :meth:`._create_nodes()` here and subclass :class:`.ListNode` as well.
+    To use it overload :meth:`._create_tasks()` here and subclass :class:`.ListNode` as well.
     """
 
     @abc.abstractmethod
-    def _create_nodes(self):
+    def _create_tasks(self):
         """
-        Return a list of nodes to execute.
+        Return a list of tasks to execute.
 
         This is called once by :class:`.ListNode.execute`.
         """
         pass
 
-class ListNode(AbstractNode, abc.ABC):
+class ListTask(AbstractTask, abc.ABC):
     """
-    A node that executes other nodes in parallel.
+    A task that executes other tasks in parallel.
 
     To use it overload :meth:`._extract_output` here and subclass :class:`.ListInput` as well.
     """
@@ -181,88 +181,88 @@ class ListNode(AbstractNode, abc.ABC):
         super().__init__()
 
     @abc.abstractmethod
-    def _extract_output(self, output, step, node, ret, node_output):
+    def _extract_output(self, output, step, task, ret, task_output):
         """
-        Extract the output of each node.
+        Extract the output of each task.
 
         Args:
-            output (:class:`.AbstractOutput`): output of this node to populate
-            step (int): index of the node to extract the output from, corresponds to the index of the node in the list
-                        returned by :meth:`.ListInput._create_nodes()`.
-            node (:class:`.AbstractNode`): node to extract the output from, you can use this to extract parts of the input as well
-            ret (:class:`.ReturnStatus`): the return status of the execution of the node
-            node_output (:class:`.AbstractOutput`): the output of the node to extract
+            output (:class:`.AbstractOutput`): output of this task to populate
+            step (int): index of the task to extract the output from,
+            corresponds to the index of the task in the list returned by :meth:`.ListInput._create_tasks()`.
+            task (:class:`.AbstractTask`): task to extract the output from, you can use this to extract parts of the input as well
+            ret (:class:`.ReturnStatus`): the return status of the execution of the task
+            task_output (:class:`.AbstractOutput`): the output of the task to extract
         """
         pass
 
     def _execute(self, output):
-        nodes = self.input._create_nodes()
-        exe = self.input.child_executor(nodes)
+        tasks = self.input._create_tasks()
+        exe = self.input.child_executor(tasks)
         exe.run()
         exe.wait()
 
-        for i, (node, ret, node_output) in enumerate(zip(nodes, exe.status, exe.output)):
-            self._extract_output(output, i, node, ret, node_output)
+        for i, (task, ret, task_output) in enumerate(zip(tasks, exe.status, exe.output)):
+            self._extract_output(output, i, task, ret, task_output)
 
 SeriesInputBase = AbstractInput.from_attributes(
         "SeriesInputBase",
-        nodes=list,
+        tasks=list,
         connections=list
 )
 
 class SeriesInput(SeriesInputBase, MasterInput):
     """
-    Keeps a list of nodes and their connection functions to run sequentially.
+    Keeps a list of tasks and their connection functions to run sequentially.
 
-    The number of added nodes must be equal to the number of connections plus one.  It's recommended to set up this
+    The number of added tasks must be equal to the number of connections plus one.  It's recommended to set up this
     input with :meth:`.first()` and :meth:`.then()` which can be composed in a builder pattern.  The connection
-    functions take as arguments the output of the last node and the input of the next node.  You may call
+    functions take as arguments the output of the last task and the input of the next task.  You may call
     :meth:`.then()` any number of times.
 
-    >>> node = SeriesNode()
+    >>> task = SeriesNode()
     >>> def transfer(input, output):
     ...     input.my_param = output.my_result
-    >>> node.input.first(MyNode()).then(MyNode(), transfer)
+    >>> task.input.first(MyNode()).then(MyNode(), transfer)
     """
     def check_ready(self):
-        return len(self.nodes) == len(connections) + 1
+        return len(self.tasks) == len(connections) + 1
 
-    def first(self, node):
+    def first(self, task):
         """
-        Set initial node.
+        Set initial task.
 
         Resets whole input
 
         Args:
-            node (AbstractNode): the first node to execute
+            task (AbstractTask): the first task to execute
 
         Returns:
             self: the input object
         """
-        self.nodes = [node]
+        self.tasks = [task]
         self.connections = []
         return self
 
-    def then(self, next_node, connection):
+    def then(self, next_task, connection):
         """
-        Add a new node and how to connect it to the previous node.
+        Add a new task and how to connect it to the previous task.
 
         Args:
-            next_node (:class:`~.AbstractNode`): next node to execute
-            connection (function): takes the input of next_node and the output of the previous node
-
+            next_task (:class:`~.AbstractTask`): next task to execute
+            connection (function): takes the input of next_task and the output
+            of the previous task
         Returns:
             self: the input object
         """
-        self.nodes.append(next_node)
+        self.tasks.append(next_task)
         self.connections.append(connection)
         return self
 
-class SeriesNode(AbstractNode):
+class SeriesTask(AbstractTask):
     """
-    Executes a series of nodes sequentially.
+    Executes a series of tasks sequentially.
 
-    Its input specifies the nodes to execute and functions (:attr:`.SeriesInput.connections`) to move input from one
+    Its input specifies the tasks to execute and functions (:attr:`.SeriesInput.connections`) to move input from one
     output to the next input in the series.
     """
 
@@ -270,21 +270,21 @@ class SeriesNode(AbstractNode):
         return SeriesInput()
 
     def _get_output(self):
-        return self.input.nodes[-1]._get_output()
+        return self.input.tasks[-1]._get_output()
 
     def _execute(self, output):
         Exe = self.input.child_executor
 
-        exe = Exe(self.input.nodes[:1])
+        exe = Exe(self.input.tasks[:1])
         exe.run()
         exe.wait()
         ret = exe.status[0]
         if not ret.is_done():
             return ReturnStatus("aborted", ret)
 
-        for node, connection in zip(self.input.nodes[1:], self.input.connections):
-            connection(node.input, exe.output[0])
-            exe = Exe([node])
+        for task, connection in zip(self.input.tasks[1:], self.input.connections):
+            connection(task.input, exe.output[0])
+            exe = Exe([task])
             exe.run()
             exe.wait()
             ret = exe.status[0]
@@ -307,18 +307,18 @@ class LoopControl(HasStorage):
 
     scratch = StorageAttribute().default(dict)
 
-    def condition(self, node: AbstractNode, output: AbstractNode):
+    def condition(self, task: AbstractTask, output: AbstractTask):
         """
         Whether to terminate the loop or not.
 
         Args:
-            node (AbstractNode): the loop body
+            task (AbstractTask): the loop body
             output (AbstractOutput): output of the loop body
 
         Args:
             bool: True to terminate the loop; False to keep it running
         """
-        return self._condition(node, output, self.scratch)
+        return self._condition(task, output, self.scratch)
 
     def restart(self, output: AbstractOutput, input: AbstractInput):
         """
@@ -344,10 +344,10 @@ class RepeatLoopControl(LoopControl):
 
 class LoopInput(LoopInputBase, MasterInput):
     """
-    Input for :class:`~.LoopNode`.
+    Input for :class:`~.LoopTask`.
 
     Attributes:
-        node (:class:`~.AbstractNode`): the loop body
+        task (:class:`~.AbstractTask`): the loop body
         control (:class:`.LoopControl`): encapsulates control flow of the loop
     """
 
@@ -364,7 +364,7 @@ class LoopInput(LoopInputBase, MasterInput):
 
     def control_with(
             self,
-            condition: Callable[[AbstractNode, AbstractOutput, dict], bool],
+            condition: Callable[[AbstractTask, AbstractOutput, dict], bool],
             restart: Callable[[AbstractOutput, AbstractInput, dict], None]
     ):
         """
@@ -376,29 +376,29 @@ class LoopInput(LoopInputBase, MasterInput):
         """
         self.control = LoopControl(condition, restart)
 
-class LoopNode(AbstractNode):
+class LoopTask(AbstractTask):
     """
-    Generic node to loop over a given input node.
+    Generic task to loop over a given input task.
     """
 
     def _get_input(self):
         return LoopInput()
 
     def _get_output(self):
-        return self.input.node._get_output()
+        return self.input.task._get_output()
 
     def _execute(self, output):
-        node = deepcopy(self.input.node)
+        task = deepcopy(self.input.task)
         control = deepcopy(self.input.control)
         scratch = {}
         while True:
-            exe = self.input.child_executor([node])
+            exe = self.input.child_executor([task])
             exe.run()
             ret = exe.status[-1]
             out = exe.output[-1]
             if not ret.is_done():
                 return ReturnStatus("aborted", ret)
-            if control.condition(node, out):
+            if control.condition(task, out):
                 break
-            control.restart(out, node.input)
+            control.restart(out, task.input)
         output.transfer(out)

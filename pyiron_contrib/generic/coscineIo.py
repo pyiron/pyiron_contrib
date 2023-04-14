@@ -9,8 +9,6 @@ import os.path
 import io
 import warnings
 
-import pandas as pd
-
 import pyiron_base
 from pyiron_base import state, ProjectHDFio
 from pyiron_base.interfaces.has_groups import HasGroups
@@ -85,7 +83,7 @@ class CoscineFileData(FileDataTemplate):
                 file_name = os.path.abspath(os.path.join(tmp_dir, self._filename))
                 if len(self.metadata["External/alias ID"].raw()) > 0:
                     new_name = os.path.abspath(
-                        os.path.join(tmp_dir, self.metadata["External/alias ID"].raw())
+                        os.path.join(tmp_dir, self.metadata["External/alias ID"].raw() + '.h5')
                     )
                     os.rename(file_name, new_name)
                     file_name = new_name
@@ -575,15 +573,42 @@ class CoscineProject(HasGroups):
         else:
             raise KeyError(key)
 
-    def upload_jobs(self, list_of_jobs):
-        pass  # ToDo
-
-    def create_node(self, form):
+    def create_node(self,
+                    name_or_form,
+                    size=None,
+                    display_name=None,
+                    description=None,
+                    disciplines=None,
+                    keywords=None,
+                    metadata_visibility=None,
+                    licence=None,
+                    internal_rules_for_reuse=None,
+                    application_profile='sfb1394/AtomisticSimulation',
+                    resource_type='rdsrwth',
+                    ):
         if self._project is None:
             raise RuntimeError(
                 "At the top level, new resources cannot be created. Switch to a project"
             )
-        self._project.create_resource(form)
+        if not isinstance(name_or_form, str):
+            form = name_or_form
+        else:
+            form = self._client.resource_form()
+            form['Resource Type'] = resource_type
+            form['Resource Size'] = size or 1
+            form['Resource Name'] = name_or_form
+            form['Display Name'] = display_name or name_or_form
+            form['Resource Description'] = description or name_or_form
+            form['Discipline'] = disciplines or self._project.disciplines
+            if keywords:
+                form['Resource Keywords'] = keywords
+            form['Metadata Visibility'] = metadata_visibility or self._project.visibility
+            if licence:
+                form['License'] = licence
+            if internal_rules_for_reuse:
+                form['Internal Rules for Reuse'] = internal_rules_for_reuse
+            form['Application Profile'] = application_profile
+        return CoscineResource(self._project.create_resource(form), parent_path=self.path)
 
     def create_group(
         self,
@@ -598,6 +623,7 @@ class CoscineProject(HasGroups):
         project_keywords=None,
         metadata_visibility=None,
         grant_id=None,
+        copy_members=True
     ):
         if project_name in self.list_all():
             raise ValueError("The name is already in this project!")
@@ -614,7 +640,7 @@ class CoscineProject(HasGroups):
             "Metadata Visibility": metadata_visibility,
             "Grant ID": grant_id,
         }
-        for key, val in update_dict.items():
+        for key, val in update_dict.copy().items():
             if val is None:
                 del update_dict[key]
 
@@ -633,6 +659,13 @@ class CoscineProject(HasGroups):
         form.fill(update_dict)
         form.generate()
         if self._project is None:
-            self._client.create_project(form)
+            new = self._client.create_project(form)
         else:
-            self._project.create_subproject(form)
+            new = self._project.create_subproject(form)
+            if copy_members:
+                with coscine.concurrent():
+                    for member in self._project.members():
+                        new.add_member(member, role=member.role)
+
+        return new
+

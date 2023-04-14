@@ -83,7 +83,12 @@ class CoscineFileData(FileDataTemplate):
                 file_name = os.path.abspath(os.path.join(tmp_dir, self._filename))
                 if len(self.metadata["External/alias ID"].raw()) > 0:
                     new_name = os.path.abspath(
-                        os.path.join(tmp_dir, self.metadata["External/alias ID"].raw() + '.h5')
+                        os.path.join(
+                            tmp_dir,
+                            "pyiron_"
+                            + self.metadata["External/alias ID"].raw()
+                            + ".h5",
+                        )
                     )
                     os.rename(file_name, new_name)
                     file_name = new_name
@@ -573,19 +578,20 @@ class CoscineProject(HasGroups):
         else:
             raise KeyError(key)
 
-    def create_node(self,
-                    name_or_form,
-                    size=None,
-                    display_name=None,
-                    description=None,
-                    disciplines=None,
-                    keywords=None,
-                    metadata_visibility=None,
-                    licence=None,
-                    internal_rules_for_reuse=None,
-                    application_profile='sfb1394/AtomisticSimulation',
-                    resource_type='rdsrwth',
-                    ):
+    def create_node(
+        self,
+        name_or_form,
+        size=None,
+        display_name=None,
+        description=None,
+        disciplines=None,
+        keywords=None,
+        metadata_visibility=None,
+        licence=None,
+        internal_rules_for_reuse=None,
+        application_profile="sfb1394/AtomisticSimulation",
+        resource_type="rdsrwth",
+    ):
         if self._project is None:
             raise RuntimeError(
                 "At the top level, new resources cannot be created. Switch to a project"
@@ -594,21 +600,25 @@ class CoscineProject(HasGroups):
             form = name_or_form
         else:
             form = self._client.resource_form()
-            form['Resource Type'] = resource_type
-            form['Resource Size'] = size or 1
-            form['Resource Name'] = name_or_form
-            form['Display Name'] = display_name or name_or_form
-            form['Resource Description'] = description or name_or_form
-            form['Discipline'] = disciplines or self._project.disciplines
+            form["Resource Type"] = resource_type
+            form["Resource Size"] = size or 1
+            form["Resource Name"] = name_or_form
+            form["Display Name"] = display_name or name_or_form
+            form["Resource Description"] = description or name_or_form
+            form["Discipline"] = disciplines or self._project.disciplines
             if keywords:
-                form['Resource Keywords'] = keywords
-            form['Metadata Visibility'] = metadata_visibility or self._project.visibility
+                form["Resource Keywords"] = keywords
+            form["Metadata Visibility"] = (
+                metadata_visibility or self._project.visibility
+            )
             if licence:
-                form['License'] = licence
+                form["License"] = licence
             if internal_rules_for_reuse:
-                form['Internal Rules for Reuse'] = internal_rules_for_reuse
-            form['Application Profile'] = application_profile
-        return CoscineResource(self._project.create_resource(form), parent_path=self.path)
+                form["Internal Rules for Reuse"] = internal_rules_for_reuse
+            form["Application Profile"] = application_profile
+        return CoscineResource(
+            self._project.create_resource(form), parent_path=self.path
+        )
 
     def create_group(
         self,
@@ -623,7 +633,7 @@ class CoscineProject(HasGroups):
         project_keywords=None,
         metadata_visibility=None,
         grant_id=None,
-        copy_members=True
+        copy_members=True,
     ):
         if project_name in self.list_all():
             raise ValueError("The name is already in this project!")
@@ -668,4 +678,3 @@ class CoscineProject(HasGroups):
                         new.add_member(member, role=member.role)
 
         return new
-

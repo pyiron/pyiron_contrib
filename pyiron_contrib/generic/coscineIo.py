@@ -181,6 +181,28 @@ class CoscineResource(StorageInterface):
     ):
         """Giving access to a CoScInE Resource to receive or upload files
 
+        To upload a file you need the file and a metadata form (a template is available using `metadata_template`,
+        fill out the metadata and upload using the `upload_file` method
+        ```
+        coscine_res = CoscineResource(connection_dict)
+        mdf = coscine_res.metadata_template
+        mdf['ID'] = 'test'
+        mdf['User'] = 'Niklas'
+        mdf['Date'] = '11.04.2023'
+        coscine_res.upload_file(file='some.txt', metadata=mdf)
+        ```
+
+        A pyiron atomistic simulation job can be uploaded simply by
+        ```
+        coscine_res.upload_job(job_object)
+        ```
+
+        If you want to receive a file from the storage, simply index the coscine resource with the name
+        ```
+        file_object = coscine_res['file_name_on_coscine']
+        ```
+        The return object has a metadata and a data attribute holding the respective information.
+
         Args:
             resource (coscine.Resource/dict): Either directly provide a coscine.Resource or a dictionary with
                 token, project_id, and resource_id to directly connect to the respective resource.

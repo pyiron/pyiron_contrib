@@ -80,11 +80,7 @@ class FileDataTemplate(BaseFileDataTemplate, ABC):
     @staticmethod
     def _get_filetype_from_filename(filename):
         filetype = Path(filename).suffix
-        if filetype == "" or filetype == ".":
-            filetype = None
-        else:
-            filetype = filetype[1:]
-        return filetype
+        return None if filetype == "" else filetype[1:]
 
     def _get_metadata(self):
         return self._metadata

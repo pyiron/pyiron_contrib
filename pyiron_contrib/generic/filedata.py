@@ -79,7 +79,7 @@ class FileDataTemplate(BaseFileDataTemplate, ABC):
 
     @staticmethod
     def _get_filetype_from_filename(filename):
-        filetype = os.path.splitext(filename)[1]
+        filetype = Path(filename).suffix
         if filetype == "" or filetype == ".":
             filetype = None
         else:
@@ -148,7 +148,7 @@ class FileData(FileDataTemplate):
             self.metadata = metadata
         else:
             self.metadata = MetaData(metadata)
-        self._hasdata = True if self._data is not None else False
+        self._hasdata = self._data is not None
 
     @property
     @lru_cache()

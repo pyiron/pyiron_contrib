@@ -154,11 +154,14 @@ class Job2CoscineMetadataConverter:
 
     def _parse_db_entry(self):
         db = self._job.database_entry
-        self._form["Status"] = db.status
-        self._form["Submission time"] = db.timestart
-        self._form["Stop time"] = db.timestop
-        self._form["Simulation type"] = db.hamilton
-        self._form["Runtime [h]"] = str(db.totalcputime / 3600.0)
+        if bool(db):
+            self._form["Status"] = db.status
+            self._form["Submission time"] = db.timestart
+            self._form["Stop time"] = db.timestop
+            self._form["Simulation type"] = db.hamilton
+            self._form["Runtime [h]"] = str(db.totalcputime / 3600.0)
+        else:
+            self._form["Status"] = self._job["status"]
 
     @property
     def form(self):
@@ -474,7 +477,7 @@ class CoscineConnect:
             self._client = token
 
         maintenance = self._client.get_maintenance()
-        if maintenance['displayName'] is not None:
+        if maintenance["displayName"] is not None:
             state.logger.warn(f"Coscine is a maintenance mode: {maintenance}")
 
     @staticmethod
@@ -635,7 +638,7 @@ class CoscineProject(HasGroups):
             if internal_rules_for_reuse:
                 form["Internal Rules for Reuse"] = internal_rules_for_reuse
             form["Application Profile"] = application_profile
-        if form['Resource Name'] in self.list_groups() + self.list_nodes():
+        if form["Resource Name"] in self.list_groups() + self.list_nodes():
             raise ValueError("This name is already in this project!")
         return CoscineResource(
             self._project.create_resource(form), parent_path=self.path

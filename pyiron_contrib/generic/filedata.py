@@ -58,10 +58,10 @@ class MetaDataTemplate(ABC):
 
 
 class MetaData(MetaDataTemplate):
-    def __init__(self, meta_data_dict=None):
-        if meta_data_dict is None:
-            meta_data_dict = {}
-        self._metadata = {key: val for key, val in meta_data_dict.items()}
+    def __init__(self, metadata_dict=None):
+        if metadata_dict is None:
+            metadata_dict = {}
+        self._metadata = {key: val for key, val in metadata_dict.items()}
 
     def to_dict(self):
         return self._metadata.copy()

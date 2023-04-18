@@ -10,6 +10,9 @@ except:
 	from pyiron_base import Project
 
 from pyiron_base import JOB_CLASS_DICT
+from pyiron_contrib.generic.storage_interface_toolkit import StorageInterfaceFactory
+
+Project.register_tools('storage_interface', StorageInterfaceFactory)
 
 # Make classes available for new pyiron version
 JOB_CLASS_DICT['ProtoMinimGradDes'] = 'pyiron_contrib.protocol.compound.minimize'

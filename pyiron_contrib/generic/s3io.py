@@ -1,3 +1,7 @@
+# coding: utf-8
+# Copyright (c) Max-Planck-Institut für Eisenforschung GmbH - Computational Materials Design (CM) Department
+# Distributed under the terms of "New BSD License", see the LICENSE file.
+
 import fnmatch
 import io
 import json
@@ -8,12 +12,13 @@ from functools import lru_cache
 import boto3
 from botocore.client import Config
 
-from pyiron_base import HasGroups
-from pyiron_base import load_file, FileDataTemplate
+from pyiron_contrib.generic.filedata import StorageInterface
+from pyiron_contrib.generic.filedata import load_file, FileDataTemplate
 
 
 class S3FileData(FileDataTemplate):
     """FileData stores an instance of a data file from an S3 system, e.g. a single Image from a measurement."""
+
     def __init__(self, s3obj, filename=None, filetype=None):
         """FileData class to store data and associated metadata.
 
@@ -25,15 +30,11 @@ class S3FileData(FileDataTemplate):
         """
         self._s3obj = s3obj
         if filename is None:
-            self.filename = s3obj.key.split('/')[-1]
+            self.filename = s3obj.key.split("/")[-1]
         else:
             self.filename = filename
         if filetype is None:
-            filetype = os.path.splitext(self.filename)[1]
-            if filetype == '' or filetype == '.':
-                self.filetype = None
-            else:
-                self.filetype = filetype[1:]
+            self.filetype = self._get_filetype_from_filename(self.filename)
         else:
             self.filetype = filetype
         self._data = None
@@ -67,21 +68,21 @@ class S3ioConnect:
     def __init__(self, credentials=None, bucket_name=None):
         """Establishes connection to a specific 'bucket' of a S3 type object store.
 
-            Args:
-                credentials (str/dict/boto3.resource/None):
-                        if str: path to a json configuration file with login credentials for the bucket.
-                        if dict: dictionary containing the login credentials.
-                        if boto3.resource: This resource is used as is, requires bucket_name to be specified.
-                        if None: use Credentials as obtained by boto3, requires bucket_name to be specified.
-                bucket_name(str/None): Name of the bucket, overwrites name given in the config.
+        Args:
+            credentials (str/dict/boto3.resource/None):
+                    if str: path to a json configuration file with login credentials for the bucket.
+                    if dict: dictionary containing the login credentials.
+                    if boto3.resource: This resource is used as is, requires bucket_name to be specified.
+                    if None: use Credentials as obtained by boto3, requires bucket_name to be specified.
+            bucket_name(str/None): Name of the bucket, overwrites name given in the config.
 
-            The credentials needs to provide the following information:
-                access_key or aws_access_key_id (str)
-                secret_key or aws_secret_access_key (str)
-            And may contain these additional fields:
-                endpoint or endpoint_url (str)
-                bucket (str)
-            Each additional keyword is passed on to boto3 as is.
+        The credentials needs to provide the following information:
+            access_key or aws_access_key_id (str)
+            secret_key or aws_secret_access_key (str)
+        And may contain these additional fields:
+            endpoint or endpoint_url (str)
+            bucket (str)
+        Each additional keyword is passed on to boto3 as is.
         """
         self.bucket_name = None
         self.s3resource = self._init_s3resource(credentials)
@@ -96,19 +97,19 @@ class S3ioConnect:
         elif credentials is None:
             # boto3 looks for the (missing) credentials at  ~/.aws/credentials or at environment variables:
             # AWS_ACCESS_KEY_ID  AWS_SECRET_ACCESS_KEY  etc.
-            return boto3.resource('s3')
+            return boto3.resource("s3")
         else:
             credentials = self._get_credentials_dict(credentials)
 
-            config = credentials.pop('config', Config(s3={'addressing_style': 'path'}))
+            config = credentials.pop("config", Config(s3={"addressing_style": "path"}))
 
-            self._normalize_key(credentials, 'aws_access_key_id', 'access_key')
-            self._normalize_key(credentials, 'aws_secret_access_key', 'secret_key')
-            self._normalize_key(credentials, 'endpoint_url', 'endpoint')
+            self._normalize_key(credentials, "aws_access_key_id", "access_key")
+            self._normalize_key(credentials, "aws_secret_access_key", "secret_key")
+            self._normalize_key(credentials, "endpoint_url", "endpoint")
 
             self.bucket_name = credentials.pop("bucket", None)
 
-            return boto3.resource('s3', config=config, **credentials)
+            return boto3.resource("s3", config=config, **credentials)
 
     def _check_for_bucket_name(self):
         if self.bucket_name is None:
@@ -126,7 +127,9 @@ class S3ioConnect:
             with open(credentials) as json_file:
                 credentials = json.load(json_file)
         if not isinstance(credentials, dict):
-            raise TypeError(f"credentials is not one of the supported types but {type(credentials)}.")
+            raise TypeError(
+                f"credentials is not one of the supported types but {type(credentials)}."
+            )
         return credentials.copy()
 
     @property
@@ -134,7 +137,7 @@ class S3ioConnect:
         return self.s3resource.meta.client.meta.endpoint_url
 
 
-class FileS3IO(HasGroups):
+class FileS3IO(StorageInterface):
     """Provides access to a specific bucket of a S3 object store similar to a regular storage system.
 
     Implements :class:`.HasGroups`. Groups are 'Folders' in the S3 storage, nodes are file like objects.
@@ -151,9 +154,18 @@ class FileS3IO(HasGroups):
 
     Attributes:
         s3_path: absolute path (starting with '/') inside the bucket, interpreting '/' as the directory separator.
-        bucket_info: dict with name and endpoint of the bucket.
+        connection_info: dict with name and endpoint of the bucket.
     """
-    def __init__(self, config=None, path='/', *, bucket_name=None):
+
+    @property
+    def _path(self):
+        return self.s3_path
+
+    @_path.setter
+    def _path(self, new_path):
+        self.s3_path = new_path
+
+    def __init__(self, config=None, path="/", *, bucket_name=None):
         """
         Establishes connection to a specific 'bucket' of a S3 type object store.
 
@@ -176,6 +188,8 @@ class FileS3IO(HasGroups):
             bucket : ""
             }
         """
+        super().__init__()
+        self._path = path
         self.history = [path]
         if isinstance(config, S3ioConnect):
             self._s3io = config
@@ -209,8 +223,8 @@ class FileS3IO(HasGroups):
         self._s3_path = posixpath.normpath(path)
         if not posixpath.isabs(self._s3_path):
             self._s3_path = "/" + self._s3_path
-        if not self._s3_path[-1] == '/':
-            self._s3_path = self._s3_path + '/'
+        if not self._s3_path[-1] == "/":
+            self._s3_path = self._s3_path + "/"
 
     @property
     def _bucket_path(self):
@@ -223,9 +237,21 @@ class FileS3IO(HasGroups):
         return self._s3_path[1:]
 
     @property
-    def bucket_info(self):
-        return {'bucket_name': self._bucket.name,
-                'endpoint_url': self._s3io.endpoint_url}
+    def connection_info(self):
+        return {
+            "s3_path": self.s3_path,
+            "bucket_name": self._bucket.name,
+            "endpoint_url": self._s3io.endpoint_url,
+        }
+
+    @classmethod
+    def from_dict(cls, connection_dict: dict):
+        path = connection_dict.get('s3_path', '/')
+        config = {
+            'bucket': connection_dict.get('bucket_name', None),
+            'endpoint':  connection_dict.get('endpoint_url', None)
+        }
+        cls(config, path)
 
     def _list_groups(self):
         """
@@ -235,9 +261,9 @@ class FileS3IO(HasGroups):
             list: list of directory names.
         """
         groups = []
-        group_path_len = len(self._bucket_path.split('/')) - 1
+        group_path_len = len(self._bucket_path.split("/")) - 1
         for obj in self._list_objects():
-            rel_obj_path_spl = obj.key.split('/')[group_path_len:]
+            rel_obj_path_spl = obj.key.split("/")[group_path_len:]
             if len(rel_obj_path_spl) > 1:
                 if rel_obj_path_spl[0] not in groups:
                     groups.append(rel_obj_path_spl[0])
@@ -251,8 +277,8 @@ class FileS3IO(HasGroups):
             list: list of file names.
         """
         nodes = []
-        for obj in self._bucket.objects.filter(Prefix=self._bucket_path, Delimiter='/'):
-            nodes.append(obj.key.split('/')[-1])
+        for obj in self._bucket.objects.filter(Prefix=self._bucket_path, Delimiter="/"):
+            nodes.append(obj.key.split("/")[-1])
         return nodes
 
     def _to_abs_bucketpath(self, path):
@@ -276,8 +302,8 @@ class FileS3IO(HasGroups):
             bool: True if path is a directory.
         """
         path = self._to_abs_bucketpath(path)
-        if len(path) > 1 and path[-1] != '/':
-            path = path + '/'
+        if len(path) > 1 and path[-1] != "/":
+            path = path + "/"
         objs = list(self._bucket.objects.filter(Prefix=path))
         return len(objs) > 0
 
@@ -328,30 +354,54 @@ class FileS3IO(HasGroups):
             self.history[0] = "/"
         self._s3_path = self.history[-1]
 
-    def upload(self, files, metadata=None):
+    def validate_metadata(self, metadata, raise_error=True):
+        if metadata is None:
+            return {}
+        elif not isinstance(metadata, dict) and raise_error:
+            raise ValueError(
+                f"Meta data needs to be a dict containing only strings but got type {type(metadata)}."
+            )
+        elif not isinstance(metadata, dict):
+            return None
+        elif not all([isinstance(i, str) for i in metadata]):
+            raise ValueError(f"Meta data only allows keywords of type 'str'.")
+
+    def upload_file(self, files, metadata=None, filenames=None):
         """
         Uploads files into the current group of the S3 object store.
 
         Arguments:
-            files (list/str) : List of filenames/ filename to upload
+            files (list/str) : file / List of files to upload
             metadata (dictionary): metadata of the files (Not nested, only "str" type)
+            filenames (list/str/None): Names the files should get
         """
-        if metadata is None:
-            metadata = {}
 
         if isinstance(files, str):
             files = [files]
 
-        for file in files:
-            [_, filename] = os.path.split(file)
+        if filenames is None:
+            filenames = [os.path.basename(file) for file in files]
+        elif isinstance(filenames, str):
+            filenames = [filenames]
+
+        if isinstance(metadata, list) and len(metadata) != len(files):
+            raise ValueError("length of files and meta data have to match!")
+        elif isinstance(metadata, list):
+            metadata = [self.validate_metadata(data) for data in metadata]
+        else:
+            tmp_metadata = self.validate_metadata(metadata)
+            metadata = [tmp_metadata for _ in filenames]
+
+        if len(filenames) != len(files):
+            raise ValueError("length of files and of filenames have to match!")
+
+        for file, filename, _metadata in zip(files, filenames, metadata):
 
             self._bucket.upload_file(
-                file,
-                self._bucket_path + filename,
-                {"Metadata": metadata}
+                file, self._bucket_path + filename, {"Metadata": _metadata}
             )
 
-    def download(self, files, targetpath="."):
+    def download_file(self, files, targetpath="."):
         """
         Download files from current group to local file system (current directory is default)
 
@@ -420,12 +470,12 @@ class FileS3IO(HasGroups):
             path = self._to_abs_bucketpath(path)
         else:
             raise ValueError("No valid path specified!")
-        if len(path) > 0 and path[-1] != '/':
-            path = path + '/'
+        if len(path) > 0 and path[-1] != "/":
+            path = path + "/"
 
         if filename is not None:
             filename_ = filename
-        elif hasattr(data_obj, 'name'):
+        elif hasattr(data_obj, "name"):
             filename_ = os.path.basename(data_obj.name)
         else:
             raise ValueError("No filename given.")
@@ -444,7 +494,7 @@ class FileS3IO(HasGroups):
         recursively including sub groups.
         """
         for obj in self._bucket.objects.filter(Prefix=self._bucket_path):
-            print(f'/{obj.key} {obj.last_modified} {obj.size} bytes')
+            print(f"/{obj.key} {obj.last_modified} {obj.size} bytes")
 
     def _list_all_files_of_bucket(self):
         return list(self._bucket.objects.all())
@@ -476,7 +526,7 @@ class FileS3IO(HasGroups):
             filelist (list): List containing objects from a bucket.
         """
         for obj in filelist:
-            print(f'/{obj.key} {obj.last_modified} {obj.size} bytes')
+            print(f"/{obj.key} {obj.last_modified} {obj.size} bytes")
 
     def remove_file(self, file):
         """
@@ -489,7 +539,7 @@ class FileS3IO(HasGroups):
             raise ValueError(f"{file} is not a file.")
         file = self._to_abs_bucketpath(file)
         self._bucket.Object(file).delete()
-        #self._remove_object(prefix=file, debug=debug)
+        # self._remove_object(prefix=file, debug=debug)
 
     def remove_group(self, path=None, debug=False):
         """
@@ -515,11 +565,13 @@ class FileS3IO(HasGroups):
             debug(bool): If True, additional information is printed.
         """
         if debug:
-            print(f'\nDeleting all objects with sample prefix {self._bucket.name}/{prefix}.')
+            print(
+                f"\nDeleting all objects with sample prefix {self._bucket.name}/{prefix}."
+            )
         delete_responses = self._bucket.objects.filter(Prefix=prefix).delete()
         if debug:
             for delete_response in delete_responses:
-                for deleted in delete_response['Deleted']:
+                for deleted in delete_response["Deleted"]:
                     print(f'\t Deleted: {deleted["Key"]}')
 
     def __enter__(self):
@@ -527,7 +579,7 @@ class FileS3IO(HasGroups):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """ Compatibility function for the with statement."""
+        """Compatibility function for the with statement."""
         self.close()
 
     def __repr__(self):
@@ -564,10 +616,9 @@ class FileS3IO(HasGroups):
             else:
                 item_abs_lst = (
                     os.path.normpath(os.path.join(self.s3_path, item))
-                        .replace("\\", "/")
-                        .split("/")
+                    .replace("\\", "/")
+                    .split("/")
                 )
                 s3_object = self.copy()
                 s3_object.s3_path = "/".join(item_abs_lst[:-1])
                 return s3_object[item_abs_lst[-1]]
-

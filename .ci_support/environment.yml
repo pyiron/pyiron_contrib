@@ -6,7 +6,7 @@ dependencies:
 - coverage
 - codacy-coverage
 - matplotlib =3.7.1
-- numpy =1.24.2
+- numpy =1.24.3
 - pyiron_base =0.5.36
 - pyiron_atomistics =0.2.66
 - pyparsing =3.0.9
@@ -18,3 +18,4 @@ dependencies:
 - moto =4.1.7
 - pycp2k =0.2.2
 - typeguard =3.0.2
+- aws-sam-translator =1.65.0

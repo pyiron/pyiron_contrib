@@ -305,7 +305,12 @@ class CoscineResource(StorageInterface):
         self._resource.upload(filename, file, _meta_data)
 
     def upload_job(
-        self, job: pyiron_base.GenericJob, form=None, update_form=False, dois=None
+        self,
+        job: pyiron_base.GenericJob,
+        form=None,
+        update_form=False,
+        dois=None,
+        upload_working_dir=False,
     ):
         """Upload a pyiron job to this CoScInE resource
 
@@ -314,6 +319,7 @@ class CoscineResource(StorageInterface):
             form: optional metadata form, required if the metadata mapping between job and resource type is unknown.
             update_form(bool): If true update given form, else use as is.
             dois(str): Optional DOI of papers from this data, overwrites doi in form!
+            upload_working_dir(bool): It true, compress and upload working directory.
         """
         job_file = job.project_hdf5.file_name
 
@@ -326,24 +332,54 @@ class CoscineResource(StorageInterface):
             form["DOIs"] = dois
 
         self.upload_file(job_file, form)
+        if upload_working_dir:
+            if not job.is_compressed():
+                job.compress()
+            self.upload_file(
+                os.path.join(job.working_directory, job.job_name + ".tar.bz2"), form
+            )
 
-    def load_job(self, project, name):
+    def load_job(self, project, name: str, download_working_dir=False):
         """Load job using the provided project instance.
 
         Careful, this job is not saved, and if it is, it would not be in the database!
 
         Args:
             project: a pyiron Project instance
-            name: the name of the file to load
+            name: the name of the job to load
         """
-        file = self[name]
+
+        if name.endswith(".h5"):
+            job_name = name[:-3]
+        elif name.endswith(".tar.bz2"):
+            job_name = name[:-8]
+        else:
+            job_name = name
+
+        hdf_name = job_name + ".h5"
+        tar_name = job_name + ".tar.bz2"
+        if hdf_name not in self.list_nodes():
+            raise ValueError(f"No such job {job_name} found.")
+
+        file = self[hdf_name]
         file_data = file.data
         if isinstance(file._data, str):
             path = "/" + file_data.keys()[0]
             job = ProjectHDFio(project, file._data, path).to_object()
+            if download_working_dir and tar_name in self.list_nodes():
+                job_file = file._data
+                wd = os.path.dirname(file._data)
+                tar_file = self[tar_name]
+                tar_file.download(wd)
+                os.rename(
+                    os.path.join(wd, tar_name),
+                    os.path.join(wd, job_file.replace(".h5", ".tar.bz2")),
+                )
             return job
         else:
-            raise ValueError(f"{name} does not seem to be a pyiron job hdf file!")
+            raise ValueError(
+                f"{name} does not seem to be a pyiron job or job related file!"
+            )
 
     def _get_one_file_obj(self, item, error_msg) -> Union[coscine.FileObject, None]:
         if item not in self.list_nodes():

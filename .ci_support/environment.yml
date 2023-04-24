@@ -14,7 +14,7 @@ dependencies:
 - seaborn =0.12.2
 - scikit-image =0.20.0
 - randspg =0.0.1
-- boto3 =1.26.114
+- boto3 =1.26.118
 - moto =4.1.7
 - pycp2k =0.2.2
 - typeguard =3.0.2

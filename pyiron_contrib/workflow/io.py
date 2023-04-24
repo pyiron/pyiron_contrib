@@ -1,13 +1,17 @@
 from __future__ import annotations
 
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 
-from pyiron_contrib.workflow.channels import Channel, InputChannel, OutputChannel
+from pyiron_contrib.workflow.channels import (
+    Channel,
+    DataChannel, InputData, OutputData,
+    SignalChannel, InputSignal, OutputSignal
+)
 from pyiron_contrib.workflow.has_to_dict import HasToDict
 from pyiron_contrib.workflow.util import DotDict
 
 
-class IO(HasToDict):
+class IO(HasToDict, ABC):
     """
     IO is a convenience layer for holding and accessing multiple input/output channels.
     It allows key and dot-based access to the underlying channels based on their name.
@@ -45,17 +49,18 @@ class IO(HasToDict):
     def _channel_class(self) -> Channel:
         pass
 
+    @abstractmethod
+    def _set_existing(self, key, value):
+        pass
+
     def __getattr__(self, item):
         return self.channel_dict[item]
 
     def __setattr__(self, key, value):
-        if key in ["channel_dict", "channel_list"]:
+        if key in ["channel_dict"]:
             super().__setattr__(key, value)
         elif key in self.channel_dict.keys():
-            if isinstance(value, Channel):
-                self.channel_dict[key].connect(value)
-            else:
-                self.channel_dict[key].update(value)
+            self._set_existing(key, value)
         elif isinstance(value, self._channel_class):
             if key != value.label:
                 raise ValueError(
@@ -75,9 +80,6 @@ class IO(HasToDict):
     def __setitem__(self, key, value):
         self.__setattr__(key, value)
 
-    def to_value_dict(self):
-        return {label: channel.value for label, channel in self.channel_dict.items()}
-
     @property
     def connected(self):
         return any([c.connected for c in self])
@@ -90,10 +92,6 @@ class IO(HasToDict):
         for c in self:
             c.disconnect_all()
 
-    def set_storage_priority(self, priority: int):
-        for c in self:
-            c.storage_priority = priority
-
     @property
     def labels(self):
         return list(self.channel_dict.keys())
@@ -104,27 +102,46 @@ class IO(HasToDict):
     def __len__(self):
         return len(self.channel_dict)
 
-    @property
-    def ready(self):
-        return all([c.ready for c in self])
+    def __dir__(self):
+        return set(super().__dir__() + self.labels)
 
     def to_dict(self):
         return {
-            "label": "inputs",
-            "ready": self.ready,
+            "label": self.__class__.__name__,
             "connected": self.connected,
             "fully_connected": self.fully_connected,
             "channels": {l: c.to_dict() for l, c in self.channel_dict.items()}
         }
 
-    def __dir__(self):
-        return set(super().__dir__() + self.labels)
 
+class DataIO(IO, ABC):
+    def _set_existing(self, key, value):
+        if isinstance(value, DataChannel):
+            self.channel_dict[key].connect(value)
+        else:
+            self.channel_dict[key].update(value)
 
-class Inputs(IO):
+    def to_value_dict(self):
+        return {label: channel.value for label, channel in self.channel_dict.items()}
+
     @property
-    def _channel_class(self) -> InputChannel:
-        return InputChannel
+    def ready(self):
+        return all([c.ready for c in self])
+
+    def set_storage_priority(self, priority: int):
+        for c in self:
+            c.storage_priority = priority
+
+    def to_dict(self):
+        d = super().to_dict()
+        d["ready"] = self.ready
+        return d
+
+
+class Inputs(DataIO):
+    @property
+    def _channel_class(self) -> InputData:
+        return InputData
 
     def activate_strict_connections(self):
         [c.activate_strict_connections() for c in self]
@@ -133,7 +150,55 @@ class Inputs(IO):
         [c.deactivate_strict_connections() for c in self]
 
 
-class Outputs(IO):
+class Outputs(DataIO):
     @property
-    def _channel_class(self) -> OutputChannel:
-        return OutputChannel
+    def _channel_class(self) -> OutputData:
+        return OutputData
+
+
+class SignalIO(IO, ABC):
+    def _set_existing(self, key, value):
+        if isinstance(value, SignalChannel):
+            self.channel_dict[key].connect(value)
+        else:
+            raise TypeError(
+                f"Tried to assign {value} ({type(value)} to the {key}, which is already"
+                f" a {type(self.channel_dict[key])}. Only other signal channels may be "
+                f"connected in this way."
+            )
+
+
+class InputSignals(SignalIO):
+    @property
+    def _channel_class(self) -> InputSignal:
+        return InputSignal
+
+
+class OutputSignals(SignalIO):
+    @property
+    def _channel_class(self) -> OutputSignal:
+        return OutputSignal
+
+
+class Signals:
+    def __init__(self):
+        self.input = InputSignals()
+        self.output = OutputSignals()
+
+    def disconnect(self):
+        self.input.disconnect()
+        self.output.disconnect()
+
+    @property
+    def connected(self):
+        return self.input.connected or self.output.connected
+
+    @property
+    def fully_connected(self):
+        return self.input.fully_connected and self.output.fully_connected
+
+    def to_dict(self):
+        return {
+            "input": self.input.to_dict(),
+            "output": self.output.to_dict(),
+        }

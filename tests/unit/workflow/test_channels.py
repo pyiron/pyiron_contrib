@@ -1,24 +1,29 @@
 from unittest import TestCase, skipUnless
 from sys import version_info
 
-from pyiron_contrib.workflow.channels import InputChannel, OutputChannel
+from pyiron_contrib.workflow.channels import (
+    InputData, OutputData, InputSignal, OutputSignal
+)
 
 
 class DummyNode:
+    def __init__(self):
+        self.foo = [0]
+
     def update(self):
-        pass
+        self.foo.append(self.foo[-1] + 1)
 
 
 @skipUnless(version_info[0] == 3 and version_info[1] >= 10, "Only supported for 3.10+")
-class TestChannels(TestCase):
+class TestDataChannels(TestCase):
 
     def setUp(self) -> None:
-        self.ni1 = InputChannel(label="numeric", node=DummyNode(), default=1, type_hint=int | float)
-        self.ni2 = InputChannel(label="numeric", node=DummyNode(), default=1, type_hint=int | float)
-        self.no = OutputChannel(label="numeric", node=DummyNode(), default=0, type_hint=int | float)
+        self.ni1 = InputData(label="numeric", node=DummyNode(), default=1, type_hint=int | float)
+        self.ni2 = InputData(label="numeric", node=DummyNode(), default=1, type_hint=int | float)
+        self.no = OutputData(label="numeric", node=DummyNode(), default=0, type_hint=int | float)
 
-        self.so1 = OutputChannel(label="list", node=DummyNode(), default=["foo"], type_hint=list)
-        self.so2 = OutputChannel(label="list", node=DummyNode(), default=["foo"], type_hint=list)
+        self.so1 = OutputData(label="list", node=DummyNode(), default=["foo"], type_hint=list)
+        self.so2 = OutputData(label="list", node=DummyNode(), default=["foo"], type_hint=list)
 
     def test_mutable_defaults(self):
         self.so1.default.append("bar")
@@ -107,3 +112,38 @@ class TestChannels(TestCase):
                 inp.value,
                 msg="Value should have been passed downstream"
             )
+
+
+class TestSignalChannels(TestCase):
+    def setUp(self) -> None:
+        node = DummyNode()
+        self.inp = InputSignal(label="inp", node=node, callback=node.update)
+        self.out = OutputSignal(label="out", node=DummyNode())
+
+    def test_connections(self):
+        with self.subTest("Good connection"):
+            self.inp.connect(self.out)
+            self.assertEqual(self.inp.connections, [self.out])
+            self.assertEqual(self.out.connections, [self.inp])
+
+        with self.subTest("Ignore repeated connection"):
+            self.out.connect(self.inp)
+            self.assertEqual(len(self.inp), 1)
+            self.assertEqual(len(self.out), 1)
+
+        with self.subTest("Check disconnection"):
+            self.out.disconnect_all()
+            self.assertEqual(len(self.inp), 0)
+            self.assertEqual(len(self.out), 0)
+
+        with self.subTest("No connections to non-SignalChannels"):
+            bad = InputData(label="numeric", node=DummyNode(), default=1, type_hint=int)
+            with self.assertRaises(TypeError):
+                self.inp.connect(bad)
+
+    def test_calls(self):
+        self.out.connect(self.inp)
+        self.out()
+        self.assertListEqual(self.inp.node.foo, [0, 1])
+        self.inp()
+        self.assertListEqual(self.inp.node.foo, [0, 1, 2])

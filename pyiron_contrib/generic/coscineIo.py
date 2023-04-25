@@ -631,7 +631,7 @@ class CoscineProject(HasGroups):
         if key in self.list_groups() and self._project is not None:
             try:
                 return self.__class__(
-                    self._project.subproject(display_name=key), parent_path=self.path
+                    self._project.subproject(display_name=key), parent_path=self._path
                 )
             except IndexError:
                 warnings.warn("More than one project matches - returning first match!")

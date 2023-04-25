@@ -563,7 +563,10 @@ class CoscineProject(HasGroups):
         project(coscine.project/coscine.client/str/None):
         parent_path
         """
-        parent_path = [] if parent_path is None else parent_path
+        if parent_path is None:
+            parent_path = []
+        elif isinstance(parent_path, str):
+            parent_path = [parent_path]
         self._path = None
         self._client, self._project = CoscineConnect.get_client_and_object(project)
         if self._project is not None:
@@ -628,7 +631,7 @@ class CoscineProject(HasGroups):
         if key in self.list_groups() and self._project is not None:
             try:
                 return self.__class__(
-                    self._project.subproject(display_name=key), parent_path=self.path
+                    self._project.subproject(display_name=key), parent_path=self._path
                 )
             except IndexError:
                 warnings.warn("More than one project matches - returning first match!")

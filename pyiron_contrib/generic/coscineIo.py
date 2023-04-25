@@ -563,7 +563,10 @@ class CoscineProject(HasGroups):
         project(coscine.project/coscine.client/str/None):
         parent_path
         """
-        parent_path = [] if parent_path is None else parent_path
+        if parent_path is None:
+            parent_path = []
+        elif isinstance(parent_path, str):
+            parent_path = [parent_path]
         self._path = None
         self._client, self._project = CoscineConnect.get_client_and_object(project)
         if self._project is not None:

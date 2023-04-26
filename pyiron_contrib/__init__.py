@@ -10,6 +10,9 @@ except:
 	from pyiron_base import Project
 
 from pyiron_base import JOB_CLASS_DICT
+from pyiron_contrib.generic.storage_interface_toolkit import StorageInterfaceFactory
+
+Project.register_tools('storage_interface', StorageInterfaceFactory)
 
 # Make classes available for new pyiron version
 JOB_CLASS_DICT['ProtoMinimGradDes'] = 'pyiron_contrib.protocol.compound.minimize'
@@ -44,12 +47,22 @@ JOB_CLASS_DICT['MlipJob'] = 'pyiron_contrib.atomistics.mlip.mlipjob'
 JOB_CLASS_DICT['Atomicrex'] = 'pyiron_contrib.atomistics.atomicrex.atomicrex_job'
 JOB_CLASS_DICT['StructureMasterInt'] = 'pyiron_contrib.atomistics.atomistics.job.structurelistmasterinteractive'
 JOB_CLASS_DICT['StorageJob'] = 'pyiron_contrib.RDM.storagejob'
+JOB_CLASS_DICT['MlipDescriptors'] = 'pyiron_contrib.atomistics.mlip.mlipdescriptors'
 JOB_CLASS_DICT['PacemakerJob'] = 'pyiron_contrib.atomistics.pacemaker.job'
 JOB_CLASS_DICT['MeamFit'] = 'pyiron_contrib.atomistics.meamfit.meamfit'
 JOB_CLASS_DICT['Cp2kJob'] = 'pyiron_contrib.atomistics.cp2k.job'
 JOB_CLASS_DICT['PiMD'] = 'pyiron_contrib.atomistics.ipi.ipi_jobs'
 JOB_CLASS_DICT['GleMD'] = 'pyiron_contrib.atomistics.ipi.ipi_jobs'
 JOB_CLASS_DICT['PigletMD'] = 'pyiron_contrib.atomistics.ipi.ipi_jobs'
+JOB_CLASS_DICT['LammpsInteractiveWithoutOutput'] = 'pyiron_contrib.nofiles.lammps'
+JOB_CLASS_DICT['SQSJobWithoutOutput'] = 'pyiron_contrib.nofiles.sqs'
+JOB_CLASS_DICT['ElasticMatrixJobWithoutFiles'] = 'pyiron_contrib.nofiles.elastic'
+JOB_CLASS_DICT['MurnaghanWithoutFiles'] = 'pyiron_contrib.nofiles.murn'
+JOB_CLASS_DICT['PhonopyJobWithoutFiles'] = 'pyiron_contrib.nofiles.phonopy'
+JOB_CLASS_DICT['SQSMasterMPI'] = 'pyiron_contrib.nofiles.master'
+JOB_CLASS_DICT['LAMMPSMinimizeMPI'] = 'pyiron_contrib.nofiles.master'
+JOB_CLASS_DICT['LAMMPSElasticMPI'] = 'pyiron_contrib.nofiles.master'
+JOB_CLASS_DICT['LAMMPSMinimizeElasticMPI'] = 'pyiron_contrib.nofiles.master'
 
 
 from ._version import get_versions

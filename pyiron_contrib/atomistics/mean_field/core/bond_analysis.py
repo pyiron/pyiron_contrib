@@ -622,7 +622,7 @@ class MDBondAnalysis(_BondAnalysisParent):
             raise ValueError("choose between long, t1, and t2")
 
     def _get_correlations(self, shell, bond_x, bond_y, axis_x, axis_y, n_bins):
-        per_shell_r_t1_t2_bond_vectors = self.get_l_t1_t2_bond_vectors()
+        per_shell_r_t1_t2_bond_vectors = self.get_r_t1_t2_bond_vectors()
         all_bonds = per_shell_r_t1_t2_bond_vectors[shell]
         n_bonds = len(all_bonds)
         if (bond_x >= n_bonds) or (bond_y >= n_bonds):
@@ -635,8 +635,8 @@ class MDBondAnalysis(_BondAnalysisParent):
     def get_mutual_information(self, shell=0, bond_x=0, bond_y=0, axis_x='long', axis_y='long', n_bins=101):
         rho_corr, rho_uncorr, _, _ = self._get_correlations(shell=shell, bond_x=bond_x, bond_y=bond_y, axis_x=axis_x,
                                                             axis_y=axis_y, n_bins=n_bins)
-        sel = (rho_uncorr > 0.0) * (rho_corr > 0.0)
-        return -(np.log((rho_corr[sel]) / rho_uncorr[sel]) * rho_uncorr[sel]).sum()
+        sel = (rho_uncorr>0.0)*(rho_corr>0.0)
+        return np.sum(rho_corr[sel]*np.log(rho_corr[sel]/rho_uncorr[sel]))
 
     def plot_correlations(self, shell=0, bond_x=0, bond_y=0, axis_x='long', axis_y='long', n_bins=101):
         rho_corr, rho_uncorr, x_edges, y_edges = self._get_correlations(shell=shell, bond_x=bond_x,

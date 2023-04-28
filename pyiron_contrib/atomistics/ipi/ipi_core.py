@@ -190,7 +190,7 @@ class IPiCore(LammpsInteractive):
         f.close()
         return np.array([float(i) for i in rdf_r]), np.array([float(i) for i in rdf_g_r])
 
-    def get_rdf(self, r_min=2., r_max=5., bins=100, thermalize=50):
+    def get_rdf(self, r_min=2., r_max=5., bins=100, thermalize=0):
         self.decompress()
         rdf_list = [self.working_directory + '/./run_rdf.sh',
                     self.working_directory,

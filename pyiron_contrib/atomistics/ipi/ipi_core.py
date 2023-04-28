@@ -137,24 +137,47 @@ class IPiCore(LammpsInteractive):
         self.custom_output.pressure = np.array([float(i) for i in pressure])
         self.custom_output.energy_tot = self.custom_output.energy_pot + self.custom_output.energy_kin
 
-    def collect_cells(self):
-        digits = "{0:0" + str(len(str(self.custom_input.n_beads))) + "}"
-        f = open(self.working_directory + '/ipi_out.pos_' + digits.format(0) + '.xyz')
+    @staticmethod
+    def _collect_traj_helper(filename):
+        f = open(filename)
         lines = f.readlines()
+        starts = []
+        for i, x in enumerate(lines):
+            if x.startswith("#"):
+                starts.append(i)
+        starts.append(len(lines) + 1)
         abc = []
         ABC = []
-        for x in lines:
-            if x.startswith("#"):
-                split_line = x.split()
-                abc.append([float(i) for i in split_line[2:5]])
-                ABC.append([float(i) for i in split_line[5:8]])
+        traj = []
+        start = starts[0]
+        for stop in starts[1:]:
+            temp_list = []
+            snap_lines = lines[start:stop - 1]
+            for i, l in enumerate(snap_lines):
+                split_l = l.split()
+                if i != 0:
+                    temp_list.append([float(j) for j in split_l[1:]])
+                else:
+                    abc.append([float(j) for j in split_l[2:5]])
+                    ABC.append([float(j) for j in split_l[5:8]])
+            start = stop
+            traj.append(temp_list)
         f.close()
-        self.custom_output.cell_abc = np.array(abc)
-        self.custom_output.cell_ABC = np.array(ABC)
+        return np.array(abc), np.array(ABC), np.array(traj)
+
+    def collect_trajectory(self):
+        #digits = "{0:0" + str(len(str(self.custom_input.n_beads))) + "}"
+        #f = open(self.working_directory + '/ipi_out.pos_' + digits.format(0) + '.xyz')
+        positions_out = self._collect_traj_helper(self.working_directory + '/ipi_out.pos.xyz')
+        forces_out = self._collect_traj_helper(self.working_directory + '/ipi_out.for.xyz')
+        self.custom_output.cell_abc = np.array(positions_out[0])
+        self.custom_output.cell_ABC = np.array(positions_out[1])
+        self.custom_output.positions = np.array(positions_out[2])
+        self.custom_output.forces = np.array(forces_out[2])
 
     def collect_output(self):
         self.collect_props()
-        self.collect_cells()
+        self.collect_trajectory()
 
     def collect_rdf(self):
         f=open(self.working_directory + '/ipi_out.AlAl.rdf.dat', "r")

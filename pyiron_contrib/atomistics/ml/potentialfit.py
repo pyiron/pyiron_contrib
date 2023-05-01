@@ -146,14 +146,14 @@ class PotentialPlots:
         low  = de.min()
 
         ax = plt.gca()
-        trafo = ax.get_xaxis_transform(),
+        trafo = ax.get_xaxis_transform()
         def annotated_vline(x, text, linestyle='--'):
             plt.axvline(x, color='k', linestyle=linestyle)
             plt.text(
                     x=x, y=0.5, s=text,
                     transform=trafo,
                     rotation='vertical',
-                    horizontal_alignment='center',
+                    horizontalalignment='center',
                     path_effects=[withStroke(linewidth=4, foreground='w')],
             )
 

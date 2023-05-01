@@ -156,7 +156,7 @@ class TestS3IO(unittest.TestCase):
 
     def test_download(self):
         self.assertFalse(os.path.exists(self.current_dir + '/any'))
-        self.s3io.download(['any'], self.current_dir)
+        self.s3io.download_file(['any'], self.current_dir)
         with open(os.path.join(self.current_dir, 'any')) as f:
             self.assertEqual(f.read(), 'any text')
         os.remove(self.current_dir + '/any')
@@ -193,7 +193,7 @@ class TestS3IO(unittest.TestCase):
 
     def test_upload(self):
         file = self.current_dir + '/some_file.txt'
-        self.s3io_io.upload([file])
+        self.s3io_io.upload_file([file])
         self.assertTrue(self.s3io_io.is_file('some_file.txt'))
         self.assertEqual(self.s3io_io.get_s3_object('some_file.txt')['Body'].read().decode('utf8'), 'text')
 

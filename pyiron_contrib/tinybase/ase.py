@@ -19,8 +19,8 @@ from ase.optimize.fire import FIRE
 from ase.optimize.gpmin.gpmin import GPMin
 
 
-AseInput = AbstractInput.from_attributes('AseInput', 'calculator')
-
+class AseInput(AbstractInput):
+    calculator = StorageAttribute()
 
 class AseStaticInput(AseInput, StructureInput):
     pass

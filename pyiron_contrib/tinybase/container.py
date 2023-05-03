@@ -8,6 +8,7 @@ from pyiron_contrib.tinybase.storage import HasHDFAdapaterMixin
 from pyiron_base.interfaces.object import HasStorage
 from pyiron_atomistics.atomistics.structure.has_structure import HasStructure
 
+from ase import Atoms
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -137,34 +138,28 @@ class AbstractInput(AbstractContainer, abc.ABC):
     def check_ready(self):
         return True
 
-StructureInput = AbstractInput.from_attributes("StructureInput", "structure")
+class StructureInput(AbstractInput):
+    structure = StorageAttribute().type(Atoms)
 
-MDInput = AbstractInput.from_attributes(
-        "MDInput",
-        "steps",
-        "timestep",
-        "temperature",
-        "output_steps",
-)
+class MDInput(AbstractInput):
+    steps = StorageAttribute().type(int)
+    timestep = StorageAttribute().type(float)
+    temperature = StorageAttribute().type(float)
+    output_steps = StorageAttribute().type(int)
 
 
 class AbstractOutput(AbstractContainer, abc.ABC):
     pass
 
-EnergyOutput = AbstractOutput.from_attributes(
-        "EnergyOutput",
-        "energy_pot",
-)
+class EnergyOutput(AbstractOutput):
+    energy_pot = StorageAttribute().type(float)
 
-MDOutputBase = AbstractOutput.from_attributes(
-        "MDOutputBase",
-        pot_energies=list,
-        kin_energies=list,
-        forces=list,
-        structures=list,
-)
+class MDOutput(HasStructure, EnergyOutput):
 
-class MDOutput(HasStructure, MDOutputBase, EnergyOutput):
+    pot_energies = StorageAttribute().type(list)
+    kin_energies = StorageAttribute().type(list)
+    forces = StorageAttribute().type(list)
+    structures = StorageAttribute().type(list)
 
     def plot_energies(self):
         plt.plot(self.pot_energies - np.min(self.pot_energies), label='pot')

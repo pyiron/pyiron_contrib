@@ -1,6 +1,7 @@
 from pyiron_contrib.tinybase.container import (
             AbstractOutput,
             StructureInput,
+            StorageAttribute
 )
 from pyiron_contrib.tinybase.task import (
             AbstractTask,
@@ -18,13 +19,10 @@ import scipy.optimize as so
 
 from pyiron_atomistics.atomistics.structure.has_structure import HasStructure
 
-MurnaghanInputBase = StructureInput.from_attributes(
-        "MurnaghanInputBase",
-        "strains",
-        "task"
-)
+class MurnaghanInput(StructureInput, ListInput):
+    strains = StorageAttribute()
+    task = StorageAttribute()
 
-class MurnaghanInput(MurnaghanInputBase, ListInput):
     def check_ready(self):
         structure_ready = self.structure is not None
         strain_ready = len(self.strains) > 0
@@ -45,14 +43,11 @@ class MurnaghanInput(MurnaghanInputBase, ListInput):
             tasks.append(n)
         return tasks
 
-MurnaghanOutputBase = AbstractOutput.from_attributes(
-        "MurnaghanOutputBase",
-        'base_structure',
-        volumes=list,
-        energies=list
-)
+class MurnaghanOutput(AbstractOutput, HasStructure):
+    base_structures = StorageAttribute()
+    volumes = StorageAttribute().type(list)
+    energies = StorageAttribute().type(list)
 
-class MurnaghanOutput(MurnaghanOutputBase, HasStructure):
     def plot(self):
         plt.plot(self.volumes, self.energies)
 

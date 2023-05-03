@@ -150,8 +150,13 @@ class TaskGenerator(AbstractTask, abc.ABC):
 # TaskGenerator.register(AbstractTask)
 # assert 
 
-FunctionInput = AbstractInput.from_attributes("FunctionInput", args=list, kwargs=dict)
-FunctionOutput = AbstractOutput.from_attributes("FunctionOutput", "result")
+class FunctionInput(AbstractInput):
+    args = StorageAttribute().type(list).default(list)
+    kwargs = StorageAttribute().type(dict).default(dict)
+
+class FunctionOutput(AbstractOutput):
+    result = StorageAttribute()
+
 class FunctionTask(AbstractTask):
     """
     A task that wraps a generic function.

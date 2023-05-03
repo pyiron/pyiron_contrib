@@ -68,6 +68,9 @@ class ProjectInterface(abc.ABC):
             pr = self.open_location(entry.project)
         pr.remove_storage(entry.name)
 
+    #TODO: 
+    # def copy_to/move_to across types of ProjectInterface
+
 
 class ProjectAdapter(ProjectInterface):
 

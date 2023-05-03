@@ -119,14 +119,18 @@ class AbstractContainer(HasStorage, HasHDFAdapaterMixin, abc.ABC):
         T.__module__ = module
         return T
 
-    def transfer(self, other):
-        """
-        Copy the contents of another 
-        """
-        if isinstance(self, other.__class__):
-            self.storage.update(other.storage)
-        else:
+    def take(self, other: 'AbstractContainer'):
+        # TODO: think hard about variance of types
+        if not isinstance(self, type(other)):
             raise TypeError("Must pass a superclass to transfer from!")
+
+        mro_iter = {k: v for c in type(other).__mro__ for k, v in c.__dict__.items()}
+        for name, attr in mro_iter.items():
+            if isinstance(attr, StorageAttribute):
+                setattr(self, name, getattr(other, name))
+
+    def put(self, other: 'AbstractContainer'):
+        other.take(self)
 
 
 class AbstractInput(AbstractContainer, abc.ABC):

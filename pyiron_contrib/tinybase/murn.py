@@ -4,7 +4,7 @@ from pyiron_contrib.tinybase.container import (
 )
 from pyiron_contrib.tinybase.task import (
             AbstractTask,
-            ListTask,
+            ListTaskGenerator,
             ListInput,
             ReturnStatus
 )
@@ -69,19 +69,17 @@ class MurnaghanOutput(MurnaghanOutputBase, HasStructure):
         s.set_cell(s.get_cell() * (self.equilibrium_volume/s.get_volume())**(1/3))
         return s
 
-class MurnaghanTask(ListTask):
+class MurnaghanTask(ListTaskGenerator):
 
     def _get_input(self):
         return MurnaghanInput()
 
     def _get_output(self):
-        return MurnaghanOutput()
+        out = MurnaghanOutput()
+        out.base_structure = self.input.structure
+        return out
 
-    def _execute(self, output):
-        output.base_structure = self.input.structure
-        return super()._execute(output)
-
-    def _extract_output(self, output, step, node, ret, node_output):
+    def _extract_output(self, output, step, task, ret, task_output):
         if len(output.energies) == 0:
             output.energies = np.zeros(len(self.input.strains))
         if len(output.volumes) == 0:

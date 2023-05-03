@@ -46,9 +46,9 @@ class TinyJob(Storable, abc.ABC):
     """
 
     _executors = {
-            'foreground': Executor,
-            'background': BackgroundExecutor,
-            'process': ProcessExecutor
+            'foreground': Executor(),
+            'background': BackgroundExecutor(max_threads=4),
+            'process': ProcessExecutor(max_processes=4)
     }
 
     def __init__(self, project: ProjectInterface, job_name: str):
@@ -157,7 +157,7 @@ class TinyJob(Storable, abc.ABC):
             :class:`.Executor`: the executor that is running the task or nothing.
         """
         if self._id is None or self.project.database.get_item(self.id).status == "ready":
-            exe = self._executor = self._executors[how](tasks=[self.task])
+            exe = self._executor = self._executors[how].submit(tasks=[self.task])
             self._setup_executor_callbacks()
             exe.run()
             return exe

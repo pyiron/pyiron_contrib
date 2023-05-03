@@ -1,17 +1,12 @@
 import abc
 from copy import deepcopy
 import enum
-from typing import Optional, Callable
+from typing import Optional, Callable, List, Generator, Tuple
 
 from pyiron_base.interfaces.object import HasStorage
 
 from pyiron_contrib.tinybase.storage import Storable, pickle_dump
 from .container import AbstractInput, AbstractOutput, StorageAttribute
-from .executor import (
-        Executor,
-        BackgroundExecutor,
-        ProcessExecutor
-)
 
 class ReturnStatus:
     """
@@ -46,12 +41,6 @@ class AbstractTask(Storable, abc.ABC):
     Subclasses must implement :meth:`._get_input()`, :meth:`._get_output()` and :meth:`._execute()` and generally supply
     their own :class:`.AbstractInput` and :class:`.AbstractOutput`.
     """
-
-    _executors = {
-            'foreground': Executor,
-            'background': BackgroundExecutor,
-            'process': ProcessExecutor
-    }
 
     def __init__(self):
         self._input = None
@@ -98,7 +87,7 @@ class AbstractTask(Storable, abc.ABC):
         """
         pass
 
-    def execute(self) -> ReturnStatus:
+    def execute(self) -> Tuple[ReturnStatus, AbstractOutput]:
         output = self._get_output()
         try:
             ret = self._execute(output)
@@ -108,10 +97,14 @@ class AbstractTask(Storable, abc.ABC):
             ret = ReturnStatus("aborted", msg=e)
         return ret, output
 
-    def run(self, how='foreground'):
-        exe = self._executors[how](tasks=[self])
-        exe.run()
-        return exe
+    # TaskIterator Impl'
+    def __iter__(self) -> Generator[
+            List['Task'],
+            List[Tuple[ReturnStatus, AbstractOutput]],
+            Tuple[ReturnStatus, AbstractOutput]
+    ]:
+        ret, *_ = yield [self]
+        return ret
 
     # Storable Impl'
     # We might even avoid this by deriving from HasStorage and put _input in there
@@ -125,6 +118,37 @@ class AbstractTask(Storable, abc.ABC):
         task = cls()
         task._input = pickle_load(storage["input"])
         return task
+
+class TaskGenerator(AbstractTask, abc.ABC):
+    """
+    A generator that yields collections of tasks that can be executed in
+    parallel.
+
+    In each iteration it will yield a list of tasks and accept a list of their
+    return status and outputs for the next iteration.  When it is done, it will
+    return a final return status and output.
+    """
+
+    @abc.abstractmethod
+    def __iter__(self) -> Generator[List['Task'],
+                                    List[Tuple[ReturnStatus, AbstractOutput]],
+                                    Tuple[ReturnStatus, AbstractOutput]]:
+        pass
+
+    def _execute(self, output):
+        gen = iter(self)
+        tasks = next(gen)
+        while True:
+            ret = [t.execute() for t in tasks]
+            try:
+                tasks = gen.send(ret)
+            except StopIteration as stop:
+                ret, out = stop.args[0]
+                output.take(out)
+                return ret
+
+# TaskGenerator.register(AbstractTask)
+# assert 
 
 FunctionInput = AbstractInput.from_attributes("FunctionInput", args=list, kwargs=dict)
 FunctionOutput = AbstractOutput.from_attributes("FunctionOutput", "result")
@@ -149,16 +173,11 @@ class FunctionTask(AbstractTask):
     def _execute(self, output):
         output.result = self._function(*self.input.args, **self.input.kwargs)
 
-MasterInput = AbstractInput.from_attributes(
-        "MasterInput",
-        child_executor=lambda: Executor
-)
-
-class ListInput(MasterInput, abc.ABC):
+class ListInput(abc.ABC):
     """
-    The input of :class:`.ListNode`.
+    The input of :class:`.ListTaskGenerator`.
 
-    To use it overload :meth:`._create_tasks()` here and subclass :class:`.ListNode` as well.
+    To use it overload :meth:`._create_tasks()` here and subclass :class:`.ListTaskGenerator` as well.
     """
 
     @abc.abstractmethod
@@ -170,7 +189,7 @@ class ListInput(MasterInput, abc.ABC):
         """
         pass
 
-class ListTask(AbstractTask, abc.ABC):
+class ListTaskGenerator(TaskGenerator, abc.ABC):
     """
     A task that executes other tasks in parallel.
 
@@ -179,6 +198,9 @@ class ListTask(AbstractTask, abc.ABC):
 
     def __init__(self):
         super().__init__()
+
+    def _get_input(self):
+        return ListInput()
 
     @abc.abstractmethod
     def _extract_output(self, output, step, task, ret, task_output):
@@ -195,22 +217,18 @@ class ListTask(AbstractTask, abc.ABC):
         """
         pass
 
-    def _execute(self, output):
+    def __iter__(self):
         tasks = self.input._create_tasks()
-        exe = self.input.child_executor(tasks)
-        exe.run()
-        exe.wait()
+        returns, outputs = zip(*(yield tasks))
 
-        for i, (task, ret, task_output) in enumerate(zip(tasks, exe.status, exe.output)):
+        output = self._get_output()
+        for i, (task, ret, task_output) in enumerate(zip(tasks, returns, outputs)):
             self._extract_output(output, i, task, ret, task_output)
 
-SeriesInputBase = AbstractInput.from_attributes(
-        "SeriesInputBase",
-        tasks=list,
-        connections=list
-)
+        return ReturnStatus("done"), output
 
-class SeriesInput(SeriesInputBase, MasterInput):
+
+class SeriesInput(AbstractInput):
     """
     Keeps a list of tasks and their connection functions to run sequentially.
 
@@ -224,6 +242,10 @@ class SeriesInput(SeriesInputBase, MasterInput):
     ...     input.my_param = output.my_result
     >>> task.input.first(MyNode()).then(MyNode(), transfer)
     """
+
+    tasks = StorageAttribute().type(list)
+    connections = StorageAttribute().type(list)
+
     def check_ready(self):
         return len(self.tasks) == len(connections) + 1
 
@@ -258,7 +280,7 @@ class SeriesInput(SeriesInputBase, MasterInput):
         self.connections.append(connection)
         return self
 
-class SeriesTask(AbstractTask):
+class SeriesTask(TaskGenerator):
     """
     Executes a series of tasks sequentially.
 
@@ -272,32 +294,19 @@ class SeriesTask(AbstractTask):
     def _get_output(self):
         return self.input.tasks[-1]._get_output()
 
-    def _execute(self, output):
-        Exe = self.input.child_executor
-
-        exe = Exe(self.input.tasks[:1])
-        exe.run()
-        exe.wait()
-        ret = exe.status[0]
+    def __iter__(self):
+        (ret, out), *_ = yield [self.input.tasks[0]]
         if not ret.is_done():
-            return ReturnStatus("aborted", ret)
+            return ReturnStatus("aborted", ret), None
 
         for task, connection in zip(self.input.tasks[1:], self.input.connections):
-            connection(task.input, exe.output[0])
-            exe = Exe([task])
-            exe.run()
-            exe.wait()
-            ret = exe.status[0]
+            connection(task.input, out)
+            (ret, out), *_ = yield [self.input.tasks[0]]
             if not ret.is_done():
-                return ReturnStatus("aborted", ret)
+                return ReturnStatus("aborted", ret), None
 
-        output.transfer(exe.output[0])
+        return ret, out
 
-LoopInputBase = AbstractInput.from_attributes(
-        "LoopInput",
-        "control",
-        trace=bool,
-)
 
 class LoopControl(HasStorage):
     def __init__(self, condition, restart):
@@ -342,7 +351,7 @@ class RepeatLoopControl(LoopControl):
         return c >= self._steps
 
 
-class LoopInput(LoopInputBase, MasterInput):
+class LoopInput(AbstractInput):
     """
     Input for :class:`~.LoopTask`.
 
@@ -350,6 +359,8 @@ class LoopInput(LoopInputBase, MasterInput):
         task (:class:`~.AbstractTask`): the loop body
         control (:class:`.LoopControl`): encapsulates control flow of the loop
     """
+
+    trace = StorageAttribute().type(bool).default(False)
 
     def repeat(self, steps: int, restart: Optional[Callable[[AbstractOutput, AbstractInput, dict], None]] = None):
         """
@@ -376,7 +387,7 @@ class LoopInput(LoopInputBase, MasterInput):
         """
         self.control = LoopControl(condition, restart)
 
-class LoopTask(AbstractTask):
+class LoopTask(TaskGenerator):
     """
     Generic task to loop over a given input task.
     """
@@ -387,18 +398,16 @@ class LoopTask(AbstractTask):
     def _get_output(self):
         return self.input.task._get_output()
 
-    def _execute(self, output):
+    def __iter__(self):
         task = deepcopy(self.input.task)
         control = deepcopy(self.input.control)
+
         scratch = {}
         while True:
-            exe = self.input.child_executor([task])
-            exe.run()
-            ret = exe.status[-1]
-            out = exe.output[-1]
+            (ret, out), *_ = yield [task]
             if not ret.is_done():
-                return ReturnStatus("aborted", ret)
+                return ReturnStatus("aborted", ret), None
             if control.condition(task, out):
                 break
             control.restart(out, task.input)
-        output.transfer(out)
+        return ret, out

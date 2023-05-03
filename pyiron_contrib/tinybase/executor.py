@@ -1,10 +1,11 @@
 import abc
 import enum
 from collections import defaultdict
-from typing import Union
+from typing import Union, List
 import time
-
 import logging
+
+from pyiron_contrib.tinybase.task import AbstractTask, TaskGenerator
 
 class RunMachine:
 
@@ -50,7 +51,7 @@ class RunMachine:
         self._callbacks.get(self._state, lambda: None)()
 
 
-class Executor:
+class ExecutionContext:
 
     def __init__(self, tasks):
         self._tasks = tasks
@@ -129,6 +130,24 @@ class Executor:
     def output(self):
         return self._run_machine._data["output"]
 
+class Executor:
+
+    def submit(self, tasks: List[AbstractTask]) -> ExecutionContext:
+        return ExecutionContext(tasks)
+
+    def run(self, gen: TaskGenerator):
+        gen = iter(gen)
+        tasks = next(gen)
+        while True:
+            exe = self.submit(tasks)
+            exe.run()
+            exe.wait()
+            try:
+                tasks = gen.send(list(zip(exe.status, exe.output)))
+            except StopIteration as stop:
+                ret, output = stop.args[0]
+                break
+        return ret, output
 
 from concurrent.futures import (
         ThreadPoolExecutor,
@@ -140,18 +159,12 @@ from threading import Lock
 def run_task(task):
     return task.execute()
 
-class FuturesExecutor(Executor, abc.ABC):
+class FuturesExecutionContext(ExecutionContext):
 
-    _FuturePoolExecutor: FExecutor = None
-
-    # poor programmer's abstract attribute check
-    def __init_subclass__(cls):
-        if cls._FuturePoolExecutor is None:
-            raise TypeError(f"Subclass {cls} of FuturesExecutor does not define 'FuturePoolExecutor'!")
-
-    def __init__(self, tasks, max_tasks=None):
+    def __init__(self, pool, tasks):
         super().__init__(tasks=tasks)
-        self._max_tasks = max_tasks if max_tasks is not None else 4
+        self._pool = pool
+        # self._max_tasks = max_tasks if max_tasks is not None else 4
         self._done = 0
         self._futures = {}
         self._status = {}
@@ -180,22 +193,31 @@ class FuturesExecutor(Executor, abc.ABC):
                 )
 
     def _run_running(self):
-        if len(self._futures) < len(self.tasks):
-            pool = self._FuturePoolExecutor(max_workers=self._max_tasks)
-            try:
-                for i, task in enumerate(self.tasks):
-                    future = pool.submit(run_task, task)
-                    self._futures[future] = task
-                    self._index[task] = i
-                    future.add_done_callback(self._process_future)
-            finally:
-                # with statement doesn't allow me to put wait=False, so I gotta do it here with try/finally.
-                pool.shutdown(wait=False)
+        if len(self._futures) == 0:
+            for i, task in enumerate(self.tasks):
+                future = self._pool.submit(run_task, task)
+                self._futures[future] = task
+                self._index[task] = i
+                future.add_done_callback(self._process_future)
         else:
             logging.info("Some tasks are still executing!")
 
-class BackgroundExecutor(FuturesExecutor):
-    _FuturePoolExecutor = ThreadPoolExecutor
+class BackgroundExecutor(Executor):
+    def __init__(self, max_threads):
+        self._max_threads = max_threads
+        self._pool = None
 
-class ProcessExecutor(FuturesExecutor):
-    _FuturePoolExecutor = ProcessPoolExecutor
+    def submit(self, tasks):
+        if self._pool is None:
+            self._pool = ThreadPoolExecutor(max_workers=self._max_threads)
+        return FuturesExecutionContext(self._pool, tasks)
+
+class ProcessExecutor(Executor):
+    def __init__(self, max_processes):
+        self._max_processes = max_processes
+        self._pool = None
+
+    def submit(self, tasks):
+        if self._pool is None:
+            self._pool = ProcessPoolExecutor(max_workers=self._max_processes)
+        return FuturesExecutionContext(self._pool, tasks)

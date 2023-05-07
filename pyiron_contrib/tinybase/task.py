@@ -58,8 +58,9 @@ class AbstractTask(Storable, abc.ABC):
     their own :class:`.AbstractInput` and :class:`.AbstractOutput`.
     """
 
-    def __init__(self):
+    def __init__(self, capture_exceptions=True):
         self._input = None
+        self._capture_exceptions=capture_exceptions
 
     @abc.abstractmethod
     def _get_input(self) -> AbstractInput:
@@ -104,6 +105,8 @@ class AbstractTask(Storable, abc.ABC):
         pass
 
     def execute(self) -> Tuple[ReturnStatus, AbstractOutput]:
+        if not self.input.check_ready():
+            return ReturnStatus.aborted("Input not ready!")
         output = self._get_output()
         try:
             ret = self._execute(output)
@@ -111,6 +114,8 @@ class AbstractTask(Storable, abc.ABC):
                 ret = ReturnStatus("done")
         except Exception as e:
             ret = ReturnStatus("aborted", msg=e)
+            if not self._capture_exceptions:
+                raise
         return ret, output
 
     # TaskIterator Impl'

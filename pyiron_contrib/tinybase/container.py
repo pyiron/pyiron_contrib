@@ -156,6 +156,15 @@ class AbstractOutput(AbstractContainer, abc.ABC):
 class EnergyOutput(AbstractOutput):
     energy_pot = StorageAttribute().type(float)
 
+class EnergyPotOutput(AbstractOutput):
+    energy_pot = StorageAttribute().type(float)
+
+class EnergyKinOutput(AbstractOutput):
+    energy_kin = StorageAttribute().type(float)
+
+class ForceOutput(AbstractOutput):
+    forces = StorageAttribute().type(np.ndarray)
+
 class MDOutput(HasStructure, EnergyOutput):
 
     pot_energies = StorageAttribute().type(list)

@@ -3,7 +3,7 @@ from pyiron_contrib.tinybase.container import (
             StorageAttribute,
             StructureInput,
             MDInput,
-            EnergyOutput,
+            EnergyPotOutput,
             MDOutput
 )
 from pyiron_contrib.tinybase.task import AbstractTask, ReturnStatus
@@ -32,7 +32,7 @@ class AseStaticTask(AbstractTask):
         return AseStaticInput()
 
     def _get_output(self):
-        return EnergyOutput()
+        return EnergyPotOutput()
 
     def _execute(self, output):
         structure = self.input.structure

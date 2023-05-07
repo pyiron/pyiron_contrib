@@ -128,7 +128,9 @@ class AbstractContainer(HasStorage, HasHDFAdapaterMixin, abc.ABC):
         mro_iter = {k: v for c in type(other).__mro__ for k, v in c.__dict__.items()}
         for name, attr in mro_iter.items():
             if isinstance(attr, StorageAttribute):
-                setattr(self, name, getattr(other, name))
+                a = getattr(other, name)
+                if a is not None:
+                    setattr(self, name, a)
 
     def put(self, other: 'AbstractContainer'):
         other.take(self)

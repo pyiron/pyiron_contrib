@@ -23,6 +23,22 @@ class ReturnStatus:
         self.code = code if not isinstance(code, str) else ReturnStatus.Code(code)
         self.msg = msg
 
+    @classmethod
+    def done(cls, msg=None):
+        return cls(code=cls.Code.DONE, msg=msg)
+
+    @classmethod
+    def aborted(cls, msg=None):
+        return cls(code=cls.Code.ABORTED, msg=msg)
+
+    @classmethod
+    def warning(cls, msg=None):
+        return cls(code=cls.Code.WARNING, msg=msg)
+
+    @classmethod
+    def not_converged(cls, msg=None):
+        return cls(code=cls.Code.NOT_CONVERGED, msg=msg)
+
     def __repr__(self):
         return f"ReturnStatus({self.code}, {self.msg})"
     def __str__(self):

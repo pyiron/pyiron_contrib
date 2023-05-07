@@ -222,9 +222,6 @@ class ListTaskGenerator(TaskGenerator, abc.ABC):
     To use it overload :meth:`._extract_output` here and subclass :class:`.ListInput` as well.
     """
 
-    def __init__(self):
-        super().__init__()
-
     def _get_input(self):
         return ListInput()
 

@@ -45,8 +45,8 @@ class MurnaghanInput(StructureInput, ListInput):
 
 class MurnaghanOutput(AbstractOutput, HasStructure):
     base_structures = StorageAttribute()
-    volumes = StorageAttribute().type(list)
-    energies = StorageAttribute().type(list)
+    volumes = StorageAttribute().type(np.ndarray)
+    energies = StorageAttribute().type(np.ndarray)
 
     def plot(self):
         plt.plot(self.volumes, self.energies)
@@ -71,14 +71,12 @@ class MurnaghanTask(ListTaskGenerator):
 
     def _get_output(self):
         out = MurnaghanOutput()
+        out.energies = np.zeros(len(self.input.strains))
+        out.volumes = np.zeros(len(self.input.strains))
         out.base_structure = self.input.structure
         return out
 
     def _extract_output(self, output, step, task, ret, task_output):
-        if len(output.energies) == 0:
-            output.energies = np.zeros(len(self.input.strains))
-        if len(output.volumes) == 0:
-            output.volumes = np.zeros(len(self.input.strains))
         if ret.is_done():
             output.energies[step] = task_output.energy_pot
             output.volumes[step] = task.input.structure.get_volume()

@@ -164,10 +164,10 @@ class ForceOutput(AbstractOutput):
 
 class MDOutput(HasStructure, EnergyPotOutput):
 
-    pot_energies = StorageAttribute().type(list)
-    kin_energies = StorageAttribute().type(list)
-    forces = StorageAttribute().type(list)
-    structures = StorageAttribute().type(list)
+    pot_energies = StorageAttribute().type(list).default(list)
+    kin_energies = StorageAttribute().type(list).default(list)
+    forces = StorageAttribute().type(list).default(list)
+    structures = StorageAttribute().type(list).default(list)
 
     def plot_energies(self):
         plt.plot(self.pot_energies - np.min(self.pot_energies), label='pot')

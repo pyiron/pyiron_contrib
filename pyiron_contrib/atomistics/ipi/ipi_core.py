@@ -152,9 +152,8 @@ class IPiCore(LammpsInteractive):
         cell_abc = []  # cell box edges
         cell_ABC = []  # cell box angles
         trajectory = []
-        start = starts[0]
-        for stop in starts[1:]:  # ignore the numer of atoms line
-            snap_lines = lines[start:stop - 1]
+        for i, stop in enumerate(starts[1:]):  # ignore the numer of atoms line
+            snap_lines = lines[starts[i]:stop - 1]
             # second line contains the cell data. Collect it.
             zeroth_line_values = [n for n in snap_lines[0].split()]
             cell_abc.append(np.array(zeroth_line_values[2:5], dtype=float))  # collect cell box edges
@@ -164,7 +163,6 @@ class IPiCore(LammpsInteractive):
             for l in snap_lines[1:]:
                 temp_list.append([float(n) for n in l.split()[1:]])  # first column is the species. Ignore it.
             trajectory.append(temp_list)
-            start = stop
         f.close()
         return np.array(cell_abc), np.array(cell_ABC), np.array(trajectory)
 

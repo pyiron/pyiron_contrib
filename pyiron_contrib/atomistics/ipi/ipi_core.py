@@ -141,11 +141,9 @@ class IPiCore(LammpsInteractive):
     def _collect_traj_helper(filename):
         f = open(filename)
         lines = f.readlines()
-        starts = []
-        for i, x in enumerate(lines):
-            if x.startswith("#"):
-                starts.append(i)
-        starts.append(len(lines) + 1)
+        starts = [
+            i for i, x in enumerate(lines) if x.startswith("#")
+        ] + [len(lines) + 1]
         abc = []
         ABC = []
         traj = []

@@ -139,33 +139,36 @@ class IPiCore(LammpsInteractive):
 
     @staticmethod
     def _collect_traj_helper(filename):
+        """
+        For each snapshot collect the cell box edges and angles and the corresponding atom positions.
+        """
         f = open(filename)
         lines = f.readlines()
+        # the first line for each snapshot is always the number of atoms.
+        # Identify the line number where each snapshot starts.
         starts = [
             i for i, x in enumerate(lines) if x.startswith("#")
-        ] + [len(lines) + 1]
-        abc = []
-        ABC = []
-        traj = []
+        ] + [len(lines) + 1]  # and also record at what line number the last snapshot ends
+        cell_abc = []  # cell box edges
+        cell_ABC = []  # cell box angles
+        trajectory = []
         start = starts[0]
-        for stop in starts[1:]:
-            temp_list = []
+        for stop in starts[1:]:  # ignore the numer of atoms line
             snap_lines = lines[start:stop - 1]
-            for i, l in enumerate(snap_lines):
-                split_l = l.split()
-                if i != 0:
-                    temp_list.append([float(j) for j in split_l[1:]])
-                else:
-                    abc.append([float(j) for j in split_l[2:5]])
-                    ABC.append([float(j) for j in split_l[5:8]])
+            # second line contains the cell data. Collect it.
+            zeroth_line_values = [n for n in snap_lines[0].split()]
+            cell_abc.append(np.array(zeroth_line_values[2:5], dtype=float))  # collect cell box edges
+            cell_ABC.append(np.array(zeroth_line_values[5:8], dtype=float))  # collect cell box angles
+            # the remaining lines of the snapshot contain the positions/forces. Collect them.
+            temp_list = []
+            for l in snap_lines[1:]:
+                temp_list.append([float(n) for n in l.split()[1:]])  # first column is the species. Ignore it.
+            trajectory.append(temp_list)
             start = stop
-            traj.append(temp_list)
         f.close()
-        return np.array(abc), np.array(ABC), np.array(traj)
+        return np.array(cell_abc), np.array(cell_ABC), np.array(trajectory)
 
     def collect_trajectory(self):
-        #digits = "{0:0" + str(len(str(self.custom_input.n_beads))) + "}"
-        #f = open(self.working_directory + '/ipi_out.pos_' + digits.format(0) + '.xyz')
         positions_out = self._collect_traj_helper(self.working_directory + '/ipi_out.pos.xyz')
         forces_out = self._collect_traj_helper(self.working_directory + '/ipi_out.for.xyz')
         self.custom_output.cell_abc = np.array(positions_out[0])

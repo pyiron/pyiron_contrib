@@ -44,12 +44,13 @@ class MurnaghanInput(StructureInput, ListInput):
         return tasks
 
 class MurnaghanOutput(AbstractOutput, HasStructure):
-    base_structures = StorageAttribute()
+    base_structure = StorageAttribute()
     volumes = StorageAttribute().type(np.ndarray)
     energies = StorageAttribute().type(np.ndarray)
 
-    def plot(self):
-        plt.plot(self.volumes, self.energies)
+    def plot(self, per_atom=True):
+        N = len(self.base_structure) if per_atom else 1
+        plt.plot(self.volumes/N, self.energies/N)
 
     @property
     def equilibrium_volume(self):

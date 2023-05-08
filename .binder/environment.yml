@@ -1,8 +1,6 @@
 channels:
 - conda-forge
 dependencies:
-- ipykernel
-- nbsphinx
 - ase =3.22.1
 - coveralls
 - coverage

@@ -21,3 +21,4 @@ dependencies:
 - aws-sam-translator =1.65.0
 - python >= 3.10
 - lammps
+- randspg =0.0.1

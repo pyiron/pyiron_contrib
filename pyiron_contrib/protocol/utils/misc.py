@@ -1,4 +1,5 @@
 from __future__ import print_function
+
 # coding: utf-8
 # Copyright (c) Max-Planck-Institut für Eisenforschung GmbH - Computational Materials Design (CM) Department
 # Distributed under the terms of "New BSD License", see the LICENSE file.
@@ -8,19 +9,21 @@ from inspect import getfullargspec
 from pydoc import locate
 from itertools import islice
 import re
+
 """
 Classes for handling protocols, particularly setting up input and output pipes.
 """
 
 __author__ = "Dominik Gehringer, Liam Huber"
-__copyright__ = "Copyright 2019, Max-Planck-Institut für Eisenforschung GmbH " \
-                "- Computational Materials Design (CM) Department"
+__copyright__ = (
+    "Copyright 2019, Max-Planck-Institut für Eisenforschung GmbH "
+    "- Computational Materials Design (CM) Department"
+)
 __version__ = "0.0"
 __maintainer__ = "Liam Huber"
 __email__ = "huber@mpie.de"
 __status__ = "development"
 __date__ = "18 July, 2019"
-
 
 
 def ordered_dict_get_index(ordered_dict, index):
@@ -34,6 +37,7 @@ def ordered_dict_get_index(ordered_dict, index):
 
     """
     return ordered_dict[next(islice(ordered_dict, index, None))]
+
 
 def ordered_dict_get_last(ordered_dict):
     """
@@ -62,7 +66,7 @@ class LoggerMixin(object):
         Returns:
             str: fully qualified type name of the instance
         """
-        return '{}.{}'.format(self.__class__.__module__, self.__class__.__name__)
+        return "{}.{}".format(self.__class__.__module__, self.__class__.__name__)
 
     @property
     def logger(self):
@@ -81,13 +85,15 @@ def requires_arguments(func):
     """
     args, varargs, varkw, defaults, _, _, _ = getfullargspec(func)
     if defaults:
-        args = args[:-len(defaults)]
+        args = args[: -len(defaults)]
     # It could be a bound method too
-    if 'self' in args:
-        args.remove('self')
+    if "self" in args:
+        args.remove("self")
     return len(args) > 0
 
+
 flatten = lambda l: [item for sublist in l for item in sublist]
+
 
 def fullname(obj):
     """
@@ -100,11 +106,13 @@ def fullname(obj):
 
     """
     obj_type = type(obj)
-    return '{}.{}'.format(obj_type.__module__, obj_type.__name__)
+    return "{}.{}".format(obj_type.__module__, obj_type.__name__)
 
 
 def get_cls(string):
-    return locate([v for v in re.findall(r'(?!\.)[\w\.]+(?!\.)', string)if v != 'class'][0])
+    return locate(
+        [v for v in re.findall(r"(?!\.)[\w\.]+(?!\.)", string) if v != "class"][0]
+    )
 
 
 def is_iterable(o):
@@ -124,6 +132,7 @@ def is_iterable(o):
     else:
         return not isinstance(o, str)
 
+
 # convenience function to ensure the passed argument is iterable
 ensure_iterable = lambda v: v if is_iterable(v) else [v]
 
@@ -131,7 +140,7 @@ ensure_iterable = lambda v: v if is_iterable(v) else [v]
 class Registry(type):
     def __init__(cls, name, bases, nmspc):
         super(Registry, cls).__init__(name, bases, nmspc)
-        if not hasattr(cls, 'registry'):
+        if not hasattr(cls, "registry"):
             cls.registry = set()
         cls.registry.add(cls)
-        cls.registry -= set(bases) # Remove base classes
+        cls.registry -= set(bases)  # Remove base classes

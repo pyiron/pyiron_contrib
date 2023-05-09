@@ -1,4 +1,5 @@
 from __future__ import print_function
+
 # coding: utf-8
 # Copyright (c) Max-Planck-Institut für Eisenforschung GmbH - Computational Materials Design (CM) Department
 # Distributed under the terms of "New BSD License", see the LICENSE file.
@@ -8,8 +9,10 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 __author__ = "Liam Huber"
-__copyright__ = "Copyright 2019, Max-Planck-Institut für Eisenforschung GmbH " \
-                "- Computational Materials Design (CM) Department"
+__copyright__ = (
+    "Copyright 2019, Max-Planck-Institut für Eisenforschung GmbH "
+    "- Computational Materials Design (CM) Department"
+)
 __version__ = "0.0"
 __maintainer__ = "Liam Huber"
 __email__ = "huber@mpie.de"
@@ -49,15 +52,23 @@ def brightness_filter(image, sigma=10, bins=100, deg=10, plot=False):
     coeffs = np.polyfit(bincenters, counts, deg=deg)
     poly = np.poly1d(coeffs)
     extrema = poly.deriv().r[1:-1]
-    extremal_bin_ids = np.array([np.argmin(np.abs((bincenters - x))) for x in extrema], dtype=int)
+    extremal_bin_ids = np.array(
+        [np.argmin(np.abs((bincenters - x))) for x in extrema], dtype=int
+    )
 
     # Find the trough location between the two biggest peaks
     ultimate_id, penultimate_id = np.argsort(poly(bincenters[extremal_bin_ids]))[-2:]
     trough_id = extremal_bin_ids[int(0.5 * (ultimate_id + penultimate_id))]
-    peak_id, pen_peak_id = extremal_bin_ids[ultimate_id], extremal_bin_ids[penultimate_id]
-    if not (bincenters[peak_id] < bincenters[trough_id] < bincenters[pen_peak_id]) and \
-            not (bincenters[peak_id] > bincenters[trough_id] > bincenters[pen_peak_id]):
-        print("WARNING: Had trouble finding a dividing trough for {}".format(image.source))
+    peak_id, pen_peak_id = (
+        extremal_bin_ids[ultimate_id],
+        extremal_bin_ids[penultimate_id],
+    )
+    if not (
+        bincenters[peak_id] < bincenters[trough_id] < bincenters[pen_peak_id]
+    ) and not (bincenters[peak_id] > bincenters[trough_id] > bincenters[pen_peak_id]):
+        print(
+            "WARNING: Had trouble finding a dividing trough for {}".format(image.source)
+        )
     threshold_signal = bincenters[trough_id]
 
     # Separate phases based on lightness/darkness
@@ -67,25 +78,27 @@ def brightness_filter(image, sigma=10, bins=100, deg=10, plot=False):
     if plot:
         # Plot the signal distribution
         _, ax = plt.subplots(figsize=(12, 6))
-        sns.distplot(signal, ax=ax, norm_hist=False, kde=False, label='brightness distribution')
-        ax.plot(bincenters, poly(bincenters), label='fit')
+        sns.distplot(
+            signal, ax=ax, norm_hist=False, kde=False, label="brightness distribution"
+        )
+        ax.plot(bincenters, poly(bincenters), label="fit")
 
-        ax.axvline(bincenters[peak_id], color='w', linestyle='--')
-        ax.axvline(bincenters[trough_id], color='w', label='threshold')
-        ax.axvline(bincenters[pen_peak_id], color='w', linestyle='--')
+        ax.axvline(bincenters[peak_id], color="w", linestyle="--")
+        ax.axvline(bincenters[trough_id], color="w", label="threshold")
+        ax.axvline(bincenters[pen_peak_id], color="w", linestyle="--")
         plt.legend()
-        plt.xlabel('Brightness of smoothed image')
-        plt.ylabel('Pixel count')
+        plt.xlabel("Brightness of smoothed image")
+        plt.ylabel("Pixel count")
         plt.show()
 
         # And the resulting map
         _, axes = plt.subplots(ncols=3, figsize=(12, 6))
         axes[0].imshow(raw_data)
-        axes[0].set_title('Original')
+        axes[0].set_title("Original")
         axes[1].imshow(image.data)
-        axes[1].set_title('Smoothed')
+        axes[1].set_title("Smoothed")
         axes[2].imshow(phase_mask)
-        axes[2].set_title('Phase mask')
+        axes[2].set_title("Phase mask")
         plt.show()
 
     return phase_fraction, threshold_signal, phase_mask

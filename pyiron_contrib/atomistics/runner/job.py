@@ -25,8 +25,7 @@ import pandas as pd
 from ase.data import atomic_numbers
 from ase.units import Bohr
 
-from runnerase.io.ase import (read_results_mode1, read_results_mode2,
-                              read_results_mode3)
+from runnerase.io.ase import read_results_mode1, read_results_mode2, read_results_mode3
 from runnerase import Runner
 from runnerase.defaultoptions import DEFAULT_PARAMETERS
 
@@ -36,22 +35,25 @@ from pyiron_base import state, Executable, GenericJob, DataContainer
 from pyiron_base import HasStorage
 
 from pyiron_contrib.atomistics.ml.potentialfit import PotentialFit
-from pyiron_contrib.atomistics.atomistics.job import (TrainingContainer,
-                                                      TrainingStorage)
+from pyiron_contrib.atomistics.atomistics.job import TrainingContainer, TrainingStorage
 
 from .utils import container_to_ase
-from .storageclasses import (HDFSymmetryFunctionSet, HDFSymmetryFunctionValues,
-                             HDFSplitTrainTest, HDFFitResults, HDFWeights,
-                             HDFScaling)
+from .storageclasses import (
+    HDFSymmetryFunctionSet,
+    HDFSymmetryFunctionValues,
+    HDFSplitTrainTest,
+    HDFFitResults,
+    HDFWeights,
+    HDFScaling,
+)
 
-__author__ = 'Alexander Knoll'
-__maintainer__ = 'Alexander Knoll'
-__email__ = 'alexander.knoll@chemie.uni-goettingen.de'
-__copyright__ = 'Copyright 2022, Georg-August-Universität Göttingen - Behler '\
-                'Group'
-__version__ = '0.1.1'
-__status__ = 'development'
-__date__ = 'May 17, 2022'
+__author__ = "Alexander Knoll"
+__maintainer__ = "Alexander Knoll"
+__email__ = "alexander.knoll@chemie.uni-goettingen.de"
+__copyright__ = "Copyright 2022, Georg-August-Universität Göttingen - Behler " "Group"
+__version__ = "0.1.1"
+__status__ = "development"
+__date__ = "May 17, 2022"
 
 
 class RunnerFit(GenericJob, HasStorage, PotentialFit):
@@ -133,17 +135,17 @@ class RunnerFit(GenericJob, HasStorage, PotentialFit):
         ```
     """
 
-    __name__ = 'RuNNerFit'
+    __name__ = "RuNNerFit"
 
     # These properties are needed by RuNNer as input data (depending on the
     # chosen RuNNer mode).
-    _input_properties = ['scaling', 'weights', 'sfvalues', 'splittraintest']
+    _input_properties = ["scaling", "weights", "sfvalues", "splittraintest"]
 
     # Define a default executable.
     _executable = Executable(
-        codename='runner',
-        module='runner',
-        path_binary_codes=state.settings.resource_paths
+        codename="runner",
+        module="runner",
+        path_binary_codes=state.settings.resource_paths,
     )
 
     def __init__(self, project: Project, job_name: str) -> None:
@@ -158,11 +160,11 @@ class RunnerFit(GenericJob, HasStorage, PotentialFit):
         HasStorage.__init__(self)
 
         # Create groups for storing calculation inputs and outputs.
-        self.storage.create_group('input')
-        self.storage.create_group('output')
+        self.storage.create_group("input")
+        self.storage.create_group("output")
 
         # Create a group for storing the RuNNer configuration parameters.
-        self.storage.input.create_group('parameters')
+        self.storage.input.create_group("parameters")
 
         self.storage.input.parameters.update(deepcopy(DEFAULT_PARAMETERS))
 
@@ -175,43 +177,43 @@ class RunnerFit(GenericJob, HasStorage, PotentialFit):
     def publication(self):
         """Define relevant publications."""
         return {
-            'runner': [
+            "runner": [
                 {
-                    'title': 'First Principles Neural Network Potentials for '
-                             'Reactive Simulations of Large Molecular and '
-                             'Condensed Systems',
-                    'journal': 'Angewandte Chemie International Edition',
-                    'volume': '56',
-                    'number': '42',
-                    'year': '2017',
-                    'issn': '1521-3773',
-                    'doi': '10.1002/anie.201703114',
-                    'url': 'https://doi.org/10.1002/anie.201703114',
-                    'author': ['Jörg Behler'],
+                    "title": "First Principles Neural Network Potentials for "
+                    "Reactive Simulations of Large Molecular and "
+                    "Condensed Systems",
+                    "journal": "Angewandte Chemie International Edition",
+                    "volume": "56",
+                    "number": "42",
+                    "year": "2017",
+                    "issn": "1521-3773",
+                    "doi": "10.1002/anie.201703114",
+                    "url": "https://doi.org/10.1002/anie.201703114",
+                    "author": ["Jörg Behler"],
                 },
                 {
-                    'title': 'Constructing high‐dimensional neural network'
-                             'potentials: A tutorial review',
-                    'journal': 'International Journal of Quantum Chemistry',
-                    'volume': '115',
-                    'number': '16',
-                    'year': '2015',
-                    'issn': '1097-461X',
-                    'doi': '10.1002/qua.24890',
-                    'url': 'https://doi.org/10.1002/qua.24890',
-                    'author': ['Jörg Behler'],
+                    "title": "Constructing high‐dimensional neural network"
+                    "potentials: A tutorial review",
+                    "journal": "International Journal of Quantum Chemistry",
+                    "volume": "115",
+                    "number": "16",
+                    "year": "2015",
+                    "issn": "1097-461X",
+                    "doi": "10.1002/qua.24890",
+                    "url": "https://doi.org/10.1002/qua.24890",
+                    "author": ["Jörg Behler"],
                 },
                 {
-                    'title': 'Generalized Neural-Network Representation of '
-                             'High-Dimensional Potential-Energy Surfaces',
-                    'journal': 'Physical Review Letters',
-                    'volume': '98',
-                    'number': '14',
-                    'year': '2007',
-                    'issn': '1079-7114',
-                    'doi': '10.1103/PhysRevLett.98.146401',
-                    'url': 'https://doi.org/10.1103/PhysRevLett.98.146401',
-                    'author': ['Jörg Behler', 'Michelle Parrinello'],
+                    "title": "Generalized Neural-Network Representation of "
+                    "High-Dimensional Potential-Energy Surfaces",
+                    "journal": "Physical Review Letters",
+                    "volume": "98",
+                    "number": "14",
+                    "year": "2007",
+                    "issn": "1079-7114",
+                    "doi": "10.1103/PhysRevLett.98.146401",
+                    "url": "https://doi.org/10.1103/PhysRevLett.98.146401",
+                    "author": ["Jörg Behler", "Michelle Parrinello"],
                 },
             ]
         }
@@ -254,7 +256,7 @@ class RunnerFit(GenericJob, HasStorage, PotentialFit):
             self.output.scaling (HDFScaling, None): If defined, the symmetry
                 function scaling data in storage.
         """
-        if 'scaling' in self.output:
+        if "scaling" in self.output:
             return self.output.scaling
 
         return None
@@ -277,7 +279,7 @@ class RunnerFit(GenericJob, HasStorage, PotentialFit):
             self.output.weights (HDFWeights, None): If defined, the weights in
                 storage.
         """
-        if 'weights' in self.output:
+        if "weights" in self.output:
             return self.output.weights
 
         return None
@@ -300,7 +302,7 @@ class RunnerFit(GenericJob, HasStorage, PotentialFit):
             self.output.sfvalues (HDFSymmetryFunctionValues, None): If defined,
                 the symmetry function values in storage.
         """
-        if 'sfvalues' in self.output:
+        if "sfvalues" in self.output:
             return self.output.sfvalues
 
         return None
@@ -323,7 +325,7 @@ class RunnerFit(GenericJob, HasStorage, PotentialFit):
             self.output.splittraintest (HDFSplitTrainTest, None): If defined,
                 the splitting data in storage.
         """
-        if 'splittraintest' in self.output:
+        if "splittraintest" in self.output:
             return self.output.splittraintest
 
         return None
@@ -373,33 +375,35 @@ class RunnerFit(GenericJob, HasStorage, PotentialFit):
                 predicted by RuNNer.
         """
         # Energies and forces will only be available after RuNNer Mode 3.
-        if 'energy' not in self.output:
-            raise RuntimeError('You have to run RuNNer prediction mode '
-                               + '(Mode 3) before you can access predictions.')
+        if "energy" not in self.output:
+            raise RuntimeError(
+                "You have to run RuNNer prediction mode "
+                + "(Mode 3) before you can access predictions."
+            )
 
         # Get a list of structures.
         structures = list(self.training_data.iter_structures())
 
         # Get the values of all properties RuNNer can predict for a structure.
-        pred_properties = {'energy': np.full((len(structures),), np.nan),
-                           'forces': np.full((3, len(structures)), np.nan)}
+        pred_properties = {
+            "energy": np.full((len(structures),), np.nan),
+            "forces": np.full((3, len(structures)), np.nan),
+        }
         for prop in pred_properties:
             if prop in self.output:
                 pred_properties[prop] = self.output[prop]
 
         predicted_data = FlattenedStorage()
 
-        for structure, energy, force in zip(structures,
-                                            pred_properties['energy'],
-                                            pred_properties['forces']):
-            predicted_data.add_chunk(len(structure), energy=energy,
-                                     forces=force)
+        for structure, energy, force in zip(
+            structures, pred_properties["energy"], pred_properties["forces"]
+        ):
+            predicted_data.add_chunk(len(structure), energy=energy, forces=force)
 
         return predicted_data
 
     def get_lammps_potential(
-        self,
-        elements: Optional[List[str]] = None
+        self, elements: Optional[List[str]] = None
     ) -> pd.DataFrame:
         """Return a pandas dataframe with information for setting up LAMMPS.
 
@@ -418,47 +422,58 @@ class RunnerFit(GenericJob, HasStorage, PotentialFit):
                 required to set up a LAMMPS job with RuNNer.
         """
         if not self.status.finished:
-            raise RuntimeError('LAMMPS potential can only be generated after a '
-                               + 'successful fit.')
+            raise RuntimeError(
+                "LAMMPS potential can only be generated after a " + "successful fit."
+            )
 
-        if 'weights' not in self.output or 'scaling' not in self.output:
-            raise RuntimeError('This potential has not been trained yet.')
+        if "weights" not in self.output or "scaling" not in self.output:
+            raise RuntimeError("This potential has not been trained yet.")
 
         # Get all elements in the training dataset.
         if elements is None:
             elements = self.training_data.get_elements()
 
         # Create a list of all files needed by the potential.
-        files = [f'{self.working_directory}/input.nn',
-                 f'{self.working_directory}/scaling.data']
+        files = [
+            f"{self.working_directory}/input.nn",
+            f"{self.working_directory}/scaling.data",
+        ]
 
         # Add the weight files.
         for elem in elements:
             atomic_number = atomic_numbers[elem]
-            filename = f'weights.{atomic_number:03}.data'
-            files.append(f'{self.working_directory}/{filename}')
+            filename = f"weights.{atomic_number:03}.data"
+            files.append(f"{self.working_directory}/{filename}")
 
         # Save the mapping of elements between LAMMPS and n2p2.
-        emap = ' '.join(el for el in elements)
+        emap = " ".join(el for el in elements)
 
         # Get the cutoff radius of the symmetry functions.
         cutoffs = self.parameters.symfunction_short.cutoffs
         cutoff = cutoffs[0]
 
         if len(cutoffs) > 1:
-            raise RuntimeError('LAMMPS potential can only be generated for a '
-                               + 'uniform cutoff radius.')
+            raise RuntimeError(
+                "LAMMPS potential can only be generated for a "
+                + "uniform cutoff radius."
+            )
 
-        return pd.DataFrame({
-            'Name': [f"RuNNer-{''.join(elements)}"],
-            'Filename': [files],
-            'Model': ['RuNNer'],
-            'Species': [elements],
-            'Config': [[f'pair_style hdnnp {cutoff * Bohr} dir "./" '
-                        + 'showew yes showewsum 0 resetew no maxew 100 '
-                        + 'cflength 1.8897261328 cfenergy 0.0367493254\n',
-                        f'pair_coeff * * {emap}\n']]
-        })
+        return pd.DataFrame(
+            {
+                "Name": [f"RuNNer-{''.join(elements)}"],
+                "Filename": [files],
+                "Model": ["RuNNer"],
+                "Species": [elements],
+                "Config": [
+                    [
+                        f'pair_style hdnnp {cutoff * Bohr} dir "./" '
+                        + "showew yes showewsum 0 resetew no maxew 100 "
+                        + "cflength 1.8897261328 cfenergy 0.0367493254\n",
+                        f"pair_coeff * * {emap}\n",
+                    ]
+                ],
+            }
+        )
 
     def write_input(self) -> None:
         """Write the relevant job input files.
@@ -466,8 +481,12 @@ class RunnerFit(GenericJob, HasStorage, PotentialFit):
         This routine writes the input files for the job using the ASE Runner
         calculator.
         """
-        input_properties = {'sfvalues': None, 'splittraintest': None,
-                            'weights': None, 'scaling': None}
+        input_properties = {
+            "sfvalues": None,
+            "splittraintest": None,
+            "weights": None,
+            "scaling": None,
+        }
 
         for prop in input_properties:
             if prop in self.output and self.output[prop] is not None:
@@ -476,20 +495,20 @@ class RunnerFit(GenericJob, HasStorage, PotentialFit):
         # Create an ASE Runner calculator object.
         # Pay attention to the different name: `structures` --> `dataset`.
         calc = Runner(
-            label='pyiron',
+            label="pyiron",
             dataset=container_to_ase(self.training_data),
-            scaling=input_properties['scaling'],
-            weights=input_properties['weights'],
-            sfvalues=input_properties['sfvalues'],
-            splittraintest=input_properties['splittraintest'],
-            **self.parameters.to_builtin()
+            scaling=input_properties["scaling"],
+            weights=input_properties["weights"],
+            sfvalues=input_properties["sfvalues"],
+            splittraintest=input_properties["splittraintest"],
+            **self.parameters.to_builtin(),
         )
 
         # Set the correct elements of the system.
         calc.set_elements()
 
         # If no seed was specified yet, choose a random value.
-        if 'random_seed' not in calc.parameters:
+        if "random_seed" not in calc.parameters:
             calc.set(random_seed=np.random.randint(1, 1000))
 
         # If no dataset was attached to the calculator, the single structure
@@ -498,31 +517,29 @@ class RunnerFit(GenericJob, HasStorage, PotentialFit):
 
         # Set the correct calculation directory and file prefix.
         calc.directory = self.working_directory
-        calc.prefix = f'mode{self.parameters.runner_mode}'
+        calc.prefix = f"mode{self.parameters.runner_mode}"
 
         # Set the 'flags' which ASE uses to see which input files need to
         # be written.
-        targets = {1: 'sfvalues', 2: 'fit', 3: 'energy'}
+        targets = {1: "sfvalues", 2: "fit", 3: "energy"}
 
         calc.write_input(
-            atoms,
-            targets[self.parameters.runner_mode],
-            system_changes=None
+            atoms, targets[self.parameters.runner_mode], system_changes=None
         )
 
     def _executable_activate(self, enforce: bool = False) -> None:
         """Link to the RuNNer executable."""
         if self._executable is None or enforce:
             self._executable = Executable(
-                codename='runner',
-                module='runner',
-                path_binary_codes=state.settings.resource_paths
+                codename="runner",
+                module="runner",
+                path_binary_codes=state.settings.resource_paths,
             )
 
     def collect_output(self) -> None:
         """Read and store the job results."""
         # Compose job label (needed by the ASE I/O routines) and store dir.
-        label = f'{self.working_directory}/mode{self.parameters.runner_mode}'
+        label = f"{self.working_directory}/mode{self.parameters.runner_mode}"
         directory = self.working_directory
 
         # If successful, RuNNer Mode 1 returns symmetry function values for
@@ -534,14 +551,14 @@ class RunnerFit(GenericJob, HasStorage, PotentialFit):
             # Transform sfvalues into the pyiron class for HDF5 storage and
             # store it in the output dictionary.
             sfvalues = HDFSymmetryFunctionValues()
-            sfvalues.from_runnerase(results['sfvalues'])
+            sfvalues.from_runnerase(results["sfvalues"])
             self.output.sfvalues = sfvalues
 
             # Transform split data between training and testing set into the
             # pyiron class for HDF5 storage and store it in the output
             # dictionary.
             splittraintest = HDFSplitTrainTest()
-            splittraintest.from_runnerase(results['splittraintest'])
+            splittraintest.from_runnerase(results["splittraintest"])
             self.output.splittraintest = splittraintest
 
         # If successful, RuNNer Mode 2 returns the weights of the atomic neural
@@ -551,31 +568,29 @@ class RunnerFit(GenericJob, HasStorage, PotentialFit):
             results = read_results_mode2(label, directory)
 
             fitresults = HDFFitResults()
-            fitresults.from_runnerase(results['fitresults'])
+            fitresults.from_runnerase(results["fitresults"])
             self.output.fitresults = fitresults
 
             weights = HDFWeights()
-            weights.from_runnerase(results['weights'])
+            weights.from_runnerase(results["weights"])
             self.output.weights = weights
 
             scaling = HDFScaling()
-            scaling.from_runnerase(results['scaling'])
+            scaling.from_runnerase(results["scaling"])
             self.output.scaling = scaling
 
         # If successful, RuNNer Mode 3 returns the energy and forces of the
         # structure for which it was executed.
         elif self.parameters.runner_mode == 3:
             results = read_results_mode3(directory)
-            self.output.energy = results['energy']
-            self.output.forces = results['forces']
+            self.output.energy = results["energy"]
+            self.output.forces = results["forces"]
 
         # Store all calculation results in the project's HDF5 file.
         self.to_hdf()
 
     def to_hdf(
-        self,
-        hdf: Optional[ProjectHDFio] = None,
-        group_name: Optional[str] = None
+        self, hdf: Optional[ProjectHDFio] = None, group_name: Optional[str] = None
     ) -> None:
         """Store all job information in HDF5 format.
 
@@ -586,18 +601,16 @@ class RunnerFit(GenericJob, HasStorage, PotentialFit):
         # Replace the runnerase class `SymmetryFunctionSet` by the extended
         # class from the `storageclasses` module which knows how to write itself
         # to hdf.
-        sfset = self.parameters.pop('symfunction_short')
+        sfset = self.parameters.pop("symfunction_short")
         new_sfset = HDFSymmetryFunctionSet()
         new_sfset.from_runnerase(sfset)
         self.parameters.symfunction_short = new_sfset
 
         GenericJob.to_hdf(self, hdf=hdf, group_name=group_name)
-        HasStorage.to_hdf(self, hdf=self.project_hdf5, group_name='')
+        HasStorage.to_hdf(self, hdf=self.project_hdf5, group_name="")
 
     def from_hdf(
-        self,
-        hdf: Optional[ProjectHDFio] = None,
-        group_name: Optional[str] = None
+        self, hdf: Optional[ProjectHDFio] = None, group_name: Optional[str] = None
     ) -> None:
         """Reload all job information from HDF5 format.
 
@@ -606,4 +619,4 @@ class RunnerFit(GenericJob, HasStorage, PotentialFit):
             group_name (str): Subcontainer name.
         """
         GenericJob.from_hdf(self, hdf=hdf, group_name=group_name)
-        HasStorage.from_hdf(self, hdf=self.project_hdf5, group_name='')
+        HasStorage.from_hdf(self, hdf=self.project_hdf5, group_name="")

@@ -246,10 +246,10 @@ class FileS3IO(StorageInterface):
 
     @classmethod
     def from_dict(cls, connection_dict: dict):
-        path = connection_dict.get('s3_path', '/')
+        path = connection_dict.get("s3_path", "/")
         config = {
-            'bucket': connection_dict.get('bucket_name', None),
-            'endpoint':  connection_dict.get('endpoint_url', None)
+            "bucket": connection_dict.get("bucket_name", None),
+            "endpoint": connection_dict.get("endpoint_url", None),
         }
         cls(config, path)
 
@@ -396,7 +396,6 @@ class FileS3IO(StorageInterface):
             raise ValueError("length of files and of filenames have to match!")
 
         for file, filename, _metadata in zip(files, filenames, metadata):
-
             self._bucket.upload_file(
                 file, self._bucket_path + filename, {"Metadata": _metadata}
             )

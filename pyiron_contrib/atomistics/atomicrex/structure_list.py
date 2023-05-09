@@ -400,7 +400,7 @@ class ARStructureContainer:
 
     def _check_identifiers(self):
         identifiers = self._structures.get_array("identifier")
-        if not np.all(np.char.find(identifiers, "/")==-1):
+        if not np.all(np.char.find(identifiers, "/") == -1):
             raise ValueError(
                 "Structure identifiers must not contain '/'. "
                 "Use .structure_file_path to use existing POSCAR files"

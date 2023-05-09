@@ -9,8 +9,14 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
 from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
-from pyiron_contrib.protocol.primitive.one_state import Counter, CreateJob, ExternalHamiltonian, GradientDescent, \
-    InitialPositions, NEBForces
+from pyiron_contrib.protocol.primitive.one_state import (
+    Counter,
+    CreateJob,
+    ExternalHamiltonian,
+    GradientDescent,
+    InitialPositions,
+    NEBForces,
+)
 from pyiron_contrib.protocol.primitive.two_state import IsGEq
 from pyiron_contrib.protocol.list import SerialList, AutoList
 from pyiron_contrib.protocol.utils import Pointer
@@ -20,8 +26,10 @@ Protocol for nudged elastic band (NEB) minimization.
 """
 
 __author__ = "Liam Huber, Raynol Dsouza, Jan Janssen"
-__copyright__ = "Copyright 2019, Max-Planck-Institut für Eisenforschung GmbH " \
-                "- Computational Materials Design (CM) Department"
+__copyright__ = (
+    "Copyright 2019, Max-Planck-Institut für Eisenforschung GmbH "
+    "- Computational Materials Design (CM) Department"
+)
 __version__ = "0.0"
 __maintainer__ = "Liam Huber"
 __email__ = "huber@mpie.de"
@@ -67,8 +75,8 @@ class NEB(CompoundVertex):
         id_ = self.input.default
         id_.n_steps = 100
         id_.f_tol = 1e-4
-        id_.spring_constant = 1.
-        id_.tangent_style = 'upwinding'
+        id_.spring_constant = 1.0
+        id_.tangent_style = "upwinding"
         id_.use_climbing_image = True
         id_.smoothing = None
         id_.gamma0 = 0.1
@@ -92,12 +100,13 @@ class NEB(CompoundVertex):
         g.make_pipeline(
             g.initialize_jobs,
             g.interpolate_images,
-            g.check_steps, 'false',
+            g.check_steps,
+            "false",
             g.calc_static,
             g.neb_forces,
             g.gradient_descent,
             g.clock,
-            g.check_steps
+            g.check_steps,
         )
         g.starting_vertex = self.graph.initialize_jobs
         g.restarting_vertex = self.graph.check_steps
@@ -125,13 +134,19 @@ class NEB(CompoundVertex):
         # calc_static
         g.calc_static.input.n_children = ip.n_images
         g.calc_static.direct.structure = ip.structure_initial
-        g.calc_static.broadcast.project_path = gp.initialize_jobs.output.project_path[-1]
+        g.calc_static.broadcast.project_path = gp.initialize_jobs.output.project_path[
+            -1
+        ]
         g.calc_static.broadcast.job_name = gp.initialize_jobs.output.job_names[-1]
-        g.calc_static.broadcast.default.positions = gp.interpolate_images.output.initial_positions[-1]
+        g.calc_static.broadcast.default.positions = (
+            gp.interpolate_images.output.initial_positions[-1]
+        )
         g.calc_static.broadcast.positions = gp.gradient_descent.output.positions[-1]
 
         # neb_forces
-        g.neb_forces.input.default.positions = gp.interpolate_images.output.initial_positions[-1]
+        g.neb_forces.input.default.positions = (
+            gp.interpolate_images.output.initial_positions[-1]
+        )
 
         g.neb_forces.input.positions = gp.gradient_descent.output.positions[-1]
         g.neb_forces.input.energies = gp.calc_static.output.energy_pot[-1]
@@ -144,9 +159,13 @@ class NEB(CompoundVertex):
 
         # gradient_descent
         g.gradient_descent.input.n_children = ip.n_images
-        g.gradient_descent.broadcast.default.positions = gp.interpolate_images.output.initial_positions[-1]
+        g.gradient_descent.broadcast.default.positions = (
+            gp.interpolate_images.output.initial_positions[-1]
+        )
 
-        g.gradient_descent.broadcast.positions = gp.gradient_descent.output.positions[-1]
+        g.gradient_descent.broadcast.positions = gp.gradient_descent.output.positions[
+            -1
+        ]
         g.gradient_descent.broadcast.forces = gp.neb_forces.output.forces[-1]
         g.gradient_descent.direct.masses = ip.structure_initial.get_masses
         g.gradient_descent.direct.gamma0 = ip.gamma0
@@ -158,9 +177,9 @@ class NEB(CompoundVertex):
     def get_output(self):
         gp = Pointer(self.graph)
         return {
-            'energy_pot': ~gp.calc_static.output.energy_pot[-1],
-            'positions': ~gp.gradient_descent.output.positions[-1],
-            'forces': ~gp.neb_forces.output.forces[-1]
+            "energy_pot": ~gp.calc_static.output.energy_pot[-1],
+            "positions": ~gp.gradient_descent.output.positions[-1],
+            "forces": ~gp.neb_forces.output.forces[-1],
         }
 
     def _get_energies(self, frame=None):
@@ -186,8 +205,8 @@ class NEB(CompoundVertex):
             _, ax = plt.subplots()
         if plot_kwargs is None:
             plot_kwargs = {}
-        if 'marker' not in plot_kwargs.keys():
-            plot_kwargs = {'marker': 'o'}
+        if "marker" not in plot_kwargs.keys():
+            plot_kwargs = {"marker": "o"}
         energies = np.array(self._get_energies(frame=frame))
         ax.plot(energies - energies[0], **plot_kwargs)
         ax.set_ylabel("Energy")
@@ -229,10 +248,13 @@ class NEB(CompoundVertex):
         Returns:
             (float): the backward migration barrier.
         """
-        return self._get_directional_barrier(frame=frame, anchor_element=-1, use_minima=use_minima)
+        return self._get_directional_barrier(
+            frame=frame, anchor_element=-1, use_minima=use_minima
+        )
 
     def get_barrier(self, frame=None, use_minima=True):
         return self.get_forward_barrier(frame=frame, use_minima=use_minima)
+
     get_barrier.__doc__ = get_forward_barrier.__doc__
 
 

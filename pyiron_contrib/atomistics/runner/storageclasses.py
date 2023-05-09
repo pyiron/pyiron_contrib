@@ -36,11 +36,14 @@ from abc import abstractmethod
 import numpy as np
 
 from runnerase.symmetryfunctions import SymmetryFunctionSet
-from runnerase.storageclasses import (RunnerSymmetryFunctionValues,
-                                      RunnerStructureSymmetryFunctionValues,
-                                      RunnerSplitTrainTest,
-                                      RunnerFitResults,
-                                      RunnerWeights, RunnerScaling)
+from runnerase.storageclasses import (
+    RunnerSymmetryFunctionValues,
+    RunnerStructureSymmetryFunctionValues,
+    RunnerSplitTrainTest,
+    RunnerFitResults,
+    RunnerWeights,
+    RunnerScaling,
+)
 from pyiron_base import ProjectHDFio
 from pyiron_base import HasHDF
 from pyiron_base import FlattenedStorage
@@ -51,12 +54,9 @@ from .utils import pad, unpad
 class HDFSymmetryFunctionValues(FlattenedStorage):
     """Extend runnerase RunnerSymmetryFunctionValues with HDF5 compatibility."""
 
-    __hdf_version__ = '0.3.0'
+    __hdf_version__ = "0.3.0"
 
-    def from_runnerase(
-        self,
-        runnerase_sfvalues: RunnerSymmetryFunctionValues
-    ) -> None:
+    def from_runnerase(self, runnerase_sfvalues: RunnerSymmetryFunctionValues) -> None:
         """Fill `self` with information of the corresponding `runnerase` object.
 
         `runnerase` stores the symmetry function values of each structure in
@@ -84,17 +84,17 @@ class HDFSymmetryFunctionValues(FlattenedStorage):
             for a whole dataset.
         """
         for structure_sfvalues in runnerase_sfvalues.data:
-
             # Preprocess the symmetry function value arrays.
             sfvalues_arrays = {}
             for element, sfvalues in structure_sfvalues.data.items():
-                name = f'sfvalues_{element}'
+                name = f"sfvalues_{element}"
                 shape = (sfvalues.shape[1],)
                 # Add arrays for storing the symmetry function values of all
                 # atoms of the same `element`, unless they are already present.
                 if name not in self.list_arrays():
-                    self.add_array(name, shape=shape, dtype=np.float64,
-                                   per='element', fill=np.NaN)
+                    self.add_array(
+                        name, shape=shape, dtype=np.float64, per="element", fill=np.NaN
+                    )
 
                 # Pad the sfvalues of the current `element` with `np.NaN` rows,
                 # so that the total length is equal to the number of atoms in
@@ -109,7 +109,7 @@ class HDFSymmetryFunctionValues(FlattenedStorage):
                 energy_short=structure_sfvalues.energy_short,
                 energy_elec=structure_sfvalues.energy_elec,
                 charge=structure_sfvalues.charge,
-                **sfvalues_arrays
+                **sfvalues_arrays,
             )
 
     def to_runnerase(self) -> RunnerSymmetryFunctionValues:
@@ -128,16 +128,16 @@ class HDFSymmetryFunctionValues(FlattenedStorage):
             struct_sfvalues = RunnerStructureSymmetryFunctionValues()
 
             # Fill the object with per-chunk properties.
-            struct_sfvalues.energy_total = self['energy_total', chunk_idx]
-            struct_sfvalues.energy_short = self['energy_short', chunk_idx]
-            struct_sfvalues.energy_elec = self['energy_elec', chunk_idx]
-            struct_sfvalues.charge = self['charge', chunk_idx]
+            struct_sfvalues.energy_total = self["energy_total", chunk_idx]
+            struct_sfvalues.energy_short = self["energy_short", chunk_idx]
+            struct_sfvalues.energy_elec = self["energy_elec", chunk_idx]
+            struct_sfvalues.charge = self["charge", chunk_idx]
 
             # Read the symmetry function values.
             for arrayname in self.list_arrays():
-                if arrayname.startswith('sfvalues'):
-                    element = arrayname.split('_')[1]
-                    sfvalues = self[f'sfvalues_{element}', chunk_idx]
+                if arrayname.startswith("sfvalues"):
+                    element = arrayname.split("_")[1]
+                    sfvalues = self[f"sfvalues_{element}", chunk_idx]
                     struct_sfvalues.data[element] = unpad(sfvalues)
 
             # Append the structure to the container object
@@ -150,7 +150,7 @@ class HDFSymmetryFunctionValues(FlattenedStorage):
 class RunneraseHDFMixin(HasHDF):
     """Abstract Mixin to add HDF5 compatibility to runnerase classes."""
 
-    __hdf_version__ = '0.3.0'
+    __hdf_version__ = "0.3.0"
 
     @property
     @abstractmethod
@@ -166,9 +166,13 @@ class RunneraseHDFMixin(HasHDF):
 
     def from_runnerase(
         self,
-        runnerase_class: Union[RunnerSplitTrainTest, RunnerWeights,
-                               RunnerScaling, RunnerFitResults,
-                               RunnerSymmetryFunctionValues]
+        runnerase_class: Union[
+            RunnerSplitTrainTest,
+            RunnerWeights,
+            RunnerScaling,
+            RunnerFitResults,
+            RunnerSymmetryFunctionValues,
+        ],
     ) -> None:
         """Fill `self` with information of the corresponding `runnerase` object.
 
@@ -179,9 +183,15 @@ class RunneraseHDFMixin(HasHDF):
         for prop in self.runnerase_properties:
             self.__dict__[prop] = runnerase_class.__dict__[prop]
 
-    def to_runnerase(self) -> Union[RunnerSplitTrainTest, RunnerWeights,
-                                    RunnerScaling, RunnerFitResults,
-                                    RunnerSymmetryFunctionValues]:
+    def to_runnerase(
+        self,
+    ) -> Union[
+        RunnerSplitTrainTest,
+        RunnerWeights,
+        RunnerScaling,
+        RunnerFitResults,
+        RunnerSymmetryFunctionValues,
+    ]:
         """Create the corresponding `runnerase` object from `self`.
 
         Returns:
@@ -202,14 +212,17 @@ class RunneraseHDFMixin(HasHDF):
             hdf (ProjectHDFio): The HDF file where `self` will be stored.
         """
         for prop in self.runnerase_properties:
-            hdf[f'{prop}'] = self.__dict__[prop]
+            hdf[f"{prop}"] = self.__dict__[prop]
 
     def _from_hdf(
-        self,
-        hdf: ProjectHDFio,
-        version: Optional[str] = None
-    ) -> Union[RunnerSplitTrainTest, RunnerWeights, RunnerScaling,
-               RunnerFitResults, RunnerSymmetryFunctionValues]:
+        self, hdf: ProjectHDFio, version: Optional[str] = None
+    ) -> Union[
+        RunnerSplitTrainTest,
+        RunnerWeights,
+        RunnerScaling,
+        RunnerFitResults,
+        RunnerSymmetryFunctionValues,
+    ]:
         """Read `self` from HDF5 storage.
 
         Args:
@@ -217,8 +230,9 @@ class RunneraseHDFMixin(HasHDF):
             version (str): The HDF version of the storage file.
         """
         if version != self.__hdf_version__:
-            raise RuntimeError('Invalid HDF5 version found while reading '
-                               + self.__class__.__name__)
+            raise RuntimeError(
+                "Invalid HDF5 version found while reading " + self.__class__.__name__
+            )
 
         # Open HDF file at the right group with a context manager.
         for node in hdf.list_nodes():
@@ -236,22 +250,19 @@ class RunneraseHDFMixin(HasHDF):
 class HDFSymmetryFunctionSet(SymmetryFunctionSet, RunneraseHDFMixin):
     """Extend runnerase SymmetryFunctionSet with HDF5 compatibility."""
 
-    __hdf_version__ = '0.3.0'
+    __hdf_version__ = "0.3.0"
 
     @property
     def runnerase_properties(self):
         """Show class properties stored in `SymmetryFunctionSet` objects."""
-        return ['_sets', '_symmetryfunctions', 'min_distances']
+        return ["_sets", "_symmetryfunctions", "min_distances"]
 
     @property
     def baseclass(self):
         """Define the base class which is wrapped by this HDF class."""
         return SymmetryFunctionSet
 
-    def _to_hdf(
-        self,
-        hdf: ProjectHDFio
-    ) -> None:
+    def _to_hdf(self, hdf: ProjectHDFio) -> None:
         """Write `self` to HDF5 storage.
 
         `runnerase`s SymmetryFunctionSet has the convenient property that
@@ -264,16 +275,14 @@ class HDFSymmetryFunctionSet(SymmetryFunctionSet, RunneraseHDFMixin):
         for idx, sfset in enumerate(self.sets):
             hdfset = HDFSymmetryFunctionSet()
             hdfset.from_runnerase(sfset)
-            hdfset.to_hdf(hdf=hdf, group_name=f'set__index_{idx}')
+            hdfset.to_hdf(hdf=hdf, group_name=f"set__index_{idx}")
 
         symmetryfunctions = [sf.to_list() for sf in self.symmetryfunctions]
-        hdf['symmetryfunctions__index_0'] = symmetryfunctions
+        hdf["symmetryfunctions__index_0"] = symmetryfunctions
 
     def _from_hdf(
-        self,
-        hdf: ProjectHDFio,
-        version: Optional[str] = None
-    ) -> 'HDFSplitTrainTest':
+        self, hdf: ProjectHDFio, version: Optional[str] = None
+    ) -> "HDFSplitTrainTest":
         """Read `self` from HDF5 storage.
 
         Args:
@@ -281,18 +290,19 @@ class HDFSymmetryFunctionSet(SymmetryFunctionSet, RunneraseHDFMixin):
             version (str): The HDF version of the storage file.
         """
         if version != self.__hdf_version__:
-            raise RuntimeError('Invalid HDF5 version found while reading '
-                               + self.__class__.__name__)
+            raise RuntimeError(
+                "Invalid HDF5 version found while reading " + self.__class__.__name__
+            )
 
         # Reload symmetry function sets.
         for group in hdf.list_groups():
-            if group.startswith('set'):
+            if group.startswith("set"):
                 new_set = hdf.__getitem__(group).to_object()
                 self.append(new_set)
 
         for node in hdf.list_nodes():
             # Reload symmetry functions.
-            if node.startswith('symmetryfunctions'):
+            if node.startswith("symmetryfunctions"):
                 sflist = hdf.__getitem__(node)
                 self.from_list(sflist)
 
@@ -305,7 +315,7 @@ class HDFSplitTrainTest(RunnerSplitTrainTest, RunneraseHDFMixin):
     @property
     def runnerase_properties(self):
         """Show class properties stored in `RunnerSplitTrainTest` objects."""
-        return ['train', 'test']
+        return ["train", "test"]
 
     @property
     def baseclass(self):
@@ -319,8 +329,14 @@ class HDFFitResults(RunnerFitResults, RunneraseHDFMixin):
     @property
     def runnerase_properties(self):
         """Show class properties stored in `RunnerFitResults` objects."""
-        return ['epochs', 'rmse_energy', 'rmse_forces', 'rmse_charge',
-                'opt_rmse_epoch', 'units']
+        return [
+            "epochs",
+            "rmse_energy",
+            "rmse_forces",
+            "rmse_charge",
+            "opt_rmse_epoch",
+            "units",
+        ]
 
     @property
     def baseclass(self):
@@ -334,7 +350,7 @@ class HDFWeights(RunnerWeights, RunneraseHDFMixin):
     @property
     def runnerase_properties(self):
         """Show class properties stored in `RunnerWeights` objects."""
-        return ['data']
+        return ["data"]
 
     @property
     def baseclass(self):
@@ -348,7 +364,7 @@ class HDFScaling(RunnerScaling, RunneraseHDFMixin):
     @property
     def runnerase_properties(self):
         """Show class properties stored in `RunnerScaling` objects."""
-        return ['data', 'target_min', 'target_max']
+        return ["data", "target_min", "target_max"]
 
     @property
     def baseclass(self):

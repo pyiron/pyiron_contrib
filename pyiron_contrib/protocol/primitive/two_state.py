@@ -17,6 +17,7 @@ class BoolVertex(PrimitiveVertex):
 
     Attributes
     """
+
     def __init__(self, name=None):
         super(BoolVertex, self).__init__(name=name)
         self.possible_vertex_states = ["true", "false"]
@@ -34,6 +35,7 @@ class IsGEq(BoolVertex):
         target (float/int): The value being checked. (Default is numpy infinity.)
         threshold (float/int): What it's being checked against. (Default is zero.)
     """
+
     def __init__(self, name=None):
         super(IsGEq, self).__init__(name=name)
         self.input.default.target = np.inf
@@ -55,6 +57,7 @@ class IsLEq(BoolVertex):
         target (float/int): The value being checked. (Default is zero.)
         threshold (float/int): What it's being checked against. (Default is numpy infinity.)
     """
+
     def __init__(self, name=None):
         super(IsLEq, self).__init__(name=name)
         self.input.default.target = np.inf
@@ -101,9 +104,9 @@ class AnyVertex(BoolVertex):
                 else:
                     bool_list.append(False)
             else:
-                raise TypeError(str(i) + ' is not an instance of PrimitiveVertex.')
+                raise TypeError(str(i) + " is not an instance of PrimitiveVertex.")
 
-        print_condition = (len(print_strings) == len(vertices))
+        print_condition = len(print_strings) == len(vertices)
 
         if np.any(bool_list):
             if bool_list[0]:

@@ -77,7 +77,7 @@ class IPiCore(LammpsInteractive):
                "mass \t 1 " + str(mass) + "\n\n" + \
                "include potential.inp\n\n" + \
                "fix \t 1 all ipi " + self.job_name + " " + str(self.custom_input.port) + " unix\n" + \
-               "run \t 5000000"
+               "run \t 10000000"
         with open(filepath, 'w') as file:
             file.writelines(data)
 

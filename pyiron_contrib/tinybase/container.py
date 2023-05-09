@@ -96,29 +96,6 @@ class StorageAttribute:
         self.__doc__ = text
 
 class AbstractContainer(HasStorage, HasHDFAdapaterMixin, abc.ABC):
-    # TODO: this should go into HasStorage, exists here only to give one location to define from_ methods
-    @classmethod
-    def from_attributes(cls, name, *attrs, module=None, bases=(), **default_attrs):
-        """
-        Create a new sub class with given attributes.
-
-        Args:
-            name (str): name of the new class
-            *attrs (str): names of the new attributes
-            module (str, optional): the module path where this class is defined; on CPython this is automagically filled
-                    in, in other python implementations you need to manually provide this value as __name__ when you
-                    call this method for the resulting class to be picklable.
-            bases (list of type): additional base classes
-            **default_attrs (str): names and defaults of new attributes
-        """
-        body = {a: StorageAttribute() for a in attrs}
-        body.update({a: StorageAttribute().default(d) for a, d in default_attrs.items()})
-        T = type(name, bases + (cls,), body)
-        if module is None:
-            # this is also how cpython does it for namedtuple
-            module = sys._getframe(1).f_globals['__name__']
-        T.__module__ = module
-        return T
 
     def take(self, other: 'AbstractContainer'):
         # TODO: think hard about variance of types
@@ -147,6 +124,11 @@ class MDInput(AbstractInput):
     steps = StorageAttribute().type(int)
     timestep = StorageAttribute().type(float)
     temperature = StorageAttribute().type(float)
+    output_steps = StorageAttribute().type(int)
+
+class MinimizeInput(AbstractInput):
+    ionic_force_tolerance = StorageAttribute().type(float)
+    max_steps = StorageAttribute().type(int)
     output_steps = StorageAttribute().type(int)
 
 

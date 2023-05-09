@@ -3,6 +3,7 @@ from pyiron_contrib.tinybase.container import (
             StorageAttribute,
             StructureInput,
             MDInput,
+            MinimizeInput,
             EnergyPotOutput,
             MDOutput
 )
@@ -74,13 +75,6 @@ class AseMDTask(AbstractTask):
         parse()
         dyn.attach(parse, interval=self.input.steps // self.input.output_steps)
         dyn.run(self.input.steps)
-
-MinimizeInput = AbstractInput.from_attributes(
-        'MinimizeInput',
-        ionic_force_tolerance=float,
-        max_steps=int,
-        output_steps=int,
-)
 
 class AseMinimizeInput(AseInput, StructureInput, MinimizeInput):
 

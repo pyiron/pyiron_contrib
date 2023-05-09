@@ -19,3 +19,5 @@ dependencies:
 - pycp2k =0.2.2
 - typeguard =3.0.2
 - aws-sam-translator =1.65.0
+- python >= 3.10
+- lammps

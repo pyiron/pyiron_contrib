@@ -1,12 +1,12 @@
 # pip install master
 pip install --no-deps .
-# Note: This produces build and pyiron_ontology.egg-info directories
+# Note: This produces build and pyiron_contrib.egg-info directories
 
 # clean up
 if [ -d "notebooks" ]; then
     mv notebooks/* .
 fi
-if [ -d "${HOME}/pyiron_ontology" ]; then
+if [ -d "${HOME}/pyiron_contrib" ]; then
     rm -r   ${HOME}/.binder \
             ${HOME}/.ci_support \
             ${HOME}/.github \

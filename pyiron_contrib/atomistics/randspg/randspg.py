@@ -71,7 +71,7 @@ class RandSpg(GenericJob, HasStructure):
 
 
     def validate_ready_to_run(self):
-        if shutil.which("randSpg") is not None:
+        if shutil.which("randSpg") is None:
             raise ValueError("randSpg binary not installed; install with `conda install -c conda-forge randspg")
 
     def set_input_to_read_only(self):

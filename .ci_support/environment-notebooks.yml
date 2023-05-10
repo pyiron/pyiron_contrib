@@ -3,4 +3,3 @@ channels:
 dependencies:
   - python >= 3.10
   - lammps
-  - randspg =0.0.1

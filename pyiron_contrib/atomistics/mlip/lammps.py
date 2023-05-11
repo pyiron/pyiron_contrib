@@ -30,7 +30,8 @@ class LammpsMlip(LammpsInteractive):
         super(LammpsMlip, self).__init__(project, job_name)
         self.input = MlipInput()
         self.__name__ = "LammpsMlip"
-        self.__version__ = None  # Reset the version number to the executable is set automatically
+        self.__version__ = None
+        # Reset the version number to the executable is set automatically
         self._executable = None
         self._executable_activate()
         self._selected_structures = None
@@ -121,11 +122,15 @@ write-cfgs:skip 0
             file_name = self._get_selection_file()
             if os.path.exists(file_name):
                 for cfg in loadcfgs(file_name):
-                    species = np.array(self.potential.Species.iloc[0])[cfg.types.astype(int)]
+                    species = np.array(
+                        self.potential.Species.iloc[0]
+                    )[cfg.types.astype(int)]
                     self.selected_structures.add_structure(
-                            Atoms(symbols=species,
-                                  positions=cfg.pos, cell=cfg.lat,
-                                  pbc=[True, True, True]),
+                            Atoms(
+                                symbols=species,
+                                positions=cfg.pos, cell=cfg.lat,
+                                pbc=[True, True, True]
+                            ),
                             mv_grade=cfg.grade
                     )
                 (

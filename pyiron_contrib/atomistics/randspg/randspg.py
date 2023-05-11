@@ -6,6 +6,7 @@ from __future__ import print_function
 
 import os
 import posixpath
+import shutil
 
 from pyiron_atomistics.atomistics.structure.structurestorage import StructureStorage
 from pyiron_atomistics.atomistics.structure.atoms import Atoms
@@ -76,6 +77,10 @@ class RandSpg(GenericJob, HasStructure):
         return self._structure_storage._get_structure(
             frame=frame, wrap_atoms=wrap_atoms
         )
+
+    def validate_ready_to_run(self):
+        if shutil.which("randSpg") is None:
+            raise ValueError("randSpg binary not installed; install with `conda install -c conda-forge randspg")
 
     def set_input_to_read_only(self):
         """

@@ -56,7 +56,7 @@ setup(
         'workflow': [
             'python>=3.10',
             'ipython',
-            'typeguard==3.0.2'
+            'typeguard==4.0.0'
         ]
     },
     cmdclass=versioneer.get_cmdclass(),

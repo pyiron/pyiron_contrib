@@ -53,9 +53,10 @@ class CoscineMetadata(coscine.resource.MetadataForm, MetaDataTemplate):
 
 
 class CoscineFileData(FileDataTemplate):
-    def __init__(self, coscine_object: coscine.FileObject):
+    def __init__(self, coscine_object: coscine.FileObject, _project=None):
         super().__init__()
         self._coscine_object = coscine_object
+        self._project = _project
         self._data = None
         self._filename = coscine_object.name
         self.filetype = self._get_filetype_from_filename(self._filename)
@@ -66,8 +67,10 @@ class CoscineFileData(FileDataTemplate):
             self.load_data()
             # return "Data not yet loaded! Call `load_data` to load"
         if isinstance(self._data, str):
-            return load_file(self._data, filetype=self.filetype)
-        return load_file(io.BytesIO(self._data), filetype=self.filetype)
+            return load_file(self._data, filetype=self.filetype, project=self._project)
+        return load_file(
+            io.BytesIO(self._data), filetype=self.filetype, project=self._project
+        )
 
     def load_data(self, force_update=False):
         if self._data is None or force_update:
@@ -457,6 +460,10 @@ class CoscineResource(StorageInterface):
         form.parse({"dummy_file_name": metadata_dict})
         return form, store_err
 
+    @property
+    def metadata_df(self):
+        return self._resource.dataframe()
+
     def parse_metadata(self, metadata):
         generated_metadata = self.validate_metadata(metadata, raise_error=False)
         if generated_metadata is None:
@@ -518,7 +525,7 @@ class CoscineConnect:
         self._object = None
         if token is None:
             try:
-                token = state.settings.credentials["COSCINE"]["TOKEN"]
+                token = state.settings.credentials["COSCINE"]["token"]
             except (KeyError, AttributeError):
                 token = getpass(prompt="Coscine token: ")
             self._client = self._connect_client(token)

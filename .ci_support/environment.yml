@@ -16,7 +16,7 @@ dependencies:
 - scikit-image =0.19.3
 - randspg =0.0.1
 - boto3 =1.26.129
-- moto =4.1.8
+- moto =4.1.9
 - pycp2k =0.2.2
 - typeguard =3.0.2
 - aws-sam-translator =1.65.0

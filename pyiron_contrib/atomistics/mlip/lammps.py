@@ -11,6 +11,8 @@ from pyiron_contrib.atomistics.mlip.mlip import read_cgfs
 from pyiron_contrib.atomistics.mlip.cfgs import loadcfgs
 from pyiron_base import GenericParameters
 
+import numpy as np
+
 __author__ = "Jan Janssen"
 __copyright__ = "Copyright 2020, Max-Planck-Institut für Eisenforschung GmbH - " \
                 "Computational Materials Design (CM) Department"
@@ -104,8 +106,10 @@ write-cfgs:skip 0
             file_name = self._get_selection_file()
             if os.path.exists(file_name):
                 for cfg in loadcfgs(file_name):
+                    species = np.array(self.potential.Species.iloc[0])[cfg.types.astype(int)]
                     self.selected_structures.add_structure(
-                            Atoms(species=self.structure.species, indices=cfg.types, positions=cfg.pos, cell=cfg.lat,
+                            Atoms(symbols=species,
+                                  positions=cfg.pos, cell=cfg.lat,
                                   pbc=[True, True, True]),
                             mv_grade=cfg.grade
                     )

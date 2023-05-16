@@ -63,6 +63,7 @@ JOB_CLASS_DICT['SQSMasterMPI'] = 'pyiron_contrib.nofiles.master'
 JOB_CLASS_DICT['LAMMPSMinimizeMPI'] = 'pyiron_contrib.nofiles.master'
 JOB_CLASS_DICT['LAMMPSElasticMPI'] = 'pyiron_contrib.nofiles.master'
 JOB_CLASS_DICT['LAMMPSMinimizeElasticMPI'] = 'pyiron_contrib.nofiles.master'
+JOB_CLASS_DICT['FitsnapJob'] = 'pyiron_contrib.atomistics.fitsnap.job'
 
 
 from ._version import get_versions

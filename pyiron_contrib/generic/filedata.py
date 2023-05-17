@@ -115,7 +115,9 @@ class FileDataTemplate(BaseFileDataTemplate, ABC):
 class FileData(FileDataTemplate):
     """FileData stores an instance of a data file, e.g. a single Image from a measurement."""
 
-    def __init__(self, file, data=None, metadata=None, filetype=None):
+    def __init__(
+        self, file, data=None, metadata=None, filetype=None, pyiron_project=None
+    ):
         """FileData class to store data and associated metadata.
 
         Args:
@@ -126,6 +128,7 @@ class FileData(FileDataTemplate):
                             If provided this overwrites the assumption based on the extension of the filename.
         """
         super().__init__()
+        self._project = pyiron_project
         if data is None:
             self.filename = os.path.split(file)[1]
             self.source = file
@@ -153,7 +156,7 @@ class FileData(FileDataTemplate):
         if self._hasdata:
             return self._data
         else:
-            return load_file(self.source, filetype=self.filetype)
+            return load_file(self.source, filetype=self.filetype, project=self._project)
 
 
 class StorageInterface(HasGroups, ABC):

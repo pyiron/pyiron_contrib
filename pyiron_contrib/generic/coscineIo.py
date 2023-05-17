@@ -53,8 +53,9 @@ class CoscineMetadata(coscine.resource.MetadataForm, MetaDataTemplate):
 
 
 class CoscineFileData(FileDataTemplate):
-    def __init__(self, coscine_object: coscine.FileObject):
+    def __init__(self, coscine_object: coscine.FileObject, pyiron_project=None):
         super().__init__()
+        self._project = pyiron_project
         self._coscine_object = coscine_object
         self._data = None
         self._filename = coscine_object.name
@@ -66,15 +67,15 @@ class CoscineFileData(FileDataTemplate):
             self.load_data()
             # return "Data not yet loaded! Call `load_data` to load"
         if isinstance(self._data, str):
-            return load_file(self._data, filetype=self.filetype)
-        return load_file(io.BytesIO(self._data), filetype=self.filetype)
+            return load_file(self._data, filetype=self.filetype, project=self._project)
+        return load_file(io.BytesIO(self._data), filetype=self.filetype, project=self._project)
 
     def load_data(self, force_update=False):
         if self._data is None or force_update:
             if (
                 "Software IDs" in self.metadata
                 and self.metadata["Software IDs"].raw().lower().startswith("pyiron")
-                and self.filetype in ["h5", "hdf"]
+                and self.filetype in [".h5", ".hdf", 'h5', 'hdf']
             ):
                 tmp_dir = os.path.join(os.curdir, "coscine_downloaded_h5")
                 if not os.path.exists(tmp_dir):
@@ -178,6 +179,7 @@ class CoscineResource(StorageInterface):
         self,
         resource: Union[coscine.Resource, dict, "CoscineResource"],
         parent_path=None,
+        pyiron_project=None
     ):
         """Giving access to a CoScInE Resource to receive or upload files
 
@@ -208,6 +210,7 @@ class CoscineResource(StorageInterface):
                 token, project_id, and resource_id to directly connect to the respective resource.
         """
         super().__init__()
+        self._project=pyiron_project
         if isinstance(resource, coscine.Resource):
             self._resource = resource
         elif isinstance(resource, dict):
@@ -339,7 +342,7 @@ class CoscineResource(StorageInterface):
                 os.path.join(job.working_directory, job.job_name + ".tar.bz2"), form
             )
 
-    def load_job(self, project, name: str, download_working_dir=False):
+    def load_job(self, name: str, download_working_dir=False, project=None):
         """Load job using the provided project instance.
 
         Careful, this job is not saved, and if it is, it would not be in the database!
@@ -348,7 +351,11 @@ class CoscineResource(StorageInterface):
             project: a pyiron Project instance
             name: the name of the job to load
         """
-
+        if project is None and self._project is None:
+            raise ValueError('No project provided')
+        elif project is None:
+            project = self._project
+        
         if name.endswith(".h5"):
             job_name = name[:-3]
         elif name.endswith(".tar.bz2"):
@@ -402,7 +409,8 @@ class CoscineResource(StorageInterface):
                     item,
                     f"Multiple matches for item = {item}, use `get_items(name={item})` to receive all matching files."
                     f" See get_items docstring for more filtering options.",
-                )
+                ),
+                pyiron_project=self._project
             )
         raise ValueError(f"Unknown item {item}")
 
@@ -518,7 +526,7 @@ class CoscineConnect:
         self._object = None
         if token is None:
             try:
-                token = state.settings.credentials["COSCINE"]["TOKEN"]
+                token = state.settings.credentials["COSCINE"]["token"]
             except (KeyError, AttributeError):
                 token = getpass(prompt="Coscine token: ")
             self._client = self._connect_client(token)
@@ -558,11 +566,13 @@ class CoscineProject(HasGroups):
         self,
         project: Union[coscine.Project, coscine.Client, str, None] = None,
         parent_path=None,
+        pyiron_project=None,
     ):
         """
         project(coscine.project/coscine.client/str/None):
         parent_path
         """
+        self._pyiron_project = pyiron_project
         if parent_path is None:
             parent_path = []
         elif isinstance(parent_path, str):
@@ -618,12 +628,12 @@ class CoscineProject(HasGroups):
 
     def __getitem__(self, key):
         if key in self.list_nodes():  # This implies project is not None
-            return CoscineResource(self._project.resource(key), self._path)
+            return CoscineResource(self._project.resource(key), self._path, pyiron_project=self._pyiron_project)
         return self.get_group(key)
 
     def get_node(self, key):
         if key in self.list_nodes():
-            return CoscineResource(self._project.resource(key), self._path)
+            return CoscineResource(self._project.resource(key), self._path, pyiron_project=self._pyiron_project)
         else:
             return KeyError(key)
 
@@ -631,7 +641,7 @@ class CoscineProject(HasGroups):
         if key in self.list_groups() and self._project is not None:
             try:
                 return self.__class__(
-                    self._project.subproject(display_name=key), parent_path=self._path
+                    self._project.subproject(display_name=key), parent_path=self._path, pyiron_project=self._pyiron_project
                 )
             except IndexError:
                 warnings.warn("More than one project matches - returning first match!")
@@ -639,7 +649,7 @@ class CoscineProject(HasGroups):
                     if _pr.display_name == key:
                         return self.__class__(_pr)
         elif key in self.list_groups():
-            return self.__class__(self._client.project(key))
+            return self.__class__(self._client.project(key), pyiron_project=self._pyiron_project)
         else:
             raise KeyError(key)
 

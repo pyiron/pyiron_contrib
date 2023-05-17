@@ -45,6 +45,7 @@ class StorageInterfaceConnector:
         self._store = {}
         if project is None:
             return
+        self._project = project
 
         if "StorageInterface" in project.data:
             self._data = project.data.StorageInterface.copy()
@@ -63,7 +64,7 @@ class StorageInterfaceConnector:
     def _connect_storage(self, name):
         info_dict = self._data[name]
         if info_dict["type"] == str(CoscineResource):
-            self._store[name] = CoscineResource(info_dict["info"])
+            self._store[name] = CoscineResource(info_dict["info"], pyiron_project=self._project)
         elif info_dict["type"] == str(FileS3IO):
             self._store[name] = FileS3IO.from_dict(info_dict["info"])
 

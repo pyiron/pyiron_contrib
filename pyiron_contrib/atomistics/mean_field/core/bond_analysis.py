@@ -266,11 +266,16 @@ class StaticBondAnalysis(_BondAnalysisParent):
             sums += i
             # normalize the bonds
             bonds /= np.linalg.norm(bonds, axis=1)[:, np.newaxis]
+            all_bonds = all_nn_bond_vectors / np.linalg.norm(all_nn_bond_vectors, axis=1)[:, np.newaxis]
             transformation_matrices = []
             for b in bonds:
                 b1 = b.copy()  # first bond is the longitudinal bond
                 # second bond is normal to the first (transverse1). If multiple normal bonds, select 1
-                b2 = bonds[np.argwhere(np.round(bonds@b1, decimals=5) == 0.).flatten()[0]]
+                try:
+                    b2 = bonds[np.argwhere(np.round(bonds@b1, decimals=5) == 0.).flatten()[0]]
+                except IndexError:
+                    # if in case a normal bond is not found for the shell, traverse through the previous shells as well
+                    b2 = all_bonds[np.argwhere(np.round(all_bonds@b1, decimals=5) == 0.).flatten()[0]]
                 # third bond is then  normal to both the first and second bonds (transverse2)
                 b3 = np.cross(b1, b2)
                 if b1.dot(np.cross(b2, b3)) < 0.:  # if this condition is not met

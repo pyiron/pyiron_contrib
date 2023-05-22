@@ -6,7 +6,7 @@ import warnings
 from pyiron_contrib.atomistics.ipi.ipi_core import IPiCore
 
 from xml.etree import ElementTree
-from numpy import random
+import random
 from shutil import copy
 
 __author__ = "Raynol Dsouza"
@@ -25,7 +25,7 @@ class PiMD(IPiCore):
 
     def calc_npt_md(self, temperature=300., pressure=101325e-9, n_beads=4, timestep=1.,
                     temperature_damping_timescale=100., pressure_damping_timescale=1000.,
-                    n_ionic_steps=100, prop_n_print=1, traj_n_print=1, seed=None, port=31415, *args, **kwargs):
+                    n_ionic_steps=100, n_print=1, seed=None, port=31415, constrain_ids=None, *args, **kwargs):
         if not seed:
             random.seed(self.job_name)
             seed = random.randint(1, 99999)
@@ -36,10 +36,10 @@ class PiMD(IPiCore):
         self.custom_input.temperature_damping_timescale = temperature_damping_timescale
         self.custom_input.pressure_damping_timescale = pressure_damping_timescale
         self.custom_input.n_ionic_steps = n_ionic_steps
-        self.custom_input.prop_n_print = prop_n_print
-        self.custom_input.traj_n_print = traj_n_print
+        self.custom_input.n_print = n_print
         self.custom_input.seed = seed
         self.custom_input.port = port
+        self.custom_input.constrain_ids = constrain_ids
 
     def write_template_file(self):
         copy(self._templates_directory + '/pimd_template.xml', self.working_directory + '/pimd_template.xml')
@@ -50,9 +50,9 @@ class PiMD(IPiCore):
         tree = ElementTree.parse(self.working_directory + '/' + xml_filename)
         root = tree.getroot()
         filepath = self.working_directory + '/ipi_input.xml'
-        root[0][0].attrib['stride'] = str(self.custom_input.prop_n_print)
-        for i in range(1, 4):
-            root[0][i].attrib['stride'] = str(self.custom_input.traj_n_print)
+        for i in range(0, 3):
+            root[0][i].attrib['stride'] = str(self.custom_input.n_print)
+        root[0][3].attrib['stride'] = str(self.custom_input.n_ionic_steps)
         root[1].text = str(self.custom_input.n_ionic_steps)
         root[2][0].text = str(self.custom_input.seed)
         root[3][0].text = self.job_name
@@ -60,6 +60,11 @@ class PiMD(IPiCore):
         root[4][0][1].text = str(self.custom_input.temperature)
         root[4][2][0][0][0].text = str(self.custom_input.pressure_damping_timescale)
         root[4][2][0][2].text = str(self.custom_input.timestep)
+        constrain_ids = self.custom_input.constrain_ids.copy()
+        if constrain_ids is not None:
+            if not isinstance(constrain_ids, list):
+                constrain_ids = constrain_ids.tolist()
+            root[4][2][2].text = str(constrain_ids)
         root[4][3][0].text = str(self.custom_input.temperature)
         root[4][3][1].text = str(self.custom_input.pressure)
         tree.write(filepath)

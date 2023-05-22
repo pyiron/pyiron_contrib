@@ -77,7 +77,7 @@ class IPiCore(LammpsInteractive):
                "mass \t 1 " + str(mass) + "\n\n" + \
                "include potential.inp\n\n" + \
                "fix \t 1 all ipi " + self.job_name + " " + str(self.custom_input.port) + " unix\n" + \
-               "run \t 5000000"
+               "run \t 10000000"
         with open(filepath, 'w') as file:
             file.writelines(data)
 
@@ -108,6 +108,7 @@ class IPiCore(LammpsInteractive):
             [self.working_directory + '/./run_ipi.sh', self.working_directory, str(self.server.cores)])
         self.collect_output()
         self.to_hdf()
+        self.status.finished = True
         self.compress()
 
     def collect_props(self):
@@ -136,23 +137,46 @@ class IPiCore(LammpsInteractive):
         self.custom_output.pressure = np.array([float(i) for i in pressure])
         self.custom_output.energy_tot = self.custom_output.energy_pot + self.custom_output.energy_kin
 
-    def collect_cells(self):
-        f = open(self.working_directory + '/ipi_out.pos_0.xyz')
+    @staticmethod
+    def _collect_traj_helper(filename):
+        """
+        For each snapshot collect the cell box edges and angles and the corresponding atom positions.
+        """
+        f = open(filename)
         lines = f.readlines()
-        abc = []
-        ABC = []
-        for x in lines:
-            if x.startswith("#"):
-                split_line = x.split()
-                abc.append([float(i) for i in split_line[2:5]])
-                ABC.append([float(i) for i in split_line[5:8]])
+        # the first line for each snapshot is always the number of atoms.
+        # Identify the line number where each snapshot starts.
+        starts = [
+            i for i, x in enumerate(lines) if x.startswith("#")
+        ] + [len(lines) + 1]  # and also record at what line number the last snapshot ends
+        cell_abc = []  # cell box edges
+        cell_ABC = []  # cell box angles
+        trajectory = []
+        for i, stop in enumerate(starts[1:]):  # ignore the numer of atoms line
+            snap_lines = lines[starts[i]:stop - 1]
+            # second line contains the cell data. Collect it.
+            zeroth_line_values = [n for n in snap_lines[0].split()]
+            cell_abc.append(np.array(zeroth_line_values[2:5], dtype=float))  # collect cell box edges
+            cell_ABC.append(np.array(zeroth_line_values[5:8], dtype=float))  # collect cell box angles
+            # the remaining lines of the snapshot contain the positions/forces. Collect them.
+            temp_list = []
+            for l in snap_lines[1:]:
+                temp_list.append([float(n) for n in l.split()[1:]])  # first column is the species. Ignore it.
+            trajectory.append(temp_list)
         f.close()
-        self.custom_output.cell_abc = np.array(abc)
-        self.custom_output.cell_ABC = np.array(ABC)
+        return np.array(cell_abc), np.array(cell_ABC), np.array(trajectory)
+
+    def collect_trajectory(self):
+        positions_out = self._collect_traj_helper(self.working_directory + '/ipi_out.pos.xyz')
+        forces_out = self._collect_traj_helper(self.working_directory + '/ipi_out.for.xyz')
+        self.custom_output.cell_abc = np.array(positions_out[0])
+        self.custom_output.cell_ABC = np.array(positions_out[1])
+        self.custom_output.positions = np.array(positions_out[2])
+        self.custom_output.forces = np.array(forces_out[2])
 
     def collect_output(self):
         self.collect_props()
-        self.collect_cells()
+        self.collect_trajectory()
 
     def collect_rdf(self):
         f=open(self.working_directory + '/ipi_out.AlAl.rdf.dat', "r")
@@ -165,7 +189,7 @@ class IPiCore(LammpsInteractive):
         f.close()
         return np.array([float(i) for i in rdf_r]), np.array([float(i) for i in rdf_g_r])
 
-    def get_rdf(self, r_min=2., r_max=5., bins=100, thermalize=50):
+    def get_rdf(self, r_min=2., r_max=5., bins=100, thermalize=0):
         self.decompress()
         rdf_list = [self.working_directory + '/./run_rdf.sh',
                     self.working_directory,

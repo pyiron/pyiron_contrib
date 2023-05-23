@@ -10,22 +10,37 @@ from numpy import random
 from shutil import copy
 
 __author__ = "Raynol Dsouza"
-__copyright__ = "Copyright 2022, Max-Planck-Institut für Eisenforschung GmbH " \
-                "- Computational Materials Design (CM) Department"
+__copyright__ = (
+    "Copyright 2022, Max-Planck-Institut für Eisenforschung GmbH "
+    "- Computational Materials Design (CM) Department"
+)
 __version__ = "0.0"
 __maintainer__ = "Raynol Dsouza"
 __email__ = "dsouza@mpie.de"
 __status__ = "development"
 __date__ = "Jan 18, 2023"
 
-class PiMD(IPiCore):
 
+class PiMD(IPiCore):
     def __init__(self, project, job_name):
         super(PiMD, self).__init__(project, job_name)
 
-    def calc_npt_md(self, temperature=300., pressure=101325e-9, n_beads=4, timestep=1.,
-                    temperature_damping_timescale=100., pressure_damping_timescale=1000.,
-                    n_ionic_steps=100, prop_n_print=1, traj_n_print=1, seed=None, port=31415, *args, **kwargs):
+    def calc_npt_md(
+        self,
+        temperature=300.0,
+        pressure=101325e-9,
+        n_beads=4,
+        timestep=1.0,
+        temperature_damping_timescale=100.0,
+        pressure_damping_timescale=1000.0,
+        n_ionic_steps=100,
+        prop_n_print=1,
+        traj_n_print=1,
+        seed=None,
+        port=31415,
+        *args,
+        **kwargs
+    ):
         if not seed:
             random.seed(self.job_name)
             seed = random.randint(1, 99999)
@@ -42,21 +57,24 @@ class PiMD(IPiCore):
         self.custom_input.port = port
 
     def write_template_file(self):
-        copy(self._templates_directory + '/pimd_template.xml', self.working_directory + '/pimd_template.xml')
+        copy(
+            self._templates_directory + "/pimd_template.xml",
+            self.working_directory + "/pimd_template.xml",
+        )
 
     def ipi_write_helper(self, xml_filename):
         if not isinstance(xml_filename, str):
             raise "template must be an xml filename string!"
-        tree = ElementTree.parse(self.working_directory + '/' + xml_filename)
+        tree = ElementTree.parse(self.working_directory + "/" + xml_filename)
         root = tree.getroot()
-        filepath = self.working_directory + '/ipi_input.xml'
-        root[0][0].attrib['stride'] = str(self.custom_input.prop_n_print)
+        filepath = self.working_directory + "/ipi_input.xml"
+        root[0][0].attrib["stride"] = str(self.custom_input.prop_n_print)
         for i in range(1, 4):
-            root[0][i].attrib['stride'] = str(self.custom_input.traj_n_print)
+            root[0][i].attrib["stride"] = str(self.custom_input.traj_n_print)
         root[1].text = str(self.custom_input.n_ionic_steps)
         root[2][0].text = str(self.custom_input.seed)
         root[3][0].text = self.job_name
-        root[4][0][0].text = 'init.xyz'
+        root[4][0][0].text = "init.xyz"
         root[4][0][1].text = str(self.custom_input.temperature)
         root[4][2][0][0][0].text = str(self.custom_input.pressure_damping_timescale)
         root[4][2][0][2].text = str(self.custom_input.timestep)
@@ -66,13 +84,13 @@ class PiMD(IPiCore):
         return tree, root, filepath
 
     def write_ipi_xml(self):
-        tree, root, filepath = self.ipi_write_helper('pimd_template.xml')
-        root[4][0].attrib['nbeads'] = str(self.custom_input.n_beads)
+        tree, root, filepath = self.ipi_write_helper("pimd_template.xml")
+        root[4][0].attrib["nbeads"] = str(self.custom_input.n_beads)
         root[4][2][0][1][0].text = str(self.custom_input.temperature_damping_timescale)
         tree.write(filepath)
 
-class GleMD(PiMD):
 
+class GleMD(PiMD):
     def __init__(self, project, job_name):
         super(GleMD, self).__init__(project, job_name)
 
@@ -84,17 +102,20 @@ class GleMD(PiMD):
         self.custom_input.C = C
 
     def write_template_file(self):
-        copy(self._templates_directory + '/gle_template.xml', self.working_directory + '/gle_template.xml')
+        copy(
+            self._templates_directory + "/gle_template.xml",
+            self.working_directory + "/gle_template.xml",
+        )
 
     def write_ipi_xml(self):
-        tree, root, filepath = self.ipi_write_helper('gle_template.xml')
-        root[4][0].attrib['nbeads'] = str(1)
+        tree, root, filepath = self.ipi_write_helper("gle_template.xml")
+        root[4][0].attrib["nbeads"] = str(1)
         root[4][2][0][1][0].text = str(self.custom_input.A)
         root[4][2][0][1][1].text = str(self.custom_input.C)
         tree.write(filepath)
 
-class PigletMD(PiMD):
 
+class PigletMD(PiMD):
     def __init__(self, project, job_name):
         super(PigletMD, self).__init__(project, job_name)
 
@@ -104,13 +125,16 @@ class PigletMD(PiMD):
         self.custom_input.C = C
 
     def write_template_file(self):
-        copy(self._templates_directory + '/piglet_template.xml', self.working_directory + '/piglet_template.xml')
+        copy(
+            self._templates_directory + "/piglet_template.xml",
+            self.working_directory + "/piglet_template.xml",
+        )
 
     def write_ipi_xml(self):
-        tree, root, filepath = self.ipi_write_helper('piglet_template.xml')
-        root[4][0].attrib['nbeads'] = str(self.custom_input.n_beads)
+        tree, root, filepath = self.ipi_write_helper("piglet_template.xml")
+        root[4][0].attrib["nbeads"] = str(self.custom_input.n_beads)
         for i in range(2):
-            root[4][2][0][1][i].attrib['shape'] = str((self.custom_input.n_beads,9,9))
+            root[4][2][0][1][i].attrib["shape"] = str((self.custom_input.n_beads, 9, 9))
         root[4][2][0][1][0].text = str(self.custom_input.A)
         root[4][2][0][1][1].text = str(self.custom_input.C)
         tree.write(filepath)

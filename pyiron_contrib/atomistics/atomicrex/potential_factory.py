@@ -228,6 +228,7 @@ tersoff_file_params = [
     "A",
 ]
 
+
 # Transform tersoff to abop parameters
 def get_r0(lam1, lam2, A, B):
     return 1 / (lam1 - lam2) * np.log(lam1 * A / (lam2 * B))
@@ -646,7 +647,6 @@ class EAMPotential(AbstractPotential, EAMlikeMixin):
         resolution=None,
         species=None,
     ):
-
         super().__init__(init=init)
         if init is None:
             self.pair_interactions = DataContainer(table_name="pair_interactions")
@@ -762,7 +762,6 @@ class EAMPotential(AbstractPotential, EAMlikeMixin):
                     leftover, value
                 )
             else:
-
                 raise KeyError(
                     f"Can't find {identifier} in potential, probably something went wrong during parsing.\n"
                     "Fitting parameters of screening functions probably doesn't work right now"
@@ -868,7 +867,6 @@ class ADPotential(AbstractPotential, EAMlikeMixin):
         resolution=None,
         species=None,
     ):
-
         super().__init__(init=init)
         if init is None:
             self.pair_interactions = DataContainer(table_name="pair_interactions")

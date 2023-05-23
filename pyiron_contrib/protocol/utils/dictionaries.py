@@ -6,7 +6,7 @@ import re
 import numpy as np
 from collections import OrderedDict
 from pyiron_contrib.protocol.utils.pointer import Pointer
-from pyiron_contrib.protocol.utils.misc import  LoggerMixin, fullname
+from pyiron_contrib.protocol.utils.misc import LoggerMixin, fullname
 from pyiron_atomistics.atomistics.structure.atoms import Atoms
 
 """
@@ -14,8 +14,10 @@ Classes to setup input and output dataflows for protocols
 """
 
 __author__ = "Dominik Gehringer, Liam Huber"
-__copyright__ = "Copyright 2019, Max-Planck-Institut für Eisenforschung GmbH " \
-                "- Computational Materials Design (CM) Department"
+__copyright__ = (
+    "Copyright 2019, Max-Planck-Institut für Eisenforschung GmbH "
+    "- Computational Materials Design (CM) Department"
+)
 __version__ = "0.0"
 __maintainer__ = "Liam Huber"
 __email__ = "huber@mpie.de"
@@ -23,11 +25,11 @@ __status__ = "development"
 __date__ = "December 10, 2019"
 
 # define a regex to find integer values
-integer_regex = re.compile(r'[-+]?([1-9]\d*|0)')
+integer_regex = re.compile(r"[-+]?([1-9]\d*|0)")
 
 
-TIMELINE_DICT_KEY_FORMAT = 't_{time}'
-GENERIC_LIST_INDEX_FORMAT = 'i_{index}'
+TIMELINE_DICT_KEY_FORMAT = "t_{time}"
+GENERIC_LIST_INDEX_FORMAT = "i_{index}"
 
 
 class IODictionary(dict, LoggerMixin):
@@ -38,11 +40,7 @@ class IODictionary(dict, LoggerMixin):
     """
 
     # those members are not accessible
-    _protected_members = [
-        'resolve',
-        'to_hdf',
-        'from_hdf'
-    ]
+    _protected_members = ["resolve", "to_hdf", "from_hdf"]
 
     def __init__(self, **kwargs):
         super(IODictionary, self).__init__(**kwargs)
@@ -59,7 +57,12 @@ class IODictionary(dict, LoggerMixin):
                 return ~value
             elif isinstance(value, list):  # TODO: Allow other containers than list
                 cls = type(value)
-                return cls([element if not isinstance(element, Pointer) else ~element for element in value])
+                return cls(
+                    [
+                        element if not isinstance(element, Pointer) else ~element
+                        for element in value
+                    ]
+                )
             else:
                 return value
         return super(IODictionary, self).__getitem__(item)
@@ -92,7 +95,7 @@ class IODictionary(dict, LoggerMixin):
 
         """
         # try to call to_hdf first
-        if hasattr(v, 'to_hdf'):
+        if hasattr(v, "to_hdf"):
             v.to_hdf(hdf, group_name=k)
             result = True
         else:
@@ -119,13 +122,16 @@ class IODictionary(dict, LoggerMixin):
             # if we deal with a dictionary we have to open a new group anyway
             with hdf.open(group_name) as server:
                 # store class metadata
-                server['TYPE'] = str(type(value))
-                server['FULLNAME'] = fullname(value)
+                server["TYPE"] = str(type(value))
+                server["FULLNAME"] = fullname(value)
                 for k, v in value.items():
                     # try to save it
                     if not isinstance(k, str):
                         # it is possible that the keys are not strings, thus we have to enforce this
-                        self.logger.warning('Key "%s" is not a string, it will be converted to %s' % (k, str(k)))
+                        self.logger.warning(
+                            'Key "%s" is not a string, it will be converted to %s'
+                            % (k, str(k))
+                        )
                         k = str(k)
                     # try it the easy way first (either call v.to_hdf or directly save it
                     if self._try_save_key(k, v, server):
@@ -151,8 +157,8 @@ class IODictionary(dict, LoggerMixin):
                 else:
                     with hdf.open(group_name) as server:
                         # again write the metadata
-                        server['TYPE'] = str(type(value))
-                        server['FULLNAME'] = fullname(value)
+                        server["TYPE"] = str(type(value))
+                        server["FULLNAME"] = fullname(value)
                         for i, v in enumerate(value):
                             index_key = GENERIC_LIST_INDEX_FORMAT.format(index=i)
                             if self._try_save_key(index_key, v, server):
@@ -185,29 +191,30 @@ class IODictionary(dict, LoggerMixin):
 
         # handle special types at first
         # try a simple load
-        if 'TYPE' not in hdf[group_name].list_nodes():
+        if "TYPE" not in hdf[group_name].list_nodes():
             return hdf[group_name]
-        elif hdf[group_name]['TYPE'] == str(IODictionary):
+        elif hdf[group_name]["TYPE"] == str(IODictionary):
             iodict = IODictionary()
             iodict.from_hdf(hdf, group_name)
             return iodict
-        elif hdf[group_name]['TYPE'] == str(Atoms):
+        elif hdf[group_name]["TYPE"] == str(Atoms):
             struct = Atoms()
             struct.from_hdf(hdf, group_name)
             return struct
         # FULLNAME will only be present if _generic_to_hdf wrote the underlying object
-        elif 'FULLNAME' in hdf[group_name].keys():
+        elif "FULLNAME" in hdf[group_name].keys():
             with hdf.open(group_name) as server:
                 from pydoc import locate
+
                 # convert the class qualifier to a type
-                cls_ = locate(server['FULLNAME'])
+                cls_ = locate(server["FULLNAME"])
                 # handle a dictionary
                 if issubclass(cls_, dict):
                     result = {}
                     # nodes are primitive objects -> that is easy
                     for k in server.list_nodes():
                         # skip the special nodes
-                        if k in ('TYPE', 'FULLNAME'):
+                        if k in ("TYPE", "FULLNAME"):
                             continue
                         result[k] = server[k]
 
@@ -225,17 +232,17 @@ class IODictionary(dict, LoggerMixin):
                     indices = []
 
                     for k in server.list_nodes():
-                        if k in ('TYPE', 'FULLNAME'):
+                        if k in ("TYPE", "FULLNAME"):
                             continue
                         # nodes are trivial
-                        index = int(k.replace('i_', ''))
+                        index = int(k.replace("i_", ""))
                         result.append(server[k])
                         indices.append(index)
                         # TODO: Since Atoms object appear as a node we might have to call it here too
 
                     for k in server.list_groups():
                         # we do have the recursive call here
-                        index = int(k.replace('i_', ''))
+                        index = int(k.replace("i_", ""))
                         result.append(self._generic_from_hdf(server, group_name=k))
                         indices.append(index)
 
@@ -245,13 +252,15 @@ class IODictionary(dict, LoggerMixin):
                     result = cls_([val for idx, val in result])
                     return result
                 else:
-                    raise ImportError('Could not locate type(%s)' % server['FULLNAME'])
+                    raise ImportError("Could not locate type(%s)" % server["FULLNAME"])
         else:
-            raise TypeError('I do not know how to deserialize type(%s)' % hdf[group_name])
+            raise TypeError(
+                "I do not know how to deserialize type(%s)" % hdf[group_name]
+            )
 
     def to_hdf(self, hdf, group_name=None):
         with hdf.open(group_name) as hdf5_server:
-            hdf5_server['TYPE'] = str(type(self))
+            hdf5_server["TYPE"] = str(type(self))
 
             for key in list(self.keys()):
                 # default value is not to save any property
@@ -272,6 +281,7 @@ class IODictionary(dict, LoggerMixin):
                     # The current workaround now is to try to delete the dataset and rewrite it
                     # TODO: Change to `del hdf5_server[key]` once pyiron.base.generic.hdfio is fixed
                     import posixpath
+
                     # hdf5_server.h5_path is relative
                     del hdf5_server[posixpath.join(hdf5_server.h5_path, key)]
                     # now we try again
@@ -285,7 +295,7 @@ class IODictionary(dict, LoggerMixin):
     def from_hdf(self, hdf, group_name):
         with hdf.open(group_name) as hdf5_server:
             for key in hdf5_server.list_nodes():
-                if key in ('TYPE', 'FULLNAME'):
+                if key in ("TYPE", "FULLNAME"):
                     continue
                 # Nodes are leaves, so just save them directly
                 # structures will be listed as nodes
@@ -293,7 +303,9 @@ class IODictionary(dict, LoggerMixin):
                     setattr(self, key, hdf5_server[key])
                 except Exception as e:
                     self.logger.exception('Failed to load "{}"'.format(key), exc_info=e)
-                    setattr(self, key, self._generic_from_hdf(hdf5_server, group_name=key))
+                    setattr(
+                        self, key, self._generic_from_hdf(hdf5_server, group_name=key)
+                    )
 
             for key in hdf5_server.list_groups():
                 # Groups are more complex data types with their own depth
@@ -318,13 +330,13 @@ class InputDictionary(IODictionary):
             return self.default.__getitem__(item)
 
     def __getattr__(self, item):
-        if item == 'default':
+        if item == "default":
             return object.__getattribute__(self, item)
         else:
             return super(InputDictionary, self).__getattr__(item)
 
     def __setattr__(self, key, value):
-        if key == 'default':
+        if key == "default":
             object.__setattr__(self, key, value)
         else:
             super(InputDictionary, self).__setattr__(key, value)
@@ -351,15 +363,16 @@ class InputDictionary(IODictionary):
 
 class TimelineDict(LoggerMixin, OrderedDict):
     """
-        Dictionary which acts as timeline
+    Dictionary which acts as timeline
     """
 
     def _parse_key(self, k):
-
         # leftover should contain only a number, try to parse it
         integer_matches = integer_regex.findall(k)
         if len(integer_matches) > 1:
-            self.logger.warning('More than one integer was found. I\'ll take the first one')
+            self.logger.warning(
+                "More than one integer was found. I'll take the first one"
+            )
             integer_matches = [integer_matches[0]]
 
         try:
@@ -393,10 +406,7 @@ class TimelineDict(LoggerMixin, OrderedDict):
 
     @property
     def array(self):
-        return np.array([
-            list(self._super_keys()),
-            list(self.values())
-        ])
+        return np.array([list(self._super_keys()), list(self.values())])
 
     def _check_key_type(self, key):
         if isinstance(key, str):
@@ -404,11 +414,16 @@ class TimelineDict(LoggerMixin, OrderedDict):
         elif isinstance(key, int):
             time = key
         elif isinstance(key, float):
-            self.logger.warning('Floating points number are not allowed here. They will be converted to an integer')
+            self.logger.warning(
+                "Floating points number are not allowed here. They will be converted to an integer"
+            )
             time = int(key)
         else:
-            raise TypeError('Only strings of format "%s", integers and floats are allowed as keys'.format(
-                TIMELINE_DICT_KEY_FORMAT))
+            raise TypeError(
+                'Only strings of format "%s", integers and floats are allowed as keys'.format(
+                    TIMELINE_DICT_KEY_FORMAT
+                )
+            )
         return time
 
     def __setitem__(self, key, value):

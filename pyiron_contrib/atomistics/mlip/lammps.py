@@ -14,8 +14,10 @@ from pyiron_base import GenericParameters
 import numpy as np
 
 __author__ = "Jan Janssen"
-__copyright__ = "Copyright 2020, Max-Planck-Institut für Eisenforschung GmbH - " \
-                "Computational Materials Design (CM) Department"
+__copyright__ = (
+    "Copyright 2020, Max-Planck-Institut für Eisenforschung GmbH - "
+    "Computational Materials Design (CM) Department"
+)
 __version__ = "1.0"
 __maintainer__ = "Jan Janssen"
 __email__ = "janssen@mpie.de"
@@ -28,7 +30,8 @@ class LammpsMlip(LammpsInteractive):
         super(LammpsMlip, self).__init__(project, job_name)
         self.input = MlipInput()
         self.__name__ = "LammpsMlip"
-        self.__version__ = None  # Reset the version number to the executable is set automatically
+        self.__version__ = None
+        # Reset the version number to the executable is set automatically
         self._executable = None
         self._executable_activate()
         self._selected_structures = None
@@ -43,13 +46,16 @@ class LammpsMlip(LammpsInteractive):
 
     def write_input(self):
         super(LammpsMlip, self).write_input()
-        if self.input.mlip['mtp-filename'] == 'auto':
-            self.input.mlip['mtp-filename'] = os.path.basename(self.potential['Filename'][0][0])
+        if self.input.mlip["mtp-filename"] == "auto":
+            self.input.mlip["mtp-filename"] = os.path.basename(
+                self.potential["Filename"][0][0]
+            )
         self.input.mlip.write_file(file_name="mlip.ini", cwd=self.working_directory)
 
     def convergence_check(self):
         for line in self["error.out"]:
-            if line.startswith("MLIP: Breaking threshold exceeded"): return False
+            if line.startswith("MLIP: Breaking threshold exceeded"):
+                return False
         return True
 
     def enable_active_learning(self, threshold=2.0, threshold_break=5.0):
@@ -63,7 +69,8 @@ class LammpsMlip(LammpsInteractive):
             threshold_break (float): stop the MD run after seeing a structure with extrapolation grade larger than this
         """
         self.executable.accepted_return_codes += [8]
-        self.input.mlip.load_string(f"""\
+        self.input.mlip.load_string(
+            f"""\
 mtp-filename auto
 calculate-efs TRUE
 select TRUE
@@ -73,10 +80,13 @@ select:save-selected selected.cfg
 select:load-state state.mvs
 select:log selection.log
 write-cfgs:skip 0
-""")
+"""
+        )
 
     def _get_selection_file(self):
-        return os.path.join(self.working_directory, self.input.mlip['select:save-selected'])
+        return os.path.join(
+            self.working_directory, self.input.mlip["select:save-selected"]
+        )
 
     @property
     def _selection_enabled(self):
@@ -89,10 +99,16 @@ write-cfgs:skip 0
 
         Only available if :method:`.enable_active_learning` was called and once the job has been collected.
         """
-        if not (self.status.collect or self.status.finished or self.status.not_converged):
-            raise ValueError("Selected structures are only available once the job has finished!")
+        if not (
+            self.status.collect or self.status.finished or self.status.not_converged
+        ):
+            raise ValueError(
+                "Selected structures are only available once the job has finished!"
+            )
         if not self._selection_enabled:
-            raise ValueError("Selected structures are only available after calling enable_active_learning()!")
+            raise ValueError(
+                "Selected structures are only available after calling enable_active_learning()!"
+            )
         if self._selected_structures is None:
             if "selected" in self["output"].list_groups():
                 self._selected_structures = self["output/selected"].to_object()
@@ -102,26 +118,43 @@ write-cfgs:skip 0
 
     def collect_output(self):
         super(LammpsMlip, self).collect_output()
-        if 'select:save-selected' in self.input.mlip._dataset['Parameter']:
+        if "select:save-selected" in self.input.mlip._dataset["Parameter"]:
             file_name = self._get_selection_file()
             if os.path.exists(file_name):
                 for cfg in loadcfgs(file_name):
-                    species = np.array(self.potential.Species.iloc[0])[cfg.types.astype(int)]
+                    species = np.array(self.potential.Species.iloc[0])[
+                        cfg.types.astype(int)
+                    ]
                     self.selected_structures.add_structure(
-                            Atoms(symbols=species,
-                                  positions=cfg.pos, cell=cfg.lat,
-                                  pbc=[True, True, True]),
-                            mv_grade=cfg.grade
+                        Atoms(
+                            symbols=species,
+                            positions=cfg.pos,
+                            cell=cfg.lat,
+                            pbc=[True, True, True],
+                        ),
+                        mv_grade=cfg.grade,
                     )
-                cell, positions, forces, stress, energy, indicies, grades, jobids, timesteps = read_cgfs(file_name=file_name)
+                (
+                    cell,
+                    positions,
+                    forces,
+                    stress,
+                    energy,
+                    indicies,
+                    grades,
+                    jobids,
+                    timesteps,
+                ) = read_cgfs(file_name=file_name)
                 with self.project_hdf5.open("output/mlip") as hdf5_output:
-                    hdf5_output['forces'] = forces
-                    hdf5_output['energy_tot'] = energy
-                    hdf5_output['pressures'] = stress
-                    hdf5_output['cells'] = cell
-                    hdf5_output['positions'] = positions
-                    hdf5_output['indicies'] = indicies
-            self.selected_structures.to_hdf(self.project_hdf5.open("output"), "selected")
+                    hdf5_output["forces"] = forces
+                    hdf5_output["energy_tot"] = energy
+                    hdf5_output["pressures"] = stress
+                    hdf5_output["cells"] = cell
+                    hdf5_output["positions"] = positions
+                    hdf5_output["indicies"] = indicies
+            self.selected_structures.to_hdf(
+                self.project_hdf5.open("output"), "selected"
+            )
 
 
 class MlipInput(Input):
@@ -131,7 +164,7 @@ class MlipInput(Input):
 
     def to_hdf(self, hdf5):
         """
-        
+
         Args:
             hdf5:
         Returns:
@@ -142,7 +175,7 @@ class MlipInput(Input):
 
     def from_hdf(self, hdf5):
         """
-        
+
         Args:
             hdf5:
         Returns:
@@ -153,14 +186,17 @@ class MlipInput(Input):
 
 
 class MlipParameter(GenericParameters):
-    def __init__(self, separator_char=' ', comment_char='#', table_name="mlip_inp"):
-        super(MlipParameter, self).__init__(separator_char=separator_char, comment_char=comment_char, table_name=table_name)
-        
+    def __init__(self, separator_char=" ", comment_char="#", table_name="mlip_inp"):
+        super(MlipParameter, self).__init__(
+            separator_char=separator_char,
+            comment_char=comment_char,
+            table_name=table_name,
+        )
+
     def load_default(self, file_content=None):
         if file_content is None:
-            file_content = '''\
+            file_content = """\
 mtp-filename auto
 select FALSE
-'''
+"""
         self.load_string(file_content)
-

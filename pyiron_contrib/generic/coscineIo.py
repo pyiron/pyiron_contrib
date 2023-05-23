@@ -121,7 +121,6 @@ def _list_filter(list_to_filter, **kwargs):
 
 
 class Job2CoscineMetadataConverter:
-
     _known_profiles = [
         "https://purl.org/coscine/ap/sfb1394/AtomisticSimulation/",
         "https://purl.org/coscine/ap/sfb1394/AtomisticSimulationMD/",

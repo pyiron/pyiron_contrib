@@ -141,33 +141,32 @@ class PotentialPlots:
         energy_pred = self._predicted_data["energy"] / self._predicted_data["length"]
         de = abs(energy_train - energy_pred)
         rmse = np.sqrt((de**2).mean())
-        mae  = de.mean()
+        mae = de.mean()
         high = de.max()
-        low  = de.min()
+        low = de.min()
 
         ax = plt.gca()
         trafo = ax.get_xaxis_transform()
-        def annotated_vline(x, text, linestyle='--'):
-            plt.axvline(x, color='k', linestyle=linestyle)
+
+        def annotated_vline(x, text, linestyle="--"):
+            plt.axvline(x, color="k", linestyle=linestyle)
             plt.text(
-                    x=x, y=0.5, s=text,
-                    transform=trafo,
-                    rotation='vertical',
-                    horizontalalignment='center',
-                    path_effects=[withStroke(linewidth=4, foreground='w')],
+                x=x,
+                y=0.5,
+                s=text,
+                transform=trafo,
+                rotation="vertical",
+                horizontalalignment="center",
+                path_effects=[withStroke(linewidth=4, foreground="w")],
             )
 
-        plt.hist(
-                de,
-                bins=np.logspace(np.log10(low), np.log10(high), bins),
-                log=logy
-        )
-        plt.xscale('log')
-        annotated_vline(rmse, f'RMSE = {rmse:.02}')
-        annotated_vline(mae,  f'MAE = {mae:.02}')
-        annotated_vline(high, f'HIGH = {high:.02}', linestyle='-')
-        annotated_vline(low,  f'LOW = {low:.02}', linestyle='-')
-        plt.xlabel('Training Error [eV/atom]')
+        plt.hist(de, bins=np.logspace(np.log10(low), np.log10(high), bins), log=logy)
+        plt.xscale("log")
+        annotated_vline(rmse, f"RMSE = {rmse:.02}")
+        annotated_vline(mae, f"MAE = {mae:.02}")
+        annotated_vline(high, f"HIGH = {high:.02}", linestyle="-")
+        annotated_vline(low, f"LOW = {low:.02}", linestyle="-")
+        plt.xlabel("Training Error [eV/atom]")
 
     def force_scatter_histogram(self, axis=None):
         """

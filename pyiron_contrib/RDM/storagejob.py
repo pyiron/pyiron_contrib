@@ -80,7 +80,6 @@ class StorageJob(GenericJob):
     """Job to store files associated with meta data either locally, or at a remote data service like s3."""
 
     def __init__(self, project, job_name):
-
         super().__init__(project, job_name)
         self.server.run_mode.interactive = True
         self._stored_files = DataContainer(table_name="stored_files")

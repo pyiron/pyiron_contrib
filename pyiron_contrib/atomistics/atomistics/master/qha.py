@@ -30,6 +30,7 @@ def get_potential_energy(frequencies, temperature, E_0=0):
     )
     return 0.5 * np.sum(hn) + values + E_0
 
+
 def get_vibrational_frequencies(structure, hessian):
     m = np.tile(structure.get_masses(), (3, 1)).T.flatten()
     mass_tensor = np.sqrt(m * m[:, np.newaxis])
@@ -48,6 +49,7 @@ def get_vibrational_frequencies(structure, hessian):
 
 class Displacements:
     """Creation of displacement field."""
+
     def __init__(self, structure, symprec=1.0e-2, include_zero=True, second_order=True):
         """
         Displacement field
@@ -270,7 +272,7 @@ class Hessian:
                 structure=self.structure,
                 include_zero=self.include_zero_displacement,
                 second_order=self.second_order,
-                symprec=self._symprec
+                symprec=self._symprec,
             ).displacements
             * self.dx
         )

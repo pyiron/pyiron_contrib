@@ -5,7 +5,13 @@
 from __future__ import print_function
 
 from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
-from pyiron_contrib.protocol.primitive.one_state import Counter, ExternalHamiltonian, GradientDescent, Max, Norm
+from pyiron_contrib.protocol.primitive.one_state import (
+    Counter,
+    ExternalHamiltonian,
+    GradientDescent,
+    Max,
+    Norm,
+)
 from pyiron_contrib.protocol.primitive.two_state import IsGEq
 from pyiron_contrib.protocol.utils import Pointer
 
@@ -14,8 +20,10 @@ Protocol for minimizing forces.
 """
 
 __author__ = "Liam Huber, Jan Janssen"
-__copyright__ = "Copyright 2019, Max-Planck-Institut für Eisenforschung GmbH " \
-                "- Computational Materials Design (CM) Department"
+__copyright__ = (
+    "Copyright 2019, Max-Planck-Institut für Eisenforschung GmbH "
+    "- Computational Materials Design (CM) Department"
+)
 __version__ = "0.0"
 __maintainer__ = "Liam Huber"
 __email__ = "huber@mpie.de"
@@ -47,16 +55,8 @@ class Minimize(CompoundVertex):
     """
 
     DefaultWhitelist = {
-        'calc_static': {
-            'output': {
-                'energy_pot': 1
-            }
-        },
-        'max_force': {
-            'output': {
-                'amax': 1
-            }
-        }
+        "calc_static": {"output": {"energy_pot": 1}},
+        "max_force": {"output": {"amax": 1}},
     }
 
     def __init__(self, **kwargs):
@@ -85,14 +85,16 @@ class Minimize(CompoundVertex):
         # Execution flow
         g = self.graph
         g.make_pipeline(
-            g.check_steps, 'false',
+            g.check_steps,
+            "false",
             g.calc_static,
             g.force_norm,
             g.max_force,
             g.gradient_descent,
-            g.check_force, 'true',
+            g.check_force,
+            "true",
             g.clock,
-            g.check_steps
+            g.check_steps,
         )
         g.starting_vertex = self.graph.check_steps
         g.restarting_vertex = self.graph.check_steps
@@ -139,10 +141,10 @@ class Minimize(CompoundVertex):
     def get_output(self):
         gp = Pointer(self.graph)
         return {
-            'energy_pot': ~gp.calc_static.output.energy_pot[-1],
-            'max_force': ~gp.max_force.output.amax[-1],
-            'positions': ~gp.gradient_descent.output.positions[-1],
-            'forces': ~gp.calc_static.output.forces[-1]
+            "energy_pot": ~gp.calc_static.output.energy_pot[-1],
+            "max_force": ~gp.max_force.output.amax[-1],
+            "positions": ~gp.gradient_descent.output.positions[-1],
+            "forces": ~gp.calc_static.output.forces[-1],
         }
 
 

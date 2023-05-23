@@ -112,7 +112,7 @@ class AtomicrexInteractive(AtomicrexBase, InteractiveBase):
                 **self.input.fit_algorithm.global_minimizer_kwargs,
             )
 
-        #self._interactive_library.set_potential_parameters(res.x)
+        # self._interactive_library.set_potential_parameters(res.x)
         self.output.residual = self._interactive_library.calculate_residual()
         self.output.iterations = res.nit
         self._interactive_library.print_potential_parameters()

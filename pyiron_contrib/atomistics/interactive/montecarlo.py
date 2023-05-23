@@ -11,8 +11,10 @@ from pyiron.atomistics.job.interactivewrapper import InteractiveWrapper
 from pyiron.atomistics.structure.atoms import Atoms
 
 __author__ = "Jan Janssen"
-__copyright__ = "Copyright 2020, Max-Planck-Institut für Eisenforschung GmbH - " \
-                "Computational Materials Design (CM) Department"
+__copyright__ = (
+    "Copyright 2020, Max-Planck-Institut für Eisenforschung GmbH - "
+    "Computational Materials Design (CM) Department"
+)
 __version__ = "1.0"
 __maintainer__ = "Jan Janssen"
 __email__ = "janssen@mpie.de"
@@ -37,6 +39,7 @@ class MonteCarloMaster(InteractiveWrapper):
         structure_sublattice (pyiron.atomistics.structure.atoms.Atoms): Crystal Lattice of interstitial positions
         ref_job (pyiron.atomistics.job.atomistic.AtomisticGenericJob): atomistic interpreter used to evaluate structures
     """
+
     def __init__(self, project, job_name):
         super(MonteCarloMaster, self).__init__(project, job_name)
         self.__name__ = "MonteCarloMaster"
@@ -93,7 +96,11 @@ class MonteCarloMaster(InteractiveWrapper):
         """
         super(MonteCarloMaster, self).validate_ready_to_run()
         if not self.structure_sublattice:
-            raise ValueError('This job does not contain a valid intersitial structure: {}'.format(self.job_name))
+            raise ValueError(
+                "This job does not contain a valid intersitial structure: {}".format(
+                    self.job_name
+                )
+            )
 
     def db_entry(self):
         """
@@ -105,10 +112,12 @@ class MonteCarloMaster(InteractiveWrapper):
         db_dict = super(MonteCarloMaster, self).db_entry()
         if self.structure_lattice and self.structure_sublattice:
             interstitial_selected_lst = self._initial_config(
-                self.input['number_of_interstitials'],
-                self.structure_sublattice
+                self.input["number_of_interstitials"], self.structure_sublattice
             )
-            structure = self.structure_lattice + self.structure_sublattice[interstitial_selected_lst]
+            structure = (
+                self.structure_lattice
+                + self.structure_sublattice[interstitial_selected_lst]
+            )
             parent_structure = structure.get_parent_basis()
             db_dict["ChemicalFormula"] = parent_structure.get_chemical_formula()
         return db_dict
@@ -123,7 +132,9 @@ class MonteCarloMaster(InteractiveWrapper):
         """
         super(MonteCarloMaster, self).to_hdf(hdf=hdf, group_name=group_name)
         with self.project_hdf5.open("input") as hdf5_input:
-            self.structure_sublattice.to_hdf(hdf5_input, group_name="structure_sublattice")
+            self.structure_sublattice.to_hdf(
+                hdf5_input, group_name="structure_sublattice"
+            )
             self.structure_lattice.to_hdf(hdf5_input, group_name="structure_lattice")
 
     def from_hdf(self, hdf=None, group_name=None):
@@ -136,8 +147,12 @@ class MonteCarloMaster(InteractiveWrapper):
         """
         super(MonteCarloMaster, self).from_hdf(hdf=hdf, group_name=group_name)
         with self.project_hdf5.open("input") as hdf5_input:
-            self.structure_sublattice = Atoms().from_hdf(hdf5_input, group_name="structure_sublattice")
-            self.structure_lattice = Atoms().from_hdf(hdf5_input, group_name="structure_lattice")
+            self.structure_sublattice = Atoms().from_hdf(
+                hdf5_input, group_name="structure_sublattice"
+            )
+            self.structure_lattice = Atoms().from_hdf(
+                hdf5_input, group_name="structure_lattice"
+            )
 
     def write_input(self):
         """
@@ -159,21 +174,21 @@ class MonteCarloMaster(InteractiveWrapper):
         Loop over the temperatures defined in the input and for each temperature calculate n rounds as defined in the
         input, finally during each round call the monte carlo calculation.
         """
-        for temperature in self.input['temperatures']:
-            for round_nr in range(int(self.input['run_rounds'])):
+        for temperature in self.input["temperatures"]:
+            for round_nr in range(int(self.input["run_rounds"])):
                 self.status.running = True
                 interstitial_selected_lst = self._initial_config(
-                    self.input['number_of_interstitials'],
-                    self.structure_sublattice
+                    self.input["number_of_interstitials"], self.structure_sublattice
                 )
                 energy_accepted_lst, energy_total_lst = self._calc_monte_carlo(
-                    interstitial_selected_lst,
-                    temperature
+                    interstitial_selected_lst, temperature
                 )
                 if self.ref_job.server.run_mode.interactive:
                     self.ref_job.interactive_close()
                 self.status.collect = True
-                self._store_output_in_hdf5(temperature, round_nr, energy_accepted_lst, energy_total_lst)
+                self._store_output_in_hdf5(
+                    temperature, round_nr, energy_accepted_lst, energy_total_lst
+                )
         self._finish_job()
 
     def _calc_monte_carlo(self, interstitial_selected_lst, temperature):
@@ -195,12 +210,16 @@ class MonteCarloMaster(InteractiveWrapper):
         step_nr, try_nr = 0, 0
         e_prev = None
         energy_total_lst, energy_accepted_lst = [], []
-        while step_nr < int(self.input['run_steps']) and \
-                try_nr < int(self.input['run_steps']) * int(self.input['run_try_factor']):
+        while step_nr < int(self.input["run_steps"]) and try_nr < int(
+            self.input["run_steps"]
+        ) * int(self.input["run_try_factor"]):
             prev_positions = interstitial_selected_lst[:]
 
             interstitial_selected_lst = self._index_switch(interstitial_selected_lst)
-            structure = self.structure_lattice + self.structure_sublattice[interstitial_selected_lst]
+            structure = (
+                self.structure_lattice
+                + self.structure_sublattice[interstitial_selected_lst]
+            )
             e_step = self._calc_energy_for_structure(structure)
 
             if self._monte_carlo_accept_step(temperature, e_step, e_prev):
@@ -225,11 +244,13 @@ class MonteCarloMaster(InteractiveWrapper):
         """
         interstitial_not_selected_lst = self._not_selected(
             interstitial_selected_lst=interstitial_selected_lst,
-            sub_lattice_structure=self.structure_sublattice
+            sub_lattice_structure=self.structure_sublattice,
         )
         random_new_element = random.choice(interstitial_not_selected_lst)
         random_current_element = random.choice(interstitial_selected_lst)
-        del interstitial_selected_lst[interstitial_selected_lst.index(random_current_element)]
+        del interstitial_selected_lst[
+            interstitial_selected_lst.index(random_current_element)
+        ]
         interstitial_selected_lst.append(random_new_element)
         return interstitial_selected_lst
 
@@ -243,7 +264,11 @@ class MonteCarloMaster(InteractiveWrapper):
         Returns:
             float: energy calculated
         """
-        if isinstance(self.ref_job, LammpsInteractive) and len(self._job_name_lst) == 0 and self.ref_job.server.run_mode.interactive:
+        if (
+            isinstance(self.ref_job, LammpsInteractive)
+            and len(self._job_name_lst) == 0
+            and self.ref_job.server.run_mode.interactive
+        ):
             self.ref_job.interactive_positions_setter(structure.positions)
             self.ref_job._interactive_lib_command(self.ref_job._interactive_run_command)
             return self.ref_job.interactive_energy_tot_getter()
@@ -256,7 +281,9 @@ class MonteCarloMaster(InteractiveWrapper):
                 self.ref_job.run(run_again=True)
             return self.ref_job.output.energy_tot[-1]
 
-    def _store_output_in_hdf5(self, temperature, round_nr, energy_accepted_lst, energy_total_lst):
+    def _store_output_in_hdf5(
+        self, temperature, round_nr, energy_accepted_lst, energy_total_lst
+    ):
         """
         Store accepted energies and total energies inside the HDF5 file
 
@@ -267,9 +294,12 @@ class MonteCarloMaster(InteractiveWrapper):
             energy_total_lst (list): list of total energies
         """
         with self.project_hdf5.open("output") as h5:
-            h5['energy_accepted_' + str(int(temperature)) + '_' + str(int(round_nr))] = \
-                np.array(energy_accepted_lst)
-            h5['energy_total_' + str(int(temperature)) + '_' + str(int(round_nr))] = np.array(energy_total_lst)
+            h5[
+                "energy_accepted_" + str(int(temperature)) + "_" + str(int(round_nr))
+            ] = np.array(energy_accepted_lst)
+            h5[
+                "energy_total_" + str(int(temperature)) + "_" + str(int(round_nr))
+            ] = np.array(energy_total_lst)
 
     @staticmethod
     def _monte_carlo_accept_step(temperature, e_step, e_prev):
@@ -286,7 +316,9 @@ class MonteCarloMaster(InteractiveWrapper):
         """
         if e_prev:
             energy_change = e_step - e_prev
-            exponent = -energy_change / (sci_const.Boltzmann / sci_const.e * temperature)
+            exponent = -energy_change / (
+                sci_const.Boltzmann / sci_const.e * temperature
+            )
             if exponent > 0:  # np.exp(709) = 8.2184074615549724e+307
                 probability = 1.0  # np.exp(710) = inf  ('RuntimeWarning: overflow encountered in exp')
             else:
@@ -338,23 +370,24 @@ class MonteCarloInput(GenericParameters):
     Args:
         input_file_name (str): Name of the input file - optional
     """
+
     def __init__(self, input_file_name=None):
         super(MonteCarloInput, self).__init__(
             input_file_name=input_file_name,
             table_name="montecarlo_inp",
             separator_char="=",
-            comment_char="#"
+            comment_char="#",
         )
 
     def load_default(self):
         """
         Loading the default settings for the input file.
         """
-        input_str = '''\
+        input_str = """\
 number_of_interstitials = 32
 run_rounds = 1
 run_steps = 100
 run_try_factor = 10
 temperatures = [200]
-'''
+"""
         self.load_string(input_str)

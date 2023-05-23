@@ -14,13 +14,16 @@ handler execution.
 """
 
 __author__ = "Dominik Gehringer, Liam Huber"
-__copyright__ = "Copyright 2019, Max-Planck-Institut für Eisenforschung GmbH " \
-                "- Computational Materials Design (CM) Department"
+__copyright__ = (
+    "Copyright 2019, Max-Planck-Institut für Eisenforschung GmbH "
+    "- Computational Materials Design (CM) Department"
+)
 __version__ = "0.0"
 __maintainer__ = "Liam Huber"
 __email__ = "huber@mpie.de"
 __status__ = "development"
 __date__ = "December 10, 2019"
+
 
 class Synchronization(object):
     """
@@ -55,7 +58,15 @@ class Event(Synchronization):
         self.__unnamed_handlers = []
         self.supressed = False
         self.__synchronize(
-            names=['add_event_handler', 'remove_event_handler', '__add__', '__sub__', 'handler_count', '__getitem__'])
+            names=[
+                "add_event_handler",
+                "remove_event_handler",
+                "__add__",
+                "__sub__",
+                "handler_count",
+                "__getitem__",
+            ]
+        )
 
     @property
     def handler_count(self):
@@ -90,10 +101,10 @@ class Event(Synchronization):
     @property
     def unnamed_handlers(self):
         """
-       `Property:` List of all lambdas
+        `Property:` List of all lambdas
 
-        Returns:
-            :obj:`list` of :obj:`function`: a list of all registered lambdas
+         Returns:
+             :obj:`list` of :obj:`function`: a list of all registered lambdas
         """
         return self.__unnamed_handlers
 
@@ -119,9 +130,9 @@ class Event(Synchronization):
             KeyError: If handlers identifier is already registered
         """
         if callable(handler):
-            if hasattr(handler, '__name__'):
+            if hasattr(handler, "__name__"):
                 name = handler.__name__
-                if name == '<lambda>':
+                if name == "<lambda>":
                     self.__unnamed_handlers.append(handler)
                     return
             else:
@@ -131,11 +142,14 @@ class Event(Synchronization):
             name = handler.name
         else:
             raise TypeError(
-                'The argument of add_event_handler must be of type event.EventHandler, function or a lambda expression')
+                "The argument of add_event_handler must be of type event.EventHandler, function or a lambda expression"
+            )
         if name not in self.__handlers.keys():
             self.__handlers[name] = handler
         else:
-            raise KeyError('The event already contains a handler named "{0}"'.format(name))
+            raise KeyError(
+                'The event already contains a handler named "{0}"'.format(name)
+            )
 
     def clear_handlers(self):
         """
@@ -164,7 +178,7 @@ class Event(Synchronization):
             for handler in local_copy:
                 try:
                     if callable(handler):
-                        if hasattr(handler, '__name__'):
+                        if hasattr(handler, "__name__"):
                             name = handler.__name__
                         else:
                             name = str(handler)
@@ -174,7 +188,11 @@ class Event(Synchronization):
                         handler.func(*args, **kwargs)
                 except:
                     logging.getLogger(__name__).exception(
-                        'An error ocurred while executing function {func}.'.format(func=name), exc_info=True)
+                        "An error ocurred while executing function {func}.".format(
+                            func=name
+                        ),
+                        exc_info=True,
+                    )
 
     def fire_handler(self, handler_name, *args, **kwargs):
         """
@@ -197,7 +215,7 @@ class Event(Synchronization):
         if not self.supressed:
             try:
                 if callable(handler):
-                    if hasattr(handler, '__name__'):
+                    if hasattr(handler, "__name__"):
                         name = handler.__name__
                     else:
                         name = str(handler)
@@ -207,7 +225,11 @@ class Event(Synchronization):
                     handler.func(*args, **kwargs)
             except:
                 logging.getLogger(__name__).exception(
-                    'An error ocurred while executing function {func}.'.format(func=name), exc_info=True)
+                    "An error ocurred while executing function {func}.".format(
+                        func=name
+                    ),
+                    exc_info=True,
+                )
 
     def has_handler(self, handler):
         """
@@ -220,7 +242,7 @@ class Event(Synchronization):
             bool: `True` if handler is available else `False`
         """
         if callable(handler):
-            if hasattr(handler, '__name__'):
+            if hasattr(handler, "__name__"):
                 name = handler.__name__
             else:
                 name = str(handler)
@@ -254,15 +276,21 @@ class Event(Synchronization):
             name = handler.name
         elif isinstance(handler, str):
             name = handler
-        elif isinstance(handler, (FunctionType, MethodType)) or inspect.ismethod(handler):
+        elif isinstance(handler, (FunctionType, MethodType)) or inspect.ismethod(
+            handler
+        ):
             name = handler.__name__
         else:
-            raise TypeError('The argument of remove_event_handler must be of type event. EventHandler, function or a '
-                            'lambda expression')
+            raise TypeError(
+                "The argument of remove_event_handler must be of type event. EventHandler, function or a "
+                "lambda expression"
+            )
         if name in self.__handlers.keys():
             del self.__handlers[name]
         else:
-            raise KeyError('The event does not contain a handler named "{0}"'.format(name))
+            raise KeyError(
+                'The event does not contain a handler named "{0}"'.format(name)
+            )
 
     def set_event_handler(self, handler):
         """
@@ -276,26 +304,30 @@ class Event(Synchronization):
             KeyError: If handlers name is not registered
         """
         if callable(handler):
-            if hasattr(handler, '__name__'):
+            if hasattr(handler, "__name__"):
                 name = handler.__name__
-                if name == '<lambda>':
-                    raise KeyError('A lambda expression cannot be reassigned')
+                if name == "<lambda>":
+                    raise KeyError("A lambda expression cannot be reassigned")
             else:
-                raise KeyError('Only a named handler can be reassigned')
+                raise KeyError("Only a named handler can be reassigned")
         elif isinstance(handler, EventHandler):
             name = handler.name
         else:
             raise TypeError(
-                'The argument of set_event_handler must be of type event.EventHandler, function or a lambda expression')
+                "The argument of set_event_handler must be of type event.EventHandler, function or a lambda expression"
+            )
         self.__handlers[name] = handler
 
     def __synchronize(self, names=None):
         """Synchronize methods in the given class.
         Only synchronize the methods whose names are
         given, or all methods if names=None."""
-        for (name, val) in self.__dict__.items():
-            if callable(val) and name != '__init__' and \
-                    (names == None or name in names):
+        for name, val in self.__dict__.items():
+            if (
+                callable(val)
+                and name != "__init__"
+                and (names == None or name in names)
+            ):
                 # print("synchronizing", name)
                 setattr(self, name, synchronized(val))
 
@@ -331,7 +363,7 @@ class EventHandler:
         return self.name.__hash__()
 
     def __repr__(self):
-        return 'event.EventHandler(name={0}, func={1})'.format(self.name, self.func)
+        return "event.EventHandler(name={0}, func={1})".format(self.name, self.func)
 
 
 def synchronized(name):
@@ -349,7 +381,8 @@ def synchronized(name):
 
         def sync_method(self, *args, **kws):
             with outer_lock:
-                if not hasattr(self, lock_name): setattr(self, lock_name, threading.Lock())
+                if not hasattr(self, lock_name):
+                    setattr(self, lock_name, threading.Lock())
                 lock = getattr(self, lock_name)
                 with lock:
                     return method(self, *args, **kws)

@@ -7,15 +7,23 @@ Job class for calculating the MTP descriptors for a set of structures.
 """
 
 __author__ = "Marvin Poul"
-__copyright__ = "Copyright 2021, Max-Planck-Institut für Eisenforschung GmbH - " \
-                "Computational Materials Design (CM) Department"
+__copyright__ = (
+    "Copyright 2021, Max-Planck-Institut für Eisenforschung GmbH - "
+    "Computational Materials Design (CM) Department"
+)
 __version__ = "1.0"
 __maintainer__ = "Marvin Poul"
 __email__ = "poul@mpie.de"
 __status__ = "development"
 __date__ = "Mar 25, 2021"
 
-from pyiron_base import Settings, DataContainer, GenericJob, Executable, FlattenedStorage
+from pyiron_base import (
+    Settings,
+    DataContainer,
+    GenericJob,
+    Executable,
+    FlattenedStorage,
+)
 from pyiron_atomistics.atomistics.structure.has_structure import HasStructure
 from .cfgs import Cfg, savecfgs
 
@@ -26,9 +34,10 @@ import numpy as np
 
 # This class expects the job executable to read the potential and configurations and write the descriptors to a few
 # hard-coded paths
-_POTENTIAL_PATH="potential.mtp"
-_INPUT_PATH="input.cfg"
-_OUTPUT_PATH="out.xyz"
+_POTENTIAL_PATH = "potential.mtp"
+_INPUT_PATH = "input.cfg"
+_OUTPUT_PATH = "out.xyz"
+
 
 class MlipDescriptors(GenericJob):
     """
@@ -39,10 +48,13 @@ class MlipDescriptors(GenericJob):
     must be set to the respective attributes of the job :attribute:`.potential` and :attribute:`.structures`.  There are
     no other input parameters.
     """
+
     def __init__(self, project, job_name):
         super().__init__(project, job_name)
-        self.input = DataContainer({'potential_job_id': None, 'structure_container_id': None},
-                                   table_name="parameters")
+        self.input = DataContainer(
+            {"potential_job_id": None, "structure_container_id": None},
+            table_name="parameters",
+        )
         self._descriptors = FlattenedStorage()
         self._executable_activate()
 
@@ -75,8 +87,10 @@ class MlipDescriptors(GenericJob):
         self._create_working_directory()
 
         potential = self.project.load(self.input.potential_job_id)
-        shutil.copy2(potential.potential_files[0],
-                     os.path.join(self.working_directory, _POTENTIAL_PATH))
+        shutil.copy2(
+            potential.potential_files[0],
+            os.path.join(self.working_directory, _POTENTIAL_PATH),
+        )
 
         cfgs = []
         container = self.project.load(self.input.structure_container_id)
@@ -90,16 +104,15 @@ class MlipDescriptors(GenericJob):
         savecfgs(filename=os.path.join(self.working_directory, _INPUT_PATH), cfgs=cfgs)
 
     def collect_output(self):
-
         def parse(f):
             s = f.readline()
             while s != "":
                 N = int(s)
                 M = int(f.readline().split()[-1])
-                x = np.empty((N,M))
+                x = np.empty((N, M))
                 for i, l in zip(range(N), f):
                     d = np.fromiter(map(float, l.split()), dtype=float)
-                    x[i, :] = d[4:4 + M]
+                    x[i, :] = d[4 : 4 + M]
                 yield x
                 s = f.readline()
 

@@ -26,12 +26,12 @@ def readcfg(f):
         line = line.upper()
         line = line.strip()
         if mode == 0:
-            if line.startswith('SIZE'):
+            if line.startswith("SIZE"):
                 line = f.readline()
                 size = int(line.strip())
                 cfg.types = np.zeros(size)
                 cfg.pos = np.zeros((size, 3))
-            elif line.startswith('SUPERCELL'):
+            elif line.startswith("SUPERCELL"):
                 line = f.readline()
                 vals = line.strip().split()
                 cfg.lat[0, :] = vals[0:3]
@@ -41,8 +41,8 @@ def readcfg(f):
                 line = f.readline()
                 vals = line.strip().split()
                 cfg.lat[2, :] = vals[0:3]
-            elif line.startswith('ATOMDATA'):
-                if line.endswith('FZ'):
+            elif line.startswith("ATOMDATA"):
+                if line.endswith("FZ"):
                     cfg.forces = np.zeros((size, 3))
                 for i in range(size):
                     line = f.readline()
@@ -51,67 +51,94 @@ def readcfg(f):
                     cfg.pos[i, :] = vals[2:5]
                     if cfg.forces is not None:
                         cfg.forces[i, :] = vals[5:8]
-            elif line.startswith('ENERGY'):
+            elif line.startswith("ENERGY"):
                 items = line.split()
                 if len(items) == 1:
                     line = f.readline()
                     cfg.energy = float(line.strip())
                 else:
                     cfg.energy = float(items[-1])
-            elif line.startswith('PLUSSTRESS'):
+            elif line.startswith("PLUSSTRESS"):
                 line = f.readline()
                 vals = line.strip().split()
                 cfg.stresses = np.zeros(6)
                 cfg.stresses[:] = vals[0:6]
-            elif line.startswith('FEATURE   MV_GRADE'):
+            elif line.startswith("FEATURE   MV_GRADE"):
                 cfg.grade = float(line.split()[-1])
-            elif line.startswith('FEATURE   PYIRON'):
+            elif line.startswith("FEATURE   PYIRON"):
                 cfg.desc = line.split()[-1]
-        if line.startswith('BEGIN_CFG'):
+        if line.startswith("BEGIN_CFG"):
             mode = 0
-        elif line.startswith('END_CFG'):
+        elif line.startswith("END_CFG"):
             break
         line = f.readline()
     return cfg
 
 
 def savecfg(f, cfg, desc=None):
-    atstr1 = 'AtomData:  id type       cartes_x      cartes_y      cartes_z           fx          fy          fz'
-    atstr2 = 'AtomData:  id type       cartes_x      cartes_y      cartes_z'
+    atstr1 = "AtomData:  id type       cartes_x      cartes_y      cartes_z           fx          fy          fz"
+    atstr2 = "AtomData:  id type       cartes_x      cartes_y      cartes_z"
     size = len(cfg.types)
-    print('BEGIN_CFG', file=f)
-    print('Size', file=f)
-    print('   %-d' % size, file=f)
+    print("BEGIN_CFG", file=f)
+    print("Size", file=f)
+    print("   %-d" % size, file=f)
     if cfg.lat is not None:
-        print('SuperCell', file=f)
+        print("SuperCell", file=f)
         for i in range(3):
-            print('         %14f%14f%14f'
-                  % (cfg.lat[i, 0], cfg.lat[i, 1], cfg.lat[i, 2]), file=f)
+            print(
+                "         %14f%14f%14f" % (cfg.lat[i, 0], cfg.lat[i, 1], cfg.lat[i, 2]),
+                file=f,
+            )
     if cfg.forces is not None:
         print(atstr1, file=f)
     else:
         print(atstr2, file=f)
     for i in range(size):
         if cfg.forces is not None:
-            print('         %4d %4d %14f%14f%14f %16.8e %16.8e %16.8e' %
-                  (i+1, cfg.types[i], cfg.pos[i, 0], cfg.pos[i, 1], cfg.pos[i, 2],
-                   cfg.forces[i, 0], cfg.forces[i, 1], cfg.forces[i, 2]), file=f)
+            print(
+                "         %4d %4d %14f%14f%14f %16.8e %16.8e %16.8e"
+                % (
+                    i + 1,
+                    cfg.types[i],
+                    cfg.pos[i, 0],
+                    cfg.pos[i, 1],
+                    cfg.pos[i, 2],
+                    cfg.forces[i, 0],
+                    cfg.forces[i, 1],
+                    cfg.forces[i, 2],
+                ),
+                file=f,
+            )
         else:
-            print('         %4d %4d %14f%14f%14f' %
-                  (i+1, cfg.types[i], cfg.pos[i, 0], cfg.pos[i, 1], cfg.pos[i, 2]),
-                  file=f)
+            print(
+                "         %4d %4d %14f%14f%14f"
+                % (i + 1, cfg.types[i], cfg.pos[i, 0], cfg.pos[i, 1], cfg.pos[i, 2]),
+                file=f,
+            )
     if cfg.energy is not None:
-        print('Energy\t%14f' % cfg.energy, file=f)
+        print("Energy\t%14f" % cfg.energy, file=f)
     if cfg.stresses is not None:
-        print('PlusStress:  xx          yy          zz          yz          xz          xy', file=f)
-        print('         %14f%14f%14f%14f%14f%14f' %
-              (cfg.stresses[0], cfg.stresses[1], cfg.stresses[2],
-               cfg.stresses[3], cfg.stresses[4], cfg.stresses[5]), file=f)
+        print(
+            "PlusStress:  xx          yy          zz          yz          xz          xy",
+            file=f,
+        )
+        print(
+            "         %14f%14f%14f%14f%14f%14f"
+            % (
+                cfg.stresses[0],
+                cfg.stresses[1],
+                cfg.stresses[2],
+                cfg.stresses[3],
+                cfg.stresses[4],
+                cfg.stresses[5],
+            ),
+            file=f,
+        )
     if desc is not None:
-        print('Feature   from %s' % desc, file=f)
+        print("Feature   from %s" % desc, file=f)
     if cfg.desc is not None:
-        print('Feature %s' % cfg.desc, file=f)
-    print('END_CFG', file=f)
+        print("Feature %s" % cfg.desc, file=f)
+    print("END_CFG", file=f)
 
 
 class cfgparser:
@@ -140,13 +167,13 @@ def printcfg(cfg):
 
 
 def loadcfgs(filename, max_cfgs=None):
-    with open(filename, 'r') as file:
+    with open(filename, "r") as file:
         with cfgparser(file, max_cfgs) as cfgs:
             return cfgs
 
 
 def savecfgs(filename, cfgs, desc=None):
-    with open(filename, 'w') as file:
+    with open(filename, "w") as file:
         for cfg in cfgs:
             savecfg(file, cfg, desc)
             print("", file=file)

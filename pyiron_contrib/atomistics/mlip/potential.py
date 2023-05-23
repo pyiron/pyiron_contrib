@@ -12,13 +12,16 @@ from pyiron_contrib.atomistics.mlip.parser import potential as parse_potential
 import numpy as np
 
 __author__ = "Marvin Poul"
-__copyright__ = "Copyright 2020, Max-Planck-Institut für Eisenforschung GmbH - " \
-                "Computational Materials Design (CM) Department"
+__copyright__ = (
+    "Copyright 2020, Max-Planck-Institut für Eisenforschung GmbH - "
+    "Computational Materials Design (CM) Department"
+)
 __version__ = "1.0"
 __maintainer__ = "Marvin Poul"
 __email__ = "poul@mpie.de"
 __status__ = "development"
 __date__ = "Aug 18, 2021"
+
 
 class MtpPotential:
     """
@@ -41,6 +44,7 @@ class MtpPotential:
     Chebyshev([...], domain=(...), window=(...))
 
     """
+
     def __init__(self, filename=None, table_name="potential"):
         """
         Create a new potential.
@@ -68,8 +72,9 @@ class MtpPotential:
         Args:
             filename (str): file path
         """
+
         def format_array(a):
-            return "{" + ', '.join(map(str, a)) + "}"
+            return "{" + ", ".join(map(str, a)) + "}"
 
         with open(filename, "w") as f:
             f.write("MTP\n")
@@ -89,12 +94,22 @@ class MtpPotential:
                 for coeffs in funcs:
                     f.write("\t\t\t" + format_array(coeffs) + "\n")
             f.write(f"alpha_moments_count = {self._store.alpha_moments_count}\n")
-            f.write(f"alpha_index_basic_count = {self._store.alpha_index_basic_count}\n")
-            f.write(f"alpha_index_basic = {format_array(map(format_array, self._store.alpha_index_basic))}\n")
-            f.write(f"alpha_index_times_count = {self._store.alpha_index_times_count}\n")
-            f.write(f"alpha_index_times = {format_array(map(format_array, self._store.alpha_index_times))}\n")
+            f.write(
+                f"alpha_index_basic_count = {self._store.alpha_index_basic_count}\n"
+            )
+            f.write(
+                f"alpha_index_basic = {format_array(map(format_array, self._store.alpha_index_basic))}\n"
+            )
+            f.write(
+                f"alpha_index_times_count = {self._store.alpha_index_times_count}\n"
+            )
+            f.write(
+                f"alpha_index_times = {format_array(map(format_array, self._store.alpha_index_times))}\n"
+            )
             f.write(f"alpha_scalar_moments = {self._store.alpha_scalar_moments}\n")
-            f.write(f"alpha_moment_mapping = {format_array(self._store.alpha_moment_mapping)}\n")
+            f.write(
+                f"alpha_moment_mapping = {format_array(self._store.alpha_moment_mapping)}\n"
+            )
             f.write(f"species_coeffs = {format_array(self._store.species_coeffs)}\n")
             f.write(f"moment_coeffs = {format_array(self._store.moment_coeffs)}\n")
 
@@ -131,10 +146,14 @@ class MtpPotential:
         rmin = self._store.radial.info.min_dist
         rmax = self._store.radial.info.max_dist
         scaling = self._store.scaling
-        if basis_type == 'Chebyshev':
-            return {types: [scaling * np.polynomial.Chebyshev(coeffs, domain=(rmin, rmax))
-                                for coeffs in funcs]
-                                    for types, funcs in self._store.radial.funcs.items()}
+        if basis_type == "Chebyshev":
+            return {
+                types: [
+                    scaling * np.polynomial.Chebyshev(coeffs, domain=(rmin, rmax))
+                    for coeffs in funcs
+                ]
+                for types, funcs in self._store.radial.funcs.items()
+            }
 
         else:
             raise NotImplementedError(f"unknown basis type {basis_type}")

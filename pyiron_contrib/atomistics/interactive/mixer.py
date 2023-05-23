@@ -4,11 +4,16 @@
 
 import numpy as np
 from pyiron_base import JobStatus, GenericJob, GenericParameters
-from pyiron.atomistics.job.interactivewrapper import InteractiveWrapper, ReferenceJobOutput
+from pyiron.atomistics.job.interactivewrapper import (
+    InteractiveWrapper,
+    ReferenceJobOutput,
+)
 
 __author__ = "Jan Janssen"
-__copyright__ = "Copyright 2020, Max-Planck-Institut für Eisenforschung GmbH - " \
-                "Computational Materials Design (CM) Department"
+__copyright__ = (
+    "Copyright 2020, Max-Planck-Institut für Eisenforschung GmbH - "
+    "Computational Materials Design (CM) Department"
+)
 __version__ = "1.0"
 __maintainer__ = "Jan Janssen"
 __email__ = "janssen@mpie.de"
@@ -121,7 +126,7 @@ class Mixer(InteractiveWrapper):
             ref_job (pyiron.atomistics.job.atomistic.AtomisticGenericJob): Reference Job
         """
         if self.ref_job_0 is None:
-            raise ValueError('Please assign ref_job_0 before ref_job_1.')
+            raise ValueError("Please assign ref_job_0 before ref_job_1.")
         ref_job.structure = self._ref_job_0.structure
         self.append(ref_job)
 
@@ -150,8 +155,10 @@ class Mixer(InteractiveWrapper):
             self._ref_job_0.structure = basis
             self._ref_job_1.structure = basis
         else:
-            raise ValueError('A structure can only be set after both ref_jobs (ref_job_0 and ref_job_1) have been' 
-                             'assinged.')
+            raise ValueError(
+                "A structure can only be set after both ref_jobs (ref_job_0 and ref_job_1) have been"
+                "assinged."
+            )
 
     def set_input_to_read_only(self):
         """
@@ -179,8 +186,12 @@ class Mixer(InteractiveWrapper):
         """
         Internal helper function to initialize the interactive interface
         """
-        for key in list(set(list(self.ref_job_0.interactive_cache.keys()) +
-                            list(self.ref_job_1.interactive_cache.keys()))):
+        for key in list(
+            set(
+                list(self.ref_job_0.interactive_cache.keys())
+                + list(self.ref_job_1.interactive_cache.keys())
+            )
+        ):
             self.interactive_cache[key] = []
         self.output = MixingOutput(job=self)
 
@@ -244,14 +255,19 @@ class Input(GenericParameters):
     """
 
     def __init__(self, input_file_name=None, table_name="input"):
-        super(Input, self).__init__(input_file_name=input_file_name, table_name=table_name, comment_char="//",
-                                    separator_char="=", end_value_char=';')
+        super(Input, self).__init__(
+            input_file_name=input_file_name,
+            table_name=table_name,
+            comment_char="//",
+            separator_char="=",
+            end_value_char=";",
+        )
 
     def load_default(self):
         """
         Loads the default file content
         """
-        file_content = ('lambda = 0.5\n')
+        file_content = "lambda = 0.5\n"
         self.load_string(file_content)
 
 
@@ -265,7 +281,7 @@ class MixingOutput(ReferenceJobOutput):
             job (Mixer): Corresponding Mixer job
         """
         super(MixingOutput, self).__init__(job=job)
-        self._lambda = float(job.input['lambda'])
+        self._lambda = float(job.input["lambda"])
 
     @property
     def energy_pot(self):
@@ -275,8 +291,9 @@ class MixingOutput(ReferenceJobOutput):
         Returns:
             list: potential energy
         """
-        return self._lambda * np.array(self._job.ref_job_0.output.energy_pot) + \
-               (1-self._lambda) * np.array(self._job.ref_job_1.output.energy_pot)
+        return self._lambda * np.array(self._job.ref_job_0.output.energy_pot) + (
+            1 - self._lambda
+        ) * np.array(self._job.ref_job_1.output.energy_pot)
 
     @property
     def energy_tot(self):
@@ -286,8 +303,9 @@ class MixingOutput(ReferenceJobOutput):
         Returns:
             list: total energy
         """
-        return self._lambda * np.array(self._job.ref_job_0.output.energy_tot) + \
-               (1 - self._lambda) * np.array(self._job.ref_job_1.output.energy_tot)
+        return self._lambda * np.array(self._job.ref_job_0.output.energy_tot) + (
+            1 - self._lambda
+        ) * np.array(self._job.ref_job_1.output.energy_tot)
 
     @property
     def forces(self):
@@ -297,8 +315,9 @@ class MixingOutput(ReferenceJobOutput):
         Returns:
             list: forces
         """
-        return self._lambda * np.array(self._job.ref_job_0.output.forces) + \
-               (1 - self._lambda) * np.array(self._job.ref_job_1.output.forces)
+        return self._lambda * np.array(self._job.ref_job_0.output.forces) + (
+            1 - self._lambda
+        ) * np.array(self._job.ref_job_1.output.forces)
 
     @property
     def pressures(self):
@@ -308,8 +327,9 @@ class MixingOutput(ReferenceJobOutput):
         Returns:
             list: pressure
         """
-        return self._lambda * np.array(self._job.ref_job_0.output.pressures) + \
-               (1 - self._lambda) * np.array(self._job.ref_job_1.output.pressures)
+        return self._lambda * np.array(self._job.ref_job_0.output.pressures) + (
+            1 - self._lambda
+        ) * np.array(self._job.ref_job_1.output.pressures)
 
     @property
     def temperature(self):
@@ -319,5 +339,6 @@ class MixingOutput(ReferenceJobOutput):
         Returns:
             list: temperature
         """
-        return self._lambda * np.array(self._job.ref_job_0.output.temperature) + \
-               (1 - self._lambda) * np.array(self._job.ref_job_1.output.temperature)
+        return self._lambda * np.array(self._job.ref_job_0.output.temperature) + (
+            1 - self._lambda
+        ) * np.array(self._job.ref_job_1.output.temperature)

@@ -5,8 +5,10 @@ Job class to run a reference jobs on all structures in a given container via an 
 """
 
 __author__ = "Marvin Poul"
-__copyright__ = "Copyright 2021, Max-Planck-Institut für Eisenforschung GmbH " \
-                "- Computational Materials Design (CM) Department"
+__copyright__ = (
+    "Copyright 2021, Max-Planck-Institut für Eisenforschung GmbH "
+    "- Computational Materials Design (CM) Department"
+)
 __version__ = "0.1"
 __maintainer__ = "Marvin Poul"
 __email__ = "poul@mpie.de"
@@ -16,6 +18,7 @@ __date__ = "Jun 14, 2021"
 
 from pyiron_atomistics.atomistics.structure.structurestorage import StructureStorage
 from pyiron_base import GenericMaster, DataContainer
+
 
 class StructureMasterInt(GenericMaster):
     """
@@ -69,12 +72,11 @@ class StructureMasterInt(GenericMaster):
             raise ValueError("No reference job set!")
         self.ref_job.validate_ready_to_run()
         copy = self.ref_job.copy_to(
-                project=self.project_hdf5,
-                new_job_name=f"{self.name}_calculator",
-                new_database_entry=True
+            project=self.project_hdf5,
+            new_job_name=f"{self.name}_calculator",
+            new_database_entry=True,
         )
         self.append(copy)
-
 
     def run_static(self):
         self.status.running = True

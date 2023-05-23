@@ -2,3 +2,4 @@
 [run]
 source = pyiron_contrib
 omit = pyiron_contrib/_version.py
+concurrency = multiprocessing

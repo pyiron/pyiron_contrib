@@ -60,10 +60,9 @@ class PiMD(IPiCore):
         root[4][0][1].text = str(self.custom_input.temperature)
         root[4][2][0][0][0].text = str(self.custom_input.pressure_damping_timescale)
         root[4][2][0][2].text = str(self.custom_input.timestep)
-        constrain_ids = self.custom_input.constrain_ids.copy()
-        if constrain_ids is not None:
-            if not isinstance(constrain_ids, list):
-                constrain_ids = constrain_ids.tolist()
+        if self.custom_input.constrain_ids is not None:
+            if not isinstance(self.custom_input.constrain_ids, list):
+                constrain_ids = self.custom_input.constrain_ids.tolist()
             root[4][2][2].text = str(constrain_ids)
         root[4][3][0].text = str(self.custom_input.temperature)
         root[4][3][1].text = str(self.custom_input.pressure)

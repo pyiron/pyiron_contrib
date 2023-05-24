@@ -17,8 +17,10 @@ A command class for running multiple of the same node
 """
 
 __author__ = "Liam Huber"
-__copyright__ = "Copyright 2019, Max-Planck-Institut für Eisenforschung GmbH " \
-                "- Computational Materials Design (CM) Department"
+__copyright__ = (
+    "Copyright 2019, Max-Planck-Institut für Eisenforschung GmbH "
+    "- Computational Materials Design (CM) Department"
+)
 __version__ = "0.0"
 __maintainer__ = "Liam Huber"
 __email__ = "huber@mpie.de"
@@ -50,7 +52,7 @@ class ListVertex(PrimitiveVertex):
 
     def __init__(self, child_type):
         if not issubclass(child_type, Vertex):
-            raise TypeError('ListVertex children must inherit from Protocol.')
+            raise TypeError("ListVertex children must inherit from Protocol.")
         self.children = None  # Ahead of super so the n_history call doesn't trigger the setter and find no children
         super(ListVertex, self).__init__()
         self.child_type = child_type
@@ -70,7 +72,9 @@ class ListVertex(PrimitiveVertex):
         super(ListVertex, self).finish()
 
     def _initialize(self, n_children):
-        children = [self.child_type(name="child_{}".format(n)) for n in range(n_children)]
+        children = [
+            self.child_type(name="child_{}".format(n)) for n in range(n_children)
+        ]
 
         # Locate children in graph
         for n, child in enumerate(children):
@@ -85,7 +89,9 @@ class ListVertex(PrimitiveVertex):
         # Link input.default to input.direct.default
         for key in list(self.direct.default.keys()):
             for child in children:
-                setattr(child.input.default, key, getattr(Pointer(self.direct.default), key))
+                setattr(
+                    child.input.default, key, getattr(Pointer(self.direct.default), key)
+                )
 
         # Link input to input.broadcast
         for key in list(self.broadcast.keys()):
@@ -95,7 +101,11 @@ class ListVertex(PrimitiveVertex):
         # Link input.default to input.broadcast.default
         for key in list(self.broadcast.default.keys()):
             for n, child in enumerate(children):
-                setattr(child.input.default, key, getattr(Pointer(self.broadcast.default), key)[n])
+                setattr(
+                    child.input.default,
+                    key,
+                    getattr(Pointer(self.broadcast.default), key)[n],
+                )
 
         self.children = children
         self._initialized = True
@@ -112,7 +122,9 @@ class ListVertex(PrimitiveVertex):
                 child.n_history = n_hist
 
     def _extract_output_data_from_children(self):
-        output_keys = list(self.children[0].output.keys())  # Assumes that all the children are the same...
+        output_keys = list(
+            self.children[0].output.keys()
+        )  # Assumes that all the children are the same...
         if len(output_keys) > 0:
             output_data = {}
             for key in output_keys:
@@ -126,7 +138,7 @@ class ListVertex(PrimitiveVertex):
 
     def to_hdf(self, hdf=None, group_name=None):
         super(ListVertex, self).to_hdf(hdf=hdf, group_name=group_name)
-        hdf[group_name]['initialized'] = self._initialized
+        hdf[group_name]["initialized"] = self._initialized
         if self.children is not None:
             with hdf.open(group_name + "/children") as hdf5_server:
                 for n, child in enumerate(self.children):
@@ -134,7 +146,7 @@ class ListVertex(PrimitiveVertex):
 
     def from_hdf(self, hdf=None, group_name=None):
         super(ListVertex, self).from_hdf(hdf=hdf, group_name=group_name)
-        self._initialized = hdf[group_name]['initialized']
+        self._initialized = hdf[group_name]["initialized"]
         if self._initialized:
             with hdf.open(group_name + "/children") as hdf5_server:
                 children = []
@@ -192,7 +204,9 @@ class ParallelList(ListVertex):
         for i in range(len(all_child_output)):
             ordered_child_output[i] = all_child_output[i]
 
-        output_keys = list(ordered_child_output[0].keys())  # Assumes that all the children are the same...
+        output_keys = list(
+            ordered_child_output[0].keys()
+        )  # Assumes that all the children are the same...
         if len(output_keys) > 0:
             output_data = {}
             for key in output_keys:
@@ -204,7 +218,7 @@ class ParallelList(ListVertex):
             output_data = None
 
         stop_time = time.time()
-        print('Time elapsed :', stop_time - start_time)
+        print("Time elapsed :", stop_time - start_time)
 
         return output_data
 
@@ -216,6 +230,7 @@ class SerialList(ListVertex):
     """
     A list of commands which are run in serial.
     """
+
     def __init__(self, child_type):
         super(SerialList, self).__init__(child_type=child_type)
 
@@ -235,14 +250,14 @@ class AutoList(ParallelList, SerialList):
     """
     Choose between `SerialList` and `ParallelList` depending on the nature of the children.
     """
+
     def __init__(self, child_type):
         super(AutoList, self).__init__(child_type=child_type)
 
     def _is_expensive(self):
         try:
             if isinstance(
-                self.children[0],
-                (VaspInteractive, SphinxInteractive, CompoundVertex)
+                self.children[0], (VaspInteractive, SphinxInteractive, CompoundVertex)
             ):  # Whitelist types that should be treated in parallel
                 return True
             else:  # Everything else is cheap enough to treat in serial

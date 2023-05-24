@@ -1,4 +1,5 @@
 from __future__ import print_function
+
 # coding: utf-8
 # Copyright (c) Max-Planck-Institut für Eisenforschung GmbH - Computational Materials Design (CM) Department
 # Distributed under the terms of "New BSD License", see the LICENSE file.
@@ -19,8 +20,10 @@ Code for storing images in hdf5 and leveraging the skimage library as a class at
 """
 
 __author__ = "Liam Huber"
-__copyright__ = "Copyright 2019, Max-Planck-Institut für Eisenforschung GmbH " \
-                "- Computational Materials Design (CM) Department"
+__copyright__ = (
+    "Copyright 2019, Max-Planck-Institut für Eisenforschung GmbH "
+    "- Computational Materials Design (CM) Department"
+)
 __version__ = "0.0"
 __maintainer__ = "Liam Huber"
 __email__ = "huber@mpie.de"
@@ -30,7 +33,7 @@ __date__ = "Feb 6, 2020"
 # Some decorators look at the signature of skimage methods to see if they take an image
 # (presumed to be in numpy.ndarray format).
 # This is done by searching the signature for the variable name below:
-_IMAGE_VARIABLE = 'image'
+_IMAGE_VARIABLE = "image"
 
 
 def pass_image_data(image):
@@ -46,7 +49,9 @@ def pass_image_data(image):
     """
 
     def decorator(function):
-        takes_image_data = list(inspect.signature(function).parameters.keys())[0] == _IMAGE_VARIABLE
+        takes_image_data = (
+            list(inspect.signature(function).parameters.keys())[0] == _IMAGE_VARIABLE
+        )
 
         def wrapper(*args, **kwargs):
             if takes_image_data:
@@ -56,8 +61,10 @@ def pass_image_data(image):
 
         wrapper.__doc__ = ""
         if takes_image_data:
-            wrapper.__doc__ += "This function has been wrapped to automatically supply the image argument. \n" \
-                               "Remaining arguments can be passed as normal.\n"
+            wrapper.__doc__ += (
+                "This function has been wrapped to automatically supply the image argument. \n"
+                "Remaining arguments can be passed as normal.\n"
+            )
         wrapper.__doc__ += "The original docstring follows:\n\n"
         wrapper.__doc__ += function.__doc__ or ""
         return wrapper
@@ -85,8 +92,10 @@ def set_image_data(image):
             else:
                 return output
 
-        wrapper.__doc__ = "This function has been wrapped; if it outputs a numpy array, it will be " \
-                          "automatically passed to the image's data field.\n" + function.__doc__
+        wrapper.__doc__ = (
+            "This function has been wrapped; if it outputs a numpy array, it will be "
+            "automatically passed to the image's data field.\n" + function.__doc__
+        )
         return wrapper
 
     return decorator
@@ -105,6 +114,7 @@ def pass_and_set_image_data(image):
 
     def decorator(function):
         return set_image_data(image)(pass_image_data(image)(function))
+
     return decorator
 
 
@@ -139,23 +149,22 @@ class Image:
 
         # Apply wrappers
         submodule_blacklist = [
-            'data',
-            'scripts',
-            'future',
-            'registration',
-
+            "data",
+            "scripts",
+            "future",
+            "registration",
         ]
         for module in iter_modules(skimage.__path__):
-            if module.name[0] == '_' or module.name in submodule_blacklist:
+            if module.name[0] == "_" or module.name in submodule_blacklist:
                 continue
             setattr(
                 self,
                 module.name,
                 ModuleScraper(
-                    'skimage.' + module.name,
+                    "skimage." + module.name,
                     decorator=pass_and_set_image_data,
-                    decorator_args=(self,)
-                )
+                    decorator_args=(self,),
+                ),
             )
 
     @property
@@ -198,8 +207,10 @@ class Image:
         elif isinstance(new_metadata, dict):
             self._metadata = Metadata(new_metadata)
         else:
-            raise ValueError("Metadata field expected a `dict`, `Metadata`, or `None`, but got {}".format(
-                type(new_metadata))
+            raise ValueError(
+                "Metadata field expected a `dict`, `Metadata`, or `None`, but got {}".format(
+                    type(new_metadata)
+                )
             )
 
     def __len__(self):
@@ -213,7 +224,9 @@ class Image:
         elif isinstance(self.source, str):
             self._data = io.imread(self.source, as_gray=self.as_gray)
         else:
-            raise ValueError("Data source not understood, should be numpy.ndarray or string pointing to image file.")
+            raise ValueError(
+                "Data source not understood, should be numpy.ndarray or string pointing to image file."
+            )
 
     def reload_data(self):
         """
@@ -297,7 +310,7 @@ class Metadata(UserDict):
         if key == "data":
             self.__dict__[key] = value
         else:
-            self.__dict__['data'][key] = value
+            self.__dict__["data"][key] = value
 
     def to_hdf(self, hdf, group_name=None):
         with hdf.open(group_name) as hdf5_server:

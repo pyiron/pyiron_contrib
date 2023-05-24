@@ -10,8 +10,10 @@ Simetimes numpy and scipy are missing things, or I can't find them.
 """
 
 __author__ = "Liam Huber"
-__copyright__ = "Copyright 2019, Max-Planck-Institut für Eisenforschung GmbH " \
-                "- Computational Materials Design (CM) Department"
+__copyright__ = (
+    "Copyright 2019, Max-Planck-Institut für Eisenforschung GmbH "
+    "- Computational Materials Design (CM) Department"
+)
 __version__ = "0.0"
 __maintainer__ = "Liam Huber"
 __email__ = "huber@mpie.de"
@@ -36,5 +38,5 @@ def welford_online(x, mean, std, k):
         float/numpy.ndarray, float/numpy.ndarray: The new mean and standard deviation for `k+1` values.
     """
     new_mean = (x + k * mean) / (k + 1)
-    new_std = np.sqrt((k * std ** 2 + (x - mean) * (x - new_mean)) / (k + 1))
+    new_std = np.sqrt((k * std**2 + (x - mean) * (x - new_mean)) / (k + 1))
     return new_mean, new_std

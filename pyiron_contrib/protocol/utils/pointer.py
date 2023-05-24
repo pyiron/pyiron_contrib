@@ -3,7 +3,7 @@
 # Distributed under the terms of "New BSD License", see the LICENSE file.
 
 from enum import Enum
-from pyiron_contrib.protocol.utils.misc import  LoggerMixin, requires_arguments
+from pyiron_contrib.protocol.utils.misc import LoggerMixin, requires_arguments
 from types import MethodType, FunctionType
 
 """
@@ -11,13 +11,16 @@ Python implementation of pointers. Pointer can be resolved using ~ operator
 """
 
 __author__ = "Dominik Gehringer, Liam Huber"
-__copyright__ = "Copyright 2019, Max-Planck-Institut für Eisenforschung GmbH " \
-                "- Computational Materials Design (CM) Department"
+__copyright__ = (
+    "Copyright 2019, Max-Planck-Institut für Eisenforschung GmbH "
+    "- Computational Materials Design (CM) Department"
+)
 __version__ = "0.0"
 __maintainer__ = "Liam Huber"
 __email__ = "huber@mpie.de"
 __status__ = "development"
 __date__ = "December 10, 2019"
+
 
 class CrumbType(Enum):
     """
@@ -55,7 +58,7 @@ class Crumb(LoggerMixin):
     @property
     def object(self):
         if self.crumb_type != CrumbType.Root:
-            raise ValueError('Only root crumbs store an object')
+            raise ValueError("Only root crumbs store an object")
         return self._name
 
     @staticmethod
@@ -99,9 +102,11 @@ class Crumb(LoggerMixin):
         return Crumb(CrumbType.Root, obj)
 
     def __repr__(self):
-        return '<{}({}, {})'.format(self.__class__.__name__,
-                                    self.crumb_type.name,
-                                    self.name if isinstance(self.name, str) else self.name.__class__.__name__)
+        return "<{}({}, {})".format(
+            self.__class__.__name__,
+            self.crumb_type.name,
+            self.name if isinstance(self.name, str) else self.name.__class__.__name__,
+        )
 
     def __hash__(self):
         crumb_hash = hash(self._crumb_type)
@@ -111,7 +116,10 @@ class Crumb(LoggerMixin):
             try:
                 crumb_hash += hash(self._name)
             except Exception as e:
-                self.logger.exception('Failed to hash "{}" object'.format(type(self._name).__name__), exc_info=e)
+                self.logger.exception(
+                    'Failed to hash "{}" object'.format(type(self._name).__name__),
+                    exc_info=e,
+                )
         return crumb_hash
 
     def __eq__(self, other):
@@ -143,25 +151,25 @@ class Path(list, LoggerMixin):
 
     def append(self, item):
         if not isinstance(item, Crumb):
-            raise TypeError('A path can only consist of crumbs')
+            raise TypeError("A path can only consist of crumbs")
         else:
             super(Path, self).append(item)
 
     def extend(self, collection):
         if not all([isinstance(item, Crumb) for item in collection]):
-            raise TypeError('A path can only consist of crumbs')
+            raise TypeError("A path can only consist of crumbs")
         else:
             super(Path, self).extend(collection)
 
     def index(self, item, **kwargs):
         if not isinstance(item, Crumb):
-            raise TypeError('A path can only consist of crumbs')
+            raise TypeError("A path can only consist of crumbs")
         else:
             return super(Path, self).index(item, **kwargs)
 
     def count(self, item):
         if not isinstance(item, Crumb):
-            raise TypeError('A path can only consist of crumbs')
+            raise TypeError("A path can only consist of crumbs")
         else:
             return super(Path, self).count(item)
 
@@ -216,7 +224,7 @@ class Pointer(LoggerMixin):
         # Have a look at the path and check that it starts with a root crumb
         root = path.pop(0)
         if root.crumb_type != CrumbType.Root:
-            raise ValueError('Got invalid path. A valid path starts with a root object')
+            raise ValueError("Got invalid path. A valid path starts with a root object")
         # First element is always an object
         result = root.object
         while len(path) > 0:
@@ -226,17 +234,19 @@ class Pointer(LoggerMixin):
             crumb_name = crumb.name
             # If the result is a pointer itself we have to resolve it first
             if isinstance(result, Pointer):
-                self.logger.info('Resolved pointer in a pointer path')
+                self.logger.info("Resolved pointer in a pointer path")
                 result = ~result
             if isinstance(crumb_name, Pointer):
-                self.logger.info('Resolved pointer in a pointer path')
+                self.logger.info("Resolved pointer in a pointer path")
                 crumb_name = ~crumb_name
             # Resolve it with the correct method - dig deeper
             if crumb_type == CrumbType.Attribute:
                 try:
                     result = getattr(result, crumb_name)
                 except AttributeError as e:
-                    self.logger.exception('Cannot fetch value "{}"'.format(crumb_name), exc_info=e)
+                    self.logger.exception(
+                        'Cannot fetch value "{}"'.format(crumb_name), exc_info=e
+                    )
                     raise e
             elif crumb_type == CrumbType.Item:
                 try:
@@ -267,12 +277,19 @@ class Pointer(LoggerMixin):
                     # Get the return value
                     result = function()
                 except Exception as e:
-                    self.logger.exception('Failed to execute callable to resolve values for '
-                                          'path {}'.format(self), exc_info=e)
+                    self.logger.exception(
+                        "Failed to execute callable to resolve values for "
+                        "path {}".format(self),
+                        exc_info=e,
+                    )
                 else:
-                    self.logger.debug('Successfully resolved callable for path {}'.format(self))
+                    self.logger.debug(
+                        "Successfully resolved callable for path {}".format(self)
+                    )
             else:
-                self.logger.warning('Found function, but it takes arguments! I \'ll not resolve it.')
+                self.logger.warning(
+                    "Found function, but it takes arguments! I 'll not resolve it."
+                )
         return result
 
     def __invert__(self):

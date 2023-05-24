@@ -9,12 +9,28 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
 from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
-from pyiron_contrib.protocol.primitive.one_state import CreateJob, Counter, CutoffDistance, ExternalHamiltonian, \
-    InitialPositions, RemoveJob, RandomVelocity, SphereReflection, VerletPositionUpdate, \
-    VerletVelocityUpdate, Zeros
+from pyiron_contrib.protocol.primitive.one_state import (
+    CreateJob,
+    Counter,
+    CutoffDistance,
+    ExternalHamiltonian,
+    InitialPositions,
+    RemoveJob,
+    RandomVelocity,
+    SphereReflection,
+    VerletPositionUpdate,
+    VerletVelocityUpdate,
+    Zeros,
+)
 from pyiron_contrib.protocol.primitive.two_state import IsGEq, ModIsZero
-from pyiron_contrib.protocol.primitive.fts_vertices import CentroidsRunningAverageMix, CentroidsReparameterization, \
-    CentroidsSmoothing, PositionsRunningAverage, StringRecenter, StringReflect
+from pyiron_contrib.protocol.primitive.fts_vertices import (
+    CentroidsRunningAverageMix,
+    CentroidsReparameterization,
+    CentroidsSmoothing,
+    PositionsRunningAverage,
+    StringRecenter,
+    StringReflect,
+)
 from pyiron_contrib.protocol.list import SerialList, ParallelList
 from pyiron_contrib.protocol.utils import Pointer
 
@@ -23,8 +39,10 @@ Protocols for the finite temperature string (FTS) method.
 """
 
 __author__ = "Raynol Dsouza, Liam Huber"
-__copyright__ = "Copyright 2019, Max-Planck-Institut für Eisenforschung GmbH " \
-                "- Computational Materials Design (CM) Department"
+__copyright__ = (
+    "Copyright 2019, Max-Planck-Institut für Eisenforschung GmbH "
+    "- Computational Materials Design (CM) Department"
+)
 __version__ = "0.0"
 __maintainer__ = "Liam Huber"
 __email__ = "huber@mpie.de"
@@ -88,11 +106,11 @@ class FTSEvolution(CompoundVertex):
 
         # Protocol defaults
         id_ = self.input.default
-        id_.temperature = 1.
+        id_.temperature = 1.0
         id_.n_steps = 100
-        id_.temperature_damping_timescale = 100.
-        id_.overheat_fraction = 2.
-        id_.time_step = 1.
+        id_.temperature_damping_timescale = 100.0
+        id_.overheat_fraction = 2.0
+        id_.time_step = 1.0
         id_.sampling_period = 1
         id_.thermalization_steps = 10
         id_.n_images = 5
@@ -100,7 +118,7 @@ class FTSEvolution(CompoundVertex):
         id_.cutoff_factor = 0.45
         id_.mixing_fraction = 0.1
         id_.relax_endpoints = False
-        id_.smooth_style = 'global'
+        id_.smooth_style = "global"
         id_.nominal_smoothing = 0.1
         id_.use_reflection = True
         id_._divisor = 1
@@ -142,23 +160,25 @@ class FTSEvolution(CompoundVertex):
             g.initial_velocities,
             g.initial_forces,
             g.cutoff,
-            g.check_steps, 'false',
+            g.check_steps,
+            "false",
             g.verlet_positions,
             g.reflect_string,  # Comes before atomic reflecting so we can actually trigger a full string reflection!
             g.reflect_atoms,  # Comes after, since even if the string doesn't reflect, an atom might have migrated.
             g.calc_static_images,
             g.verlet_velocities,
             g.running_average_pos,
-            g.check_sampling_period, 'true',
+            g.check_sampling_period,
+            "true",
             g.mix,
             g.smooth,
             g.reparameterize,
             g.calc_static_centroids,
             g.recenter,
             g.clock,
-            g.check_steps
+            g.check_steps,
         )
-        g.make_edge(g.check_sampling_period, g.recenter, 'false')
+        g.make_edge(g.check_sampling_period, g.recenter, "false")
         g.starting_vertex = g.initialize_images
         g.restarting_vertex = g.check_steps
 
@@ -203,50 +223,79 @@ class FTSEvolution(CompoundVertex):
 
         # verlet_positions
         g.verlet_positions.input.n_children = ip.n_images
-        g.verlet_positions.broadcast.default.positions = gp.initial_positions.output.initial_positions[-1]
-        g.verlet_positions.broadcast.default.velocities = gp.initial_velocities.output.velocities[-1]
+        g.verlet_positions.broadcast.default.positions = (
+            gp.initial_positions.output.initial_positions[-1]
+        )
+        g.verlet_positions.broadcast.default.velocities = (
+            gp.initial_velocities.output.velocities[-1]
+        )
         g.verlet_positions.direct.default.forces = gp.initial_forces.output.zeros[-1]
 
         g.verlet_positions.broadcast.positions = gp.recenter.output.positions[-1]
-        g.verlet_positions.broadcast.velocities = gp.verlet_velocities.output.velocities[-1]
+        g.verlet_positions.broadcast.velocities = (
+            gp.verlet_velocities.output.velocities[-1]
+        )
         g.verlet_positions.broadcast.forces = gp.recenter.output.forces[-1]
         g.verlet_positions.direct.masses = ip.structure_initial.get_masses
         g.verlet_positions.direct.time_step = ip.time_step
         g.verlet_positions.direct.temperature = ip.temperature
-        g.verlet_positions.direct.temperature_damping_timescale = ip.temperature_damping_timescale
+        g.verlet_positions.direct.temperature_damping_timescale = (
+            ip.temperature_damping_timescale
+        )
 
         # reflect_string
         g.reflect_string.input.n_children = ip.n_images
-        g.reflect_string.direct.default.all_centroid_positions = \
+        g.reflect_string.direct.default.all_centroid_positions = (
             gp.initial_positions.output.initial_positions[-1]
-        g.reflect_string.broadcast.default.centroid_positions = \
+        )
+        g.reflect_string.broadcast.default.centroid_positions = (
             gp.initial_positions.output.initial_positions[-1]
-        g.reflect_string.broadcast.default.previous_positions = \
+        )
+        g.reflect_string.broadcast.default.previous_positions = (
             gp.initial_positions.output.initial_positions[-1]
-        g.reflect_string.broadcast.default.previous_velocities = gp.initial_velocities.output.velocities[-1]
+        )
+        g.reflect_string.broadcast.default.previous_velocities = (
+            gp.initial_velocities.output.velocities[-1]
+        )
 
-        g.reflect_string.direct.all_centroid_positions = gp.reparameterize.output.centroids_pos_list[-1]
-        g.reflect_string.broadcast.centroid_positions = gp.reparameterize.output.centroids_pos_list[-1]
+        g.reflect_string.direct.all_centroid_positions = (
+            gp.reparameterize.output.centroids_pos_list[-1]
+        )
+        g.reflect_string.broadcast.centroid_positions = (
+            gp.reparameterize.output.centroids_pos_list[-1]
+        )
         g.reflect_string.broadcast.previous_positions = gp.recenter.output.positions[-1]
-        g.reflect_string.broadcast.previous_velocities = gp.reflect_atoms.output.velocities[-1]
+        g.reflect_string.broadcast.previous_velocities = (
+            gp.reflect_atoms.output.velocities[-1]
+        )
         g.reflect_string.broadcast.positions = gp.verlet_positions.output.positions[-1]
-        g.reflect_string.broadcast.velocities = gp.verlet_positions.output.velocities[-1]
+        g.reflect_string.broadcast.velocities = gp.verlet_positions.output.velocities[
+            -1
+        ]
         g.reflect_string.direct.structure = ip.structure_initial
 
         # reflect_atoms
         g.reflect_atoms.input.n_children = ip.n_images
-        g.reflect_atoms.broadcast.default.reference_positions = \
+        g.reflect_atoms.broadcast.default.reference_positions = (
             gp.initial_positions.output.initial_positions[-1]
-        g.reflect_atoms.broadcast.default.previous_positions = \
+        )
+        g.reflect_atoms.broadcast.default.previous_positions = (
             gp.initial_positions.output.initial_positions[-1]
-        g.reflect_atoms.broadcast.default.previous_velocities = gp.initial_velocities.output.velocities[-1]
+        )
+        g.reflect_atoms.broadcast.default.previous_velocities = (
+            gp.initial_velocities.output.velocities[-1]
+        )
         g.reflect_atoms.direct.default.total_steps = ip.total_steps
 
-        g.reflect_atoms.broadcast.reference_positions = gp.reparameterize.output.centroids_pos_list[-1]
+        g.reflect_atoms.broadcast.reference_positions = (
+            gp.reparameterize.output.centroids_pos_list[-1]
+        )
         g.reflect_atoms.broadcast.positions = gp.reflect_string.output.positions[-1]
         g.reflect_atoms.broadcast.velocities = gp.reflect_string.output.velocities[-1]
         g.reflect_atoms.broadcast.previous_positions = gp.recenter.output.positions[-1]
-        g.reflect_atoms.broadcast.previous_velocities = gp.reflect_atoms.output.velocities[-1]
+        g.reflect_atoms.broadcast.previous_velocities = (
+            gp.reflect_atoms.output.velocities[-1]
+        )
         g.reflect_atoms.direct.structure = ip.structure_initial
         g.reflect_atoms.direct.cutoff_distance = gp.cutoff.output.cutoff_distance[-1]
         g.reflect_atoms.direct.use_reflection = ip.use_reflection
@@ -255,32 +304,50 @@ class FTSEvolution(CompoundVertex):
         # calc_static_images
         g.calc_static_images.input.n_children = ip.n_images
         g.calc_static_images.direct.structure = ip.structure_initial
-        g.calc_static_images.broadcast.project_path = gp.initialize_images.output.project_path[-1]
-        g.calc_static_images.broadcast.job_name = gp.initialize_images.output.job_names[-1]
+        g.calc_static_images.broadcast.project_path = (
+            gp.initialize_images.output.project_path[-1]
+        )
+        g.calc_static_images.broadcast.job_name = gp.initialize_images.output.job_names[
+            -1
+        ]
         g.calc_static_images.broadcast.positions = gp.reflect_atoms.output.positions[-1]
 
         # verlet_velocities
         g.verlet_velocities.input.n_children = ip.n_images
-        g.verlet_velocities.broadcast.velocities = gp.reflect_atoms.output.velocities[-1]
+        g.verlet_velocities.broadcast.velocities = gp.reflect_atoms.output.velocities[
+            -1
+        ]
         g.verlet_velocities.broadcast.forces = gp.calc_static_images.output.forces[-1]
         g.verlet_velocities.direct.masses = ip.structure_initial.get_masses
         g.verlet_velocities.direct.time_step = ip.time_step
         g.verlet_velocities.direct.temperature = ip.temperature
-        g.verlet_velocities.direct.temperature_damping_timescale = ip.temperature_damping_timescale
+        g.verlet_velocities.direct.temperature_damping_timescale = (
+            ip.temperature_damping_timescale
+        )
 
         # running_average_positions
         g.running_average_pos.input.n_children = ip.n_images
-        g.running_average_pos.direct.default.thermalization_steps = ip.thermalization_steps
+        g.running_average_pos.direct.default.thermalization_steps = (
+            ip.thermalization_steps
+        )
         g.running_average_pos.direct.default.total_steps = ip.total_steps
         g.running_average_pos.direct.default.divisor = ip.divisor
-        g.running_average_pos.broadcast.default.running_average_positions = \
+        g.running_average_pos.broadcast.default.running_average_positions = (
             gp.initial_positions.output.initial_positions[-1]
+        )
 
-        g.running_average_pos.broadcast.total_steps = gp.running_average_pos.output.total_steps[-1]
-        g.running_average_pos.broadcast.divisor = gp.running_average_pos.output.divisor[-1]
-        g.running_average_pos.broadcast.running_average_positions = \
+        g.running_average_pos.broadcast.total_steps = (
+            gp.running_average_pos.output.total_steps[-1]
+        )
+        g.running_average_pos.broadcast.divisor = gp.running_average_pos.output.divisor[
+            -1
+        ]
+        g.running_average_pos.broadcast.running_average_positions = (
             gp.running_average_pos.output.running_average_positions[-1]
-        g.running_average_pos.broadcast.positions = gp.reflect_atoms.output.positions[-1]
+        )
+        g.running_average_pos.broadcast.positions = gp.reflect_atoms.output.positions[
+            -1
+        ]
         g.running_average_pos.direct.structure = ip.structure_initial
 
         # check_sampling_period
@@ -288,11 +355,15 @@ class FTSEvolution(CompoundVertex):
         g.check_sampling_period.input.default.mod = ip.sampling_period
 
         # mix
-        g.mix.input.default.centroids_pos_list = gp.initial_positions.output.initial_positions[-1]
+        g.mix.input.default.centroids_pos_list = (
+            gp.initial_positions.output.initial_positions[-1]
+        )
         g.mix.input.centroids_pos_list = gp.reparameterize.output.centroids_pos_list[-1]
         g.mix.input.mixing_fraction = ip.mixing_fraction
         g.mix.input.relax_endpoints = ip.relax_endpoints
-        g.mix.input.running_average_positions = gp.running_average_pos.output.running_average_positions[-1]
+        g.mix.input.running_average_positions = (
+            gp.running_average_pos.output.running_average_positions[-1]
+        )
         g.mix.input.structure = ip.structure_initial
 
         # smooth
@@ -303,44 +374,64 @@ class FTSEvolution(CompoundVertex):
         g.smooth.input.centroids_pos_list = gp.mix.output.centroids_pos_list[-1]
 
         # reparameterize
-        g.reparameterize.input.centroids_pos_list = gp.smooth.output.centroids_pos_list[-1]
-        g.reparameterize.input.structure= ip.structure_initial
+        g.reparameterize.input.centroids_pos_list = gp.smooth.output.centroids_pos_list[
+            -1
+        ]
+        g.reparameterize.input.structure = ip.structure_initial
 
         # calc_static_centroids
         g.calc_static_centroids.input.n_children = ip.n_images
         g.calc_static_centroids.direct.structure = ip.structure_initial
-        g.calc_static_centroids.broadcast.project_path = gp.initialize_centroids.output.project_path[-1]
-        g.calc_static_centroids.broadcast.job_name = gp.initialize_centroids.output.job_names[-1]
-        g.calc_static_centroids.broadcast.positions = gp.reparameterize.output.centroids_pos_list[-1]
+        g.calc_static_centroids.broadcast.project_path = (
+            gp.initialize_centroids.output.project_path[-1]
+        )
+        g.calc_static_centroids.broadcast.job_name = (
+            gp.initialize_centroids.output.job_names[-1]
+        )
+        g.calc_static_centroids.broadcast.positions = (
+            gp.reparameterize.output.centroids_pos_list[-1]
+        )
 
         # recenter
         g.recenter.input.n_children = ip.n_images
-        g.recenter.direct.default.all_centroid_positions = gp.initial_positions.output.initial_positions[-1]
-        g.recenter.broadcast.default.centroid_positions = gp.initial_positions.output.initial_positions[-1]
+        g.recenter.direct.default.all_centroid_positions = (
+            gp.initial_positions.output.initial_positions[-1]
+        )
+        g.recenter.broadcast.default.centroid_positions = (
+            gp.initial_positions.output.initial_positions[-1]
+        )
         g.recenter.direct.default.centroid_forces = gp.initial_forces.output.zeros[-1]
 
-        g.recenter.direct.all_centroid_positions = gp.reparameterize.output.centroids_pos_list[-1]
-        g.recenter.broadcast.centroid_positions = gp.reparameterize.output.centroids_pos_list[-1]
-        g.recenter.broadcast.centroid_forces = gp.calc_static_centroids.output.forces[-1]
+        g.recenter.direct.all_centroid_positions = (
+            gp.reparameterize.output.centroids_pos_list[-1]
+        )
+        g.recenter.broadcast.centroid_positions = (
+            gp.reparameterize.output.centroids_pos_list[-1]
+        )
+        g.recenter.broadcast.centroid_forces = gp.calc_static_centroids.output.forces[
+            -1
+        ]
         g.recenter.broadcast.positions = gp.reflect_atoms.output.positions[-1]
         g.recenter.broadcast.forces = gp.calc_static_images.output.forces[-1]
-        g.recenter.direct.structure= ip.structure_initial
+        g.recenter.direct.structure = ip.structure_initial
 
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
 
     def get_output(self):
         gp = Pointer(self.graph)
         return {
-            'energy_pot': ~gp.calc_static_centroids.output.energy_pot[-1],
-            'positions': ~gp.reparameterize.output.centroids_pos_list[-1],
-            'forces': ~gp.calc_static_centroids.output.forces[-1]
+            "energy_pot": ~gp.calc_static_centroids.output.energy_pot[-1],
+            "positions": ~gp.reparameterize.output.centroids_pos_list[-1],
+            "forces": ~gp.calc_static_centroids.output.forces[-1],
         }
 
     def _get_energies(self, frame=None):
         if frame is None:
             return self.graph.calc_static_centroids.output.energy_pot[-1]
         else:
-            return self.graph.calc_static_centroids.archive.output.energy_pot.data[frame]
+            return self.graph.calc_static_centroids.archive.output.energy_pot.data[
+                frame
+            ]
 
     def plot_string(self, ax=None, frame=None, plot_kwargs=None):
         """
@@ -359,8 +450,8 @@ class FTSEvolution(CompoundVertex):
             _, ax = plt.subplots()
         if plot_kwargs is None:
             plot_kwargs = {}
-        if 'marker' not in plot_kwargs.keys():
-            plot_kwargs = {'marker': 'o'}
+        if "marker" not in plot_kwargs.keys():
+            plot_kwargs = {"marker": "o"}
         energies = np.array(self._get_energies(frame=frame))
         ax.plot(energies - energies[0], **plot_kwargs)
         ax.set_ylabel("Energy")
@@ -402,10 +493,13 @@ class FTSEvolution(CompoundVertex):
         Returns:
             (float): the backward migration barrier.
         """
-        return self._get_directional_barrier(frame=frame, anchor_element=-1, use_minima=use_minima)
+        return self._get_directional_barrier(
+            frame=frame, anchor_element=-1, use_minima=use_minima
+        )
 
     def get_barrier(self, frame=None, use_minima=True):
         return self.get_forward_barrier(frame=frame, use_minima=use_minima)
+
     get_barrier.__doc__ = get_forward_barrier.__doc__
 
 
@@ -444,7 +538,8 @@ class _ConstrainedMD(CompoundVertex):
         # Execution flow
         g = self.graph
         g.make_pipeline(
-            g.check_steps, 'false',
+            g.check_steps,
+            "false",
             g.verlet_positions,
             g.reflect_string,
             g.reflect_atoms,
@@ -478,7 +573,9 @@ class _ConstrainedMD(CompoundVertex):
         g.verlet_positions.input.masses = ip.structure.get_masses
         g.verlet_positions.input.time_step = ip.time_step
         g.verlet_positions.input.temperature = ip.temperature
-        g.verlet_positions.input.temperature_damping_timescale = ip.temperature_damping_timescale
+        g.verlet_positions.input.temperature_damping_timescale = (
+            ip.temperature_damping_timescale
+        )
 
         # reflect_string
         g.reflect_string.input.default.previous_positions = ip.positions
@@ -488,8 +585,12 @@ class _ConstrainedMD(CompoundVertex):
         g.reflect_string.input.centroid_positions = ip.centroid_positions
         g.reflect_string.input.positions = gp.verlet_positions.output.positions[-1]
         g.reflect_string.input.velocities = gp.verlet_positions.output.velocities[-1]
-        g.reflect_string.input.previous_positions = gp.reflect_atoms.output.positions[-1]
-        g.reflect_string.input.previous_velocities = gp.verlet_velocities.output.velocities[-1]
+        g.reflect_string.input.previous_positions = gp.reflect_atoms.output.positions[
+            -1
+        ]
+        g.reflect_string.input.previous_velocities = (
+            gp.verlet_velocities.output.velocities[-1]
+        )
         g.reflect_string.input.pbc = ip.structure.pbc
         g.reflect_string.input.cell = ip.structure.cell.array
 
@@ -502,7 +603,9 @@ class _ConstrainedMD(CompoundVertex):
         g.reflect_atoms.input.positions = gp.reflect_string.output.positions[-1]
         g.reflect_atoms.input.velocities = gp.reflect_string.output.velocities[-1]
         g.reflect_atoms.input.previous_positions = gp.reflect_atoms.output.positions[-1]
-        g.reflect_atoms.input.previous_velocities = gp.verlet_velocities.output.velocities[-1]
+        g.reflect_atoms.input.previous_velocities = (
+            gp.verlet_velocities.output.velocities[-1]
+        )
         g.reflect_atoms.input.structure = ip.structure
         g.reflect_atoms.input.cutoff_distance = ip.cutoff_distance
         g.reflect_atoms.input.use_reflection = ip.use_reflection
@@ -520,33 +623,44 @@ class _ConstrainedMD(CompoundVertex):
         g.verlet_velocities.input.masses = ip.structure.get_masses
         g.verlet_velocities.input.time_step = ip.time_step
         g.verlet_velocities.input.temperature = ip.temperature
-        g.verlet_velocities.input.temperature_damping_timescale = ip.temperature_damping_timescale
+        g.verlet_velocities.input.temperature_damping_timescale = (
+            ip.temperature_damping_timescale
+        )
 
         # running_average_positions
-        g.running_average_pos.input.default.thermalization_steps = ip.thermalization_steps
+        g.running_average_pos.input.default.thermalization_steps = (
+            ip.thermalization_steps
+        )
         g.running_average_pos.input.default.total_steps = ip.total_steps
         g.running_average_pos.input.default.divisor = ip.divisor
-        g.running_average_pos.input.default.running_average_positions = ip.running_average_positions
+        g.running_average_pos.input.default.running_average_positions = (
+            ip.running_average_positions
+        )
 
-        g.running_average_pos.input.total_steps = gp.running_average_pos.output.total_steps[-1]
+        g.running_average_pos.input.total_steps = (
+            gp.running_average_pos.output.total_steps[-1]
+        )
         g.running_average_pos.input.divisor = gp.running_average_pos.output.divisor[-1]
-        g.running_average_pos.input.running_average_positions = \
+        g.running_average_pos.input.running_average_positions = (
             gp.running_average_pos.output.running_average_positions[-1]
+        )
         g.running_average_pos.input.positions = gp.reflect_atoms.output.positions[-1]
-        g.running_average_pos.input.structure= ip.structure
+        g.running_average_pos.input.structure = ip.structure
 
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
 
     def get_output(self):
         gp = Pointer(self.graph)
         return {
-            'positions': ~gp.reflect_atoms.output.positions[-1],
-            'velocities': ~gp.verlet_velocities.output.velocities[-1],
-            'forces': ~gp.calc_static.output.forces[-1],
-            'running_average_positions': ~gp.running_average_pos.output.running_average_positions[-1],
-            'divisor': ~gp.running_average_pos.output.divisor[-1],
-            'total_steps': ~gp.running_average_pos.output.total_steps[-1],
-            'clock': ~gp.clock.output.n_counts[-1]
+            "positions": ~gp.reflect_atoms.output.positions[-1],
+            "velocities": ~gp.verlet_velocities.output.velocities[-1],
+            "forces": ~gp.calc_static.output.forces[-1],
+            "running_average_positions": ~gp.running_average_pos.output.running_average_positions[
+                -1
+            ],
+            "divisor": ~gp.running_average_pos.output.divisor[-1],
+            "total_steps": ~gp.running_average_pos.output.total_steps[-1],
+            "clock": ~gp.clock.output.n_counts[-1],
         }
 
 
@@ -602,20 +716,22 @@ class FTSEvolutionParallel(FTSEvolution):
             g.initial_forces,
             g.initial_velocities,
             g.cutoff,
-            g.check_steps, 'false',
+            g.check_steps,
+            "false",
             g.remove_images,
             g.create_images,
             g.constrained_evo,
             g.clock,
-            g.check_thermalized, 'true',
+            g.check_thermalized,
+            "true",
             g.mix,
             g.smooth,
             g.reparameterize,
             g.calc_static_centroids,
             g.recenter,
-            g.check_steps
+            g.check_steps,
         )
-        g.make_edge(g.check_thermalized, g.check_steps, 'false')
+        g.make_edge(g.check_thermalized, g.check_steps, "false")
         g.starting_vertex = g.create_centroids
         g.restarting_vertex = g.check_steps
 
@@ -657,7 +773,9 @@ class FTSEvolutionParallel(FTSEvolution):
         g.remove_images.input.default.project_path = ip.project_path
         g.remove_images.input.default.job_names = ip.job_name
 
-        g.remove_images.input.project_path = gp.create_images.output.project_path[-1][-1]
+        g.remove_images.input.project_path = gp.create_images.output.project_path[-1][
+            -1
+        ]
         g.remove_images.input.job_names = gp.create_images.output.job_names[-1]
 
         # create_images
@@ -672,30 +790,50 @@ class FTSEvolutionParallel(FTSEvolution):
         g.constrained_evo.direct.structure = ip.structure_initial
         g.constrained_evo.direct.time_step = ip.time_step
         g.constrained_evo.direct.temperature = ip.temperature
-        g.constrained_evo.direct.temperature_damping_timescale = ip.temperature_damping_timescale
+        g.constrained_evo.direct.temperature_damping_timescale = (
+            ip.temperature_damping_timescale
+        )
 
-        g.constrained_evo.broadcast.default.positions = gp.initial_positions.output.initial_positions[-1]
-        g.constrained_evo.broadcast.default.velocities = gp.initial_velocities.output.velocities[-1]
+        g.constrained_evo.broadcast.default.positions = (
+            gp.initial_positions.output.initial_positions[-1]
+        )
+        g.constrained_evo.broadcast.default.velocities = (
+            gp.initial_velocities.output.velocities[-1]
+        )
         g.constrained_evo.direct.default.forces = gp.initial_forces.output.zeros[-1]
 
         g.constrained_evo.broadcast.positions = gp.recenter.output.positions[-1]
-        g.constrained_evo.broadcast.velocities = gp.constrained_evo.output.velocities[-1]
+        g.constrained_evo.broadcast.velocities = gp.constrained_evo.output.velocities[
+            -1
+        ]
         g.constrained_evo.broadcast.forces = gp.recenter.output.forces[-1]
 
         # constrained_evolution - reflect_string
-        g.constrained_evo.direct.default.all_centroid_positions = gp.initial_positions.output.initial_positions[-1]
-        g.constrained_evo.broadcast.default.centroid_positions = gp.initial_positions.output.initial_positions[-1]
+        g.constrained_evo.direct.default.all_centroid_positions = (
+            gp.initial_positions.output.initial_positions[-1]
+        )
+        g.constrained_evo.broadcast.default.centroid_positions = (
+            gp.initial_positions.output.initial_positions[-1]
+        )
 
-        g.constrained_evo.direct.all_centroid_positions = gp.reparameterize.output.centroids_pos_list[-1]
-        g.constrained_evo.broadcast.centroid_positions = gp.reparameterize.output.centroids_pos_list[-1]
+        g.constrained_evo.direct.all_centroid_positions = (
+            gp.reparameterize.output.centroids_pos_list[-1]
+        )
+        g.constrained_evo.broadcast.centroid_positions = (
+            gp.reparameterize.output.centroids_pos_list[-1]
+        )
 
         # constrained_evolution - reflect_atoms
         g.constrained_evo.direct.default.total_steps = ip.total_steps
-        g.constrained_evo.broadcast.total_steps = gp.constrained_evo.output.total_steps[-1]
+        g.constrained_evo.broadcast.total_steps = gp.constrained_evo.output.total_steps[
+            -1
+        ]
         g.constrained_evo.direct.cutoff_distance = gp.cutoff.output.cutoff_distance[-1]
 
         # constrained_evolution - calc_static
-        g.constrained_evo.broadcast.project_path = gp.create_images.output.project_path[-1]
+        g.constrained_evo.broadcast.project_path = gp.create_images.output.project_path[
+            -1
+        ]
         g.constrained_evo.broadcast.job_name = gp.create_images.output.job_names[-1]
 
         # constrained_evolution - verlet_velocities
@@ -704,12 +842,14 @@ class FTSEvolutionParallel(FTSEvolution):
         # constrained_evolution - running_average_positions
         g.constrained_evo.direct.default.thermalization_steps = ip.thermalization_steps
         g.constrained_evo.direct.default.divisor = ip.divisor
-        g.constrained_evo.broadcast.default.running_average_positions = \
+        g.constrained_evo.broadcast.default.running_average_positions = (
             gp.initial_positions.output.initial_positions[-1]
+        )
 
         g.constrained_evo.broadcast.divisor = gp.constrained_evo.output.divisor[-1]
-        g.constrained_evo.broadcast.running_average_positions = \
+        g.constrained_evo.broadcast.running_average_positions = (
             gp.constrained_evo.output.running_average_positions[-1]
+        )
 
         # constrained_evolution - clock
         g.constrained_evo.direct.n_steps = ip.sampling_period
@@ -722,11 +862,15 @@ class FTSEvolutionParallel(FTSEvolution):
         g.check_thermalized.input.threshold = ip.thermalization_steps
 
         # mix
-        g.mix.input.default.centroids_pos_list = gp.initial_positions.output.initial_positions[-1]
+        g.mix.input.default.centroids_pos_list = (
+            gp.initial_positions.output.initial_positions[-1]
+        )
         g.mix.input.centroids_pos_list = gp.reparameterize.output.centroids_pos_list[-1]
         g.mix.input.mixing_fraction = ip.mixing_fraction
         g.mix.input.relax_endpoints = ip.relax_endpoints
-        g.mix.input.running_average_positions = gp.constrained_evo.output.running_average_positions[-1]
+        g.mix.input.running_average_positions = (
+            gp.constrained_evo.output.running_average_positions[-1]
+        )
         g.mix.input.structure = ip.structure_initial
 
         # smooth
@@ -737,25 +881,45 @@ class FTSEvolutionParallel(FTSEvolution):
         g.smooth.input.centroids_pos_list = gp.mix.output.centroids_pos_list[-1]
 
         # reparameterize
-        g.reparameterize.input.centroids_pos_list = gp.smooth.output.centroids_pos_list[-1]
+        g.reparameterize.input.centroids_pos_list = gp.smooth.output.centroids_pos_list[
+            -1
+        ]
         g.reparameterize.input.structure = ip.structure_initial
 
         # calc_static_centroids
         g.calc_static_centroids.input.n_children = ip.n_images
         g.calc_static_centroids.direct.structure = ip.structure_initial
-        g.calc_static_centroids.broadcast.project_path = gp.create_centroids.output.project_path[-1]
-        g.calc_static_centroids.broadcast.job_name = gp.create_centroids.output.job_names[-1]
-        g.calc_static_centroids.broadcast.positions = gp.reparameterize.output.centroids_pos_list[-1]
+        g.calc_static_centroids.broadcast.project_path = (
+            gp.create_centroids.output.project_path[-1]
+        )
+        g.calc_static_centroids.broadcast.job_name = (
+            gp.create_centroids.output.job_names[-1]
+        )
+        g.calc_static_centroids.broadcast.positions = (
+            gp.reparameterize.output.centroids_pos_list[-1]
+        )
 
         # recenter
         g.recenter.input.n_children = ip.n_images
-        g.recenter.direct.default.all_centroid_positions = gp.initial_positions.output.initial_positions[-1]
-        g.recenter.broadcast.default.centroid_positions = gp.initial_positions.output.initial_positions[-1]
-        g.recenter.broadcast.default.centroid_forces = gp.initial_forces.output.zeros[-1]
+        g.recenter.direct.default.all_centroid_positions = (
+            gp.initial_positions.output.initial_positions[-1]
+        )
+        g.recenter.broadcast.default.centroid_positions = (
+            gp.initial_positions.output.initial_positions[-1]
+        )
+        g.recenter.broadcast.default.centroid_forces = gp.initial_forces.output.zeros[
+            -1
+        ]
 
-        g.recenter.direct.all_centroid_positions = gp.reparameterize.output.centroids_pos_list[-1]
-        g.recenter.broadcast.centroid_positions = gp.reparameterize.output.centroids_pos_list[-1]
-        g.recenter.broadcast.centroid_forces = gp.calc_static_centroids.output.forces[-1]
+        g.recenter.direct.all_centroid_positions = (
+            gp.reparameterize.output.centroids_pos_list[-1]
+        )
+        g.recenter.broadcast.centroid_positions = (
+            gp.reparameterize.output.centroids_pos_list[-1]
+        )
+        g.recenter.broadcast.centroid_forces = gp.calc_static_centroids.output.forces[
+            -1
+        ]
         g.recenter.broadcast.positions = gp.constrained_evo.output.positions[-1]
         g.recenter.broadcast.forces = gp.constrained_evo.output.forces[-1]
         g.recenter.direct.structure = ip.structure_initial

@@ -5,9 +5,18 @@
 from __future__ import print_function
 
 from pyiron_contrib.protocol.generic import CompoundVertex, Protocol
-from pyiron_contrib.protocol.primitive.one_state import BerendsenBarostat, Counter, CutoffDistance, \
-    ExternalHamiltonian, HarmonicHamiltonian, RandomVelocity, SphereReflection, VerletPositionUpdate, \
-    VerletVelocityUpdate, Zeros
+from pyiron_contrib.protocol.primitive.one_state import (
+    BerendsenBarostat,
+    Counter,
+    CutoffDistance,
+    ExternalHamiltonian,
+    HarmonicHamiltonian,
+    RandomVelocity,
+    SphereReflection,
+    VerletPositionUpdate,
+    VerletVelocityUpdate,
+    Zeros,
+)
 from pyiron_contrib.protocol.primitive.two_state import IsGEq
 from pyiron_contrib.protocol.utils import Pointer
 
@@ -16,8 +25,10 @@ Protocols for molecular dynamics.
 """
 
 __author__ = "Liam Huber"
-__copyright__ = "Copyright 2019, Max-Planck-Institut für Eisenforschung GmbH " \
-                "- Computational Materials Design (CM) Department"
+__copyright__ = (
+    "Copyright 2019, Max-Planck-Institut für Eisenforschung GmbH "
+    "- Computational Materials Design (CM) Department"
+)
 __version__ = "0.0"
 __maintainer__ = "Liam Huber"
 __email__ = "huber@mpie.de"
@@ -59,24 +70,25 @@ class MolecularDynamics(CompoundVertex):
         pressure (float): The isotropic pressure in GPa.
         volume (float): The volume of the system in Ang3.
     """
+
     # DefaultWhitelist sets the output which will be stored every `archive period' in the final hdf5 file.
 
     DefaultWhitelist = {
-        'verlet_positions': {
-            'output': {
-                'positions': 1000,
+        "verlet_positions": {
+            "output": {
+                "positions": 1000,
             },
         },
-        'calc_static': {
-            'output': {
-                'energy_pot': 1,
-                'forces': 1000,
+        "calc_static": {
+            "output": {
+                "energy_pot": 1,
+                "forces": 1000,
             },
         },
-        'verlet_velocities': {
-            'output': {
-                'energy_kin': 1,
-                'velocities': 1000,
+        "verlet_velocities": {
+            "output": {
+                "energy_kin": 1,
+                "velocities": 1000,
             },
         },
     }
@@ -88,12 +100,12 @@ class MolecularDynamics(CompoundVertex):
         id_ = self.input.default
         id_.temperature = None
         id_.n_steps = 100
-        id_.temperature_damping_timescale = 100.
-        id_.time_step = 1.
+        id_.temperature_damping_timescale = 100.0
+        id_.time_step = 1.0
         id_.overheat_fraction = 2
         id_.pressure = None
-        id_.pressure_style = 'anisotropic'
-        id_.pressure_damping_timescale = 1000.
+        id_.pressure_style = "anisotropic"
+        id_.pressure_damping_timescale = 1000.0
         id_._compressibility = 4.57e-5  # bar^-1
         id_._previous_volume = None
         id_._energy_kin = None
@@ -118,13 +130,14 @@ class MolecularDynamics(CompoundVertex):
             g.initial_velocities,
             g.initial_forces,
             g.initial_pressures,
-            g.check_steps, 'false',
+            g.check_steps,
+            "false",
             g.barostat,
             g.verlet_positions,
             g.calc_static,
             g.verlet_velocities,
             g.clock,
-            g.check_steps
+            g.check_steps,
         )
         g.starting_vertex = g.initial_velocities
         g.restarting_vertex = g.check_steps
@@ -170,7 +183,9 @@ class MolecularDynamics(CompoundVertex):
         g.barostat.input.pressure_style = ip.pressure_style
 
         # verelt_positions
-        g.verlet_positions.input.default.velocities = gp.initial_velocities.output.velocities[-1]
+        g.verlet_positions.input.default.velocities = (
+            gp.initial_velocities.output.velocities[-1]
+        )
         g.verlet_positions.input.default.forces = gp.initial_forces.output.zeros[-1]
 
         g.verlet_positions.input.positions = gp.barostat.output.positions[-1]
@@ -179,7 +194,9 @@ class MolecularDynamics(CompoundVertex):
         g.verlet_positions.input.masses = ip.structure.get_masses
         g.verlet_positions.input.time_step = ip.time_step
         g.verlet_positions.input.temperature = ip.temperature
-        g.verlet_positions.input.temperature_damping_timescale = ip.temperature_damping_timescale
+        g.verlet_positions.input.temperature_damping_timescale = (
+            ip.temperature_damping_timescale
+        )
 
         # calc_static
         g.calc_static.input.ref_job_full_path = ip.ref_job_full_path
@@ -193,20 +210,22 @@ class MolecularDynamics(CompoundVertex):
         g.verlet_velocities.input.masses = ip.structure.get_masses
         g.verlet_velocities.input.time_step = ip.time_step
         g.verlet_velocities.input.temperature = ip.temperature
-        g.verlet_velocities.input.temperature_damping_timescale = ip.temperature_damping_timescale
+        g.verlet_velocities.input.temperature_damping_timescale = (
+            ip.temperature_damping_timescale
+        )
 
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
 
     def get_output(self):
         gp = Pointer(self.graph)
         return {
-            'energy_pot': ~gp.calc_static.output.energy_pot[-1],
-            'energy_kin': ~gp.verlet_velocities.output.energy_kin[-1],
-            'positions': ~gp.verlet_positions.output.positions[-1],
-            'velocities': ~gp.verlet_velocities.output.velocities[-1],
-            'forces': ~gp.calc_static.output.forces[-1],
-            'pressure': ~gp.barostat.output.pressure[-1],
-            'volume': ~gp.calc_static.output.volume[-1]
+            "energy_pot": ~gp.calc_static.output.energy_pot[-1],
+            "energy_kin": ~gp.verlet_velocities.output.energy_kin[-1],
+            "positions": ~gp.verlet_positions.output.positions[-1],
+            "velocities": ~gp.verlet_velocities.output.velocities[-1],
+            "forces": ~gp.calc_static.output.forces[-1],
+            "pressure": ~gp.barostat.output.pressure[-1],
+            "volume": ~gp.calc_static.output.volume[-1],
         }
 
 
@@ -262,14 +281,15 @@ class ConfinedMD(MolecularDynamics):
             g.initial_forces,
             g.initial_pressures,
             g.cutoff,
-            g.check_steps, 'false',
+            g.check_steps,
+            "false",
             g.barostat,
             g.verlet_positions,
             g.reflect_atoms,
             g.calc_static,
             g.verlet_velocities,
             g.clock,
-            g.check_steps
+            g.check_steps,
         )
         g.starting_vertex = g.initial_velocities
         g.restarting_vertex = g.check_steps
@@ -319,7 +339,9 @@ class ConfinedMD(MolecularDynamics):
         g.barostat.input.pressure_style = ip.pressure_style
 
         # verlet_positions
-        g.verlet_positions.input.default.velocities = gp.initial_velocities.output.velocities[-1]
+        g.verlet_positions.input.default.velocities = (
+            gp.initial_velocities.output.velocities[-1]
+        )
         g.verlet_positions.input.default.forces = gp.initial_forces.output.zeros[-1]
 
         g.verlet_positions.input.positions = gp.barostat.output.positions[-1]
@@ -328,18 +350,24 @@ class ConfinedMD(MolecularDynamics):
         g.verlet_positions.input.masses = ip.structure.get_masses
         g.verlet_positions.input.time_step = ip.time_step
         g.verlet_positions.input.temperature = ip.temperature
-        g.verlet_positions.input.temperature_damping_timescale = ip.temperature_damping_timescale
+        g.verlet_positions.input.temperature_damping_timescale = (
+            ip.temperature_damping_timescale
+        )
 
         # reflect individual atoms which stray too far
         g.reflect_atoms.input.default.previous_positions = ip.structure.positions
-        g.reflect_atoms.input.default.previous_velocities = gp.initial_velocities.output.velocities[-1]
+        g.reflect_atoms.input.default.previous_velocities = (
+            gp.initial_velocities.output.velocities[-1]
+        )
         g.reflect_atoms.input.default.total_steps = ip.total_steps
 
         g.reflect_atoms.input.reference_positions = ip.structure.positions
         g.reflect_atoms.input.positions = gp.verlet_positions.output.positions[-1]
         g.reflect_atoms.input.velocities = gp.verlet_positions.output.velocities[-1]
         g.reflect_atoms.input.previous_positions = gp.barostat.output.positions[-1]
-        g.reflect_atoms.input.previous_velocities = gp.reflect_atoms.output.velocities[-1]
+        g.reflect_atoms.input.previous_velocities = gp.reflect_atoms.output.velocities[
+            -1
+        ]
         g.reflect_atoms.input.structure = ip.structure
         g.reflect_atoms.input.cutoff_distance = gp.cutoff.output.cutoff_distance[-1]
         g.reflect_atoms.input.use_reflection = ip.use_reflection
@@ -357,7 +385,9 @@ class ConfinedMD(MolecularDynamics):
         g.verlet_velocities.input.masses = ip.structure.get_masses
         g.verlet_velocities.input.time_step = ip.time_step
         g.verlet_velocities.input.temperature = ip.temperature
-        g.verlet_velocities.input.temperature_damping_timescale = ip.temperature_damping_timescale
+        g.verlet_velocities.input.temperature_damping_timescale = (
+            ip.temperature_damping_timescale
+        )
 
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
 
@@ -405,8 +435,8 @@ class HarmonicMD(CompoundVertex):
         id_ = self.input.default
         id_.temperature = None
         id_.n_steps = 100
-        id_.temperature_damping_timescale = 100.
-        id_.time_step = 1.
+        id_.temperature_damping_timescale = 100.0
+        id_.time_step = 1.0
         id_.overheat_fraction = 2
         id_.spring_constant = None
         id_.force_constants = None
@@ -430,12 +460,13 @@ class HarmonicMD(CompoundVertex):
             g.initial_velocities,
             g.initial_forces,
             g.initial_pressures,
-            g.check_steps, 'false',
+            g.check_steps,
+            "false",
             g.verlet_positions,
             g.calc_harmonic,
             g.verlet_velocities,
             g.clock,
-            g.check_steps
+            g.check_steps,
         )
         g.starting_vertex = g.initial_velocities
         g.restarting_vertex = g.check_steps
@@ -463,7 +494,9 @@ class HarmonicMD(CompoundVertex):
 
         # verelt_positions
         g.verlet_positions.input.default.positions = ip.structure.positions
-        g.verlet_positions.input.default.velocities = gp.initial_velocities.output.velocities[-1]
+        g.verlet_positions.input.default.velocities = (
+            gp.initial_velocities.output.velocities[-1]
+        )
         g.verlet_positions.input.default.forces = gp.initial_forces.output.zeros[-1]
 
         g.verlet_positions.input.positions = gp.verlet_positions.output.positions[-1]
@@ -472,7 +505,9 @@ class HarmonicMD(CompoundVertex):
         g.verlet_positions.input.masses = ip.structure.get_masses
         g.verlet_positions.input.time_step = ip.time_step
         g.verlet_positions.input.temperature = ip.temperature
-        g.verlet_positions.input.temperature_damping_timescale = ip.temperature_damping_timescale
+        g.verlet_positions.input.temperature_damping_timescale = (
+            ip.temperature_damping_timescale
+        )
 
         # calc_harmonic
         g.calc_harmonic.input.spring_constant = ip.spring_constant
@@ -487,18 +522,20 @@ class HarmonicMD(CompoundVertex):
         g.verlet_velocities.input.masses = ip.structure.get_masses
         g.verlet_velocities.input.time_step = ip.time_step
         g.verlet_velocities.input.temperature = ip.temperature
-        g.verlet_velocities.input.temperature_damping_timescale = ip.temperature_damping_timescale
+        g.verlet_velocities.input.temperature_damping_timescale = (
+            ip.temperature_damping_timescale
+        )
 
         self.set_graph_archive_clock(gp.clock.output.n_counts[-1])
 
     def get_output(self):
         gp = Pointer(self.graph)
         return {
-            'energy_pot': ~gp.calc_harmonic.output.energy_pot[-1],
-            'energy_kin': ~gp.verlet_velocities.output.energy_kin[-1],
-            'positions': ~gp.verlet_positions.output.positions[-1],
-            'velocities': ~gp.verlet_velocities.output.velocities[-1],
-            'forces': ~gp.calc_harmonic.output.forces[-1],
+            "energy_pot": ~gp.calc_harmonic.output.energy_pot[-1],
+            "energy_kin": ~gp.verlet_velocities.output.energy_kin[-1],
+            "positions": ~gp.verlet_positions.output.positions[-1],
+            "velocities": ~gp.verlet_velocities.output.velocities[-1],
+            "forces": ~gp.calc_harmonic.output.forces[-1],
         }
 
 

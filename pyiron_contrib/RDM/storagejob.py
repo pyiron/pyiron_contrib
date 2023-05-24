@@ -18,7 +18,8 @@ class StorageType:
        read_only (bool): read only StorageType cannot be changed
 
     """
-    _available_storage_types = ['local', 's3']
+
+    _available_storage_types = ["local", "s3"]
 
     def __init__(self, storage_type=None):
         """What type of storage is used
@@ -47,15 +48,17 @@ class StorageType:
 
     @classmethod
     def _read_only_error(cls):
-        raise RuntimeError("The storage type cannot be changed when it is already in use.")
+        raise RuntimeError(
+            "The storage type cannot be changed when it is already in use."
+        )
 
     @property
     def local(self):
-        return self.storage_type == 'local'
+        return self.storage_type == "local"
 
     @property
     def s3(self):
-        return self.storage_type == 's3'
+        return self.storage_type == "s3"
 
     @property
     def storage_type(self):
@@ -66,19 +69,21 @@ class StorageType:
         if self.read_only:
             self._read_only_error()
         if storage_type not in self._available_storage_types:
-            raise ValueError(f"Expected 'storage_type' to be one of {self._available_storage_types} "
-                             f"but got {storage_type}.")
+            raise ValueError(
+                f"Expected 'storage_type' to be one of {self._available_storage_types} "
+                f"but got {storage_type}."
+            )
         self._storage_type = storage_type
 
 
 class StorageJob(GenericJob):
     """Job to store files associated with meta data either locally, or at a remote data service like s3."""
-    def __init__(self, project, job_name):
 
+    def __init__(self, project, job_name):
         super().__init__(project, job_name)
         self.server.run_mode.interactive = True
-        self._stored_files = DataContainer(table_name='stored_files')
-        self._storage_type = StorageType(storage_type='local')
+        self._stored_files = DataContainer(table_name="stored_files")
+        self._storage_type = StorageType(storage_type="local")
         self._storage_type_store = DataContainer(table_name="storage_type")
         self._external_storage = None
 
@@ -101,24 +106,30 @@ class StorageJob(GenericJob):
             - s3
             - ssh
         """
-        raise NotImplementedError("Storing files remotely via ssh is not yet supported.")
+        raise NotImplementedError(
+            "Storing files remotely via ssh is not yet supported."
+        )
 
     @property
     def storage_type(self):
         return self._storage_type.storage_type
 
     def use_s3_storage(self, config=None, bucket_name=None, _only_warn=False):
-        external_storage = FileS3IO(config=config, path=self.path, bucket_name=bucket_name)
+        external_storage = FileS3IO(
+            config=config, path=self.path, bucket_name=bucket_name
+        )
         if len(external_storage.list_nodes() + external_storage.list_groups()) > 0:
             if not _only_warn:
                 raise ValueError("Storage location not empty.")
             else:
                 self._logger.warning("Storage NOT empty - Danger of data loss!")
         self._external_storage = external_storage
-        self._storage_type.storage_type = 's3'
+        self._storage_type.storage_type = "s3"
         self._storage_type_store.create_group("s3_config")
         self._storage_type_store.s3_config.config = config
-        self._storage_type_store.s3_config.bucket_info = self._external_storage.bucket_info
+        self._storage_type_store.s3_config.bucket_info = (
+            self._external_storage.connection_info
+        )
         self._storage_type_store.s3_config.bucket_name = bucket_name
 
     def _list_groups(self):
@@ -128,8 +139,8 @@ class StorageJob(GenericJob):
         return self.files_stored
 
     def use_local_storage(self):
-        self._storage_type.storage_type = 'local'
-        if 's3_config' in self._storage_type_store.keys():
+        self._storage_type.storage_type = "local"
+        if "s3_config" in self._storage_type_store.keys():
             del self._storage_type_store.s3_config
         self._external_storage = None
 
@@ -163,8 +174,10 @@ class StorageJob(GenericJob):
         if isinstance(filenames, str):
             filenames = [filenames]
         if isinstance(metadata, list) and len(metadata) != len(filenames):
-            raise ValueError(f"Length of filenames and metadata have to match, "
-                             f"but got len(filenames)={len(filenames)} and len(metadata)={len(metadata)}.")
+            raise ValueError(
+                f"Length of filenames and metadata have to match, "
+                f"but got len(filenames)={len(filenames)} and len(metadata)={len(metadata)}."
+            )
 
         files = [os.path.basename(file) for file in filenames]
         if len(set(files)) != len(files):
@@ -172,7 +185,9 @@ class StorageJob(GenericJob):
 
         for i, file in enumerate(filenames):
             if not overwrite and os.path.basename(file) in self._stored_files.keys():
-                self._logger.warning(f"{file} not copied, since already present and 'overwrite'=False.")
+                self._logger.warning(
+                    f"{file} not copied, since already present and 'overwrite'=False."
+                )
                 continue
             _metadata = metadata[i] if isinstance(metadata, list) else metadata
             self._store_file(file, _metadata)
@@ -184,7 +199,7 @@ class StorageJob(GenericJob):
             if self._storage_type.local:
                 shutil.copy(file, self.working_directory)
             elif self._storage_type.s3:
-                self._external_storage.upload(file, metadata)
+                self._external_storage.upload_file(file, metadata)
         except Exception as e:
             raise IOError(f"Storing {file} failed") from e
         else:
@@ -216,8 +231,10 @@ class StorageJob(GenericJob):
 
         files_not_found = [file for file in filenames if file not in self._stored_files]
         if len(files_not_found) > 0 and raise_error:
-            raise FileNotFoundError(f"Files {files_not_found} not found, abort removing files. You may specify "
-                                    f"raise_error=False to suppress this error.")
+            raise FileNotFoundError(
+                f"Files {files_not_found} not found, abort removing files. You may specify "
+                f"raise_error=False to suppress this error."
+            )
 
         files_to_remove = [file for file in filenames if file in self._stored_files]
         if dryrun and not silent:
@@ -232,7 +249,7 @@ class StorageJob(GenericJob):
         self.run()
 
     def run_static(self):
-        raise NotImplementedError('There is no static run mode for a Storage job.')
+        raise NotImplementedError("There is no static run mode for a Storage job.")
 
     def collect_output(self):
         pass
@@ -264,17 +281,20 @@ class StorageJob(GenericJob):
         bucket_name = bucket_name or self._storage_type_store.s3_config.bucket_name
         try:
             external_storage = FileS3IO(
-                config=config,
-                path=self.path,
-                bucket_name=bucket_name
+                config=config, path=self.path, bucket_name=bucket_name
             )
         except Exception as e:
             raise RuntimeError("Could not restore connection to the S3 storage.") from e
-        if self._storage_type_store.s3_config.bucket_info == external_storage.bucket_info:
+        if (
+            self._storage_type_store.s3_config.bucket_info
+            == external_storage.connection_info
+        ):
             self._external_storage = external_storage
         else:
-            raise RuntimeError(f"New and saved s3 storage do not match! Got {external_storage.bucket_info}"
-                               f" but expected {self._storage_type_store.s3_config.bucket_info}.")
+            raise RuntimeError(
+                f"New and saved s3 storage do not match! Got {external_storage.connection_info}"
+                f" but expected {self._storage_type_store.s3_config.connection_info}."
+            )
 
     def from_hdf(self, hdf=None, group_name=None):
         super().from_hdf(hdf, group_name)
@@ -288,7 +308,7 @@ class StorageJob(GenericJob):
     def to_hdf(self, hdf=None, group_name=None):
         super().to_hdf(hdf, group_name)
         if self._storage_type.s3:
-            self._hdf5['REQUIRE_FULL_OBJ_FOR_RM'] = True
+            self._hdf5["REQUIRE_FULL_OBJ_FOR_RM"] = True
         self._stored_files.to_hdf(hdf=self._hdf5)
         self._storage_type_store.storage_type = self.storage_type
         self._storage_type_store.fixed_storage_type = self._storage_type.read_only
@@ -323,7 +343,9 @@ class StorageJob(GenericJob):
         # Here this function is changed to return a FileData object.
         if self._storage_type.local:
             if name_lst[0] in self.list_files():
-                file_name = posixpath.join(self.working_directory, "{}".format(item_obj))
+                file_name = posixpath.join(
+                    self.working_directory, "{}".format(item_obj)
+                )
                 return FileData(file=file_name, metadata=self._stored_files[item])
         elif self._storage_type.s3:
             if name_lst[0] in self._external_storage.list_nodes():

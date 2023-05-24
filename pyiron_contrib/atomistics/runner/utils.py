@@ -39,29 +39,29 @@ def container_to_ase(container: TrainingContainer) -> List[Atoms]:
         zipped = dict(zip(arraynames, properties))
 
         # Retrieve atomic positions, cell vectors, etc.
-        atoms = pyiron_to_ase(zipped['structure'])
+        atoms = pyiron_to_ase(zipped["structure"])
 
         # Attach charges to the Atoms object.
-        if 'charges' in zipped:
-            atoms.set_initial_charges(zipped['charges'])
+        if "charges" in zipped:
+            atoms.set_initial_charges(zipped["charges"])
 
         # Store all properties that will be saved on the calculator below.
-        calc_properties = {'energy': None, 'forces': None, 'totalcharge': None}
+        calc_properties = {"energy": None, "forces": None, "totalcharge": None}
         for prop in calc_properties:
             if prop in zipped:
                 calc_properties[prop] = zipped[prop]
 
         # Overwrite the totalcharge if the property was not present.
-        if calc_properties['totalcharge'] is None:
+        if calc_properties["totalcharge"] is None:
             totalcharge = np.sum(atoms.get_initial_charges())
-            calc_properties['totalcharge'] = totalcharge
+            calc_properties["totalcharge"] = totalcharge
 
         # Storage energies, forces, and totalcharge on a calculator object.
         atoms.calc = RunnerSinglePointCalculator(
             atoms=atoms,
-            energy=calc_properties['energy'],
-            forces=calc_properties['forces'],
-            totalcharge=calc_properties['totalcharge']
+            energy=calc_properties["energy"],
+            forces=calc_properties["forces"],
+            totalcharge=calc_properties["totalcharge"],
         )
 
         structure_lst.append(atoms)
@@ -69,10 +69,7 @@ def container_to_ase(container: TrainingContainer) -> List[Atoms]:
     return structure_lst
 
 
-def ase_to_container(
-    structures: List[Atoms],
-    container: TrainingContainer
-) -> None:
+def ase_to_container(structures: List[Atoms], container: TrainingContainer) -> None:
     """Append `structures` to `TrainingContainer`.
 
     Args:
@@ -82,27 +79,24 @@ def ase_to_container(
             appended.
     """
     for structure in structures:
-
         properties = {}
 
         # If the structure has a calculator attached to it, get energies,
         # forces, etc.
         if structure.calc is not None:
-            properties['energy'] = structure.get_potential_energy()
-            properties['forces'] = structure.get_forces()
-            properties['charges'] = structure.get_initial_charges()
+            properties["energy"] = structure.get_potential_energy()
+            properties["forces"] = structure.get_forces()
+            properties["charges"] = structure.get_initial_charges()
 
             if isinstance(structure.calc, RunnerSinglePointCalculator):
-                properties['totalcharge'] = structure.calc.get_property(
-                    'totalcharge'
-                )
+                properties["totalcharge"] = structure.calc.get_property("totalcharge")
 
             else:
-                properties['totalcharge'] = np.sum(properties['charges'])
+                properties["totalcharge"] = np.sum(properties["charges"])
 
         # StructureStorage needs a `spins` property, but not all ASE Atoms
         # objects have that.
-        if not hasattr(structure, 'spins'):
+        if not hasattr(structure, "spins"):
             structure.spins = None
 
         container.include_structure(structure, **properties)
@@ -132,8 +126,8 @@ def pad(array: np.ndarray, desired_length: int) -> np.ndarray:
     array_padded[:] = np.NaN
 
     # Insert first the data for this atom, second the np.NaN values.
-    array_padded[:len(contained_indices), :] = array
-    array_padded[len(contained_indices):, 0] = missing_indices
+    array_padded[: len(contained_indices), :] = array
+    array_padded[len(contained_indices) :, 0] = missing_indices
 
     return array_padded
 

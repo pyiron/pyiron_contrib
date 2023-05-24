@@ -452,7 +452,7 @@ class QuasiHarmonicApproximation(AtomisticParallelMaster):
         else:
             pr_job = self.project_hdf5.project.open(self.job_name + "_hdf5")
             forces_lst, energy_lst = [], []
-            for job_name in self._get_jobs_sorted():
+            for job_name in self.child_names:
                 inspect = pr_job.inspect(job_name)
                 forces_lst.append(inspect["output/generic/forces"])
                 energy_lst.append(inspect["output/generic/energy_pot"])

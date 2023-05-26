@@ -472,6 +472,8 @@ class Node(HasToDict):
             self.run()
 
     def run(self) -> None:
+        if not self.ready:
+            raise ValueError(f"{self.label} is not ready")
         if self.running:
             raise RuntimeError(f"{self.label} is already running")
 

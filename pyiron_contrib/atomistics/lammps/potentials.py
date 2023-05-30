@@ -13,7 +13,10 @@ __email__ = "waseda@mpie.de"
 __status__ = "production"
 __date__ = "April 18, 2023"
 
+from typing import Optional
+
 import pandas as pd
+from pyiron_atomistics.atomistics.structure.atoms import Atoms
 from pyiron_atomistics.lammps.potential import LammpsPotentialFile
 import numpy as np
 import warnings
@@ -40,38 +43,6 @@ Example II: Hybrid potential for multiple elements
 >>> lammps_job.potential = 0.4 * eam + 0.1 * morse_Al_Ni + morse_Ni  # hybrid/scaled
 
 """
-
-
-doc_pyiron_df = """
-- "Config": Lammps commands in a list. Lines are separated by list items and
-    each entry must finish with a new line
-- "Filename": Potential file name in either absolute path or relative to
-    the pyiron-resources path (optional)
-- "Model": Model name (optional)
-- "Name": Name of the potential (optional)
-- "Species": Order of species as defined in pair_coeff
-- "Citations": Citations (optional)
-
-Example
-
->>> import pandas as pd
->>> return pd.DataFrame(
-...     {
-...         "Config": [[
-...             'pair_style my_potential 3.2\n',
-...             'pair_coeff 2 1 1.1 2.3 3.2\n'
-...         ]],
-...         "Filename": [""],
-...         "Model": ["my_model"],
-...         "Name": ["my_potential"],
-...         "Species": [["Fe", "Al"]],
-...         "Citations": [],
-...     }
-... )
-"""
-
-
-issue_page = "https://github.com/pyiron/pyiron_atomistics/issues"
 
 
 class LammpsPotentials:
@@ -101,7 +72,7 @@ class LammpsPotentials:
         model=None,
         citations=None,
         filename=None,
-        potential_name=None,
+        name=None,
         scale=None,
         cutoff=None,
     ):
@@ -121,7 +92,7 @@ class LammpsPotentials:
             "model": check_none_n_length(model, pair_style),
             "citations": check_none_n_length(citations, [[]]),
             "filename": check_none_n_length(filename, [""]),
-            "potential_name": check_none_n_length(potential_name, pair_style),
+            "name": check_none_n_length(name, pair_style),
         }
         if scale is not None:
             arg_dict["scale"] = scale
@@ -137,28 +108,21 @@ class LammpsPotentials:
         new_pot.set_df(self.get_df())
         return new_pot
 
-    @staticmethod
-    def _unique(args):
-        labels, indices = np.unique(args, return_index=True)
-        return labels[np.argsort(indices)]
-
     @property
     def model(self) -> str:
         """Model name (required in pyiron df)"""
-        return "_and_".join(self._unique(self.df.model))
+        return "_and_".join(set(self.df.model))
 
     @property
-    def potential_name(self) -> str:
+    def name(self) -> str:
         """Potential name (required in pyiron df)"""
-        return "_and_".join(self._unique(self.df.potential_name))
+        return "_and_".join(set(self.df.name))
 
     @property
     def species(self):
         """Species defined in the potential"""
-        species = self._unique([ss for s in self.df.interacting_species for ss in s])
-        preset = self._unique(
-            ["___".join(s) for s in self.df.preset_species if len(s) > 0]
-        )
+        species = set([ss for s in self.df.interacting_species for ss in s])
+        preset = set(["___".join(s) for s in self.df.preset_species if len(s) > 0])
         if len(preset) == 0:
             return list(species)
         elif len(preset) > 1:
@@ -166,13 +130,12 @@ class LammpsPotentials:
                 "Currently not possible to have multiple file-based potentials"
             )
         preset = list(preset)[0].split("___")
-        comp_lst = [s for s in species if s not in self._unique(preset)]
-        return [p for p in preset + comp_lst if p != "*"]
+        return [p for p in preset + list(species - set(preset)) if p != "*"]
 
     @property
     def filename(self) -> list:
         """LAMMPS potential files"""
-        return [f for f in self._unique(self.df.filename) if len(f) > 0]
+        return [f for f in set(self.df.filename) if len(f) > 0]
 
     @property
     def citations(self) -> str:
@@ -181,7 +144,7 @@ class LammpsPotentials:
 
     @property
     def is_scaled(self) -> bool:
-        """Scaling in pair_style hybrid/scaled and hybrid/overlay (which is scale=1)"""
+        """Scaling in pair_style hybrid/scaled and hybrid/overlay (whih is scale=1)"""
         return "scale" in self.df
 
     @property
@@ -305,14 +268,15 @@ class LammpsPotentials:
             preset_species=self.df.preset_species,
         ).results
 
-    def get_df(self):
+    @property
+    def pyiron_df(self):
         """df used in pyiron potential"""
         return pd.DataFrame(
             {
                 "Config": [[self.pair_style] + self.pair_coeff],
                 "Filename": [self.filename],
                 "Model": [self.model],
-                "Name": [self.potential_name],
+                "Name": [self.name],
                 "Species": [self.species],
                 "Citations": [self.citations],
             }
@@ -423,18 +387,7 @@ class Library(LammpsPotentials):
                 return [" ".join(c.replace("\n", "").split()[1:])] * sum(
                     ["pair_coeff" in c for c in config]
                 )
-        raise ValueError(
-            f"""
-            pair_style could not determined: {config}.
-
-            The reason why you are seeing this error is most likely because
-            the potential you chose had a corrupt config. It is
-            supposed to have at least one item which starts with "pair_style".
-            If you are using the standard pyiron database, feel free to
-            submit an issue on {issue_page}
-            Typically you can get a reply within 24h.
-            """
-        )
+        raise ValueError(f"pair_style could not determined: {config}")
 
     @staticmethod
     def _get_pair_coeff(config):
@@ -473,6 +426,22 @@ class Library(LammpsPotentials):
                 )
         return
 
+    def __init__(
+            self,
+            *chemical_elements: str,
+            choice: Optional[int] = None,
+            name: Optional[str] = None,
+            structure: Optional[Atoms] = None
+    ):
+        self._choice = choice
+        if name is not None:
+            self._df_candidates = LammpsPotentialFile().find_by_name(name)
+        else:
+            structure_elements = [] if structure is None \
+                else list(structure.get_species_symbols())
+            chemical_elements = list(set(list(chemical_elements) + structure_elements))
+            self._df_candidates = LammpsPotentialFile().find(chemical_elements)
+
     def list_potentials(self):
         return self._df_candidates.Name
 
@@ -482,8 +451,14 @@ class Library(LammpsPotentials):
     @property
     def df(self):
         if self._df is None:
-            df = self._df_candidates.iloc[0]
-            if len(self._df_candidates) > 1:
+            choice = 0 if self._choice is None else self._choice
+            if choice > len(self._df_candidates):
+                raise ValueError(
+                    f"Cannot choose {self._choice} among {len(self._df_candidates)} "
+                    f"available choices."
+                )
+            df = self._df_candidates.iloc[choice]
+            if self._choice is None and len(self._df_candidates) > 1:
                 warnings.warn(
                     f"Potential not uniquely specified - use default {df.Name}"
                 )
@@ -497,31 +472,10 @@ class Library(LammpsPotentials):
                 model=df.Model,
                 citations=df.Citations,
                 filename=[df.Filename],
-                potential_name=df.Name,
+                name=df.Name,
                 scale=self._get_scale(df.Config),
             )
         return self._df
-
-
-def check_cutoff(f):
-    def wrapper(*args, **kwargs):
-        if "cutoff" not in kwargs or kwargs["cutoff"] == 0:
-            raise ValueError(
-                f"""
-                It is not possible to set cutoff=0 for parameter-based
-                potentials. If you think this should be possible, you have the
-                following options:
-
-                - Open an issue on our GitHub page: {issue_page}
-
-                - Write your own potential in pyiron format. Here's how:
-
-                {doc_pyiron_df}
-            """
-            )
-        return f(*args, **kwargs)
-
-    return wrapper
 
 
 class Morse(LammpsPotentials):
@@ -531,7 +485,6 @@ class Morse(LammpsPotentials):
     E = D_0*[exp(-2*alpha*(r-r_0))-2*exp(-alpha*(r-r_0))]
     """
 
-    @check_cutoff
     def __init__(self, *chemical_elements, D_0, alpha, r_0, cutoff, pair_style="morse"):
         """
         Args:
@@ -563,7 +516,6 @@ class CustomPotential(LammpsPotentials):
     pyiron
     """
 
-    @check_cutoff
     def __init__(self, pair_style, *chemical_elements, cutoff, **kwargs):
         """
         Args:
@@ -573,7 +525,7 @@ class CustomPotential(LammpsPotentials):
 
         Example:
 
-        >>> custom_pot = CustomPotential("lj/cut", "Al", "Ni", epsilon=0.5, sigma=1, cutoff=3)
+        >>> morse = Morse("lj/cut", "Al", "Ni", epsilon=0.5, sigma=1, cutoff=3)
 
         Important: the order of parameters is conserved in the LAMMPS input
         (except for `cutoff`, which is always the last argument).

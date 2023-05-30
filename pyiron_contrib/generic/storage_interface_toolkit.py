@@ -43,9 +43,9 @@ class StorageInterfaceConnector:
     @import_alarm
     def __init__(self, project):
         self._store = {}
+        self._project = project
         if project is None:
             return
-        self._project = project
 
         if "StorageInterface" in project.data:
             self._data = project.data.StorageInterface.copy()

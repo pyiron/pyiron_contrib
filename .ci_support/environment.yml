@@ -8,7 +8,7 @@ dependencies:
 - ipython
 - matplotlib =3.7.1
 - numpy =1.24.3
-- pyiron_base =0.5.38
+- pyiron_base =0.5.39
 - pyiron_atomistics =0.2.67
 - pyparsing =3.0.9
 - scipy =1.10.1

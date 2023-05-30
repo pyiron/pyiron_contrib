@@ -66,6 +66,7 @@ JOB_CLASS_DICT.update(
         "LAMMPSElasticMPI": "pyiron_contrib.nofiles.master",
         "LAMMPSMinimizeElasticMPI": "pyiron_contrib.nofiles.master",
         "FitsnapJob": "pyiron_contrib.atomistics.fitsnap.job",
+        "QuasiHarmonicApproximation": "pyiron_contrib.atomistics.atomistics.master.qha",
     }
 )
 

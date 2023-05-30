@@ -9,8 +9,10 @@ from pyiron_contrib.atomistics.mlip.mlip import write_cfg, read_cgfs
 from pyiron_base import GenericParameters
 
 __author__ = "Jan Janssen"
-__copyright__ = "Copyright 2020, Max-Planck-Institut für Eisenforschung GmbH - " \
-                "Computational Materials Design (CM) Department"
+__copyright__ = (
+    "Copyright 2020, Max-Planck-Institut für Eisenforschung GmbH - "
+    "Computational Materials Design (CM) Department"
+)
 __version__ = "1.0"
 __maintainer__ = "Jan Janssen"
 __email__ = "janssen@mpie.de"
@@ -28,11 +30,11 @@ class MlipJob(AtomisticGenericJob):
 
     @property
     def potential(self):
-        return self.input['mlip:load-from']
+        return self.input["mlip:load-from"]
 
     @potential.setter
     def potential(self, potential_filename):
-        self.input['mlip:load-from'] = potential_filename
+        self.input["mlip:load-from"] = potential_filename
 
     def set_input_to_read_only(self):
         """
@@ -53,40 +55,61 @@ class MlipJob(AtomisticGenericJob):
             self.input.from_hdf(hdf5_input)
 
     def write_input(self):
-        write_cfg(file_name=os.path.join(self.working_directory, 'structure.cfg'),
-                  indices_lst=[self.structure.indices],
-                  position_lst=[self.structure.positions],
-                  cell_lst=[self.structure.cell],
-                  forces_lst=None, energy_lst=None, track_lst=None, stress_lst=None)
-        shutil.copyfile(self.input['mlip:load-from'], os.path.join(self.working_directory, 'potential.mtp'))
-        self.input['mlip:load-from'] = 'potential.mtp'
+        write_cfg(
+            file_name=os.path.join(self.working_directory, "structure.cfg"),
+            indices_lst=[self.structure.indices],
+            position_lst=[self.structure.positions],
+            cell_lst=[self.structure.cell],
+            forces_lst=None,
+            energy_lst=None,
+            track_lst=None,
+            stress_lst=None,
+        )
+        shutil.copyfile(
+            self.input["mlip:load-from"],
+            os.path.join(self.working_directory, "potential.mtp"),
+        )
+        self.input["mlip:load-from"] = "potential.mtp"
         self.input.write_file(file_name="mlip.ini", cwd=self.working_directory)
 
     def collect_output(self):
-        file_name = os.path.join(self.working_directory, 'structurebyMTP.cfg')
-        cell, positions, forces, stress, energy, indicies, grades, jobids, timesteps = read_cgfs(file_name=file_name)
-        with self.project_hdf5.open('output') as hdf5_output:
-            hdf5_output['forces'] = forces
-            hdf5_output['energy_tot'] = energy
-            hdf5_output['pressures'] = stress
-            hdf5_output['cells'] = cell
-            hdf5_output['positions'] = positions
-            hdf5_output['indicies'] = indicies
+        file_name = os.path.join(self.working_directory, "structurebyMTP.cfg")
+        (
+            cell,
+            positions,
+            forces,
+            stress,
+            energy,
+            indicies,
+            grades,
+            jobids,
+            timesteps,
+        ) = read_cgfs(file_name=file_name)
+        with self.project_hdf5.open("output") as hdf5_output:
+            hdf5_output["forces"] = forces
+            hdf5_output["energy_tot"] = energy
+            hdf5_output["pressures"] = stress
+            hdf5_output["cells"] = cell
+            hdf5_output["positions"] = positions
+            hdf5_output["indicies"] = indicies
 
 
 class MlipParameter(GenericParameters):
-    def __init__(self, separator_char=' ', comment_char='#', table_name="mlip_inp"):
-        super(MlipParameter, self).__init__(separator_char=separator_char, comment_char=comment_char,
-                                            table_name=table_name)
+    def __init__(self, separator_char=" ", comment_char="#", table_name="mlip_inp"):
+        super(MlipParameter, self).__init__(
+            separator_char=separator_char,
+            comment_char=comment_char,
+            table_name=table_name,
+        )
         self._bool_dict = {True: "TRUE", False: "FALSE"}
 
     def load_default(self, file_content=None):
         if file_content is None:
-            file_content = '''\
+            file_content = """\
 abinitio void
 mlip mtpr
 mlip:load-from auto
 calculate-efs TRUE
 write-cfgs structurebyMTP.cfg
-'''
+"""
         self.load_string(file_content)

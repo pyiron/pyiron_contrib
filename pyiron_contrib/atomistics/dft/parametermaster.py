@@ -9,8 +9,10 @@ from pyiron.atomistics.master.parallel import AtomisticParallelMaster
 from pyiron_base import JobGenerator
 
 __author__ = "Jan Janssen"
-__copyright__ = "Copyright 2020, Max-Planck-Institut für Eisenforschung GmbH - " \
-                "Computational Materials Design (CM) Department"
+__copyright__ = (
+    "Copyright 2020, Max-Planck-Institut für Eisenforschung GmbH - "
+    "Computational Materials Design (CM) Department"
+)
 __version__ = "1.0"
 __maintainer__ = "Jan Janssen"
 __email__ = "janssen@mpie.de"
@@ -31,10 +33,12 @@ class ParameterJobGenerator(JobGenerator):
         Returns:
             list: of pairs of energy cut off and kpoint mesh
         """
-        return [[encut, kpoint_mesh] for encut, kpoint_mesh in zip(
-            self._job.iteration_frame.ENCUT,
-            self._job.iteration_frame.KPOINT_MESH
-        )]
+        return [
+            [encut, kpoint_mesh]
+            for encut, kpoint_mesh in zip(
+                self._job.iteration_frame.ENCUT, self._job.iteration_frame.KPOINT_MESH
+            )
+        ]
 
     @staticmethod
     def job_name(parameter):
@@ -46,8 +50,16 @@ class ParameterJobGenerator(JobGenerator):
         Returns:
             str: job name
         """
-        return "job_encut_" + str(parameter[0]).replace('.', '_') + \
-               '_kpoints_' + str(parameter[1][0]) + '_' + str(parameter[1][1]) + '_' + str(parameter[1][2])
+        return (
+            "job_encut_"
+            + str(parameter[0]).replace(".", "_")
+            + "_kpoints_"
+            + str(parameter[1][0])
+            + "_"
+            + str(parameter[1][1])
+            + "_"
+            + str(parameter[1][2])
+        )
 
     def modify_job(self, job, parameter):
         """
@@ -76,10 +88,10 @@ class ParameterMaster(AtomisticParallelMaster):
             job_name (str): name of the job, which has to be unique within the project
         """
         super(ParameterMaster, self).__init__(project, job_name)
-        self.__name__ = 'ParameterMaster'
-        self.__version__ = '0.0.1'
+        self.__name__ = "ParameterMaster"
+        self.__version__ = "0.0.1"
         self._job_generator = ParameterJobGenerator(self)
-        self.iteration_frame = pandas.DataFrame({'ENCUT': [], 'KPOINT_MESH': []})
+        self.iteration_frame = pandas.DataFrame({"ENCUT": [], "KPOINT_MESH": []})
 
     def to_hdf(self, hdf=None, group_name=None):
         """
@@ -90,8 +102,8 @@ class ParameterMaster(AtomisticParallelMaster):
             group_name (str): HDF5 subgroup name - optional
         """
         super(ParameterMaster, self).to_hdf(hdf=hdf, group_name=group_name)
-        with self.project_hdf5.open('input') as hdf5_input:
-            hdf5_input['dataframe'] = self.iteration_frame.to_dict(orient='list')
+        with self.project_hdf5.open("input") as hdf5_input:
+            hdf5_input["dataframe"] = self.iteration_frame.to_dict(orient="list")
 
     def from_hdf(self, hdf=None, group_name=None):
         """
@@ -102,8 +114,8 @@ class ParameterMaster(AtomisticParallelMaster):
             group_name (str): HDF5 subgroup name - optional
         """
         super(ParameterMaster, self).from_hdf(hdf=hdf, group_name=group_name)
-        with self.project_hdf5.open('input') as hdf5_input:
-            self.iteration_frame = pandas.DataFrame(hdf5_input['dataframe'])
+        with self.project_hdf5.open("input") as hdf5_input:
+            self.iteration_frame = pandas.DataFrame(hdf5_input["dataframe"])
 
     def collect_output(self):
         """

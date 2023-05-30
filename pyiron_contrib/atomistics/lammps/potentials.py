@@ -14,7 +14,6 @@ __status__ = "production"
 __date__ = "April 18, 2023"
 
 from typing import Optional
-
 import pandas as pd
 from pyiron_atomistics.atomistics.structure.atoms import Atoms
 from pyiron_atomistics.lammps.potential import LammpsPotentialFile

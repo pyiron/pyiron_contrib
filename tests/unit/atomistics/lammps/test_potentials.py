@@ -150,10 +150,12 @@ class TestPotentials(unittest.TestCase):
         )
         self.assertEqual(pot.pair_style, "pair_style a\n")
 
-    def test_PairCoeff(self):
-        pot = LammpsPotentials()
-        pc = pot._PairCoeff(
-            is_hybrid=False,
+class TestPairCoeff(unittest.TestCase):
+    def setUp(cls):
+        cls.pot = LammpsPotentials()
+
+    def test_counter(self):
+        pc = self.pot._PairCoeff(
             pair_style=["my_style"],
             interacting_species=[["Al", "Fe"]],
             pair_coeff=["some arguments"],

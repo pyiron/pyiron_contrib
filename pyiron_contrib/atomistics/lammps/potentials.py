@@ -209,19 +209,21 @@ class LammpsPotentials:
     class _PairCoeff:
         def __init__(
             self,
-            is_hybrid,
             pair_style,
             interacting_species,
             pair_coeff,
             species,
             preset_species,
         ):
-            self.is_hybrid = is_hybrid
             self._interacting_species = interacting_species
             self._pair_coeff = pair_coeff
             self._species = species
             self._preset_species = preset_species
             self._pair_style = pair_style
+
+        @property
+        def is_hybrid(self):
+            return len(set(self._pair_style)) > 1
 
         @property
         def counter(self):
@@ -297,7 +299,6 @@ class LammpsPotentials:
         """LAMMPS pair_coeff"""
 
         return self._PairCoeff(
-            is_hybrid="hybrid" in self.pair_style,
             pair_style=self.df.pair_style,
             interacting_species=self.df.interacting_species,
             pair_coeff=self.df.pair_coeff,

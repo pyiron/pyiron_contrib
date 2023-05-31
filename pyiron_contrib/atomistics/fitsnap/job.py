@@ -73,10 +73,7 @@ class FitsnapJob(TemplateJob):
         self.__version__ = "0.1"
         self.__name__ = "FitsnapJob"
         self.input.update(default_input)
-        self._lst_of_struct = []
-        self._a = None
-        self._b = None
-        self._coefficients = None
+        self._lst_of_struct = [] # List of ASE atoms containing flagged info (energy, forces, stress, etc.)
         
     @property
     def list_of_structures(self):

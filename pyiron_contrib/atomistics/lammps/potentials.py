@@ -126,7 +126,7 @@ class LammpsPotentials:
         if scale is not None:
             arg_dict["scale"] = scale
         try:
-            self.set_df(pd.DataFrame(arg_dict))
+            self.set_data(pd.DataFrame(arg_dict))
         except ValueError:
             raise ValueError(
                 f"Initialization failed - inconsistency in data: {arg_dict}"
@@ -134,7 +134,7 @@ class LammpsPotentials:
 
     def copy(self):
         new_pot = LammpsPotentials()
-        new_pot.set_df(self.get_df())
+        new_pot.set_data(self.get_all_data())
         return new_pot
 
     @staticmethod
@@ -288,7 +288,7 @@ class LammpsPotentials:
             for pc, ps in zip(self._pair_coeff, self._preset_species):
                 if len(ps) > 0 and "eam" in pc:
                     s = " ".join(ps + (len(self._species) - len(ps)) * ["NULL"])
-                    pc = pc.replace(" ".join(ps), s)
+                    pc = s.join(pc.rsplit(" ".join(ps), 1))
                 results.append(pc)
             return results
 
@@ -324,7 +324,7 @@ class LammpsPotentials:
     def _repr_html_(self):
         return self.df._repr_html_()
 
-    def set_df(self, df):
+    def set_data(self, df):
         for key in [
             "pair_style",
             "interacting_species",
@@ -340,7 +340,7 @@ class LammpsPotentials:
         """DataFrame containing all info for each pairwise interactions"""
         return self._df
 
-    def get_df(self, default_scale=None):
+    def get_all_data(self, default_scale=None):
         if default_scale is None or "scale" in self.df:
             return self.df.copy()
         df = self.df.copy()
@@ -352,9 +352,10 @@ class LammpsPotentials:
             if self.is_scaled or scale_or_potential.is_scaled:
                 raise ValueError("You cannot mix hybrid types")
             new_pot = LammpsPotentials()
-            new_pot.set_df(
+            new_pot.set_data(
                 pd.concat(
-                    (self.get_df(), scale_or_potential.get_df()), ignore_index=True
+                    (self.get_all_data(), scale_or_potential.get_all_data()),
+                    ignore_index=True
                 )
             )
             return new_pot
@@ -368,9 +369,9 @@ class LammpsPotentials:
 
     def __add__(self, potential):
         new_pot = LammpsPotentials()
-        new_pot.set_df(
+        new_pot.set_data(
             pd.concat(
-                (self.get_df(default_scale=1), potential.get_df(default_scale=1)),
+                (self.get_all_data(default_scale=1), potential.get_all_data(default_scale=1)),
                 ignore_index=True,
             )
         )
@@ -496,7 +497,7 @@ class Library(LammpsPotentials):
                 preset_species=[df.Species],
                 model=df.Model,
                 citations=df.Citations,
-                filename=[df.Filename],
+                filename=df.Filename,
                 potential_name=df.Name,
                 scale=self._get_scale(df.Config),
             )

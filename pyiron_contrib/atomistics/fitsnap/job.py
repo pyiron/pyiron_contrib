@@ -1,4 +1,6 @@
+import os
 from mpi4py import MPI
+import pandas as pd
 from fitsnap3lib.fitsnap import FitSnap
 from pyiron_base import TemplateJob, DataContainer
 from fitsnap3lib.scrapers.ase_funcs import ase_scraper
@@ -72,8 +74,10 @@ class FitsnapJob(TemplateJob):
         super(FitsnapJob, self).__init__(project, job_name)
         self.__version__ = "0.1"
         self.__name__ = "FitsnapJob"
+        self._compress_by_default = False # Make sure to not compress.
         self.input.update(default_input)
         self._lst_of_struct = [] # List of ASE atoms containing flagged info (energy, forces, stress, etc.)
+        self._potential = None
         
     @property
     def list_of_structures(self):
@@ -82,6 +86,33 @@ class FitsnapJob(TemplateJob):
     @list_of_structures.setter
     def list_of_structures(self, structure_lst):
         self._lst_of_struct = structure_lst
+
+    @property # Set potential property to potential.
+    def potential(self):
+        return self.get_potential()
+
+    def save_pyiron_lammps_potential_dict(self):
+        """save_pyiron_lammps_potential_dict 
+        Load generated fitsnap potential into lammps files.
+
+        Necessary right now - but can be 
+        """
+        snapmod = self.input['OUTFILE']['potential'] + '.mod'
+        snapparam = self.input['OUTFILE']['potential'] + '.snapparam'
+        snapcoeff = self.input['OUTFILE']['potential'] + '.snapcoeff'
+        
+        outsnapparam = os.path.join(self.working_directory, snapparam)
+        outsnapcoeff = os.path.join(self.working_directory, snapcoeff)
+
+        self._potential = {
+        'Name': [ 'Snap_Potential' ],
+        'Filename': [ [outsnapparam, outsnapcoeff, snapmod] ],
+        'Model': [ 'Custom' ],
+        'Species': [ self.input['BISPECTRUM']['type'].split() ],
+        'Config': [ ['include {}\n'.format(snapmod)] ]
+        }
+        with self.project_hdf5.open("output") as hdf_output:
+            hdf_output["lammps_potential"] = self._potential
 
     def run_static(self):
         comm = MPI.COMM_WORLD
@@ -110,16 +141,18 @@ class FitsnapJob(TemplateJob):
         if self.input['PYIRON_PERFORM_FIT']: 
             fs.perform_fit()
             fs.output.write_lammps(fs.solver.fit)
+            self.save_pyiron_lammps_potential_dict()
         self.status.finished = True
 
-    def to_hdf(self, hdf=None, group_name=None):
-        super(FitsnapJob, self).to_hdf(hdf=hdf, group_name=group_name)
-
-    def from_hdf(self, hdf=None, group_name=None):
-        super(FitsnapJob, self).from_hdf(hdf=hdf, group_name=group_name)
+    def get_potential(self):
+        if self._potential is not None:
+            return pd.DataFrame(self._potential)
 
     def to_hdf(self, hdf=None, group_name=None):
         super(FitsnapJob, self).to_hdf(hdf=hdf, group_name=group_name)
 
     def from_hdf(self, hdf=None, group_name=None):
         super(FitsnapJob, self).from_hdf(hdf=hdf, group_name=group_name)
+        with self.project_hdf5.open("output") as hdf_output:
+            if "lammps_potential" in hdf_output.list_nodes():
+                self._potential = hdf_output["lammps_potential"]

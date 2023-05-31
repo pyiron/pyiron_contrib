@@ -2,7 +2,7 @@
 # Copyright (c) Max-Planck-Institut für Eisenforschung GmbH - Computational Materials Design (CM) Department
 # Distributed under the terms of "New BSD License", see the LICENSE file.
 
-from pyiron_atomistics.lammps.potentials import Library, Morse, CustomPotential, LammpsPotentials
+from pyiron_contrib.atomistics.lammps.potentials import Library, Morse, CustomPotential, LammpsPotentials
 import unittest
 import pandas as pd
 import numpy as np
@@ -26,11 +26,11 @@ class TestPotentials(unittest.TestCase):
             "preset_species",
         ]
         arg_dict = {k: [] for k in required_keys}
-        pot.set_df(pd.DataFrame(arg_dict))
+        pot.set_data(pd.DataFrame(arg_dict))
         self.assertIsInstance(pot.df, pd.DataFrame)
         for key in required_keys:
             arg_dict = {k: [] for k in required_keys if k != key}
-            self.assertRaises(ValueError, pot.set_df, pd.DataFrame(arg_dict))
+            self.assertRaises(ValueError, pot.set_data, pd.DataFrame(arg_dict))
 
     def test_initialize_df(self):
         pot = LammpsPotentials()

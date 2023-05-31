@@ -1,6 +1,7 @@
 import os
 from mpi4py import MPI
 import pandas as pd
+import numpy as np
 from fitsnap3lib.fitsnap import FitSnap
 from pyiron_base import TemplateJob, DataContainer
 from fitsnap3lib.scrapers.ase_funcs import ase_scraper
@@ -121,14 +122,22 @@ class FitsnapJob(TemplateJob):
         fs = FitSnap(input_dict, comm=comm, arglist=["--overwrite"])
 
         if isinstance(self.input['PYIRON_LOAD_DESCRIPTORS'],dict):
-            fs.pt.create_shared_array(name="a", size1=self.input['PYIRON_LOAD_DESCRIPTORS']['a'].shape[0], 
-                                      size2=self.input['PYIRON_LOAD_DESCRIPTORS']['a'].shape[1], tm=0)
-            fs.pt.create_shared_array(name="b", size1=self.input['PYIRON_LOAD_DESCRIPTORS']['b'].shape[0], size2=1, tm=0)
-            fs.pt.create_shared_array(name="w", size1=self.input['PYIRON_LOAD_DESCRIPTORS']['c'].shape[0], size2=1, tm=0)
-            fs.pt.shared_arrays["a"].array = self.input['PYIRON_LOAD_DESCRIPTORS']['a']
-            fs.pt.shared_arrays["b"].array = self.input['PYIRON_LOAD_DESCRIPTORS']['b']
-            fs.pt.shared_arrays["w"].array = self.input['PYIRON_LOAD_DESCRIPTORS']['w']
-            fs.pt.fitsnap_dict['Testing'] = [False] * self.input['PYIRON_LOAD_DESCRIPTORS']['a'].shape[0]
+            if any([self.input['PYIRON_LOAD_DESCRIPTORS'].get('a',None) is None,
+                    self.input['PYIRON_LOAD_DESCRIPTORS'].get('b',None) is None,
+                    self.input['PYIRON_LOAD_DESCRIPTORS'].get('w',None) is None]):
+                raise ValueError('At least "a", "b", and "w" matrices must be passed to "PYIRON_LOAD_DESCRIPTORS" dictionary.')
+            else:
+                a_array = self.input['PYIRON_LOAD_DESCRIPTORS']['a']
+                b_array = self.input['PYIRON_LOAD_DESCRIPTORS']['b']
+                w_array = self.input['PYIRON_LOAD_DESCRIPTORS']['w'] 
+                fs.pt.create_shared_array(name="a", size1=a_array.shape[0], 
+                                        size2=a_array.shape[1], tm=0)
+                fs.pt.create_shared_array(name="b", size1=b_array.shape[0], size2=1, tm=0)
+                fs.pt.create_shared_array(name="w", size1=w_array.shape[0], size2=1, tm=0)
+                fs.pt.shared_arrays["a"].array = a_array
+                fs.pt.shared_arrays["b"].array = b_array
+                fs.pt.shared_arrays["w"].array = w_array
+                fs.pt.fitsnap_dict['Testing'] = [False] * a_array.shape[0]
         else:
             data = ase_scraper(
                 self._lst_of_struct

@@ -11,6 +11,7 @@ default_input = settings = \
 "PYIRON_PERFORMFIT": True,
 "PYIRON_SAVE_DESCRIPTORS": True,
 "PYIRON_LOAD_DESCRIPTORS": False, # Pass in dictionary with {'a':np.ndarray,'b':np.ndarray,'w':np.ndarry}
+### Fitsnap Parameters
 "BISPECTRUM":
     {
     "numTypes": 1,

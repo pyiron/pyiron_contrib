@@ -394,7 +394,7 @@ class LammpsPotentials:
             new_pot.set_data(
                 pd.concat(
                     (self.get_all_data(), scale_or_potential.get_all_data()),
-                    ignore_index=True
+                    ignore_index=True,
                 )
             )
             return new_pot
@@ -410,7 +410,10 @@ class LammpsPotentials:
         new_pot = LammpsPotentials()
         new_pot.set_data(
             pd.concat(
-                (self.get_all_data(default_scale=1), potential.get_all_data(default_scale=1)),
+                (
+                    self.get_all_data(default_scale=1),
+                    potential.get_all_data(default_scale=1),
+                ),
                 ignore_index=True,
             )
         )

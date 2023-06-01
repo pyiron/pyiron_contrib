@@ -154,7 +154,7 @@ class TestPairCoeff(unittest.TestCase):
     def setUp(cls):
         cls.pot = LammpsPotentials()
 
-    def test_counter_and_hybrid(self):
+    def test_hybrid(self):
         pc = self.pot._PairCoeff(
             pair_style=["my_style"],
             interacting_species=[["Al", "Fe"]],
@@ -164,6 +164,7 @@ class TestPairCoeff(unittest.TestCase):
         )
         self.assertEqual(pc.counter, [""])
         self.assertFalse(pc.is_hybrid)
+        self.assertEqual(pc.pair_style, [""])
         pc = self.pot._PairCoeff(
             pair_style=2 * ["my_style"],
             interacting_species=2 * [["Al", "Fe"]],
@@ -173,6 +174,7 @@ class TestPairCoeff(unittest.TestCase):
         )
         self.assertEqual(pc.counter, ["", ""])
         self.assertFalse(pc.is_hybrid)
+        self.assertEqual(pc.pair_style, ["", ""])
         pc = self.pot._PairCoeff(
             pair_style=2 * ["my_style"] + ["another_style"],
             interacting_species=3 * [["Al", "Fe"]],
@@ -182,6 +184,7 @@ class TestPairCoeff(unittest.TestCase):
         )
         self.assertEqual(pc.counter, ["1", "2", ""])
         self.assertTrue(pc.is_hybrid)
+        self.assertEqual(pc.pair_style, ["my_style", "my_style", "another_style"])
 
     def test_results(self):
         pc = self.pot._PairCoeff(

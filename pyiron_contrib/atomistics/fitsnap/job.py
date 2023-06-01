@@ -2,9 +2,8 @@ import os
 from mpi4py import MPI
 import pandas as pd
 import copy
-import numpy as np
 from fitsnap3lib.fitsnap import FitSnap
-from pyiron_base import TemplateJob, DataContainer
+from pyiron_base import TemplateJob
 from fitsnap3lib.scrapers.ase_funcs import ase_scraper
 
 default_input = settings = \
@@ -168,7 +167,7 @@ class FitsnapJob(TemplateJob):
             self.save_pyiron_lammps_potential_dict()
         self.status.finished = True
 
-    def get_potential(self):
+    def get_lammps_potential(self):
         if self._potential is not None:
             return pd.DataFrame(self._potential)
 

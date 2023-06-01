@@ -1,6 +1,7 @@
 import os
 from mpi4py import MPI
 import pandas as pd
+import copy
 import numpy as np
 from fitsnap3lib.fitsnap import FitSnap
 from pyiron_base import TemplateJob, DataContainer
@@ -9,9 +10,11 @@ from fitsnap3lib.scrapers.ase_funcs import ase_scraper
 default_input = settings = \
 {
 ### PYIRON-Specific Keywords and Options:
-"PYIRON_PERFORMFIT": True,
+"PYIRON":{
+"PYIRON_PERFORM_FIT": True,
 "PYIRON_SAVE_DESCRIPTORS": True,
 "PYIRON_LOAD_DESCRIPTORS": False, # Pass in dictionary with {'a':np.ndarray,'b':np.ndarray,'w':np.ndarry}
+},
 ### Fitsnap Parameters
 "BISPECTRUM":
     {
@@ -105,10 +108,11 @@ class FitsnapJob(TemplateJob):
         
         outsnapparam = os.path.join(self.working_directory, snapparam)
         outsnapcoeff = os.path.join(self.working_directory, snapcoeff)
+        outmod = os.path.join(self.working_directory, snapmod)
 
         self._potential = {
         'Name': [ 'Snap_Potential' ],
-        'Filename': [ [outsnapparam, outsnapcoeff, snapmod] ],
+        'Filename': [ [outsnapparam, outsnapcoeff, outmod] ],
         'Model': [ 'Custom' ],
         'Species': [ self.input['BISPECTRUM']['type'].split() ],
         'Config': [ ['include {}\n'.format(snapmod)] ]
@@ -119,36 +123,46 @@ class FitsnapJob(TemplateJob):
     def run_static(self):
         comm = MPI.COMM_WORLD
         input_dict = self.input.to_builtin()
-        fs = FitSnap(input_dict, comm=comm, arglist=["--overwrite"])
+        fs_input = copy.deepcopy(input_dict)
 
-        if isinstance(self.input['PYIRON_LOAD_DESCRIPTORS'],dict):
-            if any([self.input['PYIRON_LOAD_DESCRIPTORS'].get('a',None) is None,
-                    self.input['PYIRON_LOAD_DESCRIPTORS'].get('b',None) is None,
-                    self.input['PYIRON_LOAD_DESCRIPTORS'].get('w',None) is None]):
+        ## Ensure fitnsap files written to pyiron working directory. A bit hacky.
+        # Ideally fitnsap would be aware of directory from which the python function FitSnap is instantiated.
+        fs_input['OUTFILE']['metrics'] = os.path.join(self.working_directory,fs_input['OUTFILE']['metrics'])
+        fs_input['OUTFILE']['potential'] = os.path.join(self.working_directory,fs_input['OUTFILE']['potential'])
+        # Currently fitsnap does not allow any additional terms for input dictionary.
+        # This is a workaround for now.
+        del fs_input['PYIRON'] 
+
+        fs = FitSnap(fs_input, comm=comm, arglist=["--overwrite"])
+
+        if isinstance(self.input['PYIRON']['PYIRON_LOAD_DESCRIPTORS'],dict):
+            if any([self.input['PYIRON']['PYIRON_LOAD_DESCRIPTORS'].get('a',None) is None,
+                    self.input['PYIRON']['PYIRON_LOAD_DESCRIPTORS'].get('b',None) is None,
+                    self.input['PYIRON']['PYIRON_LOAD_DESCRIPTORS'].get('w',None) is None]):
                 raise ValueError('At least "a", "b", and "w" matrices must be passed to "PYIRON_LOAD_DESCRIPTORS" dictionary.')
             else:
-                a_array = self.input['PYIRON_LOAD_DESCRIPTORS']['a']
-                b_array = self.input['PYIRON_LOAD_DESCRIPTORS']['b']
-                w_array = self.input['PYIRON_LOAD_DESCRIPTORS']['w'] 
-                fs.pt.create_shared_array(name="a", size1=a_array.shape[0], 
+                a_array = self.input["PYIRON"]['PYIRON_LOAD_DESCRIPTORS']['a']
+                b_array = self.input["PYIRON"]['PYIRON_LOAD_DESCRIPTORS']['b']
+                w_array = self.input["PYIRON"]['PYIRON_LOAD_DESCRIPTORS']['w'] 
+                fs.pt.create_shared_array(name='a', size1=a_array.shape[0], 
                                         size2=a_array.shape[1], tm=0)
-                fs.pt.create_shared_array(name="b", size1=b_array.shape[0], size2=1, tm=0)
-                fs.pt.create_shared_array(name="w", size1=w_array.shape[0], size2=1, tm=0)
-                fs.pt.shared_arrays["a"].array = a_array
-                fs.pt.shared_arrays["b"].array = b_array
-                fs.pt.shared_arrays["w"].array = w_array
+                fs.pt.create_shared_array(name='b', size1=b_array.shape[0], size2=1, tm=0)
+                fs.pt.create_shared_array(name='w', size1=w_array.shape[0], size2=1, tm=0)
+                fs.pt.shared_arrays['a'].array = a_array
+                fs.pt.shared_arrays['b'].array = b_array
+                fs.pt.shared_arrays['w'].array = w_array
                 fs.pt.fitsnap_dict['Testing'] = [False] * a_array.shape[0]
         else:
             data = ase_scraper(
                 self._lst_of_struct
             )
             fs.process_configs(data=data)
-        if self.input["PYIRON_SAVE_DESCRIPTORS"]:
+        if self.input["PYIRON"]["PYIRON_SAVE_DESCRIPTORS"]:
             with self.project_hdf5.open("output") as hdf_output:
                 hdf_output["a"] = fs.pt.shared_arrays['a'].array
                 hdf_output["b"] = fs.pt.shared_arrays['b'].array
                 hdf_output["w"] = fs.pt.shared_arrays['w'].array
-        if self.input['PYIRON_PERFORM_FIT']: 
+        if self.input["PYIRON"]['PYIRON_PERFORM_FIT']: 
             fs.perform_fit()
             fs.output.write_lammps(fs.solver.fit)
             self.save_pyiron_lammps_potential_dict()

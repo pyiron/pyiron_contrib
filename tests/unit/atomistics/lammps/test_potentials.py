@@ -202,6 +202,14 @@ class TestPairCoeff(unittest.TestCase):
             ]
         )
 
+    def test_pairs(self):
+        pc = self.pot._PairCoeff(
+            pair_style=["style_one", "style_two"],
+            interacting_species=[["Al", "Fe"], ["Al", "Al"]],
+            pair_coeff=["arg_one", "arg_two"],
+            species=["Al", "Fe"],
+            preset_species=2 * [[]],
+        )
 
 if __name__ == "__main__":
     unittest.main()

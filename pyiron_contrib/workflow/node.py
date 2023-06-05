@@ -4,6 +4,7 @@ import inspect
 import warnings
 from functools import partialmethod
 from typing import get_args, get_type_hints, Optional, TYPE_CHECKING
+import dis
 
 from pyiron_contrib.workflow.channels import (
     InputData,
@@ -366,7 +367,7 @@ class Node(HasToDict):
 
     @staticmethod
     def _check_node_ready_to_run(func):
-        undefined_variables = set(list(check_func_variables(func))
+        undefined_variables = set(list(check_func_variables(func)))
         if len(undefined_variables) == 0:
             return True
         else:
@@ -554,7 +555,7 @@ class Node(HasToDict):
 def check_func_variables(func):
     for ins in dis.get_instructions(func):
         if inspect.iscode(ins.argval):  # inner function
-            yield from check_node_variables(ins.argval)
+            yield from check_func_variables(ins.argval)
         elif ins.opname == "LOAD_GLOBAL":  # global variable
             yield ins.argval
 

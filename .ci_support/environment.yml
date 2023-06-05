@@ -19,4 +19,4 @@ dependencies:
 - moto =4.1.11
 - pycp2k =0.2.2
 - typeguard =4.0.0
-- aws-sam-translator =1.65.0
+- aws-sam-translator =1.68.0

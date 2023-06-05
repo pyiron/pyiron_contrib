@@ -328,6 +328,7 @@ class Node(HasToDict):
 
         self.running = False
         self.failed = False
+        self._check_node_ready_to_run(node_function)
         self.node_function = node_function
         self.label = label if label is not None else node_function.__name__
 
@@ -362,6 +363,18 @@ class Node(HasToDict):
 
         if update_on_instantiation:
             self.update()
+
+    @staticmethod
+    def _check_node_ready_to_run(func):
+        undefined_variables = set(list(check_func_variables(func))
+        if len(undefined_variables) == 0:
+            return True
+        else:
+            warnings.warn(
+                "The following variables do not seem to be defined/imported:"
+                f" {', '.join(undefined_variables)}"
+            )
+            return False
 
     def _build_input_channels(self, storage_priority: dict[str:int]):
         channels = []
@@ -536,6 +549,14 @@ class Node(HasToDict):
             "outputs": self.outputs.to_dict(),
             "signals": self.signals.to_dict(),
         }
+
+
+def check_func_variables(func):
+    for ins in dis.get_instructions(func):
+        if inspect.iscode(ins.argval):  # inner function
+            yield from check_node_variables(ins.argval)
+        elif ins.opname == "LOAD_GLOBAL":  # global variable
+            yield ins.argval
 
 
 class FastNode(Node):

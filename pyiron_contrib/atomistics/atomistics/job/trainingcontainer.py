@@ -246,7 +246,7 @@ class TrainingContainer(GenericJob, HasStructure):
         name: str,
         selector: Callable[[StructureStorage, int], bool],
         delete_existing_job: bool = False,
-        run: bool = True
+        run: bool = True,
     ) -> "TrainingContainer":
         """
         Create a new TrainingContainer with structures filtered by selector.

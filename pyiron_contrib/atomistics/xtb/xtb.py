@@ -100,7 +100,7 @@ class XtbJob(PythonTemplateJob):
         os.environ["MKL_NUM_THREADS"]="1"
         os.environ["NUMEXPR_NUM_THREADS"]="1"
         os.environ["OMP_NUM_THREADS"]="1"
-        ase_atoms = self.input['']
+        ase_atoms = convert_xyz_ase(self.input['structure'])
         calc = XTB(method=self.input['method'], solvent=self.input['solvent'],
                            max_iterations=self.input['xtb_max_iterations'],
                            electronic_temperature=self.input['xtb_electronic_temperature'],

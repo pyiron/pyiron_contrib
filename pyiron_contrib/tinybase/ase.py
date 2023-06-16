@@ -79,7 +79,7 @@ class AseMDTask(AbstractTask):
 class AseMinimizeInput(AseInput, StructureInput, MinimizeInput):
 
     algo = StorageAttribute().type(str).default('LBFGS')
-    minimizer_kwargs = StorageAttribute().type(dict).default(dict)
+    minimizer_kwargs = StorageAttribute().type(dict).constructor(dict)
 
     def lbfgs(self, damping=None, alpha=None):
         self.algo = 'LBFGS'

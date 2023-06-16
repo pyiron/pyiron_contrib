@@ -105,8 +105,8 @@ class ExecutablePathResolver:
 
 class ShellInput(AbstractInput):
     command = StorageAttribute()
-    arguments = StorageAttribute().type(list).default(list)
-    environ = StorageAttribute().type(dict).default(dict)
+    arguments = StorageAttribute().type(list).constructor(list)
+    environ = StorageAttribute().type(dict).constructor(dict)
     working_directory = StorageAttribute().type(str)
     allowed_returncode = StorageAttribute().type(list)
 

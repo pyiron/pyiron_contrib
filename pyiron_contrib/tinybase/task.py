@@ -172,8 +172,8 @@ class TaskGenerator(AbstractTask, abc.ABC):
 # assert 
 
 class FunctionInput(AbstractInput):
-    args = StorageAttribute().type(list).default(list)
-    kwargs = StorageAttribute().type(dict).default(dict)
+    args = StorageAttribute().type(list).constructor(list)
+    kwargs = StorageAttribute().type(dict).constructor(dict)
 
 class FunctionOutput(AbstractOutput):
     result = StorageAttribute()
@@ -337,7 +337,7 @@ class LoopControl(HasStorage):
         self._condition = condition
         self._restart = restart
 
-    scratch = StorageAttribute().default(dict)
+    scratch = StorageAttribute().constructor(dict)
 
     def condition(self, task: AbstractTask, output: AbstractTask):
         """

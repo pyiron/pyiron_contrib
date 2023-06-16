@@ -1,6 +1,7 @@
 """Generic Input Base Clases"""
 
 import abc
+from copy import deepcopy
 import sys
 
 from pyiron_contrib.tinybase.storage import HasHDFAdapaterMixin
@@ -20,14 +21,14 @@ class StorageAttribute:
     writes and reads values to the underlying :attr:`.HasStorage.storage`. DataContainer of the class.  When accessing
     this property before setting it, `None` is returned.
 
-    It's possible to modify the default value and the accepted type of values by using the builder-style :meth:`.type`
-    and :meth:`.default` methods.
+    It's possible to modify the default value and the accepted type of values by using the builder-style :meth:`.type`,
+    :meth:`.default` and :meth:`.constructor` methods.
 
     >>> class MyType(HasStorage):
     ...     a = StorageAttribute()
     ...     b = StorageAttribute().type(int)
-    ...     c = StorageAttribute().default(list)
-    ...     d = StorageAttribute().default(lambda: 42).type(int)
+    ...     c = StorageAttribute().constructor(list)
+    ...     d = StorageAttribute().default(42).type(int)
 
     >>> t = MyType()
     >>> t.a # return None
@@ -35,7 +36,7 @@ class StorageAttribute:
     >>> t.b
     3
     >>> t.b = 'asdf'
-    TypeError(f"{value} is not of type {self.value_type}")
+    TypeError("'asdf' is not of type <class 'int'>")
     >>> t.c
     []
     >>> t.d
@@ -79,7 +80,23 @@ class StorageAttribute:
         self.value_type = value_type
         return self
 
-    def default(self, default_constructor):
+    def default(self, value):
+        """
+        Set a default value, if the attribute is accessed without being set.
+
+        The given value is deep copied before being set.  If your type does not
+        support this or it is inefficient, use :meth:`.constructor`.
+
+        Args:
+            value: any value to be used as default
+
+        Returns:
+            self: the object it is called on
+        """
+        self.default_constructor = lambda: deepcopy(value)
+        return self
+
+    def constructor(self, default_constructor):
         """
         Set a function to create a default value, if the attribute is accessed without being set.
 
@@ -94,6 +111,7 @@ class StorageAttribute:
 
     def doc(self, text):
         self.__doc__ = text
+        return self
 
 class AbstractContainer(HasStorage, HasHDFAdapaterMixin, abc.ABC):
 
@@ -146,10 +164,10 @@ class ForceOutput(AbstractOutput):
 
 class MDOutput(HasStructure, EnergyPotOutput):
 
-    pot_energies = StorageAttribute().type(list).default(list)
-    kin_energies = StorageAttribute().type(list).default(list)
-    forces = StorageAttribute().type(list).default(list)
-    structures = StorageAttribute().type(list).default(list)
+    pot_energies = StorageAttribute().type(list).constructor(list)
+    kin_energies = StorageAttribute().type(list).constructor(list)
+    forces = StorageAttribute().type(list).constructor(list)
+    structures = StorageAttribute().type(list).constructor(list)
 
     def plot_energies(self):
         plt.plot(self.pot_energies - np.min(self.pot_energies), label='pot')

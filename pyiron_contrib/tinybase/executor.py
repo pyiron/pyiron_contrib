@@ -136,20 +136,6 @@ class Executor:
     def submit(self, tasks: List[AbstractTask]) -> ExecutionContext:
         return ExecutionContext(tasks)
 
-    def run(self, gen: TaskGenerator):
-        gen = iter(gen)
-        tasks = next(gen)
-        while True:
-            exe = self.submit(tasks)
-            exe.run()
-            exe.wait()
-            try:
-                tasks = gen.send(list(zip(exe.status, exe.output)))
-            except StopIteration as stop:
-                ret, output = stop.args[0]
-                break
-        return ret, output
-
 from concurrent.futures import (
         ThreadPoolExecutor,
         ProcessPoolExecutor,

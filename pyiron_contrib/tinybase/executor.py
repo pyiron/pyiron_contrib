@@ -1,6 +1,7 @@
 import abc
 import enum
 from collections import defaultdict
+from functools import partial
 from typing import Union, List
 import time
 import logging
@@ -167,6 +168,8 @@ class FuturesExecutionContext(ExecutionContext):
         # self._max_tasks = max_tasks if max_tasks is not None else 4
         self._done = 0
         self._futures = {}
+        self._subcontexts = {}
+        self._generators = {}
         self._status = {}
         self._output = {}
         self._index = {}
@@ -176,11 +179,34 @@ class FuturesExecutionContext(ExecutionContext):
         task = self._futures[future]
 
         status, output = future.result(timeout=0)
-        self._status[task] = status
-        self._output[task] = output
         with self._lock:
+            self._status[task] = status
+            self._output[task] = output
             self._done += 1
         self._check_finish()
+
+    def _prepare_subcontext(self, task, sub_tasks):
+        sub = self._subcontexts[task] = type(self)(self._pool, sub_tasks)
+        sub._run_machine.observe(
+            "finished",
+            partial(self._process_generator, task)
+        )
+        sub.run()
+        return sub
+
+    def _process_generator(self, task, _data):
+        gen = self._generators[task]
+        sub = self._subcontexts[task]
+        try:
+            tasks = gen.send(list(zip(sub.status, sub.output)))
+            self._prepare_subcontext(task, tasks)
+        except StopIteration as stop:
+            with self._lock:
+                self._status[task], self._output[task] = stop.args[0]
+                self._done += 1
+                del self._subcontexts[task]
+                del self._generators[task]
+            self._check_finish()
 
     def _check_finish(self, log=False):
         with self._lock:
@@ -195,10 +221,14 @@ class FuturesExecutionContext(ExecutionContext):
     def _run_running(self):
         if len(self._futures) == 0:
             for i, task in enumerate(self.tasks):
-                future = self._pool.submit(run_task, task)
-                self._futures[future] = task
                 self._index[task] = i
-                future.add_done_callback(self._process_future)
+                if isinstance(task, TaskGenerator):
+                    gen = self._generators[task] = iter(task)
+                    self._prepare_subcontext(task, next(gen))
+                else:
+                    future = self._pool.submit(run_task, task)
+                    self._futures[future] = task
+                    future.add_done_callback(self._process_future)
         else:
             logging.info("Some tasks are still executing!")
 

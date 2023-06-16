@@ -324,7 +324,7 @@ class SeriesTask(TaskGenerator):
 
         for task, connection in zip(self.input.tasks[1:], self.input.connections):
             connection(task.input, out)
-            (ret, out), *_ = yield [self.input.tasks[0]]
+            (ret, out), *_ = yield [task]
             if not ret.is_done():
                 return ReturnStatus("aborted", ret), None
 

@@ -270,7 +270,7 @@ class SeriesInput(AbstractInput):
     connections = StorageAttribute().type(list)
 
     def check_ready(self):
-        return len(self.tasks) == len(connections) + 1
+        return len(self.tasks) == len(self.connections) + 1
 
     def first(self, task):
         """

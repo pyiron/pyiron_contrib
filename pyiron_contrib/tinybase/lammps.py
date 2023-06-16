@@ -83,10 +83,8 @@ class LammpsInputTask(AbstractTask):
         potential.copy_pot_files(self.input.working_directory)
 
         control = LammpsControl()
-        if self.input.calc_type == "static":
-            control.calc_static()
-        else:
-            assert "Cannot happen"
+        assert self.input.calc_type == "static", "Cannot happen"
+        control.calc_static()
         control.write_file(
             file_name="control.inp", cwd=self.input.working_directory
         )

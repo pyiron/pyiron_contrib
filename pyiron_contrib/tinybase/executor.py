@@ -164,7 +164,13 @@ class FuturesExecutionContext(ExecutionContext):
     def _process_future(self, future):
         task = self._futures[future]
 
-        status, output = future.result(timeout=0)
+        # do not specify a timeout even though we already know that the future
+        # has finished.  For executors with high latency, low number of workers
+        # and large number of tasks transfering the results back to this thread
+        # can take longer than one would naively assume (>1ms).  If this is the
+        # case we might trip the timeout while waiting for the result, botching
+        # the calculation
+        status, output = future.result()
         with self._lock:
             self._status[task] = status
             self._output[task] = output
@@ -237,3 +243,20 @@ class ProcessExecutor(Executor):
         if self._pool is None:
             self._pool = ProcessPoolExecutor(max_workers=self._max_processes)
         return FuturesExecutionContext(self._pool, tasks)
+
+from dask.distributed import Client, LocalCluster
+
+class DaskExecutor(Executor):
+    def __init__(self, client):
+        self._client = client
+
+    @classmethod
+    def from_cluster(cls, cluster):
+        return cls(Client(cluster))
+
+    @classmethod
+    def from_localcluster(cls, max_processes=None, **kwargs):
+        return cls(Client(LocalCluster(n_workers=max_processes, **kwargs)))
+
+    def submit(self, tasks):
+        return FuturesExecutionContext(self._client, tasks)

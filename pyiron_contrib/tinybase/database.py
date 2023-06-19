@@ -158,11 +158,11 @@ class TinyDB(GenericDatabase):
 
     def _row_to_entry(self, job_data):
         return DatabaseEntry(
-                name=job_data["name"],
-                project=job_data["location"],
-                username=job_data["username"],
-                status=job_data["status"],
-                jobtype=job_data["type"]
+                name=job_data.name,
+                project=job_data.location,
+                username=job_data.username,
+                status=job_data.status,
+                jobtype=job_data.type
         )
 
     def get_item(self, job_id: int) -> DatabaseEntry:
@@ -222,6 +222,4 @@ class TinyDB(GenericDatabase):
             ).join(
                     JobType, Job.jobtype_id==JobType.id
             )
-            return pd.DataFrame(
-                    list(map(dict, query.all()))
-            )
+            return pd.DataFrame([r._asdict() for r in query.all()])

@@ -246,18 +246,20 @@ class TrainingContainer(GenericJob, HasStructure):
         name: str,
         selector: Callable[[StructureStorage, int], bool],
         delete_existing_job: bool = False,
+        run: bool = True,
     ) -> "TrainingContainer":
         """
         Create a new TrainingContainer with structures filtered by selector.
 
         `self` must have status `finished`.  `selector` is passed the underlying :class:`StructureStorage` of this
         container and the index of the structure and return a boolean whether to include the structure in the new
-        container or not.  The new container is saved and run.
+        container or not.  By default the new container is saved and run.
 
         Args:
             name (str): name of the new TrainingContainer
             selector (Callable[[StructureStorage, int], bool]): callable that selects structure to include
             delete_existing_job (bool): if job with name exist, remove it first
+            run (bool): if True, immediately run and save the job.
 
         Returns:
             :class:`.TrainingContainer`: new container with selected structures
@@ -273,7 +275,8 @@ class TrainingContainer(GenericJob, HasStructure):
         if not cont.status.initialized:
             raise ValueError(f"Job '{name}' already exists with status: {cont.status}!")
         cont._container = self._container.sample(selector)
-        cont.run()
+        if run:
+            cont.run()
         return cont
 
     @property

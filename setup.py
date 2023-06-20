@@ -33,7 +33,7 @@ setup(
     install_requires=[        
         'matplotlib==3.7.1',
         'numpy==1.24.3',
-        'pyiron_base==0.5.39',
+        'pyiron_base==0.6.1',
         'scipy==1.10.1',
         'seaborn==0.12.2',
         'pyparsing==3.0.9'
@@ -41,7 +41,7 @@ setup(
     extras_require={
         'atomistic': [
             'ase==3.22.1',
-            'pyiron_atomistics==0.2.67',
+            'pyiron_atomistics==0.3.0',
             'pycp2k==0.2.2',
         ],
         'fenics': [
@@ -50,7 +50,7 @@ setup(
         ],
         'image': ['scikit-image==0.19.3'],
         'generic': [
-            'boto3==1.26.146', 
+            'boto3==1.26.151', 
             'moto==4.1.11'
         ],
         'workflow': [

@@ -3,28 +3,20 @@ from collections import namedtuple
 import os.path
 from typing import List
 from typing import Optional
-from sqlalchemy import (
-        ForeignKey,
-        String,
-        Integer,
-        Column,
-        create_engine
-)
-from sqlalchemy.exc import (
-        MultipleResultsFound,
-        NoResultFound
-)
+from sqlalchemy import ForeignKey, String, Integer, Column, create_engine
+from sqlalchemy.exc import MultipleResultsFound, NoResultFound
 from sqlalchemy.orm import declarative_base, relationship
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 import pandas as pd
 
-DatabaseEntry = namedtuple("DatabaseEntry",
-        ["name", "username", "project", "status", "jobtype"]
+DatabaseEntry = namedtuple(
+    "DatabaseEntry", ["name", "username", "project", "status", "jobtype"]
 )
 
 Base = declarative_base()
+
 
 class Project(Base):
     __tablename__ = "project_table"
@@ -35,6 +27,7 @@ class Project(Base):
     # jobs = relationship("Job", back_populates="project")
     # jobs = relationship("Job", backref="project")
 
+
 # FIXME: Can be many-to-many later
 class JobStatus(Base):
     __tablename__ = "job_status_table"
@@ -42,12 +35,14 @@ class JobStatus(Base):
     id = Column(Integer, primary_key=True)
     status = Column(String(250))
 
+
 # FIXME: Can be many-to-many later
 class JobType(Base):
     __tablename__ = "job_type_table"
 
     id = Column(Integer, primary_key=True)
     type = Column(String(250))
+
 
 class Job(Base):
     __tablename__ = "job_table"
@@ -60,6 +55,7 @@ class Job(Base):
     project_id = Column(Integer, ForeignKey("project_table.id"))
     status_id = Column(Integer, ForeignKey("job_status_table.id"))
     # project = relationship("Project", back_populates="jobs")
+
 
 # TODO: this will be pyiron_base.IsDatabase
 class GenericDatabase(abc.ABC):
@@ -95,6 +91,7 @@ class GenericDatabase(abc.ABC):
     def job_table(self) -> pd.DataFrame:
         pass
 
+
 class TinyDB(GenericDatabase):
     """
     Minimal database implementation and "reference".  Exists mostly to allow easy testing without messing with
@@ -109,8 +106,10 @@ class TinyDB(GenericDatabase):
             # this allows to access the same DB from the different threads in one process
             # it's necessary for an in memory database, otherwise all threads see different dbs
             kwargs["poolclass"] = StaticPool
-            kwargs["connect_args"] = {'check_same_thread':False}
-        self._engine = create_engine(f"sqlite:///{self._path}", echo=self._echo, **kwargs)
+            kwargs["connect_args"] = {"check_same_thread": False}
+        self._engine = create_engine(
+            f"sqlite:///{self._path}", echo=self._echo, **kwargs
+        )
         Base.metadata.create_all(self.engine)
         Base.metadata.reflect(self.engine, extend_existing=True)
 
@@ -120,11 +119,19 @@ class TinyDB(GenericDatabase):
 
     def add_item(self, entry: DatabaseEntry) -> int:
         with Session(self.engine) as session:
-            project = session.query(Project).where(Project.location==entry.project).one_or_none()
+            project = (
+                session.query(Project)
+                .where(Project.location == entry.project)
+                .one_or_none()
+            )
             if project is None:
                 project = Project(location=entry.project)
                 session.add(project)
-            jobtype = session.query(JobType).where(JobType.type==entry.jobtype).one_or_none()
+            jobtype = (
+                session.query(JobType)
+                .where(JobType.type == entry.jobtype)
+                .one_or_none()
+            )
             if jobtype is None:
                 jobtype = JobType(type=entry.jobtype)
                 session.add(jobtype)
@@ -132,11 +139,11 @@ class TinyDB(GenericDatabase):
             session.add(status)
             session.flush()
             job = Job(
-                    name=entry.name,
-                    username=entry.username,
-                    project_id=project.id,
-                    status_id=status.id,
-                    jobtype_id=jobtype.id
+                name=entry.name,
+                username=entry.username,
+                project_id=project.id,
+                status_id=status.id,
+                jobtype_id=jobtype.id,
             )
             session.add(job)
             session.flush()
@@ -147,10 +154,12 @@ class TinyDB(GenericDatabase):
     def update_status(self, job_id, status):
         with Session(self.engine) as session:
             try:
-                s = session.query(JobStatus).select_from(Job).where(
-                        Job.id == job_id,
-                        JobStatus.id == Job.status_id
-                ).one()
+                s = (
+                    session.query(JobStatus)
+                    .select_from(Job)
+                    .where(Job.id == job_id, JobStatus.id == Job.status_id)
+                    .one()
+                )
                 s.status = status
                 session.commit()
             except Exception as e:
@@ -158,44 +167,52 @@ class TinyDB(GenericDatabase):
 
     def _row_to_entry(self, job_data):
         return DatabaseEntry(
-                name=job_data.name,
-                project=job_data.location,
-                username=job_data.username,
-                status=job_data.status,
-                jobtype=job_data.type
+            name=job_data.name,
+            project=job_data.location,
+            username=job_data.username,
+            status=job_data.status,
+            jobtype=job_data.type,
         )
 
     def get_item(self, job_id: int) -> DatabaseEntry:
         with Session(self.engine) as session:
-            job_data = session.query(
+            job_data = (
+                session.query(
                     Job.__table__, Project.location, JobStatus.status, JobType.type
-            ).select_from(
-                    Job
-            ).where(
-                    Job.id == job_id
-            ).join(
-                    Project, Job.project_id==Project.id
-            ).join(
-                    JobStatus, Job.status_id==JobStatus.id
-            ).join(
-                    JobType, Job.jobtype_id==JobType.id
-            ).one()
+                )
+                .select_from(Job)
+                .where(Job.id == job_id)
+                .join(Project, Job.project_id == Project.id)
+                .join(JobStatus, Job.status_id == JobStatus.id)
+                .join(JobType, Job.jobtype_id == JobType.id)
+                .one()
+            )
             return self._row_to_entry(job_data)
 
     def get_item_id(self, job_name: str, project_id: int) -> Optional[int]:
         with Session(self.engine) as session:
             try:
-                return session.query(Job.id).where(
+                return (
+                    session.query(Job.id)
+                    .where(
                         Job.name == job_name,
                         Job.project_id == project_id,
-                ).one().id
+                    )
+                    .one()
+                    .id
+                )
             except (MultipleResultsFound, NoResultFound):
                 return None
 
     def get_project_id(self, location: str) -> Optional[int]:
         with Session(self.engine) as session:
             try:
-                return session.query(Project.id).where(Project.location == location).one().id
+                return (
+                    session.query(Project.id)
+                    .where(Project.location == location)
+                    .one()
+                    .id
+                )
             # FIXME: MultipleResultsFound should be reraised because it indicates a broken database
             except (MultipleResultsFound, NoResultFound):
                 return None
@@ -211,15 +228,13 @@ class TinyDB(GenericDatabase):
 
     def job_table(self) -> pd.DataFrame:
         with Session(self.engine) as session:
-            query = session.query(
+            query = (
+                session.query(
                     Job.__table__, Project.location, JobStatus.status, JobType.type
-            ).select_from(
-                    Job
-            ).join(
-                    Project, Job.project_id==Project.id
-            ).join(
-                    JobStatus, Job.status_id==JobStatus.id
-            ).join(
-                    JobType, Job.jobtype_id==JobType.id
+                )
+                .select_from(Job)
+                .join(Project, Job.project_id == Project.id)
+                .join(JobStatus, Job.status_id == JobStatus.id)
+                .join(JobType, Job.jobtype_id == JobType.id)
             )
             return pd.DataFrame([r._asdict() for r in query.all()])

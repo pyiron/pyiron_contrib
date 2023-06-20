@@ -2,11 +2,15 @@ import abc
 import os.path
 
 from pyiron_base import Project, DataContainer
-from pyiron_contrib.tinybase.storage import GenericStorage, ProjectHDFioStorageAdapter, DataContainerAdapter
+from pyiron_contrib.tinybase.storage import (
+    GenericStorage,
+    ProjectHDFioStorageAdapter,
+    DataContainerAdapter,
+)
 from pyiron_contrib.tinybase.database import TinyDB, GenericDatabase
 
-class ProjectInterface(abc.ABC):
 
+class ProjectInterface(abc.ABC):
     @classmethod
     @abc.abstractmethod
     def open_location(cls, location) -> "ProjectInterface":
@@ -68,12 +72,11 @@ class ProjectInterface(abc.ABC):
             pr = self.open_location(entry.project)
         pr.remove_storage(entry.name)
 
-    #TODO: 
+    # TODO:
     # def copy_to/move_to across types of ProjectInterface
 
 
 class ProjectAdapter(ProjectInterface):
-
     def __init__(self, project):
         self._project = project
         self._database = None
@@ -84,8 +87,7 @@ class ProjectAdapter(ProjectInterface):
 
     def create_storage(self, name):
         return ProjectHDFioStorageAdapter(
-                self,
-                self._project.create_hdf(self._project.path, name)
+            self, self._project.create_hdf(self._project.path, name)
         )
 
     def exists_storage(self, name) -> bool:
@@ -107,8 +109,8 @@ class ProjectAdapter(ProjectInterface):
     def path(self):
         return self._project.path
 
-class InMemoryProject(ProjectInterface):
 
+class InMemoryProject(ProjectInterface):
     def __init__(self, location, db=None, storage=None):
         if db is None:
             db = TinyDB(":memory:")
@@ -124,7 +126,9 @@ class InMemoryProject(ProjectInterface):
         return self.__class__(location, db=self.database, storage=self._storage)
 
     def create_storage(self, name) -> GenericStorage:
-        return DataContainerAdapter(self, self._storage[self._location], "/").create_group(name)
+        return DataContainerAdapter(
+            self, self._storage[self._location], "/"
+        ).create_group(name)
 
     def exists_storage(self, name) -> bool:
         return name in self._storage[self._location].list_groups()

@@ -4,19 +4,17 @@ from typing import Optional
 
 from pyiron_contrib.tinybase.task import AbstractTask
 from pyiron_contrib.tinybase.storage import (
-        Storable,
-        GenericStorage,
-        pickle_load,
-        pickle_dump
+    Storable,
+    GenericStorage,
+    pickle_load,
+    pickle_dump,
 )
 from pyiron_contrib.tinybase.executor import (
-        Executor,
-        BackgroundExecutor,
-        ProcessExecutor
+    Executor,
+    BackgroundExecutor,
+    ProcessExecutor,
 )
-from pyiron_contrib.tinybase.database import (
-    DatabaseEntry
-)
+from pyiron_contrib.tinybase.database import DatabaseEntry
 from pyiron_contrib.tinybase.project import ProjectInterface, ProjectAdapter
 from pyiron_base.state import state
 
@@ -46,9 +44,9 @@ class TinyJob(Storable, abc.ABC):
     """
 
     _executors = {
-            'foreground': Executor(),
-            'background': BackgroundExecutor(max_threads=4),
-            'process': ProcessExecutor(max_processes=4)
+        "foreground": Executor(),
+        "background": BackgroundExecutor(max_threads=4),
+        "process": ProcessExecutor(max_processes=4),
     }
 
     def __init__(self, project: ProjectInterface, job_name: str):
@@ -78,7 +76,9 @@ class TinyJob(Storable, abc.ABC):
             try:
                 self.load()
             except Exception as e:
-                raise RuntimeError(f"Failed to reload run job from storage: {e}") from None
+                raise RuntimeError(
+                    f"Failed to reload run job from storage: {e}"
+                ) from None
 
     @property
     def name(self):
@@ -137,14 +137,16 @@ class TinyJob(Storable, abc.ABC):
     def _setup_executor_callbacks(self):
         self._executor._run_machine.observe("ready", lambda _: self.store(self.storage))
         self._executor._run_machine.observe("finished", self._set_output)
-        self._executor._run_machine.observe("finished", lambda _: self.store(self.storage))
+        self._executor._run_machine.observe(
+            "finished", lambda _: self.store(self.storage)
+        )
 
         self._executor._run_machine.observe("ready", self._add_to_database)
         self._executor._run_machine.observe("running", self._update_status("running"))
         self._executor._run_machine.observe("collect", self._update_status("collect"))
         self._executor._run_machine.observe("finished", self._update_status("finished"))
 
-    def run(self, how='foreground') -> Optional[Executor]:
+    def run(self, how="foreground") -> Optional[Executor]:
         """
         Start execution of the job.
 
@@ -156,7 +158,10 @@ class TinyJob(Storable, abc.ABC):
         Returns:
             :class:`.Executor`: the executor that is running the task or nothing.
         """
-        if self._id is None or self.project.database.get_item(self.id).status == "ready":
+        if (
+            self._id is None
+            or self.project.database.get_item(self.id).status == "ready"
+        ):
             exe = self._executor = self._executors[how].submit(tasks=[self.task])
             self._setup_executor_callbacks()
             exe.run()
@@ -179,11 +184,11 @@ class TinyJob(Storable, abc.ABC):
     def _add_to_database(self, _data):
         if self._id is None:
             entry = DatabaseEntry(
-                    name=self.name,
-                    project=self.project.path,
-                    username=state.settings.login_user,
-                    status="ready",
-                    jobtype=self.jobtype,
+                name=self.name,
+                project=self.project.path,
+                username=state.settings.login_user,
+                status="ready",
+                jobtype=self.jobtype,
             )
             self._id = self.project.database.add_item(entry)
         return self.id
@@ -241,6 +246,7 @@ class GenericTinyJob(TinyJob):
     >>> isinstance(job.input, type(MyTask.input))
     True
     """
+
     def __init__(self, project, job_name):
         super().__init__(project=project, job_name=job_name)
         self._task_class = None

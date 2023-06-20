@@ -5,21 +5,20 @@ from glob import glob
 from pyiron_base.state import state
 
 from pyiron_contrib.tinybase.container import (
-        AbstractInput,
-        AbstractOutput,
-        StorageAttribute
+    AbstractInput,
+    AbstractOutput,
+    StorageAttribute,
 )
 
-from pyiron_contrib.tinybase.task import (
-        AbstractTask,
-        ReturnStatus
-)
+from pyiron_contrib.tinybase.task import AbstractTask, ReturnStatus
 
 import os
+
 if os.name == "nt":
     EXE_SUFFIX = "bat"
 else:
     EXE_SUFFIX = "sh"
+
 
 class ExecutablePathResolver:
     """
@@ -40,6 +39,7 @@ class ExecutablePathResolver:
 
     :meth:`.__str__` is overloaded to :meth:`.path()`.
     """
+
     def __init__(self, module, code, version=None):
         self._module = module
         self._code = code
@@ -65,17 +65,19 @@ class ExecutablePathResolver:
         List unique version strings found.
         """
         exes = self.list(version="*")
+
         def extract(p):
             return os.path.splitext(
                 os.path.basename(p).split(f"run_{self._code}", maxsplit=1)[1]
             )[0][1:]
+
         return list(set(map(extract, exes)))
 
     @property
     def version(self):
         vers = self.list_versions()
         for v in vers:
-            if 'default' in vers:
+            if "default" in vers:
                 return v
         return vers[0]
 
@@ -95,7 +97,7 @@ class ExecutablePathResolver:
         if self._version is not None:
             return exes[0]
         for p in exes:
-            if 'default' in p:
+            if "default" in p:
                 return p
         return exes[0]
 
@@ -110,13 +112,14 @@ class ShellInput(AbstractInput):
     working_directory = StorageAttribute().type(str)
     allowed_returncode = StorageAttribute().type(list)
 
+
 class ShellOutput(AbstractOutput):
     stdout = StorageAttribute()
     stderr = StorageAttribute()
     returncode = StorageAttribute().type(int)
 
-class ShellTask(AbstractTask):
 
+class ShellTask(AbstractTask):
     def _get_input(self):
         return ShellInput()
 
@@ -127,11 +130,11 @@ class ShellTask(AbstractTask):
         environ = dict(os.environ)
         environ.update({k: str(v) for k, v in self.input.environ.items()})
         proc = subprocess.run(
-                [str(self.input.command), *map(str, self.input.arguments)],
-                capture_output=True,
-                cwd=self.input.working_directory,
-                encoding='utf8',
-                env=environ
+            [str(self.input.command), *map(str, self.input.arguments)],
+            capture_output=True,
+            cwd=self.input.working_directory,
+            encoding="utf8",
+            env=environ,
         )
         output.stdout = proc.stdout
         output.stderr = proc.stderr
@@ -140,4 +143,4 @@ class ShellTask(AbstractTask):
         if allowed_returncode is None:
             allowed_returncode = [0]
         if proc.returncode not in allowed_returncode:
-            return ReturnStatus('aborted', f'non-zero error code {proc.returncode}')
+            return ReturnStatus("aborted", f"non-zero error code {proc.returncode}")

@@ -3,35 +3,32 @@ from tempfile import TemporaryDirectory
 
 from ase import Atoms
 from pymatgen.io.lammps.outputs import (
-        parse_lammps_dumps,
-        parse_lammps_log,
+    parse_lammps_dumps,
+    parse_lammps_log,
 )
 
 from pyiron_atomistics.lammps.potential import (
-        LammpsPotential,
-        LammpsPotentialFile,
-        list_potentials
+    LammpsPotential,
+    LammpsPotentialFile,
+    list_potentials,
 )
 from pyiron_atomistics.lammps.control import LammpsControl
 
 from pyiron_contrib.tinybase.container import (
-        AbstractInput,
-        AbstractOutput,
-        StorageAttribute,
-        StructureInput,
-        EnergyPotOutput,
-        EnergyKinOutput,
-        ForceOutput,
-        MDOutput,
+    AbstractInput,
+    AbstractOutput,
+    StorageAttribute,
+    StructureInput,
+    EnergyPotOutput,
+    EnergyKinOutput,
+    ForceOutput,
+    MDOutput,
 )
 from pyiron_contrib.tinybase.task import (
-        AbstractTask,
-        ReturnStatus,
+    AbstractTask,
+    ReturnStatus,
 )
-from pyiron_contrib.tinybase.shell import (
-        ShellTask,
-        ExecutablePathResolver
-)
+from pyiron_contrib.tinybase.shell import ShellTask, ExecutablePathResolver
 
 
 class LammpsInputInput(AbstractInput):
@@ -40,15 +37,19 @@ class LammpsInputInput(AbstractInput):
     calc_type = StorageAttribute()
 
     def calc_static(self):
-        self.calc_type = 'static'
+        self.calc_type = "static"
 
     def check_ready(self):
-        return self.working_directory is not None \
-                and self.calc_type == "static" \
-                and super().check_ready()
+        return (
+            self.working_directory is not None
+            and self.calc_type == "static"
+            and super().check_ready()
+        )
+
 
 class LammpsInputOutput(AbstractOutput):
     working_directory = StorageAttribute().type(str)
+
 
 class LammpsInputTask(AbstractTask):
     """
@@ -70,8 +71,7 @@ class LammpsInputTask(AbstractTask):
 
     def _execute(self, output):
         with open(
-                os.path.join(self.input.working_directory, "structure.inp"),
-                "w"
+            os.path.join(self.input.working_directory, "structure.inp"), "w"
         ) as f:
             self.input.structure.write(f, format="lammps-data")
 
@@ -85,9 +85,7 @@ class LammpsInputTask(AbstractTask):
         control = LammpsControl()
         assert self.input.calc_type == "static", "Cannot happen"
         control.calc_static()
-        control.write_file(
-            file_name="control.inp", cwd=self.input.working_directory
-        )
+        control.write_file(file_name="control.inp", cwd=self.input.working_directory)
 
         output.working_directory = self.input.working_directory
 
@@ -96,11 +94,12 @@ class LammpsStaticParserInput(AbstractInput):
     working_directory = StorageAttribute().type(str)
 
     def check_ready(self):
-        return self.working_directory is not None \
-                and super().check_ready()
+        return self.working_directory is not None and super().check_ready()
+
 
 class LammpsStaticOutput(EnergyPotOutput, EnergyKinOutput, ForceOutput):
     pass
+
 
 class LammpsStaticParserTask(AbstractTask):
     """
@@ -117,14 +116,14 @@ class LammpsStaticParserTask(AbstractTask):
 
     def _execute(self, output):
         log = parse_lammps_log(
-                os.path.join(self.input.working_directory, "log.lammps")
+            os.path.join(self.input.working_directory, "log.lammps")
         )[-1]
         output.energy_pot = energy_pot = log["PotEng"].iloc[-1]
         output.energy_kin = log["TotEng"].iloc[-1] - energy_pot
-        dump = list(parse_lammps_dumps(
-                os.path.join(self.input.working_directory, "dump.out")
-        ))[-1]
-        output.forces = dump.data[['fx','fy','fz']].to_numpy()
+        dump = list(
+            parse_lammps_dumps(os.path.join(self.input.working_directory, "dump.out"))
+        )[-1]
+        output.forces = dump.data[["fx", "fy", "fz"]].to_numpy()
 
 
 class LammpsInput(StructureInput):
@@ -144,6 +143,7 @@ class LammpsInput(StructureInput):
     def check_ready(self):
         return self.potential is not None and super().check_ready()
 
+
 class LammpsStaticTask(AbstractTask):
     """
     A static calculation with lammps.
@@ -157,9 +157,7 @@ class LammpsStaticTask(AbstractTask):
 
     def _execute(self, output):
         with TemporaryDirectory() as dir:
-            inp = LammpsInputTask(
-                    capture_exceptions=self._capture_exceptions
-            )
+            inp = LammpsInputTask(capture_exceptions=self._capture_exceptions)
             inp.input.working_directory = dir
             inp.input.structure = self.input.structure
             inp.input.potential = self.input.potential
@@ -168,18 +166,14 @@ class LammpsStaticTask(AbstractTask):
             if not ret.is_done():
                 return ReturnStatus.aborted(f"Writing input failed: {ret.msg}")
 
-            lmp = ShellTask(
-                    capture_exceptions=self._capture_exceptions
-            )
+            lmp = ShellTask(capture_exceptions=self._capture_exceptions)
             lmp.input.command = ExecutablePathResolver("lammps", "lammps")
             lmp.input.working_directory = dir
             ret, out = lmp.execute()
             if not ret.is_done():
                 return ReturnStatus.aborted(f"Running lammps failed: {ret.msg}")
 
-            psr = LammpsStaticParserTask(
-                    capture_exceptions=self._capture_exceptions
-            )
+            psr = LammpsStaticParserTask(capture_exceptions=self._capture_exceptions)
             psr.input.working_directory = dir
             ret, out = psr.execute()
             if not ret.is_done():

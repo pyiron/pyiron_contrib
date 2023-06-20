@@ -8,6 +8,7 @@ from pyiron_base.interfaces.object import HasStorage
 from pyiron_contrib.tinybase.storage import Storable, pickle_dump
 from .container import AbstractInput, AbstractOutput, StorageAttribute
 
+
 class ReturnStatus:
     """
     Status of the calculation.
@@ -41,6 +42,7 @@ class ReturnStatus:
 
     def __repr__(self):
         return f"ReturnStatus({self.code}, {self.msg})"
+
     def __str__(self):
         return f"{self.code}({self.msg})"
 
@@ -49,6 +51,7 @@ class ReturnStatus:
         Returns True if calculation was successful.
         """
         return self.code == self.Code.DONE
+
 
 class AbstractTask(Storable, abc.ABC):
     """
@@ -60,7 +63,7 @@ class AbstractTask(Storable, abc.ABC):
 
     def __init__(self, capture_exceptions=True):
         self._input = None
-        self._capture_exceptions=capture_exceptions
+        self._capture_exceptions = capture_exceptions
 
     @abc.abstractmethod
     def _get_input(self) -> AbstractInput:
@@ -119,10 +122,12 @@ class AbstractTask(Storable, abc.ABC):
         return ret, output
 
     # TaskIterator Impl'
-    def __iter__(self) -> Generator[
-            List['Task'],
-            List[Tuple[ReturnStatus, AbstractOutput]],
-            Tuple[ReturnStatus, AbstractOutput]
+    def __iter__(
+        self,
+    ) -> Generator[
+        List["Task"],
+        List[Tuple[ReturnStatus, AbstractOutput]],
+        Tuple[ReturnStatus, AbstractOutput],
     ]:
         ret, *_ = yield [self]
         return ret
@@ -140,6 +145,7 @@ class AbstractTask(Storable, abc.ABC):
         task._input = pickle_load(storage["input"])
         return task
 
+
 class TaskGenerator(AbstractTask, abc.ABC):
     """
     A generator that yields collections of tasks that can be executed in
@@ -151,9 +157,13 @@ class TaskGenerator(AbstractTask, abc.ABC):
     """
 
     @abc.abstractmethod
-    def __iter__(self) -> Generator[List['Task'],
-                                    List[Tuple[ReturnStatus, AbstractOutput]],
-                                    Tuple[ReturnStatus, AbstractOutput]]:
+    def __iter__(
+        self,
+    ) -> Generator[
+        List["Task"],
+        List[Tuple[ReturnStatus, AbstractOutput]],
+        Tuple[ReturnStatus, AbstractOutput],
+    ]:
         pass
 
     def _execute(self, output):
@@ -168,15 +178,19 @@ class TaskGenerator(AbstractTask, abc.ABC):
                 output.take(out)
                 return ret
 
+
 # TaskGenerator.register(AbstractTask)
-# assert 
+# assert
+
 
 class FunctionInput(AbstractInput):
     args = StorageAttribute().type(list).constructor(list)
     kwargs = StorageAttribute().type(dict).constructor(dict)
 
+
 class FunctionOutput(AbstractOutput):
     result = StorageAttribute()
+
 
 class FunctionTask(AbstractTask):
     """
@@ -199,6 +213,7 @@ class FunctionTask(AbstractTask):
     def _execute(self, output):
         output.result = self._function(*self.input.args, **self.input.kwargs)
 
+
 class ListInput(abc.ABC):
     """
     The input of :class:`.ListTaskGenerator`.
@@ -214,6 +229,7 @@ class ListInput(abc.ABC):
         This is called once by :class:`.ListNode.execute`.
         """
         pass
+
 
 class ListTaskGenerator(TaskGenerator, abc.ABC):
     """
@@ -303,6 +319,7 @@ class SeriesInput(AbstractInput):
         self.connections.append(connection)
         return self
 
+
 class SeriesTask(TaskGenerator):
     """
     Executes a series of tasks sequentially.
@@ -362,15 +379,16 @@ class LoopControl(HasStorage):
         """
         self._restart(output, input, self.scratch)
 
+
 class RepeatLoopControl(LoopControl):
     def __init__(self, steps, restart=lambda *_: None):
         super().__init__(condition=self._count_steps, restart=restart)
         self._steps = steps
 
     def _count_steps(self, output, input, scratch={}):
-        c = scratch.get('counter', 0)
+        c = scratch.get("counter", 0)
         c += 1
-        scratch['counter'] = c
+        scratch["counter"] = c
         return c >= self._steps
 
 
@@ -385,7 +403,11 @@ class LoopInput(AbstractInput):
 
     trace = StorageAttribute().type(bool).default(False)
 
-    def repeat(self, steps: int, restart: Optional[Callable[[AbstractOutput, AbstractInput, dict], None]] = None):
+    def repeat(
+        self,
+        steps: int,
+        restart: Optional[Callable[[AbstractOutput, AbstractInput, dict], None]] = None,
+    ):
         """
         Set up a loop control that loops for steps and calls restart in between.
 
@@ -397,9 +419,9 @@ class LoopInput(AbstractInput):
             self.control = RepeatLoopControl(steps)
 
     def control_with(
-            self,
-            condition: Callable[[AbstractTask, AbstractOutput, dict], bool],
-            restart: Callable[[AbstractOutput, AbstractInput, dict], None]
+        self,
+        condition: Callable[[AbstractTask, AbstractOutput, dict], bool],
+        restart: Callable[[AbstractOutput, AbstractInput, dict], None],
     ):
         """
         Set up a loop control that uses the callables for control flow.
@@ -409,6 +431,7 @@ class LoopInput(AbstractInput):
             restart (function): takes the output of the last loop body, the input of the next one and a persistant dict
         """
         self.control = LoopControl(condition, restart)
+
 
 class LoopTask(TaskGenerator):
     """

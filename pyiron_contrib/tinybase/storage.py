@@ -8,9 +8,11 @@ from pyiron_contrib.tinybase import __version__ as base__version__
 import pickle
 import codecs
 
+
 # utility functions until ASE can be HDF'd
 def pickle_dump(obj):
     return codecs.encode(pickle.dumps(obj), "base64").decode()
+
 
 def pickle_load(buf):
     return pickle.loads(codecs.decode(buf.encode(), "base64"))
@@ -156,6 +158,7 @@ class GenericStorage(abc.ABC):
             raise RuntimeError("Failed to import serialized object!")
         return cls.restore(self, version=version)
 
+
 class ProjectHDFioStorageAdapter(GenericStorage):
     """
     Adapter class around ProjectHDFio to let it be used as a GenericStorage.
@@ -191,6 +194,7 @@ class ProjectHDFioStorageAdapter(GenericStorage):
     def name(self):
         return self._hdf.name
 
+
 class DataContainerAdapter(GenericStorage):
     """
     Provides in memory location to store objects.
@@ -218,7 +222,6 @@ class DataContainerAdapter(GenericStorage):
             d = self._cont[name]
         return self.__class__(self._project, d, name)
 
-
     def list_nodes(self):
         return self._cont.list_nodes()
 
@@ -232,6 +235,7 @@ class DataContainerAdapter(GenericStorage):
     @property
     def name(self):
         return self._name
+
 
 # DESIGN: equivalent of HasHDF but with generalized language
 class Storable(abc.ABC):
@@ -290,6 +294,7 @@ class Storable(abc.ABC):
         except Exception as e:
             raise ValueError(f"Failed to restore object with {e}")
 
+
 class HasHDFAdapaterMixin(Storable):
     """
     Implements :class:`.Storable` in terms of HasHDF.  Make any sub class of it a subclass :class:`.Storable` as well by
@@ -305,4 +310,3 @@ class HasHDFAdapaterMixin(Storable):
         obj = cls(**kw)
         obj._from_hdf(storage, version)
         return obj
-

@@ -1,11 +1,11 @@
 from pyiron_contrib.tinybase.container import (
-            AbstractInput,
-            StorageAttribute,
-            StructureInput,
-            MDInput,
-            MinimizeInput,
-            EnergyPotOutput,
-            MDOutput
+    AbstractInput,
+    StorageAttribute,
+    StructureInput,
+    MDInput,
+    MinimizeInput,
+    EnergyPotOutput,
+    MDOutput,
 )
 from pyiron_contrib.tinybase.task import AbstractTask, ReturnStatus
 
@@ -23,12 +23,12 @@ from ase.optimize.gpmin.gpmin import GPMin
 class AseInput(AbstractInput):
     calculator = StorageAttribute()
 
+
 class AseStaticInput(AseInput, StructureInput):
     pass
 
 
 class AseStaticTask(AbstractTask):
-
     def _get_input(self):
         return AseStaticInput()
 
@@ -44,8 +44,8 @@ class AseStaticTask(AbstractTask):
 class AseMDInput(AseInput, MDInput):
     pass
 
-class AseMDTask(AbstractTask):
 
+class AseMDTask(AbstractTask):
     def _get_input(self):
         return AseMDInput()
 
@@ -56,14 +56,16 @@ class AseMDTask(AbstractTask):
         structure = self.input.structure.copy()
         structure.calc = self.input.calculator
 
-        MaxwellBoltzmannDistribution(structure, temperature_K=self.input.temperature * 2)
+        MaxwellBoltzmannDistribution(
+            structure, temperature_K=self.input.temperature * 2
+        )
 
         dyn = Langevin(
-                structure,
-                timestep=self.input.timestep * units.fs,
-                temperature_K=self.input.temperature,
-                friction=1e-3,
-                append_trajectory=True
+            structure,
+            timestep=self.input.timestep * units.fs,
+            temperature_K=self.input.temperature,
+            friction=1e-3,
+            append_trajectory=True,
         )
 
         def parse():
@@ -76,36 +78,33 @@ class AseMDTask(AbstractTask):
         dyn.attach(parse, interval=self.input.steps // self.input.output_steps)
         dyn.run(self.input.steps)
 
-class AseMinimizeInput(AseInput, StructureInput, MinimizeInput):
 
-    algo = StorageAttribute().type(str).default('LBFGS')
+class AseMinimizeInput(AseInput, StructureInput, MinimizeInput):
+    algo = StorageAttribute().type(str).default("LBFGS")
     minimizer_kwargs = StorageAttribute().type(dict).constructor(dict)
 
     def lbfgs(self, damping=None, alpha=None):
-        self.algo = 'LBFGS'
+        self.algo = "LBFGS"
         if damping is not None:
-            self.minimizer_kwargs['damping'] = damping
+            self.minimizer_kwargs["damping"] = damping
         if alpha is not None:
-            self.minimizer_kwargs['alpha'] = alpha
+            self.minimizer_kwargs["alpha"] = alpha
 
     def fire(self):
-        self.algo = 'FIRE'
+        self.algo = "FIRE"
         self.minimizer_kwargs = {}
 
     def gpmin(self):
-        self.algo = 'GPMIN'
+        self.algo = "GPMIN"
         self.minimizer_kwargs = {}
 
     def get_ase_optimizer(self, structure):
-        return {
-                'LBFGS': LBFGS,
-                'FIRE': FIRE,
-                'GPMIN': GPMin
-        }.get(self.algo)(structure, **self.minimizer_kwargs)
+        return {"LBFGS": LBFGS, "FIRE": FIRE, "GPMIN": GPMin}.get(self.algo)(
+            structure, **self.minimizer_kwargs
+        )
 
 
 class AseMinimizeTask(AbstractTask):
-
     def _get_input(self):
         return AseMinimizeInput()
 
@@ -132,6 +131,6 @@ class AseMinimizeTask(AbstractTask):
         force_tolerance = self.input.ionic_force_tolerance
         if max_force > force_tolerance:
             return ReturnStatus(
-                    "not_converged",
-                    f"force in last step ({max_force}) is larger than tolerance ({force_tolerance})!"
+                "not_converged",
+                f"force in last step ({max_force}) is larger than tolerance ({force_tolerance})!",
             )

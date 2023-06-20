@@ -8,20 +8,20 @@ import logging
 
 from pyiron_contrib.tinybase.task import AbstractTask, TaskGenerator
 
-class RunMachine:
 
+class RunMachine:
     class Code(enum.Enum):
-        INIT = 'init'
-        READY = 'ready'
-        RUNNING = 'running'
-        COLLECT = 'collect'
-        FINISHED = 'finished'
+        INIT = "init"
+        READY = "ready"
+        RUNNING = "running"
+        COLLECT = "collect"
+        FINISHED = "finished"
 
     def __init__(self, initial_state):
         self._state = RunMachine.Code(initial_state)
         self._callbacks = {}
         self._observers = defaultdict(list)
-        self._data = {} # state variables associated with each state
+        self._data = {}  # state variables associated with each state
 
     @property
     def state(self):
@@ -53,7 +53,6 @@ class RunMachine:
 
 
 class ExecutionContext:
-
     def __init__(self, tasks):
         self._tasks = tasks
         self._run_machine = RunMachine("init")
@@ -104,9 +103,10 @@ class ExecutionContext:
         self._run_machine.step("collect", status=status, output=output)
 
     def _run_collect(self):
-        self._run_machine.step("finished",
-                status=self.status,
-                output=self.output,
+        self._run_machine.step(
+            "finished",
+            status=self.status,
+            output=self.output,
         )
 
     def _run_finished(self):
@@ -131,23 +131,25 @@ class ExecutionContext:
     def output(self):
         return self._run_machine._data["output"]
 
-class Executor:
 
+class Executor:
     def submit(self, tasks: List[AbstractTask]) -> ExecutionContext:
         return ExecutionContext(tasks)
 
+
 from concurrent.futures import (
-        ThreadPoolExecutor,
-        ProcessPoolExecutor,
-        Executor as FExecutor
+    ThreadPoolExecutor,
+    ProcessPoolExecutor,
+    Executor as FExecutor,
 )
 from threading import Lock
+
 
 def run_task(task):
     return task.execute()
 
-class FuturesExecutionContext(ExecutionContext):
 
+class FuturesExecutionContext(ExecutionContext):
     def __init__(self, pool, tasks):
         super().__init__(tasks=tasks)
         self._pool = pool
@@ -179,10 +181,7 @@ class FuturesExecutionContext(ExecutionContext):
 
     def _prepare_subcontext(self, task, sub_tasks):
         sub = self._subcontexts[task] = type(self)(self._pool, sub_tasks)
-        sub._run_machine.observe(
-            "finished",
-            partial(self._process_generator, task)
-        )
+        sub._run_machine.observe("finished", partial(self._process_generator, task))
         sub.run()
         return sub
 
@@ -203,11 +202,18 @@ class FuturesExecutionContext(ExecutionContext):
     def _check_finish(self, log=False):
         with self._lock:
             if self._done == len(self.tasks):
-                status = [self._status[n] for n in sorted(self.tasks, key=lambda n: self._index[n])]
-                output = [self._output[n] for n in sorted(self.tasks, key=lambda n: self._index[n])]
-                self._run_machine.step("collect",
-                        status=status,
-                        output=output,
+                status = [
+                    self._status[n]
+                    for n in sorted(self.tasks, key=lambda n: self._index[n])
+                ]
+                output = [
+                    self._output[n]
+                    for n in sorted(self.tasks, key=lambda n: self._index[n])
+                ]
+                self._run_machine.step(
+                    "collect",
+                    status=status,
+                    output=output,
                 )
 
     def _run_running(self):
@@ -224,6 +230,7 @@ class FuturesExecutionContext(ExecutionContext):
         else:
             logging.info("Some tasks are still executing!")
 
+
 class BackgroundExecutor(Executor):
     def __init__(self, max_threads):
         self._max_threads = max_threads
@@ -233,6 +240,7 @@ class BackgroundExecutor(Executor):
         if self._pool is None:
             self._pool = ThreadPoolExecutor(max_workers=self._max_threads)
         return FuturesExecutionContext(self._pool, tasks)
+
 
 class ProcessExecutor(Executor):
     def __init__(self, max_processes):
@@ -244,7 +252,9 @@ class ProcessExecutor(Executor):
             self._pool = ProcessPoolExecutor(max_workers=self._max_processes)
         return FuturesExecutionContext(self._pool, tasks)
 
+
 from dask.distributed import Client, LocalCluster
+
 
 class DaskExecutor(Executor):
     def __init__(self, client):

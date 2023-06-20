@@ -13,6 +13,7 @@ from ase import Atoms
 import numpy as np
 import matplotlib.pyplot as plt
 
+
 class StorageAttribute:
     """
     Create an attribute that is synced to a storage attribute.
@@ -113,9 +114,9 @@ class StorageAttribute:
         self.__doc__ = text
         return self
 
-class AbstractContainer(HasStorage, HasHDFAdapaterMixin, abc.ABC):
 
-    def take(self, other: 'AbstractContainer'):
+class AbstractContainer(HasStorage, HasHDFAdapaterMixin, abc.ABC):
+    def take(self, other: "AbstractContainer"):
         # TODO: think hard about variance of types
         if not isinstance(self, type(other)):
             raise TypeError("Must pass a superclass to transfer from!")
@@ -127,7 +128,7 @@ class AbstractContainer(HasStorage, HasHDFAdapaterMixin, abc.ABC):
                 if a is not None:
                     setattr(self, name, a)
 
-    def put(self, other: 'AbstractContainer'):
+    def put(self, other: "AbstractContainer"):
         other.take(self)
 
 
@@ -135,14 +136,17 @@ class AbstractInput(AbstractContainer, abc.ABC):
     def check_ready(self):
         return True
 
+
 class StructureInput(AbstractInput):
     structure = StorageAttribute().type(Atoms)
+
 
 class MDInput(AbstractInput):
     steps = StorageAttribute().type(int)
     timestep = StorageAttribute().type(float)
     temperature = StorageAttribute().type(float)
     output_steps = StorageAttribute().type(int)
+
 
 class MinimizeInput(AbstractInput):
     ionic_force_tolerance = StorageAttribute().type(float)
@@ -153,25 +157,28 @@ class MinimizeInput(AbstractInput):
 class AbstractOutput(AbstractContainer, abc.ABC):
     pass
 
+
 class EnergyPotOutput(AbstractOutput):
     energy_pot = StorageAttribute().type(float)
+
 
 class EnergyKinOutput(AbstractOutput):
     energy_kin = StorageAttribute().type(float)
 
+
 class ForceOutput(AbstractOutput):
     forces = StorageAttribute().type(np.ndarray)
 
-class MDOutput(HasStructure, EnergyPotOutput):
 
+class MDOutput(HasStructure, EnergyPotOutput):
     pot_energies = StorageAttribute().type(list).constructor(list)
     kin_energies = StorageAttribute().type(list).constructor(list)
     forces = StorageAttribute().type(list).constructor(list)
     structures = StorageAttribute().type(list).constructor(list)
 
     def plot_energies(self):
-        plt.plot(self.pot_energies - np.min(self.pot_energies), label='pot')
-        plt.plot(self.kin_energies, label='kin')
+        plt.plot(self.pot_energies - np.min(self.pot_energies), label="pot")
+        plt.plot(self.kin_energies, label="kin")
         plt.legend()
 
     def _number_of_structures(self):

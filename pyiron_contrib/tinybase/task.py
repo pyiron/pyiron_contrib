@@ -9,7 +9,7 @@ from pyiron_contrib.tinybase.storage import Storable, pickle_dump, pickle_load
 from pyiron_contrib.tinybase.container import (
     AbstractInput,
     AbstractOutput,
-    StorageAttribute
+    StorageAttribute,
 )
 
 

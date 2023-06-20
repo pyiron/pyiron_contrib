@@ -4,7 +4,6 @@ from pyiron_contrib.tinybase.container import (
     StorageAttribute,
 )
 from pyiron_contrib.tinybase.task import (
-    AbstractTask,
     ListTaskGenerator,
     ListInput,
     ReturnStatus,
@@ -31,8 +30,8 @@ class MurnaghanInput(StructureInput, ListInput):
         task.input.structure = self.structure
         return structure_ready and strain_ready and task.input.check_ready()
 
-    def set_strain_range(self, range, steps):
-        self.strains = (1 + np.linspace(-range, range, steps)) ** (1 / 3)
+    def set_strain_range(self, volume_range, steps):
+        self.strains = (1 + np.linspace(-volume_range, volume_range, steps)) ** (1 / 3)
 
     def _create_tasks(self):
         cell = self.structure.get_cell()

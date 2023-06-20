@@ -6,8 +6,7 @@ from typing import Optional, Callable, List, Generator, Tuple
 from pyiron_base.interfaces.object import HasStorage
 
 from pyiron_contrib.tinybase.storage import Storable, pickle_dump
-from .container import AbstractInput, AbstractOutput, StorageAttribute
-
+from pyiron_contrib.tinybase.container import AbstractInput, AbstractOutput, StorageAttribute
 
 class ReturnStatus:
     """
@@ -448,7 +447,6 @@ class LoopTask(TaskGenerator):
         task = deepcopy(self.input.task)
         control = deepcopy(self.input.control)
 
-        scratch = {}
         while True:
             (ret, out), *_ = yield [task]
             if not ret.is_done():

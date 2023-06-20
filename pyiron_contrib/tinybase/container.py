@@ -2,7 +2,6 @@
 
 import abc
 from copy import deepcopy
-import sys
 
 from pyiron_contrib.tinybase.storage import HasHDFAdapaterMixin
 

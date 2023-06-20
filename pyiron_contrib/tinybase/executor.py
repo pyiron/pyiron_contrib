@@ -1,4 +1,3 @@
-import abc
 import enum
 from collections import defaultdict
 from functools import partial
@@ -140,7 +139,6 @@ class Executor:
 from concurrent.futures import (
     ThreadPoolExecutor,
     ProcessPoolExecutor,
-    Executor as FExecutor,
 )
 from threading import Lock
 

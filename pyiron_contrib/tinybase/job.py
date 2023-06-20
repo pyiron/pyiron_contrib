@@ -230,8 +230,8 @@ class TinyJob(Storable, abc.ABC):
         return job
 
 
-# I'm not perfectly happy with this, but three thoughts led to this class:
-# 1. I want to be able to set any task on a tiny job with subclassing, to make the prototyping new jobs in the notebook
+# I'm not perfectly happy with this, but two thoughts led to this class:
+# 1. I want to be able to set any task on a tiny job without subclassing, to make the prototyping new jobs in the notebook
 #    easy
 # 2. I do *not* want people to accidently change the task instance/class while the job is running
 class GenericTinyJob(TinyJob):

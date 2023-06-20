@@ -12,8 +12,6 @@ from pyiron_contrib.tinybase.container import (
 
 from pyiron_contrib.tinybase.task import AbstractTask, ReturnStatus
 
-import os
-
 if os.name == "nt":
     EXE_SUFFIX = "bat"
 else:

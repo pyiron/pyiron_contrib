@@ -1,7 +1,6 @@
 import os
 from tempfile import TemporaryDirectory
 
-from ase import Atoms
 from pymatgen.io.lammps.outputs import (
     parse_lammps_dumps,
     parse_lammps_log,
@@ -22,7 +21,6 @@ from pyiron_contrib.tinybase.container import (
     EnergyPotOutput,
     EnergyKinOutput,
     ForceOutput,
-    MDOutput,
 )
 from pyiron_contrib.tinybase.task import (
     AbstractTask,
@@ -156,9 +154,9 @@ class LammpsStaticTask(AbstractTask):
         return LammpsStaticOutput()
 
     def _execute(self, output):
-        with TemporaryDirectory() as dir:
+        with TemporaryDirectory() as tmp_dir:
             inp = LammpsInputTask(capture_exceptions=self._capture_exceptions)
-            inp.input.working_directory = dir
+            inp.input.working_directory = tmp_dir
             inp.input.structure = self.input.structure
             inp.input.potential = self.input.potential
             inp.input.calc_static()
@@ -168,13 +166,13 @@ class LammpsStaticTask(AbstractTask):
 
             lmp = ShellTask(capture_exceptions=self._capture_exceptions)
             lmp.input.command = ExecutablePathResolver("lammps", "lammps")
-            lmp.input.working_directory = dir
+            lmp.input.working_directory = tmp_dir
             ret, out = lmp.execute()
             if not ret.is_done():
                 return ReturnStatus.aborted(f"Running lammps failed: {ret.msg}")
 
             psr = LammpsStaticParserTask(capture_exceptions=self._capture_exceptions)
-            psr.input.working_directory = dir
+            psr.input.working_directory = tmp_dir
             ret, out = psr.execute()
             if not ret.is_done():
                 return ReturnStatus.aborted(f"Parsing failed: {ret.msg}")

@@ -9,9 +9,6 @@ from pyiron_contrib.tinybase.container import (
 )
 from pyiron_contrib.tinybase.task import AbstractTask, ReturnStatus
 
-import numpy as np
-import matplotlib.pyplot as plt
-
 from ase.md.langevin import Langevin
 from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
 from ase import units

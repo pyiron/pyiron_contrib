@@ -26,7 +26,11 @@ class TestWorkflow(TestCase):
         # Validate name incrementation
         wf.add(Node(fnc, "x", label="foo"))
         wf.add.Node(fnc, "y", label="bar")
-        wf.baz = Node(fnc, "y", label="whatever_baz_gets_used")
+        wf.baz = Node(
+            fnc,
+            "y",
+            label="without_strict_you_can_override_by_assignment"
+        )
         Node(fnc, "x", label="boa", workflow=wf)
         self.assertListEqual(
             list(wf.nodes.keys()),
@@ -50,6 +54,21 @@ class TestWorkflow(TestCase):
         with self.assertRaises(AttributeError):
             Node(fnc, "x", label="boa", workflow=wf)
 
+    def test_node_packages(self):
+        wf = Workflow("my_workflow")
+
+        # Test invocation
+        wf.add.atomistics.BulkStructure(repeat=3, cubic=True, element="Al")
+        # Test invocation with attribute assignment
+        wf.engine = wf.add.atomistics.Lammps(structure=wf.bulk_structure)
+
+        self.assertSetEqual(
+            set(wf.nodes.keys()),
+            set(["bulk_structure", "engine"]),
+            msg=f"Expected one node label generated automatically from the class and "
+                f"the other from the attribute assignment, but got {wf.nodes.keys()}"
+        )
+
     def test_double_workfloage_and_node_removal(self):
         wf1 = Workflow("one")
         wf1.add.Node(fnc, "y", label="node1")
@@ -71,11 +90,20 @@ class TestWorkflow(TestCase):
         wf.add.Node(fnc, "y", label="n2")
         wf.add.Node(fnc, "y", label="n3")
 
-        self.assertEqual(len(wf.input), 3)
-        self.assertEqual(len(wf.output), 3)
+        with self.subTest("Workflow IO should be drawn from its nodes"):
+            self.assertEqual(len(wf.inputs), 3)
+            self.assertEqual(len(wf.outputs), 3)
 
         wf.n3.inputs.x = wf.n2.outputs.y
         wf.n2.inputs.x = wf.n1.outputs.y
 
-        self.assertEqual(len(wf.input), 1)
-        self.assertEqual(len(wf.output), 1)
+        with self.subTest("Only unconnected channels should count"):
+            self.assertEqual(len(wf.inputs), 1)
+            self.assertEqual(len(wf.outputs), 1)
+
+    def test_node_decorator_access(self):
+        @Workflow.wrap_as.fast_node("y")
+        def plus_one(x: int = 0) -> int:
+            return x + 1
+
+        self.assertEqual(plus_one().outputs.y.value, 1)

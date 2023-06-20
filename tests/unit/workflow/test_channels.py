@@ -9,6 +9,8 @@ from pyiron_contrib.workflow.channels import (
 class DummyNode:
     def __init__(self):
         self.foo = [0]
+        self.running = False
+        self.label = "node_label"
 
     def update(self):
         self.foo.append(self.foo[-1] + 1)
@@ -98,10 +100,19 @@ class TestDataChannels(TestCase):
         )
 
     def test_ready(self):
-        self.no.value = 1
-        self.assertTrue(self.no.ready)
-        self.no.value = "Not numeric at all"
-        self.assertFalse(self.no.ready)
+        self.ni1.value = 1
+        self.assertTrue(self.ni1.ready)
+
+        with self.subTest("Test the waiting mechanism"):
+            self.ni1.wait_for_update()
+            self.assertTrue(self.ni1.waiting_for_update)
+            self.assertFalse(self.ni1.ready)
+            self.ni1.update(2)
+            self.assertFalse(self.ni1.waiting_for_update)
+            self.assertTrue(self.ni1.ready)
+
+        self.ni1.value = "Not numeric at all"
+        self.assertFalse(self.ni1.ready)
 
     def test_update(self):
         self.no.connect(self.ni1, self.ni2)
@@ -112,6 +123,10 @@ class TestDataChannels(TestCase):
                 inp.value,
                 msg="Value should have been passed downstream"
             )
+
+        self.ni1.node.running = True
+        with self.assertRaises(RuntimeError):
+            self.no.update(42)
 
 
 class TestSignalChannels(TestCase):

@@ -13,19 +13,30 @@ import ruamel.yaml as yaml
 
 from shutil import copyfile
 
-from pyiron_base import GenericJob, GenericParameters, state, Executable, FlattenedStorage
+from pyiron_base import (
+    GenericJob,
+    GenericParameters,
+    state,
+    Executable,
+    FlattenedStorage,
+)
 
-from pyiron_contrib.atomistics.atomistics.job.trainingcontainer import TrainingStorage, TrainingContainer
+from pyiron_contrib.atomistics.atomistics.job.trainingcontainer import (
+    TrainingStorage,
+    TrainingContainer,
+)
 from pyiron_contrib.atomistics.ml.potentialfit import PotentialFit
 
-from pyiron_atomistics.atomistics.structure.atoms import Atoms as pyironAtoms, ase_to_pyiron
+from pyiron_atomistics.atomistics.structure.atoms import (
+    Atoms as pyironAtoms,
+    ase_to_pyiron,
+)
 from ase.atoms import Atoms as aseAtoms
 
 s = state.settings
 
 
 class PacemakerJob(GenericJob, PotentialFit):
-
     def __init__(self, project, job_name):
         super().__init__(project, job_name)
         self.__name__ = "Pacemaker2022"
@@ -35,50 +46,56 @@ class PacemakerJob(GenericJob, PotentialFit):
 
         self.input = GenericParameters(table_name="input")
         self._cutoff = 7.0
-        self.input['cutoff'] = self._cutoff
-        self.input['metadata'] = {'comment': 'pyiron-generated fitting job'}
+        self.input["cutoff"] = self._cutoff
+        self.input["metadata"] = {"comment": "pyiron-generated fitting job"}
 
         # data_config
-        self.input['data'] = {}
+        self.input["data"] = {}
         # potential_config
-        self.input['potential'] = {
+        self.input["potential"] = {
             "elements": [],
             "bonds": {
                 "ALL": {
                     "radbase": "SBessel",
                     "rcut": self._cutoff,
                     "dcut": 0.01,
-                    "radparameters": [5.25]
+                    "radparameters": [5.25],
                 }
             },
-
             "embeddings": {
                 "ALL": {
                     "fs_parameters": [1, 1, 1, 0.5],
                     "ndensity": 2,
-                    "npot": "FinnisSinclairShiftedScaled"
+                    "npot": "FinnisSinclairShiftedScaled",
                 }
             },
-
             "functions": {
                 "ALL": {
                     "nradmax_by_orders": [15, 3, 2, 1],
                     "lmax_by_orders": [0, 3, 2, 1],
                 }
-            }
+            },
         }
 
         # fit_config
-        self.input['fit'] = {
-            "loss": {"L1_coeffs": 1e-8, "L2_coeffs": 1e-8, "kappa": 0.3, "w0_rad": 0,
-                     "w1_rad": 0, "w2_rad": 0},
+        self.input["fit"] = {
+            "loss": {
+                "L1_coeffs": 1e-8,
+                "L2_coeffs": 1e-8,
+                "kappa": 0.3,
+                "w0_rad": 0,
+                "w1_rad": 0,
+                "w2_rad": 0,
+            },
             "maxiter": 1000,
             "optimizer": "BFGS",
-            "fit_cycles": 1
+            "fit_cycles": 1,
         }
-        self.input['backend'] = {"batch_size": 100,
-                                 "display_step": 50,
-                                 "evaluator": "tensorpot"}  # backend_config
+        self.input["backend"] = {
+            "batch_size": 100,
+            "display_step": 50,
+            "evaluator": "tensorpot",
+        }  # backend_config
 
         self.structure_data = None
         self._executable = None
@@ -116,10 +133,15 @@ class PacemakerJob(GenericJob, PotentialFit):
                     "year": "2022",
                     "doi": "10.1103/PhysRevMaterials.6.013804",
                     "url": "https://doi.org/10.1103/PhysRevMaterials.6.013804",
-                    "author": ["Anton Bochkarev", "Yury Lysogorskiy", "Sarath Menon", "Minaam Qamar", "Matous Mrovec",
-                               "Ralf Drautz"],
+                    "author": [
+                        "Anton Bochkarev",
+                        "Yury Lysogorskiy",
+                        "Sarath Menon",
+                        "Minaam Qamar",
+                        "Matous Mrovec",
+                        "Ralf Drautz",
+                    ],
                 },
-
                 {
                     "title": "Performant implementation of the atomic cluster expansion (PACE) and application to copper and silicon",
                     "journal": "npj Computational Materials",
@@ -128,11 +150,19 @@ class PacemakerJob(GenericJob, PotentialFit):
                     "year": "2021",
                     "doi": "10.1038/s41524-021-00559-9",
                     "url": "https://doi.org/10.1038/s41524-021-00559-9",
-                    "author": ["Yury Lysogorskiy", "Cas van der Oord", "Anton Bochkarev", "Sarath Menon",
-                               "Matteo Rinaldi",
-                               "Thomas Hammerschmidt", "Matous Mrovec", "Aidan Thompson", "Gábor Csányi",
-                               "Christoph Ortner",
-                               "Ralf Drautz"],
+                    "author": [
+                        "Yury Lysogorskiy",
+                        "Cas van der Oord",
+                        "Anton Bochkarev",
+                        "Sarath Menon",
+                        "Matteo Rinaldi",
+                        "Thomas Hammerschmidt",
+                        "Matous Mrovec",
+                        "Aidan Thompson",
+                        "Gábor Csányi",
+                        "Christoph Ortner",
+                        "Ralf Drautz",
+                    ],
                 },
                 {
                     "title": "Atomic cluster expansion for accurate and transferable interatomic potentials",
@@ -147,7 +177,6 @@ class PacemakerJob(GenericJob, PotentialFit):
         }
 
     def _save_structure_dataframe_pckl_gzip(self, df):
-
         if "NUMBER_OF_ATOMS" not in df.columns and "number_of_atoms" in df.columns:
             df.rename(columns={"number_of_atoms": "NUMBER_OF_ATOMS"}, inplace=True)
         df["NUMBER_OF_ATOMS"] = df["NUMBER_OF_ATOMS"].astype(int)
@@ -163,10 +192,14 @@ class PacemakerJob(GenericJob, PotentialFit):
                 df["ase_atoms"] = df["atoms"].map(lambda s: s.to_ase())
                 df.drop(columns=["atoms"], inplace=True)
             else:
-                assert isinstance(at, aseAtoms), "'atoms' column is not a valid ASE Atoms object"
+                assert isinstance(
+                    at, aseAtoms
+                ), "'atoms' column is not a valid ASE Atoms object"
                 df.rename(columns={"atoms": "ase_atom"}, inplace=True)
         elif "ase_atoms" not in df.columns:
-            raise ValueError("DataFrame should contain 'atoms' (pyiron Atoms) or 'ase_atoms' (ASE atoms) columns")
+            raise ValueError(
+                "DataFrame should contain 'atoms' (pyiron Atoms) or 'ase_atoms' (ASE atoms) columns"
+            )
 
         if "stress" in df.columns:
             df.drop(columns=["stress"], inplace=True)
@@ -175,8 +208,11 @@ class PacemakerJob(GenericJob, PotentialFit):
             df["pbc"] = df["ase_atoms"].map(lambda atoms: np.all(atoms.pbc))
 
         data_file_name = os.path.join(self.working_directory, "df_fit.pckl.gzip")
-        logging.info("Saving training structures dataframe into {} with pickle protocol = 4, compression = gzip".format(
-            data_file_name))
+        logging.info(
+            "Saving training structures dataframe into {} with pickle protocol = 4, compression = gzip".format(
+                data_file_name
+            )
+        )
         df.to_pickle(data_file_name, compression="gzip", protocol=4)
         return data_file_name
 
@@ -188,7 +224,9 @@ class PacemakerJob(GenericJob, PotentialFit):
 
         if isinstance(self.structure_data, pd.DataFrame):
             logging.info("structure_data is pandas.DataFrame")
-            data_file_name = self._save_structure_dataframe_pckl_gzip(self.structure_data)
+            data_file_name = self._save_structure_dataframe_pckl_gzip(
+                self.structure_data
+            )
             self.input["data"] = {"filename": data_file_name}
             elements_set = set()
             for at in self.structure_data["ase_atoms"]:
@@ -201,15 +239,22 @@ class PacemakerJob(GenericJob, PotentialFit):
                 logging.info("structure_data is valid file path")
                 self.input["data"] = {"filename": self.structure_data}
             else:
-                raise ValueError("Provided structure_data filename ({}) doesn't exists".format(self.structure_data))
-        elif hasattr(self.structure_data, "get_pandas"):  # duck-typing check for TrainingContainer
+                raise ValueError(
+                    "Provided structure_data filename ({}) doesn't exists".format(
+                        self.structure_data
+                    )
+                )
+        elif hasattr(
+            self.structure_data, "get_pandas"
+        ):  # duck-typing check for TrainingContainer
             logging.info("structure_data is TrainingContainer")
             df = self.structure_data.to_pandas()
             data_file_name = self._save_structure_dataframe_pckl_gzip(df)
             self.input["data"] = {"filename": data_file_name}
         elif self.structure_data is None:
             raise ValueError(
-                "`structure_data` is none, but should be pd.DataFrame, TrainingContainer or valid pickle.gzip filename")
+                "`structure_data` is none, but should be pd.DataFrame, TrainingContainer or valid pickle.gzip filename"
+            )
 
         metadata_dict = self.input["metadata"]
         metadata_dict["pyiron_job_id"] = str(self.job_id)
@@ -220,7 +265,7 @@ class PacemakerJob(GenericJob, PotentialFit):
             "potential": self.input["potential"],
             "data": self.input["data"],
             "fit": self.input["fit"],
-            'backend': self.input["backend"],
+            "backend": self.input["backend"],
         }
 
         if isinstance(self.input["potential"], str):
@@ -228,10 +273,16 @@ class PacemakerJob(GenericJob, PotentialFit):
             if os.path.isfile(pot_file_name):
                 logging.info("Input potential is filename")
                 pot_basename = os.path.basename(pot_file_name)
-                copyfile(pot_file_name, os.path.join(self.working_directory, pot_basename))
-                input_yaml_dict['potential'] = pot_basename
+                copyfile(
+                    pot_file_name, os.path.join(self.working_directory, pot_basename)
+                )
+                input_yaml_dict["potential"] = pot_basename
             else:
-                raise ValueError("Provided potential filename ({}) doesn't exists".format(self.input["potential"]))
+                raise ValueError(
+                    "Provided potential filename ({}) doesn't exists".format(
+                        self.input["potential"]
+                    )
+                )
 
         with open(os.path.join(self.working_directory, "input.yaml"), "w") as f:
             yaml.dump(input_yaml_dict, f)
@@ -270,39 +321,52 @@ class PacemakerJob(GenericJob, PotentialFit):
                 h5out[key] = arr
 
         # training data
-        training_data_fname = os.path.join(self.working_directory, "fitting_data_info.pckl.gzip")
+        training_data_fname = os.path.join(
+            self.working_directory, "fitting_data_info.pckl.gzip"
+        )
         df = pd.read_pickle(training_data_fname, compression="gzip")
         df["atoms"] = df.ase_atoms.map(ase_to_pyiron)
         training_data_ts = TrainingStorage()
         for _, r in df.iterrows():
-            training_data_ts.add_structure(r.atoms,
-                                           energy=r.energy_corrected,
-                                           forces=r.forces,
-                                           identifier=r['name'])
+            training_data_ts.add_structure(
+                r.atoms,
+                energy=r.energy_corrected,
+                forces=r.forces,
+                identifier=r["name"],
+            )
 
         # predicted data
         predicted_fname = os.path.join(self.working_directory, "train_pred.pckl.gzip")
         df = pd.read_pickle(predicted_fname, compression="gzip")
         predicted_data_fs = FlattenedStorage()
-        predicted_data_fs.add_array('energy', dtype=np.float64, shape=(), per='chunk')
-        predicted_data_fs.add_array('energy_true', dtype=np.float64, shape=(), per='chunk')
+        predicted_data_fs.add_array("energy", dtype=np.float64, shape=(), per="chunk")
+        predicted_data_fs.add_array(
+            "energy_true", dtype=np.float64, shape=(), per="chunk"
+        )
 
-        predicted_data_fs.add_array('number_of_atoms', dtype=np.int64, shape=(), per='chunk')
+        predicted_data_fs.add_array(
+            "number_of_atoms", dtype=np.int64, shape=(), per="chunk"
+        )
 
-        predicted_data_fs.add_array('forces', dtype=np.float64, shape=(3,), per='element')
-        predicted_data_fs.add_array('forces_true', dtype=np.float64, shape=(3,), per='element')
+        predicted_data_fs.add_array(
+            "forces", dtype=np.float64, shape=(3,), per="element"
+        )
+        predicted_data_fs.add_array(
+            "forces_true", dtype=np.float64, shape=(3,), per="element"
+        )
         for i, r in df.iterrows():
-            identifier = r['name'] if "name" in r else str(i)
-            predicted_data_fs.add_chunk(r["NUMBER_OF_ATOMS"], identifier=identifier,
-                                        energy=r.energy_pred,
-                                        forces=r.forces_pred,
-                                        energy_true=r.energy_corrected,
-                                        forces_true=r.forces,
-                                        number_of_atoms = r.NUMBER_OF_ATOMS,
-
-                                        energy_per_atom = r.energy_pred / r.NUMBER_OF_ATOMS,
-                                        energy_per_atom_true=r.energy_corrected / r.NUMBER_OF_ATOMS,
-                                        )
+            identifier = r["name"] if "name" in r else str(i)
+            predicted_data_fs.add_chunk(
+                r["NUMBER_OF_ATOMS"],
+                identifier=identifier,
+                energy=r.energy_pred,
+                forces=r.forces_pred,
+                energy_true=r.energy_corrected,
+                forces_true=r.forces,
+                number_of_atoms=r.NUMBER_OF_ATOMS,
+                energy_per_atom=r.energy_pred / r.NUMBER_OF_ATOMS,
+                energy_per_atom_true=r.energy_corrected / r.NUMBER_OF_ATOMS,
+            )
 
         with self.project_hdf5.open("output") as hdf5_output:
             training_data_ts.to_hdf(hdf=hdf5_output, group_name="training_data")
@@ -313,11 +377,16 @@ class PacemakerJob(GenericJob, PotentialFit):
         elem = " ".join(elements_name)
         pot_file_name = self.get_final_potential_filename_ace()
         pot_dict = {
-            'Config': [["pair_style pace\n", "pair_coeff  * * {} {}\n".format(pot_file_name, elem)]],
-            'Filename': [""],
-            'Model': ["ACE"],
-            'Name': [self.job_name],
-            'Species': [elements_name]
+            "Config": [
+                [
+                    "pair_style pace\n",
+                    "pair_coeff  * * {} {}\n".format(pot_file_name, elem),
+                ]
+            ],
+            "Filename": [""],
+            "Model": ["ACE"],
+            "Name": [self.job_name],
+            "Species": [elements_name],
         }
 
         ace_potential = pd.DataFrame(pot_dict)
@@ -325,18 +394,12 @@ class PacemakerJob(GenericJob, PotentialFit):
         return ace_potential
 
     def to_hdf(self, hdf=None, group_name=None):
-        super().to_hdf(
-            hdf=hdf,
-            group_name=group_name
-        )
+        super().to_hdf(hdf=hdf, group_name=group_name)
         with self.project_hdf5.open("input") as h5in:
             self.input.to_hdf(h5in)
 
     def from_hdf(self, hdf=None, group_name=None):
-        super().from_hdf(
-            hdf=hdf,
-            group_name=group_name
-        )
+        super().from_hdf(hdf=hdf, group_name=group_name)
         with self.project_hdf5.open("input") as h5in:
             self.input.from_hdf(h5in)
 
@@ -353,7 +416,9 @@ class PacemakerJob(GenericJob, PotentialFit):
     def _executable_activate(self, enforce=False, codename="pacemaker"):
         if self._executable is None or enforce:
             self._executable = Executable(
-                codename=codename, module="pacemaker", path_binary_codes=state.settings.resource_paths
+                codename=codename,
+                module="pacemaker",
+                path_binary_codes=state.settings.resource_paths,
             )
 
     def _add_training_data(self, container: TrainingContainer) -> None:
@@ -369,7 +434,9 @@ class PacemakerJob(GenericJob, PotentialFit):
         return self["output/predicted_data"].to_object()
 
     # copied/adapted from mlip.py
-    def create_training_dataframe(self, _train_job_id_list: List = None) -> pd.DataFrame:
+    def create_training_dataframe(
+        self, _train_job_id_list: List = None
+    ) -> pd.DataFrame:
         if _train_job_id_list is None:
             _train_job_id_list = self._train_job_id_list
         df_list = []
@@ -380,7 +447,9 @@ class PacemakerJob(GenericJob, PotentialFit):
                 data_df = job.to_pandas()
                 df_list.append(data_df)
             else:
-                raise NotImplementedError("Currently only TrainingContainer is supported")
+                raise NotImplementedError(
+                    "Currently only TrainingContainer is supported"
+                )
 
         total_training_df = pd.concat(df_list, axis=0)
         total_training_df.reset_index(drop=True, inplace=True)

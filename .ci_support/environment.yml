@@ -5,17 +5,18 @@ dependencies:
 - coveralls
 - coverage
 - codacy-coverage
+- ipython
 - matplotlib =3.7.1
 - numpy =1.24.3
-- pyiron_base =0.5.36
-- pyiron_atomistics =0.2.66
+- pyiron_base =0.6.1
+- pyiron_atomistics =0.3.0
 - pyparsing =3.0.9
 - scipy =1.10.1
 - seaborn =0.12.2
 - scikit-image =0.19.3
 - randspg =0.0.1
-- boto3 =1.26.118
-- moto =4.1.8
+- boto3 =1.26.151
+- moto =4.1.11
 - pycp2k =0.2.2
-- typeguard =3.0.2
-- aws-sam-translator =1.65.0
+- typeguard =4.0.0
+- aws-sam-translator =1.68.0

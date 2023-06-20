@@ -20,10 +20,10 @@ from pyiron_contrib.protocol.utils import Pointer
 from pyiron_contrib.protocol.utils import ensure_iterable
 from pyiron_contrib.protocol.math import welford_online
 
-KB = physical_constants['Boltzmann constant in eV/K'][0]
+KB = physical_constants["Boltzmann constant in eV/K"][0]
 EV_TO_U_ANGSQ_PER_FSSQ = 0.00964853322
 # https://www.wolframalpha.com/input/?i=1+eV+in+u+*+%28angstrom%2Ffs%29%5E2
-U_ANGSQ_PER_FSSQ_TO_EV = 1. / EV_TO_U_ANGSQ_PER_FSSQ
+U_ANGSQ_PER_FSSQ_TO_EV = 1.0 / EV_TO_U_ANGSQ_PER_FSSQ
 EV_PER_ANGCUB_TO_GPA = 160.21766208  # eV/A^3 to GPa
 GPA_TO_BAR = 1e4
 
@@ -32,8 +32,10 @@ Primitive vertices which have only one outbound execution edge.
 """
 
 __author__ = "Liam Huber, Raynol Dsouza, Dominik Noeger"
-__copyright__ = "Copyright 2019, Max-Planck-Institut für Eisenforschung GmbH " \
-                "- Computational Materials Design (CM) Department"
+__copyright__ = (
+    "Copyright 2019, Max-Planck-Institut für Eisenforschung GmbH "
+    "- Computational Materials Design (CM) Department"
+)
 __version__ = "0.0"
 __maintainer__ = "Liam Huber"
 __email__ = "huber@mpie.de"
@@ -61,7 +63,6 @@ class BuildMixingPairs(PrimitiveVertex):
         self.input.default.custom_lambdas = None
 
     def command(self, n_lambdas, custom_lambdas):
-
         if custom_lambdas is not None:
             lambdas = np.array(custom_lambdas)
         else:
@@ -72,9 +73,9 @@ class BuildMixingPairs(PrimitiveVertex):
         delta_lambdas[-1] = delta_lambdas[-1] / 2
 
         return {
-                'lambda_pairs': np.array([lambdas, 1 - lambdas]).T,
-                'delta_lambdas': delta_lambdas
-            }
+            "lambda_pairs": np.array([lambdas, 1 - lambdas]).T,
+            "delta_lambdas": delta_lambdas,
+        }
 
 
 class Counter(PrimitiveVertex):
@@ -96,14 +97,11 @@ class Counter(PrimitiveVertex):
             count = self.output.n_counts[-1] + add_counts
         else:
             count = self.output.n_counts[-1] + 1
-        return {
-            'n_counts': count
-        }
+        return {"n_counts": count}
 
 
 class Compute(PrimitiveVertex):
-    """
-    """
+    """ """
 
     def __init__(self, name=None):
         super(Compute, self).__init__(name=name)
@@ -123,9 +121,7 @@ class Zeros(PrimitiveVertex):
     """
 
     def command(self, shape):
-        return {
-            'zeros': np.zeros(shape)
-        }
+        return {"zeros": np.zeros(shape)}
 
 
 class DeleteAtom(PrimitiveVertex):
@@ -148,10 +144,7 @@ class DeleteAtom(PrimitiveVertex):
         vacancy_structure.pop(atom_id)
         mask = np.delete(np.arange(len(structure)).astype(int), atom_id)
 
-        return {
-            'structure': vacancy_structure,
-            'mask': mask
-        }
+        return {"structure": vacancy_structure, "mask": mask}
 
 
 class ExternalHamiltonian(PrimitiveVertex):
@@ -183,7 +176,9 @@ class ExternalHamiltonian(PrimitiveVertex):
 
     def __init__(self, name=None):
         super(ExternalHamiltonian, self).__init__(name=name)
-        self._fast_lammps_mode = True  # Set to false only to intentionally be slow for comparison purposes
+        self._fast_lammps_mode = (
+            True  # Set to false only to intentionally be slow for comparison purposes
+        )
         self._job_project_path = None
         self._job = None
         self._job_name = None
@@ -194,22 +189,40 @@ class ExternalHamiltonian(PrimitiveVertex):
         id_.structure = None
         id_.positions = None
         id_.cell = None
-        id_.interesting_keys = ['positions', 'forces', 'energy_pot', 'pressures', 'volume', 'cell']
+        id_.interesting_keys = [
+            "positions",
+            "forces",
+            "energy_pot",
+            "pressures",
+            "volume",
+            "cell",
+        ]
 
-    def command(self, ref_job_full_path, project_path, job_name, structure, positions, cell, interesting_keys):
-
+    def command(
+        self,
+        ref_job_full_path,
+        project_path,
+        job_name,
+        structure,
+        positions,
+        cell,
+        interesting_keys,
+    ):
         if self._job_project_path is None:
             if project_path is None and ref_job_full_path is not None:
-                self._job_project_path, self._job_name = self._initialize(self.get_graph_location(),
-                                                                          ref_job_full_path,
-                                                                          structure,
-                                                                          self._fast_lammps_mode
-                                                                          )
+                self._job_project_path, self._job_name = self._initialize(
+                    self.get_graph_location(),
+                    ref_job_full_path,
+                    structure,
+                    self._fast_lammps_mode,
+                )
             elif project_path is not None and ref_job_full_path is None:
                 self._job_project_path = project_path
                 self._job_name = job_name
             else:
-                raise AttributeError('Please specify valid project path OR ref_job_full_path, but not both!')
+                raise AttributeError(
+                    "Please specify valid project path OR ref_job_full_path, but not both!"
+                )
 
         if self._job is None:
             self._reload()
@@ -234,25 +247,26 @@ class ExternalHamiltonian(PrimitiveVertex):
             self._job.calc_static()
             self._job.run()
         else:
-            raise TypeError('Job of class {} is not compatible.'.format(self._job.__class__))
+            raise TypeError(
+                "Job of class {} is not compatible.".format(self._job.__class__)
+            )
 
         return {key: self._get_interactive_value(key) for key in interesting_keys}
 
     @staticmethod
-    def _initialize(graph_location, ref_job_full_path, structure, fast_lammps_mode, name=None):
+    def _initialize(
+        graph_location, ref_job_full_path, structure, fast_lammps_mode, name=None
+    ):
         """
         Initialize / create the interactive job and save it.
         """
         if name is None:
-            name = graph_location + '_job'
+            name = graph_location + "_job"
         project_path, ref_job_path = split(ref_job_full_path)
         pr = Project(path=project_path)
         ref_job = pr.load(ref_job_path)
         job = ref_job.copy_to(
-            project=pr,
-            new_job_name=name,
-            input_only=True,
-            new_database_entry=True
+            project=pr, new_job_name=name, input_only=True, new_database_entry=True
         )
         if structure is not None:
             job.structure = structure
@@ -261,12 +275,14 @@ class ExternalHamiltonian(PrimitiveVertex):
             if isinstance(job, LammpsInteractive) and fast_lammps_mode:
                 # Note: This might be done by default at some point in LammpsInteractive,
                 # and could then be removed here
-                job.interactive_flush_frequency = 10 ** 10
-                job.interactive_write_frequency = 10 ** 10
+                job.interactive_flush_frequency = 10**10
+                job.interactive_write_frequency = 10**10
             job.calc_static()
             job.run()
         else:
-            raise TypeError('Job of class {} is not compatible.'.format(ref_job.__class__))
+            raise TypeError(
+                "Job of class {} is not compatible.".format(ref_job.__class__)
+            )
 
         return job.project.path, job.job_name
 
@@ -283,17 +299,17 @@ class ExternalHamiltonian(PrimitiveVertex):
         """
         Get output corresponding to the `interesting_keys` from interactive job.
         """
-        if key == 'positions':
+        if key == "positions":
             val = np.array(self._job.interactive_positions_getter())
-        elif key == 'forces':
+        elif key == "forces":
             val = np.array(self._job.interactive_forces_getter())
-        elif key == 'energy_pot':
+        elif key == "energy_pot":
             val = self._job.interactive_energy_pot_getter()
-        elif key == 'pressures':
+        elif key == "pressures":
             val = np.array(self._job.interactive_pressures_getter())
-        elif key == 'volume':
+        elif key == "volume":
             val = self._job.interactive_volume_getter()
-        elif key == 'cell':
+        elif key == "cell":
             val = np.array(self._job.interactive_cells_getter())
         else:
             raise NotImplementedError
@@ -338,18 +354,20 @@ class CreateJob(ExternalHamiltonian):
         job_names = []
         project_path = []
         for i in np.arange(n_images):
-            name = graph_location + '_' + str(i)
-            output = self._initialize(graph_location, ref_job_full_path, structure,
-                                      self._fast_lammps_mode, name)
+            name = graph_location + "_" + str(i)
+            output = self._initialize(
+                graph_location,
+                ref_job_full_path,
+                structure,
+                self._fast_lammps_mode,
+                name,
+            )
             project_path.append(output[0])
             job_names.append(output[1])
         self._project_path = project_path
         self._job_names = job_names
 
-        return {
-            'project_path': project_path,
-            'job_names': job_names
-        }
+        return {"project_path": project_path, "job_names": job_names}
 
     def finish(self):
         """
@@ -390,9 +408,10 @@ class MinimizeReferenceJob(ExternalHamiltonian):
 
     def command(self, ref_job_full_path, structure, pressure=None, *args, **kwargs):
         graph_location = self.get_graph_location()
-        name = 'minimize_ref_job'
-        project_path, job_name = self._initialize(graph_location, ref_job_full_path, structure,
-                                                  self._fast_lammps_mode, name)
+        name = "minimize_ref_job"
+        project_path, job_name = self._initialize(
+            graph_location, ref_job_full_path, structure, self._fast_lammps_mode, name
+        )
         pr = Project(path=project_path)
         job = pr.load(job_name)
         job.structure = structure
@@ -402,8 +421,8 @@ class MinimizeReferenceJob(ExternalHamiltonian):
             job.interactive_close()
 
         return {
-            'energy_pot': job.output.energy_pot[-1],
-            'forces': job.output.forces[-1]
+            "energy_pot": job.output.energy_pot[-1],
+            "forces": job.output.forces[-1],
         }
 
 
@@ -414,6 +433,7 @@ class RemoveJob(PrimitiveVertex):
         project_path (string): The path of the project. (Default is None.)
         job_names (string): The names of the jobs to be removed. (Default is None.)
     """
+
     def __init__(self, name=None):
         super(RemoveJob, self).__init__(name=name)
         self.input.default.project_path = None
@@ -449,9 +469,17 @@ class GradientDescent(PrimitiveVertex):
         id_.fix_com = True
         id_.use_adagrad = False
 
-    def command(self, positions, forces, gamma0, use_adagrad, fix_com, mask=None, masses=None,
-                output_displacements=True):
-
+    def command(
+        self,
+        positions,
+        forces,
+        gamma0,
+        use_adagrad,
+        fix_com,
+        mask=None,
+        masses=None,
+        output_displacements=True,
+    ):
         positions = np.array(positions)
         forces = np.array(forces)
         unmasked_positions = None
@@ -493,14 +521,9 @@ class GradientDescent(PrimitiveVertex):
             disp = pos_change
 
         if output_displacements:
-            return {
-                'positions': new_pos,
-                'displacements': disp
-            }
+            return {"positions": new_pos, "displacements": disp}
         else:
-            return {
-                'positions': new_pos
-            }
+            return {"positions": new_pos}
 
 
 class InitialPositions(PrimitiveVertex):
@@ -522,7 +545,6 @@ class InitialPositions(PrimitiveVertex):
         self.input.default.initial_positions = None
 
     def command(self, initial_positions, structure_initial, structure_final, n_images):
-
         if initial_positions is None:
             pos_i = structure_initial.positions
             pos_f = structure_final.positions
@@ -536,9 +558,7 @@ class InitialPositions(PrimitiveVertex):
             if len(initial_positions) != n_images:
                 raise TypeError("Length of positions is not the same as n_images!")
 
-        return {
-            'initial_positions': initial_positions
-        }
+        return {"initial_positions": initial_positions}
 
 
 class HarmonicHamiltonian(PrimitiveVertex):
@@ -569,9 +589,16 @@ class HarmonicHamiltonian(PrimitiveVertex):
         id_.spring_constant = None
         id_.force_constants = None
 
-    def command(self, positions, reference_positions, structure, spring_constant=None, force_constants=None,
-                mask=None, eq_energy=None):
-
+    def command(
+        self,
+        positions,
+        reference_positions,
+        structure,
+        spring_constant=None,
+        force_constants=None,
+        mask=None,
+        eq_energy=None,
+    ):
         dr = structure.find_mic(positions - reference_positions)
         if spring_constant is not None and force_constants is None:
             if mask is not None:
@@ -582,9 +609,13 @@ class HarmonicHamiltonian(PrimitiveVertex):
                 energy = -0.5 * np.tensordot(dr, forces)
 
         elif force_constants is not None and spring_constant is None:
-            transformed_force_constants = self.transform_force_constants(force_constants, len(structure.positions))
+            transformed_force_constants = self.transform_force_constants(
+                force_constants, len(structure.positions)
+            )
             transformed_displacements = self.transform_displacements(dr)
-            transformed_forces = -np.dot(transformed_force_constants, transformed_displacements)
+            transformed_forces = -np.dot(
+                transformed_force_constants, transformed_displacements
+            )
             retransformed_forces = self.retransform_forces(transformed_forces, dr)
             if mask is not None:
                 forces = retransformed_forces[mask]
@@ -594,15 +625,14 @@ class HarmonicHamiltonian(PrimitiveVertex):
                 energy = -0.5 * np.tensordot(forces, dr)
 
         else:
-            raise TypeError('Please specify either a spring constant or the force constant matrix')
+            raise TypeError(
+                "Please specify either a spring constant or the force constant matrix"
+            )
 
         if eq_energy is not None:
             energy += eq_energy
 
-        return {
-            'forces': forces,
-            'energy_pot': energy
-        }
+        return {"forces": forces, "energy_pot": energy}
 
     @staticmethod
     def transform_force_constants(force_constants, n_atoms):
@@ -610,11 +640,12 @@ class HarmonicHamiltonian(PrimitiveVertex):
         if force_shape[2] == 3 and force_shape[3] == 3:
             force_reshape = force_shape[0] * force_shape[2]
             transformed_force_constants = np.transpose(
-                force_constants,
-                (0, 2, 1, 3)
+                force_constants, (0, 2, 1, 3)
             ).reshape((force_reshape, force_reshape))
         elif force_shape[1] == 3 and force_shape[3] == 3:
-            transformed_force_constants = np.array(force_constants).reshape(3 * n_atoms, 3 * n_atoms)
+            transformed_force_constants = np.array(force_constants).reshape(
+                3 * n_atoms, 3 * n_atoms
+            )
 
         return transformed_force_constants
 
@@ -645,26 +676,28 @@ class LangevinThermostat(PrimitiveVertex):
     def __init__(self, name=None):
         super(LangevinThermostat, self).__init__(name=name)
         id_ = self.input.default
-        id_.temperature = 0.
-        id_.damping_timescale = 100.
-        id_.time_step = 1.
+        id_.temperature = 0.0
+        id_.damping_timescale = 100.0
+        id_.time_step = 1.0
         id_.fix_com = True
 
-    def command(self, velocities, masses, temperature, damping_timescale, time_step, fix_com):
+    def command(
+        self, velocities, masses, temperature, damping_timescale, time_step, fix_com
+    ):
         # Ensure that masses are a commensurate shape
         masses = np.array(masses)[:, np.newaxis]
         gamma = masses / damping_timescale
         np.random.seed()
-        noise = np.sqrt(2 * (gamma / time_step) * KB * temperature) * np.random.randn(*velocities.shape)
+        noise = np.sqrt(2 * (gamma / time_step) * KB * temperature) * np.random.randn(
+            *velocities.shape
+        )
         drag = -gamma * velocities
         thermostat_forces = noise + drag
 
         if fix_com:  # Apply zero net force
             thermostat_forces -= np.mean(noise, axis=0)
 
-        return {
-            'forces': thermostat_forces
-        }
+        return {"forces": thermostat_forces}
 
 
 class Max(PrimitiveVertex):
@@ -696,9 +729,7 @@ class Max(PrimitiveVertex):
         id_.initial_val = None
 
     def command(self, a, axis, keepdims, initial_val):
-        return {
-            'amax': np.amax(a, axis=axis, keepdims=keepdims)
-        }
+        return {"amax": np.amax(a, axis=axis, keepdims=keepdims)}
 
 
 class NEBForces(PrimitiveVertex):
@@ -734,14 +765,22 @@ class NEBForces(PrimitiveVertex):
     def __init__(self, name=None):
         super(NEBForces, self).__init__(name=name)
         id_ = self.input.default
-        id_.spring_constant = 1.
-        id_.tangent_style = 'upwinding'
+        id_.spring_constant = 1.0
+        id_.tangent_style = "upwinding"
         id_.use_climbing_image = True
         id_.smoothing = None
 
-    def command(self, positions, energies, forces, structure, spring_constant, tangent_style, smoothing,
-                use_climbing_image):
-
+    def command(
+        self,
+        positions,
+        energies,
+        forces,
+        structure,
+        spring_constant,
+        tangent_style,
+        smoothing,
+        use_climbing_image,
+    ):
         if use_climbing_image:
             climbing_image_index = np.argmax(energies)
         else:
@@ -767,22 +806,27 @@ class NEBForces(PrimitiveVertex):
             tau_right = dr_right / np.linalg.norm(dr_right)
 
             # Calculate the NEB tangent vector
-            if tangent_style == 'plain':
+            if tangent_style == "plain":
                 tau = self.normalize(dr_right + dr_left)
-            elif tangent_style == 'improved':
+            elif tangent_style == "improved":
                 tau = self.normalize(tau_left + tau_right)
-            elif tangent_style == 'upwinding':
+            elif tangent_style == "upwinding":
                 en_left = energies[i - 1]
                 en = energies[i]
                 en_right = energies[i + 1]
-                tau = self._get_upwinding_tau(tau_left, tau_right, en_left, en, en_right)
+                tau = self._get_upwinding_tau(
+                    tau_left, tau_right, en_left, en, en_right
+                )
             else:
                 # This branch should be inaccessible due to the setter...
                 raise KeyError("No such tangent_style: " + str(tangent_style))
 
             if smoothing is not None:
-                force_smoothing = (self.saturating_angle_control(dr_left, dr_right) *
-                                   smoothing * (dr_right - dr_left))
+                force_smoothing = (
+                    self.saturating_angle_control(dr_left, dr_right)
+                    * smoothing
+                    * (dr_right - dr_left)
+                )
             else:
                 force_smoothing = 0
 
@@ -798,11 +842,11 @@ class NEBForces(PrimitiveVertex):
             else:
                 dr_mag = np.linalg.norm(dr_right) - np.linalg.norm(dr_left)
                 force_spring = spring_constant * dr_mag * tau
-                neb_forces.append(input_force_perpendicular + force_spring + force_smoothing)
+                neb_forces.append(
+                    input_force_perpendicular + force_spring + force_smoothing
+                )
 
-        return {
-            'forces': neb_forces
-        }
+        return {"forces": neb_forces}
 
     def _get_upwinding_tau(self, tau_left, tau_right, en_left, en, en_right):
         """
@@ -820,8 +864,9 @@ class NEBForces(PrimitiveVertex):
         den_mag_min = min(abs(den_left), abs(den_right))
         den_mag_max = max(abs(den_left), abs(den_right))
         # Calculate the NEB direction
-        tau = tau_left * (den_mag_max * high_left + extrema * den_mag_min * high_right) + \
-              tau_right * (den_mag_max * high_right + extrema * den_mag_min * high_left)
+        tau = tau_left * (
+            den_mag_max * high_left + extrema * den_mag_min * high_right
+        ) + tau_right * (den_mag_max * high_right + extrema * den_mag_min * high_left)
         return self.normalize(tau)
 
     @staticmethod
@@ -869,9 +914,7 @@ class Norm(PrimitiveVertex):
         id_.keepdims = False
 
     def command(self, x, ord, axis, keepdims):
-        return {
-            'n': np.linalg.norm(x, ord=ord, axis=axis, keepdims=keepdims)
-        }
+        return {"n": np.linalg.norm(x, ord=ord, axis=axis, keepdims=keepdims)}
 
 
 class Overwrite(PrimitiveVertex):
@@ -888,9 +931,7 @@ class Overwrite(PrimitiveVertex):
     def command(self, target, mask, new_values):
         overwritten = np.array(target)
         overwritten[mask] = new_values
-        return {
-            'overwritten': overwritten
-        }
+        return {"overwritten": overwritten}
 
 
 class RandomVelocity(PrimitiveVertex):
@@ -912,21 +953,19 @@ class RandomVelocity(PrimitiveVertex):
 
     def __init__(self, name=None):
         super(RandomVelocity, self).__init__(name=name)
-        self.input.default.overheat_fraction = 2.
+        self.input.default.overheat_fraction = 2.0
 
     def command(self, temperature, masses, overheat_fraction):
         masses = np.array(masses)[:, np.newaxis]
-        vel_scale = np.sqrt(EV_TO_U_ANGSQ_PER_FSSQ * KB * temperature / masses) * np.sqrt(overheat_fraction)
+        vel_scale = np.sqrt(
+            EV_TO_U_ANGSQ_PER_FSSQ * KB * temperature / masses
+        ) * np.sqrt(overheat_fraction)
         np.random.seed(0)
         vel_dir = np.random.randn(len(masses), 3)
         vel = vel_scale * vel_dir
         vel -= np.mean(vel, axis=0)
         energy_kin = 0.5 * np.sum(masses * vel * vel) * U_ANGSQ_PER_FSSQ_TO_EV
-        return {
-            'velocities': vel,
-            'energy_kin': energy_kin,
-            'n_atoms': len(vel)
-        }
+        return {"velocities": vel, "energy_kin": energy_kin, "n_atoms": len(vel)}
 
 
 class SphereReflection(PrimitiveVertex):
@@ -957,24 +996,36 @@ class SphereReflection(PrimitiveVertex):
         id_.use_reflection = True
         id_.total_steps = 0
 
-    def command(self, reference_positions, cutoff_distance, positions, velocities, previous_positions,
-                previous_velocities, structure, use_reflection, total_steps):
+    def command(
+        self,
+        reference_positions,
+        cutoff_distance,
+        positions,
+        velocities,
+        previous_positions,
+        previous_velocities,
+        structure,
+        use_reflection,
+        total_steps,
+    ):
         total_steps += 1
-        distance = np.linalg.norm(structure.find_mic(reference_positions - positions), axis=-1)
+        distance = np.linalg.norm(
+            structure.find_mic(reference_positions - positions), axis=-1
+        )
         is_at_home = (distance < cutoff_distance)[:, np.newaxis]
         if np.all(is_at_home) or use_reflection is False:
             return {
-                'positions': positions,
-                'velocities': velocities,
-                'reflected': False,
-                'total_steps': total_steps
+                "positions": positions,
+                "velocities": velocities,
+                "reflected": False,
+                "total_steps": total_steps,
             }
         else:
             return {
-                'positions': previous_positions,
-                'velocities': -previous_velocities,
-                'reflected': True,
-                'total_steps': total_steps
+                "positions": previous_positions,
+                "velocities": -previous_velocities,
+                "reflected": True,
+                "total_steps": total_steps,
             }
 
 
@@ -1006,11 +1057,23 @@ class SphereReflectionPerAtom(PrimitiveVertex):
         id_.use_reflection = True
         id_.total_steps = 0
 
-    def command(self, reference_positions, cutoff_distance, positions, velocities, previous_positions,
-                previous_velocities, structure, use_reflection, total_steps):
+    def command(
+        self,
+        reference_positions,
+        cutoff_distance,
+        positions,
+        velocities,
+        previous_positions,
+        previous_velocities,
+        structure,
+        use_reflection,
+        total_steps,
+    ):
         total_steps += 1
         if use_reflection:
-            distance = np.linalg.norm(structure.find_mic(reference_positions - positions), axis=-1)
+            distance = np.linalg.norm(
+                structure.find_mic(reference_positions - positions), axis=-1
+            )
             is_at_home = (distance < cutoff_distance)[:, np.newaxis]
             is_away = 1 - is_at_home
         else:
@@ -1018,10 +1081,10 @@ class SphereReflectionPerAtom(PrimitiveVertex):
             is_away = 1 - is_at_home
 
         return {
-            'positions': is_at_home * positions + is_away * previous_positions,
-            'velocities': is_at_home * velocities + is_away * -previous_velocities,
-            'reflected': is_away.astype(bool).flatten(),
-            'total_steps': total_steps
+            "positions": is_at_home * positions + is_away * previous_positions,
+            "velocities": is_at_home * velocities + is_away * -previous_velocities,
+            "reflected": is_away.astype(bool).flatten(),
+            "total_steps": total_steps,
         }
 
 
@@ -1045,9 +1108,7 @@ class CutoffDistance(PrimitiveVertex):
 
         cutoff_distance = nn_list.distances[0] * cutoff_factor
 
-        return {
-            'cutoff_distance': cutoff_distance[-1]
-        }
+        return {"cutoff_distance": cutoff_distance[-1]}
 
 
 class Slice(PrimitiveVertex):
@@ -1068,9 +1129,7 @@ class Slice(PrimitiveVertex):
     def command(self, vector, mask, ensure_iterable_mask):
         if ensure_iterable_mask:
             mask = ensure_iterable(mask)
-        return {
-            'sliced': vector[mask]
-        }
+        return {"sliced": vector[mask]}
 
 
 class Transpose(PrimitiveVertex):
@@ -1084,9 +1143,7 @@ class Transpose(PrimitiveVertex):
 
     def command(self, matrix):
         transpose = list(map(list, zip(*matrix)))
-        return {
-            'matrix_transpose': transpose
-        }
+        return {"matrix_transpose": transpose}
 
 
 class VerletParent(PrimitiveVertex, ABC):
@@ -1107,7 +1164,7 @@ class VerletParent(PrimitiveVertex, ABC):
     def __init__(self, name=None):
         super(VerletParent, self).__init__(name=name)
         id_ = self.input.default
-        id_.time_step = 1.
+        id_.time_step = 1.0
         id_.temperature = None
         id_.temperature_damping_timescale = None
 
@@ -1140,8 +1197,13 @@ class VerletParent(PrimitiveVertex, ABC):
         """
         drag = -0.5 * time_step * velocities / damping_timescale
         np.random.seed()
-        noise = np.sqrt(EV_TO_U_ANGSQ_PER_FSSQ * KB * temperature * time_step / (masses * damping_timescale)) \
-                * np.random.randn(*velocities.shape)
+        noise = np.sqrt(
+            EV_TO_U_ANGSQ_PER_FSSQ
+            * KB
+            * temperature
+            * time_step
+            / (masses * damping_timescale)
+        ) * np.random.randn(*velocities.shape)
         noise -= np.mean(noise, axis=0)
         return drag + noise
 
@@ -1162,7 +1224,16 @@ class VerletPositionUpdate(VerletParent):
         velocities (numpy.ndarray): The new velocities *half* a time step in the future.
     """
 
-    def command(self, positions, velocities, forces, masses, time_step, temperature, temperature_damping_timescale):
+    def command(
+        self,
+        positions,
+        velocities,
+        forces,
+        masses,
+        time_step,
+        temperature,
+        temperature_damping_timescale,
+    ):
         masses = self.reshape_masses(masses)
         acceleration = self.convert_to_acceleration(forces, masses)
         vel_half = velocities + 0.5 * acceleration * time_step
@@ -1172,14 +1243,11 @@ class VerletPositionUpdate(VerletParent):
                 time_step,
                 masses,
                 temperature_damping_timescale,
-                velocities
+                velocities,
             )
         pos_step = positions + vel_half * time_step
 
-        return {
-            'positions': pos_step,
-            'velocities': vel_half
-        }
+        return {"positions": pos_step, "velocities": vel_half}
 
 
 class VerletVelocityUpdate(VerletParent):
@@ -1201,7 +1269,15 @@ class VerletVelocityUpdate(VerletParent):
         instant_temperature (float): The instantaneous temperature, obtained from the total kinetic energy.
     """
 
-    def command(self, velocities, forces, masses, time_step, temperature, temperature_damping_timescale):
+    def command(
+        self,
+        velocities,
+        forces,
+        masses,
+        time_step,
+        temperature,
+        temperature_damping_timescale,
+    ):
         masses = self.reshape_masses(masses)
         acceleration = self.convert_to_acceleration(forces, masses)
 
@@ -1212,15 +1288,17 @@ class VerletVelocityUpdate(VerletParent):
                 time_step,
                 masses,
                 temperature_damping_timescale,
-                velocities
+                velocities,
             )
-        kinetic_energy = 0.5 * np.sum(masses * vel_step * vel_step) / EV_TO_U_ANGSQ_PER_FSSQ
+        kinetic_energy = (
+            0.5 * np.sum(masses * vel_step * vel_step) / EV_TO_U_ANGSQ_PER_FSSQ
+        )
         instant_temperature = (kinetic_energy * 2) / (3 * KB * len(velocities))
 
         return {
-            'velocities': vel_step,
-            'energy_kin': kinetic_energy,
-            'instant_temperature': instant_temperature
+            "velocities": vel_step,
+            "energy_kin": kinetic_energy,
+            "instant_temperature": instant_temperature,
         }
 
 
@@ -1247,15 +1325,26 @@ class VoronoiReflection(PrimitiveVertex):
     def __init__(self, name=None):
         super(VoronoiReflection, self).__init__(name=name)
 
-    def command(self, reference_positions, positions, velocities, previous_positions, previous_velocities, pbc, cell):
-        _, distance_matrix = get_distances(p1=reference_positions, p2=positions, cell=cell, pbc=pbc)
+    def command(
+        self,
+        reference_positions,
+        positions,
+        velocities,
+        previous_positions,
+        previous_velocities,
+        pbc,
+        cell,
+    ):
+        _, distance_matrix = get_distances(
+            p1=reference_positions, p2=positions, cell=cell, pbc=pbc
+        )
         closest_reference = np.argmin(distance_matrix, axis=0)
         is_at_home = (closest_reference == np.arange(len(positions)))[:, np.newaxis]
         is_away = 1 - is_at_home
         return {
-            'positions': is_at_home * positions + is_away * previous_positions,
-            'velocities': is_at_home * velocities + is_away * -previous_velocities,
-            'reflected': is_away.astype(bool).flatten()
+            "positions": is_at_home * positions + is_away * previous_positions,
+            "velocities": is_at_home * velocities + is_away * -previous_velocities,
+            "reflected": is_away.astype(bool).flatten(),
         }
 
 
@@ -1287,8 +1376,11 @@ class WeightedSum(PrimitiveVertex):
             n = len(vectors)
             weights = np.ones() / n
         elif len(weights) != len(vectors):
-            raise ValueError('The length of the weights and vectors must be comensurate, but were {} and {}'.format(
-                len(weights), len(vectors)))
+            raise ValueError(
+                "The length of the weights and vectors must be comensurate, but were {} and {}".format(
+                    len(weights), len(vectors)
+                )
+            )
 
         # Mask vectors
         if masks is not None:
@@ -1310,9 +1402,7 @@ class WeightedSum(PrimitiveVertex):
         if len(weighted_sum.shape) == 0:
             weighted_sum = float(weighted_sum)
 
-        return {
-            'weighted_sum': weighted_sum
-        }
+        return {"weighted_sum": weighted_sum}
 
 
 class WelfordOnline(PrimitiveVertex):
@@ -1350,11 +1440,7 @@ class WelfordOnline(PrimitiveVertex):
             n_samples = 0
         else:
             new_mean, new_std = welford_online(sample, mean, std, n_samples)
-        return {
-            'mean': new_mean,
-            'std': new_std,
-            'n_samples': n_samples + 1
-        }
+        return {"mean": new_mean, "std": new_std, "n_samples": n_samples + 1}
 
 
 class FEPExponential(PrimitiveVertex):
@@ -1370,7 +1456,9 @@ class FEPExponential(PrimitiveVertex):
 
     def command(self, u_diff, delta_lambda, temperature):
         return {
-            'exponential_difference': np.exp(-u_diff * delta_lambda / (KB * temperature))
+            "exponential_difference": np.exp(
+                -u_diff * delta_lambda / (KB * temperature)
+            )
         }
 
 
@@ -1395,20 +1483,29 @@ class TILDPostProcess(PrimitiveVertex):
         fep_free_energy_se (float): The standard error calculated via free energy perturbation.
     """
 
-    def command(self, lambda_pairs, tild_mean, tild_std, fep_exp_mean, fep_exp_std, temperature, n_samples):
-
-        tild_fe_mean, tild_fe_std, tild_fe_se = self.get_tild_free_energy(lambda_pairs, tild_mean, tild_std,
-                                                                          n_samples)
-        fep_fe_mean, fep_fe_std, fep_fe_se = self.get_fep_free_energy(fep_exp_mean, fep_exp_std, n_samples,
-                                                                      temperature)
+    def command(
+        self,
+        lambda_pairs,
+        tild_mean,
+        tild_std,
+        fep_exp_mean,
+        fep_exp_std,
+        temperature,
+        n_samples,
+    ):
+        tild_fe_mean, tild_fe_std, tild_fe_se = self.get_tild_free_energy(
+            lambda_pairs, tild_mean, tild_std, n_samples
+        )
+        fep_fe_mean, fep_fe_std, fep_fe_se = self.get_fep_free_energy(
+            fep_exp_mean, fep_exp_std, n_samples, temperature
+        )
         return {
-            'tild_free_energy_mean': tild_fe_mean,
-            'tild_free_energy_std': tild_fe_std,
-            'tild_free_energy_se': tild_fe_se,
-            'fep_free_energy_mean': fep_fe_mean,
-            'fep_free_energy_std': fep_fe_std,
-            'fep_free_energy_se': fep_fe_se
-
+            "tild_free_energy_mean": tild_fe_mean,
+            "tild_free_energy_std": tild_fe_std,
+            "tild_free_energy_se": tild_fe_se,
+            "fep_free_energy_mean": fep_fe_mean,
+            "fep_free_energy_std": fep_fe_std,
+            "fep_free_energy_se": fep_fe_se,
         }
 
     @staticmethod
@@ -1431,7 +1528,7 @@ class TILDPostProcess(PrimitiveVertex):
         y_se = unumpy.uarray(fep_exp_mean, fep_exp_se)
         free_energy = 0
         free_energy_se = 0
-        for (val, val_se) in zip(y, y_se):
+        for val, val_se in zip(y, y_se):
             free_energy += -KB * temperature * unumpy.log(val)
             free_energy_se += -KB * temperature * unumpy.log(val_se)
         mean = unumpy.nominal_values(free_energy)
@@ -1471,18 +1568,29 @@ class BerendsenBarostat(PrimitiveVertex):
     def __init__(self, name=None):
         super(BerendsenBarostat, self).__init__(name=name)
         id_ = self.input.default
-        id_.pressure = 0.
-        id_.temperature = 0.
-        id_.pressure_damping_timescale = 1000.
-        id_.time_step = 1.
+        id_.pressure = 0.0
+        id_.temperature = 0.0
+        id_.pressure_damping_timescale = 1000.0
+        id_.time_step = 1.0
         id_.compressibility = 4.57e-5  # compressibility of water in bar^-1
-        id_.pressure_style = 'isotropic'
+        id_.pressure_style = "isotropic"
 
-    def command(self, pressure, temperature, box_pressure, energy_kin, time_step, positions,
-                pressure_damping_timescale, compressibility, structure, previous_volume, pressure_style):
-
-        if pressure_style != 'isotropic' and pressure_style != 'anisotropic':
-            raise TypeError('style can only be \'isotropic\' or \'anisotropic\'')
+    def command(
+        self,
+        pressure,
+        temperature,
+        box_pressure,
+        energy_kin,
+        time_step,
+        positions,
+        pressure_damping_timescale,
+        compressibility,
+        structure,
+        previous_volume,
+        pressure_style,
+    ):
+        if pressure_style != "isotropic" and pressure_style != "anisotropic":
+            raise TypeError("style can only be 'isotropic' or 'anisotropic'")
 
         n_atoms = len(structure.positions)
 
@@ -1497,19 +1605,23 @@ class BerendsenBarostat(PrimitiveVertex):
         if pressure is None:
             new_structure = structure.copy()
             total_pressure = isotropic_pressure
-        elif pressure is not None and pressure_style == 'isotropic':
+        elif pressure is not None and pressure_style == "isotropic":
             new_structure = structure.copy()
             new_structure.positions = positions
-            first_term = ((2 * energy_kin) / (3 * previous_volume)) * EV_PER_ANGCUB_TO_GPA
+            first_term = (
+                (2 * energy_kin) / (3 * previous_volume)
+            ) * EV_PER_ANGCUB_TO_GPA
             tau = (time_step / pressure_damping_timescale) * (compressibility / 3)
             total_pressure = first_term + isotropic_pressure  # GPa
             eta = 1 - (tau * (pressure - total_pressure) * GPA_TO_BAR)
             new_cell = new_structure.cell * eta
             new_structure.set_cell(new_cell, scale_atoms=True)
-        elif pressure is not None and pressure_style == 'anisotropic':
+        elif pressure is not None and pressure_style == "anisotropic":
             new_structure = structure.copy()
             new_structure.positions = positions
-            first_term = ((2 * energy_kin) / (3 * previous_volume)) * EV_PER_ANGCUB_TO_GPA
+            first_term = (
+                (2 * energy_kin) / (3 * previous_volume)
+            ) * EV_PER_ANGCUB_TO_GPA
             tau = (time_step / pressure_damping_timescale) * (compressibility / 3)
             total_pressure_x = first_term + box_pressure[0, 0]  # GPa
             eta_x = 1 - (tau * (pressure - total_pressure_x) * GPA_TO_BAR)
@@ -1519,29 +1631,38 @@ class BerendsenBarostat(PrimitiveVertex):
             eta_z = 1 - (tau * (pressure - total_pressure_z) * GPA_TO_BAR)
 
             old_cell = new_structure.cell
-            new_cell = np.array([eta_x * old_cell[0],
-                                 eta_y * old_cell[1],
-                                 eta_z * old_cell[2]])
+            new_cell = np.array(
+                [eta_x * old_cell[0], eta_y * old_cell[1], eta_z * old_cell[2]]
+            )
 
             new_structure.set_cell(new_cell, scale_atoms=True)
-            total_pressure = np.mean([total_pressure_x, total_pressure_y, total_pressure_z])
+            total_pressure = np.mean(
+                [total_pressure_x, total_pressure_y, total_pressure_z]
+            )
         else:
-            raise TypeError('Invalid value for pressure')
+            raise TypeError("Invalid value for pressure")
 
         return {
-            'pressure': total_pressure,
-            'structure': new_structure,
-            'positions': new_structure.positions
+            "pressure": total_pressure,
+            "structure": new_structure,
+            "positions": new_structure.positions,
         }
 
 
 class ComputeFormationEnergy(PrimitiveVertex):
-    """
-    """
+    """ """
 
-    def command(self, n_atoms, eq_energy, harm_to_inter_mean, harm_to_inter_std, harm_to_inter_se, inter_to_vac_mean,
-                inter_to_vac_std, inter_to_vac_se):
-
+    def command(
+        self,
+        n_atoms,
+        eq_energy,
+        harm_to_inter_mean,
+        harm_to_inter_std,
+        harm_to_inter_se,
+        inter_to_vac_mean,
+        inter_to_vac_std,
+        inter_to_vac_se,
+    ):
         harm_to_inter_fe = unumpy.uarray(harm_to_inter_mean, harm_to_inter_std)
         harm_to_inter_fe_se = unumpy.uarray(harm_to_inter_mean, harm_to_inter_se)
         inter_to_vac_fe = unumpy.uarray(inter_to_vac_mean, inter_to_vac_std)
@@ -1551,7 +1672,7 @@ class ComputeFormationEnergy(PrimitiveVertex):
         fe_se = ((eq_energy + harm_to_inter_fe_se) / n_atoms) + inter_to_vac_fe_se
 
         return {
-            'formation_energy_mean': float(unumpy.nominal_values(fe)),
-            'formation_energy_std': float(unumpy.std_devs(fe)),
-            'formation_energy_se': float(unumpy.std_devs(fe_se))
+            "formation_energy_mean": float(unumpy.nominal_values(fe)),
+            "formation_energy_std": float(unumpy.std_devs(fe)),
+            "formation_energy_se": float(unumpy.std_devs(fe_se)),
         }

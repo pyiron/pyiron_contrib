@@ -34,7 +34,6 @@ class GeneralARInput(DataContainer):
         output_interval=10000,
         enable_fitting=True,
     ):
-
         super().__init__(
             table_name="general_input",
         )
@@ -666,7 +665,7 @@ class SpaMinimizer(DataContainer):
         self.max_iter = max_iter
         self.seed = seed
         self.local_minimizer = None
-    
+
     @property
     def name(self):
         return "spa"
@@ -829,7 +828,7 @@ class ScipyAlgorithm:
 
     def from_hdf(self, hdf, group_name):
         with hdf.open(group_name) as h:
-            #self._type_from_hdf(h)
+            # self._type_from_hdf(h)
             self.global_minimizer = h["global_minimizer"]
 
     def _type_to_hdf(self, hdf):

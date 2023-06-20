@@ -4,9 +4,12 @@ from abc import ABC, abstractmethod
 
 from pyiron_contrib.workflow.channels import (
     Channel,
-    DataChannel, InputData, OutputData,
-    SignalChannel, InputSignal, OutputSignal
+    InputData,
+    OutputData,
+    InputSignal,
+    OutputSignal,
 )
+from pyiron_contrib.workflow.has_channel import HasChannel
 from pyiron_contrib.workflow.has_to_dict import HasToDict
 from pyiron_contrib.workflow.util import DotDict
 
@@ -36,10 +39,12 @@ class IO(HasToDict, ABC):
     is equivalent to
     >>> some_io.some_existing_channel.connect(some_other_channel)
     """
+
     def __init__(self, *channels: Channel):
         self.channel_dict = DotDict(
             {
-                channel.label: channel for channel in channels
+                channel.label: channel
+                for channel in channels
                 if isinstance(channel, self._channel_class)
             }
         )
@@ -53,7 +58,7 @@ class IO(HasToDict, ABC):
     def _set_existing(self, key, value):
         pass
 
-    def __getattr__(self, item):
+    def __getattr__(self, item) -> Channel:
         return self.channel_dict[item]
 
     def __setattr__(self, key, value):
@@ -74,7 +79,7 @@ class IO(HasToDict, ABC):
                 f"attribute {key} got assigned {value} of type {type(value)}"
             )
 
-    def __getitem__(self, item):
+    def __getitem__(self, item) -> Channel:
         return self.__getattr__(item)
 
     def __setitem__(self, key, value):
@@ -110,14 +115,14 @@ class IO(HasToDict, ABC):
             "label": self.__class__.__name__,
             "connected": self.connected,
             "fully_connected": self.fully_connected,
-            "channels": {l: c.to_dict() for l, c in self.channel_dict.items()}
+            "channels": {l: c.to_dict() for l, c in self.channel_dict.items()},
         }
 
 
 class DataIO(IO, ABC):
     def _set_existing(self, key, value):
-        if isinstance(value, DataChannel):
-            self.channel_dict[key].connect(value)
+        if isinstance(value, HasChannel):
+            self.channel_dict[key].connect(value.channel)
         else:
             self.channel_dict[key].update(value)
 
@@ -158,8 +163,8 @@ class Outputs(DataIO):
 
 class SignalIO(IO, ABC):
     def _set_existing(self, key, value):
-        if isinstance(value, SignalChannel):
-            self.channel_dict[key].connect(value)
+        if isinstance(value, HasChannel):
+            self.channel_dict[key].connect(value.channel)
         else:
             raise TypeError(
                 f"Tried to assign {value} ({type(value)} to the {key}, which is already"

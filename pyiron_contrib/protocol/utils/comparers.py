@@ -12,8 +12,10 @@ Classes to override compare
 """
 
 __author__ = "Dominik Gehringer, Liam Huber"
-__copyright__ = "Copyright 2019, Max-Planck-Institut für Eisenforschung GmbH " \
-                "- Computational Materials Design (CM) Department"
+__copyright__ = (
+    "Copyright 2019, Max-Planck-Institut für Eisenforschung GmbH "
+    "- Computational Materials Design (CM) Department"
+)
 __version__ = "0.0"
 __maintainer__ = "Liam Huber"
 __email__ = "huber@mpie.de"
@@ -22,10 +24,14 @@ __date__ = "December 10, 2019"
 
 try:
     from xxhash import xxh64_hexdigest
+
     hashfunction = xxh64_hexdigest
 except ImportError:
     from hashlib import sha1
-    logging.getLogger('pyiron_contrib.protocol.generic').debug('Falling back to SHA1 hashing')
+
+    logging.getLogger("pyiron_contrib.protocol.generic").debug(
+        "Falling back to SHA1 hashing"
+    )
     hashfunction = sha1
 
 ensure_iterable_tuple = lambda o: tuple(ensure_iterable)
@@ -80,9 +86,11 @@ class Comparer(LoggerMixin, metaclass=Registry):
             else:
                 b = b._object
         elif not self.compatible_types(type(b), self._cls):
-            self.logger.warning("Comparer failed due to type difference between {} and {}".format(
-                type(b).__name__, type(self._cls).__name__
-            ))
+            self.logger.warning(
+                "Comparer failed due to type difference between {} and {}".format(
+                    type(b).__name__, type(self._cls).__name__
+                )
+            )
             return False
 
         comparer = self._get_comparer()
@@ -95,8 +103,12 @@ class Comparer(LoggerMixin, metaclass=Registry):
         # one can create on the fly subclasses, therefore we have to check it
         if len(self.__registry_cache) != len(self.registry):
             for cls in self.registry:
-                if not hasattr(cls, 'type'):
-                    raise TypeError('The subclass "{}" must have a "type" attribute'.format(cls.__name__))
+                if not hasattr(cls, "type"):
+                    raise TypeError(
+                        'The subclass "{}" must have a "type" attribute'.format(
+                            cls.__name__
+                        )
+                    )
                 self.__registry_cache[cls.type] = cls
 
         # registry is updated
@@ -148,7 +160,9 @@ class NumpyArrayComparer(Comparer):
         # check if the datatype is inexact at all
         inexact = epsilon is not None
         if inexact:
-            return self.object.shape == b.shape and np.allclose(self.object, b, atol=fudge_factor*epsilon, rtol=0)
+            return self.object.shape == b.shape and np.allclose(
+                self.object, b, atol=fudge_factor * epsilon, rtol=0
+            )
         else:
             # it is an exact data type such as int
             return np.array_equal(self.object, b)
@@ -172,8 +186,9 @@ class AtomsComparer(Comparer):
             len(self.object) == len(b),
             Comparer(self.object.cell.array) == b.cell.array,
             Comparer(self.object.get_scaled_positions()) == b.get_scaled_positions(),
-            Comparer(self.object.get_initial_magnetic_moments()) == b.get_initial_magnetic_moments(),
-            index_spec_mapping(self.object) == index_spec_mapping(b)
+            Comparer(self.object.get_initial_magnetic_moments())
+            == b.get_initial_magnetic_moments(),
+            index_spec_mapping(self.object) == index_spec_mapping(b),
         ]
         return all(conditions)
 
@@ -191,7 +206,7 @@ class ListComparer(Comparer):
 
         conditions = [
             len(self.object) == len(b),
-            all([Comparer(val) == last_val for val, last_val in zip(self.object, b)])
+            all([Comparer(val) == last_val for val, last_val in zip(self.object, b)]),
         ]
 
         return all(conditions)

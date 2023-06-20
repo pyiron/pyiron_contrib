@@ -1,4 +1,5 @@
 from __future__ import print_function
+
 # coding: utf-8
 # Copyright (c) Max-Planck-Institut für Eisenforschung GmbH - Computational Materials Design (CM) Department
 # Distributed under the terms of "New BSD License", see the LICENSE file.
@@ -22,8 +23,10 @@ scraped, along with some convenience decorators to switch their function-based l
 """
 
 __author__ = "Liam Huber"
-__copyright__ = "Copyright 2019, Max-Planck-Institut für Eisenforschung GmbH " \
-                "- Computational Materials Design (CM) Department"
+__copyright__ = (
+    "Copyright 2019, Max-Planck-Institut für Eisenforschung GmbH "
+    "- Computational Materials Design (CM) Department"
+)
 __version__ = "0.0"
 __maintainer__ = "Liam Huber"
 __email__ = "huber@mpie.de"
@@ -45,9 +48,8 @@ class ImageJob(GenericJob):
         super(ImageJob, self).__init__(project, job_name)
         self.__name__ = "ImageJob"
         self._images = DistributingList()
-        self.input = DataContainer(table_name ="input")
-        self.output = DataContainer(table_name ="output")
-
+        self.input = DataContainer(table_name="input")
+        self.output = DataContainer(table_name="output")
 
     @property
     def images(self):
@@ -59,17 +61,21 @@ class ImageJob(GenericJob):
             self._images = val
         elif isinstance(val, (tuple, list, np.ndarray)):
             if not all([isinstance(obj, Image) for obj in val]):
-                raise ValueError("Only `Image`-type objects can be set to the `images` attribute.")
+                raise ValueError(
+                    "Only `Image`-type objects can be set to the `images` attribute."
+                )
             self._images = DistributingList(val)
         else:
-            raise ValueError("Images was expecting a list-like object, but got {}".format(type(val)))
+            raise ValueError(
+                "Images was expecting a list-like object, but got {}".format(type(val))
+            )
 
     @staticmethod
     def _get_factors(n):
         i = int(n**0.5 + 0.5)
         while n % i != 0:
             i -= 1
-        return i, int(n/i)
+        return i, int(n / i)
 
     def plot(self, mask=None, subplots_kwargs=None, imshow_kwargs=None, hide_axes=True):
         """
@@ -118,7 +124,9 @@ class ImageJob(GenericJob):
         """
 
         if not isfile(source) and not isinstance(source, np.ndarray):
-            raise ValueError("Could not find a file at {}, nor is source an array.".format(source))
+            raise ValueError(
+                "Could not find a file at {}, nor is source an array.".format(source)
+            )
         if isinstance(source, str) and relative_path:
             source = abspath(source)
         self.images.append(Image(source=source, metadata=metadata, as_gray=as_gray))
@@ -144,12 +152,14 @@ class ImageJob(GenericJob):
                 self.add_image(source, metadata=metadata, as_gray=as_gray)
 
     def run(self, run_again=False, repair=False, debug=False, run_mode=None):
-        super(ImageJob, self).run(run_again=run_again, repair=repair, debug=debug, run_mode=run_mode)
+        super(ImageJob, self).run(
+            run_again=run_again, repair=repair, debug=debug, run_mode=run_mode
+        )
 
     def run_static(self):
         """This is just a toy example right now."""
         self.status.running = True
-        if hasattr(self.input, 'filter') and self.input.filter == 'brightness_filter':
+        if hasattr(self.input, "filter") and self.input.filter == "brightness_filter":
             fractions = []
             cutoffs = []
             masks = []
@@ -207,4 +217,3 @@ class ImageJob(GenericJob):
                 img = Image(source=None)
                 img.from_hdf(hdf=hdf5_server, group_name="img{}".format(n))
                 self.images.append(img)
-

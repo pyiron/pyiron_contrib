@@ -4,7 +4,8 @@ from functools import partial
 from warnings import warn
 
 from pyiron_contrib.workflow.has_to_dict import HasToDict
-from pyiron_contrib.workflow.node import Node
+from pyiron_contrib.workflow.node import Node, node, fast_node, single_value_node
+from pyiron_contrib.workflow.node_library import atomistics, package, standard
 from pyiron_contrib.workflow.util import DotDict
 
 
@@ -15,8 +16,11 @@ class _NodeAdder:
 
     TODO: Give access to pre-built fixed nodes under various domain names
     """
+
     def __init__(self, workflow: Workflow):
         self._workflow = workflow
+        self.atomistics = package.NodePackage(self._workflow, *atomistics.nodes)
+        self.standard = package.NodePackage(self._workflow, *standard.nodes)
 
     Node = Node
 
@@ -27,37 +31,15 @@ class _NodeAdder:
         return value
 
     def __call__(self, node: Node):
-        if node.workflow is not None:
-            raise ValueError(
-                f"This node ({node.label}) already belongs to the workflow "
-                f"{node.workflow.label}. Please remove it there before trying to add it"
-                f"to this workflow ({self._workflow.label})."
-            )
+        return self._workflow.add_node(node)
 
-        if node.label in self._workflow.__dir__() and \
-                not isinstance(getattr(self._workflow, node.label), Node):
-            raise AttributeError(
-                f"Cannot add a node with label {node.label}, that is already an "
-                f"attribute"
-            )
 
-        if self._workflow.strict_naming and node.label in self._workflow.nodes.keys():
-            raise AttributeError(
-                f"Cannot add a node with label {node.label}, that is already a node."
-            )
+class _NodeDecoratorAccess:
+    """An intermediate container to store node-creating decorators as class methods."""
 
-        # Otherwise, if not strict then iterate on name
-        i = 0
-        label = node.label
-        while label in self._workflow.nodes.keys():
-            warn(f"{label} is already a node; appending an index to the label...")
-            label = f"{node.label}{i}"
-            i += 1
-        node.label = label
-        # Or this while loop just terminates immediately if the name is unique
-
-        self._workflow.nodes[node.label] = node
-        node.workflow = self._workflow
+    node = node
+    fast_node = fast_node
+    single_value_node = single_value_node
 
 
 class Workflow(HasToDict):
@@ -103,19 +85,53 @@ class Workflow(HasToDict):
         >>> print(wf.my_node.inputs.x, wf.my_node0.inputs.x, wf.my_node1.inputs.x)
         0, 1, 2
 
-        We can also use pre-built nodes, e.g.
-        >>> from pyiron_contrib.workflow import nodes
+        The `Workflow` class is designed as a single point of entry for workflows, so
+        you can also access decorators to define new node classes right from the
+        workflow (cf. the `Node` docs for more detail on the node types).
+        Let's use these to explore a workflow's input and output, which are dynamically
+        generated from the unconnected IO of its nodes:
+        >>> @Workflow.wrap_as.fast_node("y")
+        >>> def plus_one(x: int = 0):
+        ...     return x + 1
         >>>
+        >>> wf = Workflow("io_workflow")
+        >>> wf.first = plus_one()
+        >>> wf.second = plus_one()
+        >>> print(len(wf.inputs), len(wf.outputs))
+        2 2
+
+        If we connect the output of one node to the input of the other, there are fewer
+        dangling channels for the workflow IO to find:
+        >>> wf.second.inputs.x = wf.first.outputs.y
+        >>> print(len(wf.inputs), len(wf.outputs))
+        1 1
+
+        The workflow joins node lavels and channel labels with a `_` character to
+        provide direct access to the output:
+        >>> print(wf.outputs.second_y.value)
+        2
+
+        Workflows also give access to packages of pre-built nodes under different
+        namespaces, e.g.
         >>> wf = Workflow("with_prebuilt")
         >>>
-        >>> wf.structure = nodes.BulkStructure(repeat=3, cubic=True, element="Al")
-        >>> wf.engine = nodes.Lammps(structure=wf.structure.outputs.structure)
-        >>> wf.calc = nodes.CalcMD(job=wf.engine.outputs.job)
-        >>> wf.plot = nodes.Scatter(
+        >>> wf.structure = wf.add.atomistics.BulkStructure(
+        ...     repeat=3,
+        ...     cubic=True,
+        ...     element="Al"
+        ... )
+        >>> wf.engine = atomistics.Lammps(structure=wf.structure)
+        >>> wf.calc = atomistics.CalcMd(
+        ...     job=wf.engine,
+        ...     run_on_updates=True,
+        ...     update_on_instantiation=True,
+        ... )
+        >>> wf.plot = standard.Scatter(
         ...     x=wf.calc.outputs.steps,
         ...     y=wf.calc.outputs.temperature
         ... )
 
+    TODO: Registration of new node packages
 
     TODO: Workflows can be serialized.
 
@@ -129,21 +145,95 @@ class Workflow(HasToDict):
         apply that falls short of a full export, but still guarantees the internal
         integrity of workflows when they're used somewhere else?
     """
+
+    wrap_as = _NodeDecoratorAccess
+
     def __init__(self, label: str, *nodes: Node, strict_naming=True):
-        self.__dict__['label'] = label
-        self.__dict__['nodes'] = DotDict()
-        self.__dict__['add'] = _NodeAdder(self)
-        self.__dict__['strict_naming'] = strict_naming
+        self.__dict__["label"] = label
+        self.__dict__["nodes"] = DotDict()
+        self.__dict__["add"] = _NodeAdder(self)
+        self.__dict__["strict_naming"] = strict_naming
         # We directly assign using __dict__ because we override the setattr later
 
         for node in nodes:
-            self.add(node)
+            self.add_node(node)
+
+    def add_node(self, node: Node, label: str = None) -> None:
+        """
+        Assign a node to the workflow. Optionally provide a new label for that node.
+
+        Args:
+            node (pyiron_contrib.workflow.node.Node): The node to add.
+            label (Optional[str]): The label for this node.
+
+        Raises:
+
+        """
+        if not isinstance(node, Node):
+            raise TypeError(
+                f"Only new node instances may be added, but got {type(node)}."
+            )
+
+        label = self._ensure_label_is_unique(node.label if label is None else label)
+        self._ensure_node_belongs_to_at_most_this_workflow(node, label)
+
+        self.nodes[label] = node
+        node.label = label
+        node.workflow = self
+        return node
+
+    def _ensure_node_belongs_to_at_most_this_workflow(self, node: Node, label: str):
+        if (
+            node.workflow is self  # This should guarantee the node is in self.nodes
+            and label != node.label
+        ):
+            assert self.nodes[node.label] is node  # Should be unreachable by users
+            warn(
+                f"Reassigning the node {node.label} to the label {label} when "
+                f"adding it to the workflow {self.label}."
+            )
+            del self.nodes[node.label]
+        elif node.workflow is not None:
+            raise ValueError(
+                f"The node ({node.label}) already belongs to the workflow "
+                f"{node.workflow.label}. Please remove it there before trying to "
+                f"add it to this workflow ({self.label})."
+            )
+
+    def _ensure_label_is_unique(self, label):
+        if label in self.__dir__():
+            if isinstance(getattr(self, label), Node):
+                if self.strict_naming:
+                    raise AttributeError(
+                        f"{label} is already the label for a node. Please remove it "
+                        f"before assigning another node to this label."
+                    )
+                else:
+                    label = self._add_suffix_to_label(label)
+            else:
+                raise AttributeError(
+                    f"{label} is an attribute or method of the {self.__class__} class, "
+                    f"and cannot be used as a node label."
+                )
+        return label
+
+    def _add_suffix_to_label(self, label):
+        i = 0
+        new_label = label
+        while new_label in self.nodes.keys():
+            warn(
+                f"{label} is already a node; appending an index to the "
+                f"node label instead: {label}{i}"
+            )
+            new_label = f"{label}{i}"
+            i += 1
+        return new_label
 
     def activate_strict_naming(self):
-        self.__dict__['strict_naming'] = True
+        self.__dict__["strict_naming"] = True
 
     def deactivate_strict_naming(self):
-        self.__dict__['strict_naming'] = False
+        self.__dict__["strict_naming"] = False
 
     def remove(self, node: Node | str):
         if isinstance(node, Node):
@@ -154,29 +244,12 @@ class Workflow(HasToDict):
             del self.nodes[node]
 
     def __setattr__(self, label: str, node: Node):
-        if label in self.__dir__() and not isinstance(getattr(self, label), Node):
-            raise AttributeError(
-                f"{label} is already an attribute of {self.label} and cannot be "
-                f"reassigned. If this is a node, you can remove the existing node "
-                f"first to free the namespace."
+        if not isinstance(node, Node):
+            raise TypeError(
+                "Only new node instances may be assigned as attributes. This is "
+                "syntacic sugar for adding new nodes to the .nodes collection"
             )
-        elif not isinstance(node, Node):
-            raise TypeError(f"Can only assign nodes, but got {type(node)}")
-        else:
-            if node.label != label:
-                warn(
-                    f"Reassigning the node {node.label} to the label {label} when "
-                    f"adding it to the workflow {self.label}."
-                )
-            old_label = node.label
-            old_workflow = node.workflow
-            try:
-                node.label = label
-                self.add(node)
-            except:
-                node.label = old_label
-                node.workflow = old_workflow
-                raise
+        self.add_node(node, label=label)
 
     def __getattr__(self, key):
         return self.nodes[key]
@@ -194,7 +267,7 @@ class Workflow(HasToDict):
         return len(self.nodes)
 
     @property
-    def input(self):
+    def inputs(self):
         return DotDict(
             {
                 f"{node.label}_{channel.label}": channel
@@ -205,7 +278,7 @@ class Workflow(HasToDict):
         )
 
     @property
-    def output(self):
+    def outputs(self):
         return DotDict(
             {
                 f"{node.label}_{channel.label}": channel

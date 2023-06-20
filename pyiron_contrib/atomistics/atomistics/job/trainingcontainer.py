@@ -41,7 +41,10 @@ from ase.atoms import Atoms as ASEAtoms
 
 from pyiron_atomistics.atomistics.structure.atoms import Atoms
 from pyiron_atomistics.atomistics.structure.has_structure import HasStructure
-from pyiron_atomistics.atomistics.structure.structurestorage import StructureStorage, StructurePlots
+from pyiron_atomistics.atomistics.structure.structurestorage import (
+    StructureStorage,
+    StructurePlots,
+)
 from pyiron_atomistics.atomistics.structure.neighbors import NeighborsTrajectory
 from pyiron_base import GenericJob, DataContainer, deprecate
 
@@ -58,8 +61,7 @@ class TrainingContainer(GenericJob, HasStructure):
         self._container = TrainingStorage()
 
         self.input = DataContainer(
-            {"save_neighbors": True, "num_neighbors": 12},
-            table_name="parameters"
+            {"save_neighbors": True, "num_neighbors": 12}, table_name="parameters"
         )
 
     def include_job(self, job, iteration_step=-1):
@@ -73,13 +75,7 @@ class TrainingContainer(GenericJob, HasStructure):
         """
         self._container.include_job(job, iteration_step)
 
-    def include_structure(
-        self,
-        structure,
-        energy=None,
-        name=None,
-        **properties
-    ):
+    def include_structure(self, structure, energy=None, name=None, **properties):
         """
         Add new structure to structure list and save energy and forces with it.
 
@@ -95,8 +91,9 @@ class TrainingContainer(GenericJob, HasStructure):
                 notation
             name (str, optional): name describing the structure
         """
-        self._container.include_structure(structure, name=name, energy=energy,
-                                          **properties)
+        self._container.include_structure(
+            structure, name=name, energy=energy, **properties
+        )
 
     def add_structure(
         self, structure, energy, forces=None, stress=None, identifier=None, **arrays
@@ -115,7 +112,12 @@ class TrainingContainer(GenericJob, HasStructure):
             name (str, optional): name describing the structure
         """
         self._container.add_structure(
-            structure, energy, identifier=identifier, forces=forces, stress=stress, **arrays
+            structure,
+            energy,
+            identifier=identifier,
+            forces=forces,
+            stress=stress,
+            **arrays,
         )
 
     def include_dataset(self, dataset):
@@ -240,20 +242,24 @@ class TrainingContainer(GenericJob, HasStructure):
                 self.input.from_hdf(self.project_hdf5, "parameters")
 
     def sample(
-        self, name: str, selector: Callable[[StructureStorage, int], bool],
-        delete_existing_job: bool = False
+        self,
+        name: str,
+        selector: Callable[[StructureStorage, int], bool],
+        delete_existing_job: bool = False,
+        run: bool = True,
     ) -> "TrainingContainer":
         """
         Create a new TrainingContainer with structures filtered by selector.
 
         `self` must have status `finished`.  `selector` is passed the underlying :class:`StructureStorage` of this
         container and the index of the structure and return a boolean whether to include the structure in the new
-        container or not.  The new container is saved and run.
+        container or not.  By default the new container is saved and run.
 
         Args:
             name (str): name of the new TrainingContainer
             selector (Callable[[StructureStorage, int], bool]): callable that selects structure to include
             delete_existing_job (bool): if job with name exist, remove it first
+            run (bool): if True, immediately run and save the job.
 
         Returns:
             :class:`.TrainingContainer`: new container with selected structures
@@ -263,11 +269,14 @@ class TrainingContainer(GenericJob, HasStructure):
         """
         if not self.status.finished:
             raise ValueError(f"Job must be finished, not '{self.status}'!")
-        cont = self.project.create.job.TrainingContainer(name, delete_existing_job=delete_existing_job)
+        cont = self.project.create.job.TrainingContainer(
+            name, delete_existing_job=delete_existing_job
+        )
         if not cont.status.initialized:
             raise ValueError(f"Job '{name}' already exists with status: {cont.status}!")
         cont._container = self._container.sample(selector)
-        cont.run()
+        if run:
+            cont.run()
         return cont
 
     @property
@@ -343,8 +352,10 @@ class TrainingPlots(StructurePlots):
         N = self._store.get_array("length")
         E = self._store.get_array("energy") / N
         neigh = self._calc_neighbors(num_neighbors=num_neighbors)
-        D = np.array([d.min() for d in np.split(neigh['distances'][:, 0], N.cumsum())[:-1]])
-        plt.scatter(D, E, marker='.')
+        D = np.array(
+            [d.min() for d in np.split(neigh["distances"][:, 0], N.cumsum())[:-1]]
+        )
+        plt.scatter(D, E, marker=".")
 
     def forces(self, axis: Optional[int] = None):
         """
@@ -393,9 +404,13 @@ class TrainingStorage(StructureStorage):
                 }
             )
             if self.has_array("forces"):
-                self._table_cache["forces"] = [self.get_array("forces", i) for i in range(len(self))]
+                self._table_cache["forces"] = [
+                    self.get_array("forces", i) for i in range(len(self))
+                ]
             if self.has_array("stress"):
-                self._table_cache["stress"] = [self.get_array("stress", i) for i in range(len(self))]
+                self._table_cache["stress"] = [
+                    self.get_array("stress", i) for i in range(len(self))
+                ]
             self._table_cache["number_of_atoms"] = [
                 len(s) for s in self._table_cache.atoms
             ]
@@ -415,7 +430,7 @@ class TrainingStorage(StructureStorage):
         """
 
         kwargs = {
-                "energy": job["output/generic/energy_pot"][iteration_step],
+            "energy": job["output/generic/energy_pot"][iteration_step],
         }
         ff = job["output/generic/forces"]
         if ff is not None:
@@ -446,29 +461,23 @@ class TrainingStorage(StructureStorage):
             indices = ii[iteration_step]
         else:
             indices = job["input/structure/indices"]
-        species=np.asarray(job["input/structure/species"])
+        species = np.asarray(job["input/structure/species"])
         cell = job["output/generic/cells"][iteration_step]
         positions = job["output/generic/positions"][iteration_step]
-        pbc=job["input/structure/cell/pbc"]
+        pbc = job["input/structure/cell/pbc"]
 
         self.add_chunk(
-                len(indices),
-                identifier=job.name,
-                symbols=species[indices],
-                positions=positions,
-                cell=[cell],
-                pbc=[pbc],
-                **kwargs
+            len(indices),
+            identifier=job.name,
+            symbols=species[indices],
+            positions=positions,
+            cell=[cell],
+            pbc=[pbc],
+            **kwargs,
         )
 
     @deprecate("Use add_structure instead")
-    def include_structure(
-        self,
-        structure,
-        energy,
-        name=None,
-        **properties
-    ):
+    def include_structure(self, structure, energy, name=None, **properties):
         """
         Add new structure to structure list and save energy and forces with it.
 
@@ -482,25 +491,21 @@ class TrainingStorage(StructureStorage):
             stress (6 array of float, optional): per structure stresses in voigt notation
             name (str, optional): name describing the structure
         """
-        self.add_structure(structure, identifier=name, energy=energy,
-                           **properties)
+        self.add_structure(structure, identifier=name, energy=energy, **properties)
 
     def add_structure(
-        self,
-        structure: Atoms,
-        energy,
-        identifier=None,
-        **arrays
+        self, structure: Atoms, energy, identifier=None, **arrays
     ) -> None:
         if "forces" in arrays and not self.has_array("forces"):
-            self.add_array("forces", shape=(3,), dtype=np.float64, per="element",
-                           fill=np.nan)
+            self.add_array(
+                "forces", shape=(3,), dtype=np.float64, per="element", fill=np.nan
+            )
         if "stress" in arrays and not self.has_array("stress"):
             # save stress in voigt notation
-            self.add_array("stress", shape=(6,), dtype=np.float64, per="chunk",
-                           fill=np.nan)
-        super().add_structure(structure, identifier=identifier, energy=energy,
-                              **arrays)
+            self.add_array(
+                "stress", shape=(6,), dtype=np.float64, per="chunk", fill=np.nan
+            )
+        super().add_structure(structure, identifier=identifier, energy=energy, **arrays)
 
     def include_dataset(self, dataset):
         """
@@ -559,12 +564,18 @@ class TrainingStorage(StructureStorage):
         dict_arrays = {}
 
         # Get structure information.
-        dict_arrays['structure'] = list(self.iter_structures())
+        dict_arrays["structure"] = list(self.iter_structures())
 
         # Some arrays are only for internal usage or structure information that
         # was already saved in dict['structure'].
-        internal_arrays = ['start_index', 'length', 'cell', 'pbc', 'positions',
-                           'symbols']
+        internal_arrays = [
+            "start_index",
+            "length",
+            "cell",
+            "pbc",
+            "positions",
+            "symbols",
+        ]
         for array in self.list_arrays():
             # Skip internal arrays.
             if array in internal_arrays:

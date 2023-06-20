@@ -1,4 +1,5 @@
 from __future__ import print_function
+
 # coding: utf-8
 # Copyright (c) Max-Planck-Institut für Eisenforschung GmbH - Computational Materials Design (CM) Department
 # Distributed under the terms of "New BSD License", see the LICENSE file.
@@ -17,8 +18,10 @@ yet.
 """
 
 __author__ = "Liam Huber"
-__copyright__ = "Copyright 2019, Max-Planck-Institut für Eisenforschung GmbH " \
-                "- Computational Materials Design (CM) Department"
+__copyright__ = (
+    "Copyright 2019, Max-Planck-Institut für Eisenforschung GmbH "
+    "- Computational Materials Design (CM) Department"
+)
 __version__ = "0.0"
 __maintainer__ = "Liam Huber"
 __email__ = "huber@mpie.de"
@@ -28,10 +31,15 @@ __date__ = "Feb 3, 2020"
 
 def _elementwise_other(function):
     def wrapper(self, other):
-        if hasattr(other, '__len__') and len(other) == len(self):
-            return DistributingList(getattr(obj, function.__name__)(oth) for obj, oth in zip(self, other))
+        if hasattr(other, "__len__") and len(other) == len(self):
+            return DistributingList(
+                getattr(obj, function.__name__)(oth) for obj, oth in zip(self, other)
+            )
         else:
-            return DistributingList(getattr(obj, function.__name__)(other) for obj in self)
+            return DistributingList(
+                getattr(obj, function.__name__)(other) for obj in self
+            )
+
     return wrapper
 
 
@@ -41,22 +49,60 @@ def _decorate_by_name(decorator, names):
             if hasattr(cls, name):
                 setattr(cls, name, decorator(getattr(cls, name)))
         return cls
+
     return decorate
 
 
-@_decorate_by_name(decorator=_elementwise_other,
-                   names=[
-                       '__eq__', '__ne__', '__lt__', '__gt__', '__le__', '__ge__',
-                       '__add__', '__sub__', '__mul__', '__floordiv__', '__div__',
-                       '__mod__', '__divmod__', '__pow__',
-                       '__lshift__', '__rshift__', '__and__', '__or__', '__xor__',
-                       '__radd__', '__rsub__', '__rmul__', '__rfloordiv__', '__rdiv__',
-                       '__rmod__', '__rdivmod__', '__rpow__',
-                       '__rlshift__', '__rrshift__', '__rand__', '__ror__', '__rxor__',
-                       '__iadd__', '__isub__', '__imul__', '__ifloordiv__', '__idiv__',
-                       '__imod__', '__idivmod__', '__ipow__',
-                       '__ilshift__', '__irshift__', '__iand__', '__ior__', '__ixor__',
-                   ])
+@_decorate_by_name(
+    decorator=_elementwise_other,
+    names=[
+        "__eq__",
+        "__ne__",
+        "__lt__",
+        "__gt__",
+        "__le__",
+        "__ge__",
+        "__add__",
+        "__sub__",
+        "__mul__",
+        "__floordiv__",
+        "__div__",
+        "__mod__",
+        "__divmod__",
+        "__pow__",
+        "__lshift__",
+        "__rshift__",
+        "__and__",
+        "__or__",
+        "__xor__",
+        "__radd__",
+        "__rsub__",
+        "__rmul__",
+        "__rfloordiv__",
+        "__rdiv__",
+        "__rmod__",
+        "__rdivmod__",
+        "__rpow__",
+        "__rlshift__",
+        "__rrshift__",
+        "__rand__",
+        "__ror__",
+        "__rxor__",
+        "__iadd__",
+        "__isub__",
+        "__imul__",
+        "__ifloordiv__",
+        "__idiv__",
+        "__imod__",
+        "__idivmod__",
+        "__ipow__",
+        "__ilshift__",
+        "__irshift__",
+        "__iand__",
+        "__ior__",
+        "__ixor__",
+    ],
+)
 class DistributingList(UserList):
     """
     A list-like class which resolves attribute and function calls by returning a list-like class of the corresponding
@@ -93,17 +139,18 @@ class DistributingList(UserList):
 
 class LockedIfAttributeTrue(LoggerMixin):
     """
-    A descriptor which prevents modification when the provided attribute of the owning instance is True. 
-    
+    A descriptor which prevents modification when the provided attribute of the owning instance is True.
+
     Educational credit goes to:
     https://nbviewer.jupyter.org/urls/gist.github.com/ChrisBeaumont/5758381/raw/descriptor_writeup.ipynb
-    
+
     Attributes:
         default: The default value for the descriptor.
         attribute_name (str): The name of the attribute to look for in the owner instance when determining lock state.
         data (weakref.WeakKeyDictionary): A container to track instances.
         name (str): The name of the attribute the descriptor is being assigned to.
     """
+
     def __init__(self, default, attribute_name):
         self.default = default
         self.attribute_name = attribute_name
@@ -118,8 +165,11 @@ class LockedIfAttributeTrue(LoggerMixin):
 
     def __set__(self, instance, value):
         if getattr(instance, self.attribute_name):
-            self.logger.warning("The attribute '{}' cannot be modified while '{}' is True".format(self.name,
-                                                                                                  self.attribute_name))
+            self.logger.warning(
+                "The attribute '{}' cannot be modified while '{}' is True".format(
+                    self.name, self.attribute_name
+                )
+            )
         else:
             self.data[instance] = value
 
@@ -151,24 +201,26 @@ class ModuleScraper:
             float, bool, numpy.ndarray)`.)
     """
 
-    safe = LockedIfAttributeTrue(True, '_activated')
-    recursive = LockedIfAttributeTrue(True, '_activated')
-    scrape_functions = LockedIfAttributeTrue(True, '_activated')
-    scrape_classes = LockedIfAttributeTrue(True, '_activated')
-    scrape_primitives = LockedIfAttributeTrue(True, '_activated')
-    primitives_list = LockedIfAttributeTrue((int, float, bool, np.ndarray), '_activated')
+    safe = LockedIfAttributeTrue(True, "_activated")
+    recursive = LockedIfAttributeTrue(True, "_activated")
+    scrape_functions = LockedIfAttributeTrue(True, "_activated")
+    scrape_classes = LockedIfAttributeTrue(True, "_activated")
+    scrape_primitives = LockedIfAttributeTrue(True, "_activated")
+    primitives_list = LockedIfAttributeTrue(
+        (int, float, bool, np.ndarray), "_activated"
+    )
 
     def __init__(
-            self,
-            module,
-            decorator=None,
-            decorator_args=None,
-            safe=True,
-            recursive=True,
-            scrape_functions=True,
-            scrape_classes=True,
-            scrape_primitives=True,
-            primitives_list=None
+        self,
+        module,
+        decorator=None,
+        decorator_args=None,
+        safe=True,
+        recursive=True,
+        scrape_functions=True,
+        scrape_classes=True,
+        scrape_primitives=True,
+        primitives_list=None,
     ):
         """
         Args:
@@ -208,9 +260,13 @@ class ModuleScraper:
             module = import_module(self._module)
 
         for name, obj in inspect.getmembers(module):
-            if self.safe and name[0] == '_':
+            if self.safe and name[0] == "_":
                 continue
-            elif self.recursive and inspect.ismodule(obj) and obj.__package__ == module.__package__:
+            elif (
+                self.recursive
+                and inspect.ismodule(obj)
+                and obj.__package__ == module.__package__
+            ):
                 # Behave recursively for submodules
                 submodule = ModuleScraper(
                     obj,
@@ -221,7 +277,7 @@ class ModuleScraper:
                     scrape_functions=self.scrape_functions,
                     scrape_classes=self.scrape_classes,
                     scrape_primitives=self.scrape_primitives,
-                    primitives_list=self.primitives_list
+                    primitives_list=self.primitives_list,
                 )
                 setattr(self, name, submodule)
                 if self.recursive:
@@ -248,11 +304,12 @@ class ModuleScraper:
             return getattr(self, item)
         else:
             if inspect.ismodule(self._module):
-                name = self._module.__name__.split('.')[-1]
+                name = self._module.__name__.split(".")[-1]
             else:
-                name = self._module.split('.')[-1]
+                name = self._module.split(".")[-1]
             raise AttributeError(
-                "'{0}' has no attribute '{1}' first.".format(name, item))
+                "'{0}' has no attribute '{1}' first.".format(name, item)
+            )
 
     def to_hdf(self):
         pass

@@ -9,8 +9,10 @@ from pyiron.gpaw.pyiron_ase import AseAdapter
 from pyiron.atomistics.job.interactivewrapper import InteractiveWrapper
 
 __author__ = "Jan Janssen"
-__copyright__ = "Copyright 2020, Max-Planck-Institut für Eisenforschung GmbH - " \
-                "Computational Materials Design (CM) Department"
+__copyright__ = (
+    "Copyright 2020, Max-Planck-Institut für Eisenforschung GmbH - "
+    "Computational Materials Design (CM) Department"
+)
 __version__ = "1.0"
 __maintainer__ = "Jan Janssen"
 __email__ = "janssen@mpie.de"
@@ -68,18 +70,15 @@ class LangevinAse(InteractiveWrapper):
         """
         self.status.running = True
         self.ref_job_initialize()
-        aseadapter = AseAdapter(
-            self.ref_job,
-            self._fast_mode
-        )
+        aseadapter = AseAdapter(self.ref_job, self._fast_mode)
         langevin = Langevin(
             atoms=aseadapter,
-            timestep=self.input['time_step'] * units.fs,
-            temperature=self.input['temperature'] * units.kB,
-            friction=self.input['friction'],
-            fixcm=True
+            timestep=self.input["time_step"] * units.fs,
+            temperature=self.input["temperature"] * units.kB,
+            friction=self.input["friction"],
+            fixcm=True,
         )
-        langevin.run(self.input['ionic_steps'])
+        langevin.run(self.input["ionic_steps"])
         self.status.collect = True
         aseadapter.interactive_close()
         self._finish_job()
@@ -95,16 +94,23 @@ class Input(GenericParameters):
     """
 
     def __init__(self, input_file_name=None, table_name="input"):
-        super(Input, self).__init__(input_file_name=input_file_name, table_name=table_name, comment_char="#",
-                                    separator_char="=", end_value_char=';')
+        super(Input, self).__init__(
+            input_file_name=input_file_name,
+            table_name=table_name,
+            comment_char="#",
+            separator_char="=",
+            end_value_char=";",
+        )
 
     def load_default(self):
         """
         Loads the default file content
         """
-        file_content = ('ionic_steps = 100\n'
-                        'temperature = 1500\n'
-                        'time_step = 1\n'
-                        'friction = 0.002\n'
-                        'fix_center_of_mass = True\n')
+        file_content = (
+            "ionic_steps = 100\n"
+            "temperature = 1500\n"
+            "time_step = 1\n"
+            "friction = 0.002\n"
+            "fix_center_of_mass = True\n"
+        )
         self.load_string(file_content)

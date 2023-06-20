@@ -6,6 +6,7 @@ from __future__ import print_function
 
 import os
 import posixpath
+import shutil
 
 from pyiron_atomistics.atomistics.structure.structurestorage import StructureStorage
 from pyiron_atomistics.atomistics.structure.atoms import Atoms
@@ -14,8 +15,10 @@ from pyiron_base import GenericParameters, GenericJob, deprecate
 from pyiron_atomistics.vasp.structure import read_atoms
 
 __author__ = "Jan Janssen"
-__copyright__ = "Copyright 2020, Max-Planck-Institut für Eisenforschung GmbH - " \
-                "Computational Materials Design (CM) Department"
+__copyright__ = (
+    "Copyright 2020, Max-Planck-Institut für Eisenforschung GmbH - "
+    "Computational Materials Design (CM) Department"
+)
 __version__ = "1.0"
 __maintainer__ = "Jan Janssen"
 __email__ = "janssen@mpie.de"
@@ -37,6 +40,7 @@ class RandSpg(GenericJob, HasStructure):
     Code: https://github.com/xtalopt/randSpg
     Paper: https://www.sciencedirect.com/science/article/pii/S0010465516303848
     """
+
     def __init__(self, project, job_name):
         super(RandSpg, self).__init__(project, job_name)
         self.__version__ = "0.1"
@@ -48,8 +52,13 @@ class RandSpg(GenericJob, HasStructure):
 
     @property
     def list_of_structures(self):
-        return list( (self._structure_storage.get_array("identifier", i), self._structure_storage.get_structure(i))
-                            for i in range(len(self._structure_storage)) )
+        return list(
+            (
+                self._structure_storage.get_array("identifier", i),
+                self._structure_storage.get_structure(i),
+            )
+            for i in range(len(self._structure_storage))
+        )
 
     @deprecate("Use get_structure()/iter_structures()/list_of_structures instead!")
     def list_structures(self):
@@ -58,7 +67,6 @@ class RandSpg(GenericJob, HasStructure):
         else:
             return []
 
-
     def _number_of_structures(self):
         return self._structure_storage._number_of_structures()
 
@@ -66,8 +74,15 @@ class RandSpg(GenericJob, HasStructure):
         return self._structure_storage._translate_frame(frame)
 
     def _get_structure(self, frame, wrap_atoms=True):
-        return self._structure_storage._get_structure(frame=frame, wrap_atoms=wrap_atoms)
+        return self._structure_storage._get_structure(
+            frame=frame, wrap_atoms=wrap_atoms
+        )
 
+    def validate_ready_to_run(self):
+        if shutil.which("randSpg") is None:
+            raise ValueError(
+                "randSpg binary not installed; install with `conda install -c conda-forge randspg"
+            )
 
     def set_input_to_read_only(self):
         """
@@ -97,12 +112,12 @@ class RandSpg(GenericJob, HasStructure):
         Args:
             file_name (str): output.log - optional
         """
-        self._structure_storage = StructureStorage() # reset saved structures
+        self._structure_storage = StructureStorage()  # reset saved structures
         dir_path = posixpath.join(self.working_directory, dir_name)
         for file_name in os.listdir(dir_path):
             self._structure_storage.add_structure(
-                    read_atoms(filename=posixpath.join(dir_path, file_name)),
-                    identifier=file_name.replace('-', '_')
+                read_atoms(filename=posixpath.join(dir_path, file_name)),
+                identifier=file_name.replace("-", "_"),
             )
         with self.project_hdf5.open("output") as hdf5_output:
             self._structure_storage.to_hdf(hdf5_output)
@@ -140,16 +155,18 @@ class RandSpg(GenericJob, HasStructure):
 
 class ExampleInput(GenericParameters):
     def __init__(self, input_file_name=None):
-        super(ExampleInput, self).__init__(input_file_name=input_file_name,
-                                           table_name="randspg_in",
-                                           comment_char="#",
-                                           separator_char='=')
+        super(ExampleInput, self).__init__(
+            input_file_name=input_file_name,
+            table_name="randspg_in",
+            comment_char="#",
+            separator_char="=",
+        )
 
     def load_default(self):
         """
         Loading the default settings for the input file.
         """
-        input_str = '''\
+        input_str = """\
 #Inputfile
 composition = Mg4Al2
 spacegroups = 1-8, 10, 25, 28, 30-32
@@ -163,7 +180,7 @@ scalingFactor = 0.5
 maxAttempts = 100
 outputDir = randSpgOut
 verbosity = r
-'''
+"""
         self.load_string(input_str)
 
     def write_file(self, file_name, cwd=None):

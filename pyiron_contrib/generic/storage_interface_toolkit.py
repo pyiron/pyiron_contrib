@@ -37,7 +37,6 @@ class StorageInterfaceCreator:
 
 
 class StorageInterfaceConnector:
-
     _known_storage_classes = {str(CoscineResource): "coscine", str(FileS3IO): "s3"}
 
     @import_alarm

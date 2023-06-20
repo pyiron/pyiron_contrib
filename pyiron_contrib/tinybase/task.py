@@ -5,7 +5,7 @@ from typing import Optional, Callable, List, Generator, Tuple
 
 from pyiron_base.interfaces.object import HasStorage
 
-from pyiron_contrib.tinybase.storage import Storable, pickle_dump
+from pyiron_contrib.tinybase.storage import Storable, pickle_dump, pickle_load
 from pyiron_contrib.tinybase.container import AbstractInput, AbstractOutput, StorageAttribute
 
 class ReturnStatus:

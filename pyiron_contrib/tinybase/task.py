@@ -382,13 +382,13 @@ class LoopControl(HasStorage):
 class RepeatLoopControl(LoopControl):
     def __init__(self, steps, restart=lambda *_: None):
         super().__init__(condition=self._count_steps, restart=restart)
-        self._steps = steps
+        self.storage.steps = steps
+        self.storage.counter = 0
 
-    def _count_steps(self, output, input, scratch={}):
-        c = scratch.get("counter", 0)
-        c += 1
-        scratch["counter"] = c
-        return c >= self._steps
+    def _count_steps(self, output, input, scratch):
+        c = self.storage.counter
+        self.storage.counter += 1
+        return c >= self.storage.steps
 
 
 class LoopInput(AbstractInput):
@@ -401,6 +401,7 @@ class LoopInput(AbstractInput):
     """
 
     trace = StorageAttribute().type(bool).default(False)
+    control = StorageAttribute().type(LoopControl)
 
     def repeat(
         self,

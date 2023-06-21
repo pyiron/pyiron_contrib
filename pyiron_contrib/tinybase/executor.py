@@ -268,3 +268,15 @@ class DaskExecutor(Executor):
 
     def submit(self, tasks):
         return FuturesExecutionContext(self._client, tasks)
+
+
+from pympipool import PoolExecutor
+
+
+class PyMPIExecutor(Executor):
+    def __init__(self, max_workers, **kwargs):
+        self._max_workers = max_workers
+        self._pool = PoolExecutor(max_workers=max_workers, **kwargs)
+
+    def submit(self, tasks):
+        return FuturesExecutionContext(self._pool, tasks)

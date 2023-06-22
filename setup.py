@@ -36,7 +36,7 @@ setup(
         'pyiron_base==0.6.1',
         'scipy==1.10.1',
         'seaborn==0.12.2',
-        'pyparsing==3.0.9'
+        'pyparsing==3.1.0'
     ],
     extras_require={
         'atomistic': [
@@ -50,7 +50,7 @@ setup(
         ],
         'image': ['scikit-image==0.19.3'],
         'generic': [
-            'boto3==1.26.151', 
+            'boto3==1.26.155', 
             'moto==4.1.11'
         ],
         'workflow': [

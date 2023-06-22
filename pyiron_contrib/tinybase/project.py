@@ -1,5 +1,6 @@
 import abc
 import os.path
+from typing import Union
 
 from pyiron_base import Project, DataContainer
 from pyiron_contrib.tinybase.storage import (
@@ -9,6 +10,8 @@ from pyiron_contrib.tinybase.storage import (
 )
 from pyiron_contrib.tinybase.database import TinyDB, GenericDatabase
 
+class JobNotFoundError(Exception):
+    pass
 
 class ProjectInterface(abc.ABC):
     @classmethod
@@ -45,13 +48,32 @@ class ProjectInterface(abc.ABC):
             )
         return self._creator
 
-    def load(self, name_or_id: int | str) -> "TinyJob":
-        # if a name is given, job must be in the current project
+    def load(self, name_or_id: Union[int, str]) -> "TinyJob":
+        """
+        Load a job from storage.
+
+        If the job name is given, it must be a child of this project and not
+        any of its sub projects.
+
+        Args:
+            name_or_id (int, str): either the job name or its id
+
+        Returns:
+            :class:`.TinyJob`: the loaded job
+
+        Raises:
+            :class:`.JobNotFoundError`: if no job of the given name or id exists
+        """
         if isinstance(name_or_id, str):
             pr = self
             name = name_or_id
+            if not pr.exists_storage(name):
+                raise JobNotFoundError(f"No job with name {name} found!")
         else:
-            entry = self.database.get_item(name_or_id)
+            try:
+                entry = self.database.get_item(name_or_id)
+            except ValueError as e:
+                raise JobNotFoundError(*e.args)
             pr = self.open_location(entry.project)
             name = entry.name
         return pr.create_storage(name).to_object()

@@ -21,6 +21,7 @@ from functools import wraps
 from os import sched_getaffinity
 
 import pyiron_contrib.tinybase.job
+from pyiron_contrib.tinybase.project import JobNotFoundError
 from pyiron_contrib.tinybase.executor import (
         Executor,
         ProcessExecutor,
@@ -77,23 +78,20 @@ class JobCreator(Creator):
                 delete_existing_job (bool): if a job if this name and type
                     exists and its status is aborted, delete it first
             """
-            task = self._jobs[task_type]
-            if self._project.exists_storage(name):
-                try:
-                    job = self._project.create_storage(name).to_object()
-                except Exception as e:
-                    raise RuntimeError(
-                        f"Failed to reload run job from storage: {e}"
-                    ) from None
-                if not isinstance(job, pyiron_contrib.tinybase.job.TinyJob):
-                    raise ValueError(f"Storage with name {name} exists, but is not a job! {job}")
-                if not isinstance(job.task, task):
-                    raise ValueError(f"Job with given name already exists, but is of different type!")
-                return job
-            else:
-                return pyiron_contrib.tinybase.job.TinyJob(
-                    task(), self._project, name
-                )
+            try:
+                job = self._project.load(name)
+                if delete_existing_job \
+                        or (delete_aborted_job and job.status == "aborted"):
+                    job.remove()
+                else:
+                    if not isinstance(job.task, task):
+                        raise ValueError(f"Job with given name already exists, but is of different type!")
+                    return job
+            except JobNotFoundError:
+                pass
+            return pyiron_contrib.tinybase.job.TinyJob(
+                task(), self._project, name
+            )
 
         return create
 

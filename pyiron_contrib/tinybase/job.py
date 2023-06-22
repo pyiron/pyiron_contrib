@@ -79,6 +79,13 @@ class TinyJob(Storable):
         return self._project
 
     @property
+    def status(self):
+        try:
+            return self._project.database.get_item(self.id).status
+        except ValueError:
+            return "initialized"
+
+    @property
     def task(self):
         return self._task
 

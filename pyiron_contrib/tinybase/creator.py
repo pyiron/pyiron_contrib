@@ -23,32 +23,35 @@ from os import sched_getaffinity
 import pyiron_contrib.tinybase.job
 from pyiron_contrib.tinybase.project import JobNotFoundError
 from pyiron_contrib.tinybase.executor import (
-        Executor,
-        ProcessExecutor,
-        BackgroundExecutor,
-        DaskExecutor
+    Executor,
+    ProcessExecutor,
+    BackgroundExecutor,
+    DaskExecutor,
 )
 from pyiron_atomistics import ase_to_pyiron, Atoms
 
 import ase.build
 
-class Creator(abc.ABC):
 
+class Creator(abc.ABC):
     @abc.abstractmethod
     def __init__(self, project, config):
         pass
 
-    #TODO add all methods
+    # TODO add all methods
+
 
 def load_class(class_path):
     module, klass = class_path.rsplit(".", maxsplit=1)
     try:
         return getattr(importlib.import_module(module), klass)
     except ImportError as e:
-        raise ValueError(f"Importing task class '{class_path}' failed: {e.args}!") from None
+        raise ValueError(
+            f"Importing task class '{class_path}' failed: {e.args}!"
+        ) from None
+
 
 class JobCreator(Creator):
-
     def __init__(self, project, job_dict):
         self._project = project
         self._jobs = job_dict.copy()
@@ -64,9 +67,9 @@ class JobCreator(Creator):
             task = self._jobs[task_type] = load_class(task)
 
         def create(
-                name: str,
-                delete_existing_job: bool = False,
-                delete_aborted_job: bool = False
+            name: str,
+            delete_existing_job: bool = False,
+            delete_aborted_job: bool = False,
         ):
             """
             Create or load a new job.
@@ -80,18 +83,19 @@ class JobCreator(Creator):
             """
             try:
                 job = self._project.load(name)
-                if delete_existing_job \
-                        or (delete_aborted_job and job.status == "aborted"):
+                if delete_existing_job or (
+                    delete_aborted_job and job.status == "aborted"
+                ):
                     job.remove()
                 else:
                     if not isinstance(job.task, task):
-                        raise ValueError(f"Job with given name already exists, but is of different type!")
+                        raise ValueError(
+                            f"Job with given name already exists, but is of different type!"
+                        )
                     return job
             except JobNotFoundError:
                 pass
-            return pyiron_contrib.tinybase.job.TinyJob(
-                task(), self._project, name
-            )
+            return pyiron_contrib.tinybase.job.TinyJob(task(), self._project, name)
 
         return create
 
@@ -109,14 +113,16 @@ class JobCreator(Creator):
             name = type(task).__name__
         if name in self._jobs:
             if task != self._jobs[name]:
-                raise ValueError("Refusing to register task: different task of the same name already exists!")
+                raise ValueError(
+                    "Refusing to register task: different task of the same name already exists!"
+                )
             else:
                 return self._jobs[name]
         self._jobs[name] = task
         return task
 
-class TaskCreator(Creator):
 
+class TaskCreator(Creator):
     def __init__(self, project, config):
         self._tasks = config.copy()
 
@@ -143,14 +149,16 @@ class TaskCreator(Creator):
             name = type(task).__name__
         if name in self._jobs:
             if task != self._jobs[name]:
-                raise ValueError("Refusing to register task: different task of the same name already exists!")
+                raise ValueError(
+                    "Refusing to register task: different task of the same name already exists!"
+                )
             else:
                 return self._jobs[name]
         self._jobs[name] = task
         return task
 
-class StructureCreator(Creator):
 
+class StructureCreator(Creator):
     def __init__(self, project, config):
         pass
 
@@ -163,9 +171,7 @@ class StructureCreator(Creator):
         return Atoms(*args, **kwargs)
 
 
-
 class ExecutorCreator(Creator):
-
     _DEFAULT_CPUS = min(int(0.5 * len(sched_getaffinity(0))), 8)
 
     def __init__(self, project, config):
@@ -181,6 +187,7 @@ class ExecutorCreator(Creator):
         def f(self, *args, **kwargs):
             self._most_recent = func(self, *args, **kwargs)
             return self._most_recent
+
         return f
 
     @wraps(ProcessExecutor)
@@ -205,8 +212,8 @@ class ExecutorCreator(Creator):
 
     del _save
 
-class RootCreator:
 
+class RootCreator:
     def __init__(self, project, config):
         self._project = project
         self._subcreators = {}
@@ -231,18 +238,18 @@ class RootCreator:
         except KeyError:
             raise AttributeError(f"No creator of name {name} registered!")
 
+
 TASK_CONFIG = {
-        "AseStatic": "pyiron_contrib.tinybase.ase.AseStaticTask",
-        "AseMinimize": "pyiron_contrib.tinybase.ase.AseMinimizeTask",
-        "AseMD": "pyiron_contrib.tinybase.ase.AseMDTask",
-        "Murnaghan": "pyiron_contrib.tinybase.murn.MurnaghanTask",
+    "AseStatic": "pyiron_contrib.tinybase.ase.AseStaticTask",
+    "AseMinimize": "pyiron_contrib.tinybase.ase.AseMinimizeTask",
+    "AseMD": "pyiron_contrib.tinybase.ase.AseMDTask",
+    "Murnaghan": "pyiron_contrib.tinybase.murn.MurnaghanTask",
 }
 
 
-
 CREATOR_CONFIG = {
-        "job": (JobCreator, TASK_CONFIG),
-        "task": (TaskCreator, TASK_CONFIG),
-        "structure": (StructureCreator, {}),
-        "executor": (ExecutorCreator, {})
+    "job": (JobCreator, TASK_CONFIG),
+    "task": (TaskCreator, TASK_CONFIG),
+    "structure": (StructureCreator, {}),
+    "executor": (ExecutorCreator, {}),
 }

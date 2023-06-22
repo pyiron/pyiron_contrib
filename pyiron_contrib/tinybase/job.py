@@ -125,7 +125,9 @@ class TinyJob(Storable):
         self._executor._run_machine.observe("collect", self._update_status("collect"))
         self._executor._run_machine.observe("finished", self._update_status("finished"))
 
-    def run(self, executor: Union[Executor, str, None] = None) -> Optional[ExecutionContext]:
+    def run(
+        self, executor: Union[Executor, str, None] = None
+    ) -> Optional[ExecutionContext]:
         """
         Start execution of the job.
 
@@ -144,7 +146,7 @@ class TinyJob(Storable):
             or self.project.database.get_item(self.id).status == "ready"
         ):
             if executor is None:
-                executor = 'most_recent'
+                executor = "most_recent"
             if isinstance(executor, str):
                 executor = getattr(self.project.create.executor, executor)()
             exe = self._executor = executor.submit(tasks=[self.task])

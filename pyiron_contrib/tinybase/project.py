@@ -10,8 +10,10 @@ from pyiron_contrib.tinybase.storage import (
 )
 from pyiron_contrib.tinybase.database import TinyDB, GenericDatabase
 
+
 class JobNotFoundError(Exception):
     pass
+
 
 class ProjectInterface(abc.ABC):
     @classmethod
@@ -41,11 +43,10 @@ class ProjectInterface(abc.ABC):
 
     @property
     def create(self):
-        if not hasattr(self, '_creator'):
+        if not hasattr(self, "_creator"):
             from pyiron_contrib.tinybase.creator import RootCreator, CREATOR_CONFIG
-            self._creator = RootCreator(
-                    self, CREATOR_CONFIG
-            )
+
+            self._creator = RootCreator(self, CREATOR_CONFIG)
         return self._creator
 
     def load(self, name_or_id: Union[int, str]) -> "TinyJob":

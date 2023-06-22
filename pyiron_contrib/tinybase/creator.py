@@ -174,7 +174,6 @@ class StructureCreator(Creator):
 
     atoms = Atoms
 
-
 class ExecutorCreator(Creator):
     _DEFAULT_CPUS = min(int(0.5 * cpu_count()), 8)
 

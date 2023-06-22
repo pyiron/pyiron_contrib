@@ -36,6 +36,15 @@ class ProjectInterface(abc.ABC):
     def database(self):
         return self._get_database()
 
+    @property
+    def create(self):
+        if not hasattr(self, '_creator'):
+            from pyiron_contrib.tinybase.creator import RootCreator, CREATOR_CONFIG
+            self._creator = RootCreator(
+                    self, CREATOR_CONFIG
+            )
+        return self._creator
+
     def load(self, name_or_id: int | str) -> "TinyJob":
         # if a name is given, job must be in the current project
         if isinstance(name_or_id, str):

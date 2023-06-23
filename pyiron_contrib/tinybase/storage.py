@@ -397,7 +397,7 @@ class PickleStorable(Storable):
     """
     Trivial implementation of :class:`.Storable` that pickles values.
 
-    Used as a fallback by :class:`.ProjectHDFioStorageAdapter` if value cannot
+    Used as a fallback by :class:`.GenericStorage` if value cannot
     be stored in HDF natively.
     """
 

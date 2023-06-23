@@ -156,6 +156,22 @@ class TinyJob(Storable):
         else:
             logging.info("Job already finished!")
 
+    def wait(self, timeout: Optional[float] = None):
+        """
+        Wait until job is finished.
+
+        Args:
+            timeout (float, optional): maximum time to wait in seconds; wait
+                indefinitely by default
+
+        Raises:
+            ValueError: if job status is not `finished` or `running`
+        """
+        if self.status == "finished": return
+        if self.status != "running":
+            raise ValueError("Job not running!")
+        self._executor.wait(timeout=timeout)
+
     def remove(self):
         """
         Remove the job from the database and storage.

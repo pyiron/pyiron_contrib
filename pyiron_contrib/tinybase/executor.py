@@ -115,7 +115,7 @@ class ExecutionContext:
     def run(self):
         self._run_machine.step()
 
-    def wait(self, until="finished", max_wait=inf, sleep=0.1):
+    def wait(self, until="finished", timeout=None, sleep=0.1):
         """
         Sleep until specified state of the run state machine is reached.
 
@@ -125,18 +125,20 @@ class ExecutionContext:
         Args:
             until (str): wait until the executor has reached this state; must
                 be a valid state name of :class:`.RunMachine.Code`.
-            max_wait (float): maximum amount of seconds to wait; wait
+            timeout (float): maximum amount of seconds to wait; wait
                 indefinitely by default
             sleep (float): amount of seconds to sleep in between status checks
 
         Raises:
             ValueError: if the current state is `init`
         """
+        if timeout is None:
+            timeout = inf
         if self._run_machine.state == RunMachine.Code("init"):
             raise ValueError("Still in state 'init'! Call run() first!")
         until = RunMachine.Code(until)
         start = time.monotonic()
-        while until != self._run_machine.state and time.monotonic() - start < max_wait:
+        while until != self._run_machine.state and time.monotonic() - start < timeout:
             time.sleep(sleep)
 
     @property

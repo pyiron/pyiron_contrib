@@ -231,8 +231,6 @@ class ProjectHDFioStorageAdapter(GenericStorage):
             return value
 
     def _set(self, item, value):
-        if item == "structures__index_0":
-            breakpoint()
         if isinstance(value, Storable):
             value.store(self, item)
         else:

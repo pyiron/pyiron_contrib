@@ -3,19 +3,11 @@ import importlib
 from typing import Any, Union, Optional
 
 from pyiron_base import DataContainer
+from pyiron_base.storage.hdfio import ProjectHDFio
 from pyiron_contrib.tinybase import __version__ as base__version__
 
 import pickle
 import codecs
-
-
-# utility functions until ASE can be HDF'd
-def pickle_dump(obj):
-    return codecs.encode(pickle.dumps(obj), "base64").decode()
-
-
-def pickle_load(buf):
-    return pickle.loads(codecs.decode(buf.encode(), "base64"))
 
 
 class GenericStorage(abc.ABC):
@@ -30,6 +22,25 @@ class GenericStorage(abc.ABC):
 
     Implementations must allow multiple objects of this class to refer to the same underlying storage group at the same
     time and access via the methods here must be atomic.
+
+    Mandatory overrides for all implementations are 
+
+    1. :meth:`.__getitem__` to read values, 
+    2. :meth:`._set` to write values,
+    3. :meth:`.create_group` to create sub groups,
+    4. :meth:`.list_nodes` and :meth:`.list_groups` to see the contained groups and nodes,
+    5. :attr:`.project` which is a back reference to the project that originally created this storage,
+    6. :attr:`.name` which is the name of the group that this object points to, e.g. `storage.create_group(name).name == name`.
+
+    If :meth:`_set` raises a `TypeError` indicating that it does not know how to store an object of a certain type,
+    :meth:`.__setitem__` will pickle it automatically and try to write it again.  Such an object can be retrieved with
+    :meth:`.to_object`.
+
+    For values that implement :class:`.Storable` there is an intentional asymmetry in item writing and reading.  Writing
+    it calls :meth:`.Storable.store` automatically, but reading will return the :class:`.GenericStorage` group that was
+    created during writing *without* calling :meth:`.Storable.restore` automatically.  The original value can be
+    obtained by calling :meth:`.GenericStorage.to_object` on the returned group.  This is so that power users and
+    developers can access sub objects efficiently without having to load all the containing objects first.
     """
 
     @abc.abstractmethod
@@ -51,7 +62,45 @@ class GenericStorage(abc.ABC):
         """
         pass
 
+    def get(self, item, default=None):
+        """
+        Same as item access, but return default if given.
+
+        Args:
+            item (str): name of value
+
+        Returns:
+            :class:`.GenericStorage`: if `item` refers to a sub group
+            object: value that is stored under `item`
+
+        Raises:
+            KeyError: `item` is neither a node or a sub group of this group
+        """
+        try:
+            value = self[item]
+        except KeyError:
+            if default is not None:
+                return default
+            else:
+                raise
+
     @abc.abstractmethod
+    def _set(self, item: str, value: Any):
+        """
+        Set a value to storage.
+
+        If this method raises a `TypeError` when called by
+        :meth:`~.__setitem__`, that method will pickle the value and try again.
+
+        Args:
+            item (str): name of the value
+            value (object): value to store
+
+        Raises:
+            TypeError: if the underlying storage cannot store values of the given type naively
+        """
+        pass
+
     def __setitem__(self, item: str, value: Any):
         """
         Set a value to storage.
@@ -60,7 +109,13 @@ class GenericStorage(abc.ABC):
             item (str): name of the value
             value (object): value to store
         """
-        pass
+        if isinstance(value, Storable):
+            value.store(self, group_name=item)
+        else:
+            try:
+                self._set(item, value)
+            except TypeError:
+                self[item] = PickleStorable(value)
 
     @abc.abstractmethod
     def create_group(self, name):
@@ -169,10 +224,25 @@ class ProjectHDFioStorageAdapter(GenericStorage):
         self._hdf = hdf
 
     def __getitem__(self, item):
-        return self._hdf[item]
+        value = self._hdf[item]
+        if isinstance(value, ProjectHDFio):
+            return type(self)(self._project, value)
+        else:
+            return value
 
-    def __setitem__(self, item, value):
-        self._hdf[item] = value
+    def _set(self, item, value):
+        if item == "structures__index_0":
+            breakpoint()
+        if isinstance(value, Storable):
+            value.store(self, item)
+        else:
+            try:
+                self._hdf[item] = value
+            except TypeError: # HDF layer doesn't know how to write value
+                # h5io bug, when triggering an error in the middle of a write
+                # some residual data maybe left in the file
+                del self._hdf[item]
+                raise
 
     def create_group(self, name):
         return ProjectHDFioStorageAdapter(self._project, self._hdf.create_group(name))
@@ -212,7 +282,7 @@ class DataContainerAdapter(GenericStorage):
         else:
             return v
 
-    def __setitem__(self, item: str, value: Any):
+    def _set(self, item: str, value: Any):
         self._cont[item] = value
 
     def create_group(self, name):
@@ -279,6 +349,10 @@ class Storable(abc.ABC):
         """
         Restore an object of type `cls` from storage.
 
+        The object returned may not be of type `cls` in special circumstances,
+        such as :class:`.PickleStorable`, which returns its underlying value
+        directly.
+
         Args:
             storage (:class:`.GenericStorage`): storage to read from
             version (str): version string of pyiron that wrote the object
@@ -292,8 +366,7 @@ class Storable(abc.ABC):
         try:
             return cls._restore(storage, version)
         except Exception as e:
-            raise ValueError(f"Failed to restore object with {e}")
-
+            raise ValueError(f"Failed to restore object with: {e}")
 
 class HasHDFAdapaterMixin(Storable):
     """
@@ -310,3 +383,30 @@ class HasHDFAdapaterMixin(Storable):
         obj = cls(**kw)
         obj._from_hdf(storage, version)
         return obj
+
+
+def pickle_dump(obj):
+    return codecs.encode(pickle.dumps(obj), "base64").decode()
+
+
+def pickle_load(buf):
+    return pickle.loads(codecs.decode(buf.encode(), "base64"))
+
+
+class PickleStorable(Storable):
+    """
+    Trivial implementation of :class:`.Storable` that pickles values.
+
+    Used as a fallback by :class:`.ProjectHDFioStorageAdapter` if value cannot
+    be stored in HDF natively.
+    """
+
+    def __init__(self, value):
+        self._value = value
+
+    def _store(self, storage):
+        storage["pickle"] = pickle_dump(self._value)
+
+    @classmethod
+    def _restore(cls, storage, version):
+        return pickle_load(storage["pickle"])

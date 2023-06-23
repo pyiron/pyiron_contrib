@@ -4,6 +4,7 @@ from functools import partial
 from typing import Union, List
 import time
 import logging
+from math import inf
 
 from pyiron_contrib.tinybase.task import AbstractTask, TaskGenerator
 
@@ -114,12 +115,28 @@ class ExecutionContext:
     def run(self):
         self._run_machine.step()
 
-    def wait(self, until="finished", sleep=0.1):
+    def wait(self, until="finished", max_wait=inf, sleep=0.1):
         """
         Sleep until specified state of the run state machine is reached.
+
+        Before calling this method, the state of this context must be past
+        `init`, i.e. you have to call :meth:`.run` at least once.
+
+        Args:
+            until (str): wait until the executor has reached this state; must
+                be a valid state name of :class:`.RunMachine.Code`.
+            max_wait (float): maximum amount of seconds to wait; wait
+                indefinitely by default
+            sleep (float): amount of seconds to sleep in between status checks
+
+        Raises:
+            ValueError: if the current state is `init`
         """
+        if self._run_machine.state == RunMachine.Code("init"):
+            raise ValueError("Still in state 'init'! Call run() first!")
         until = RunMachine.Code(until)
-        while until != self._run_machine.state:
+        start = time.monotonic()
+        while until != self._run_machine.state and time.monotonic() - start < max_wait:
             time.sleep(sleep)
 
     @property

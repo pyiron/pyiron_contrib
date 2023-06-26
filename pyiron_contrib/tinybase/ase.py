@@ -20,10 +20,16 @@ from ase.optimize.gpmin.gpmin import GPMin
 class AseInput(AbstractInput):
     calculator = StorageAttribute()
 
+    def _store(self, storage):
+        # if the calculator was attached to pyiron Atoms object, saving the calculator would fail, since it would be
+        # pickled, but our Atoms cannot be pickled. Therefore remove the reference here.  If the task were to be
+        # re-executed after being loaded, the atoms would be reattached anyway.
+        self.calculator.atoms = None
+        super()._store(storage=storage)
+
 
 class AseStaticInput(AseInput, StructureInput):
     pass
-
 
 class AseStaticTask(AbstractTask):
     def _get_input(self):

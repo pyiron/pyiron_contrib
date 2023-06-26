@@ -23,24 +23,25 @@ class GenericStorage(abc.ABC):
     Implementations must allow multiple objects of this class to refer to the same underlying storage group at the same
     time and access via the methods here must be atomic.
 
-    Mandatory overrides for all implementations are 
+    Mandatory overrides for all implementations are
 
-    1. :meth:`.__getitem__` to read values, 
+    1. :meth:`.__getitem__` to read values,
     2. :meth:`._set` to write values,
     3. :meth:`.create_group` to create sub groups,
     4. :meth:`.list_nodes` and :meth:`.list_groups` to see the contained groups and nodes,
     5. :attr:`.project` which is a back reference to the project that originally created this storage,
     6. :attr:`.name` which is the name of the group that this object points to, e.g. `storage.create_group(name).name == name`.
 
-    If :meth:`_set` raises a `TypeError` indicating that it does not know how to store an object of a certain type,
-    :meth:`.__setitem__` will pickle it automatically and try to write it again.  Such an object can be retrieved with
-    :meth:`.to_object`.
-
     For values that implement :class:`.Storable` there is an intentional asymmetry in item writing and reading.  Writing
     it calls :meth:`.Storable.store` automatically, but reading will return the :class:`.GenericStorage` group that was
     created during writing *without* calling :meth:`.Storable.restore` automatically.  The original value can be
     obtained by calling :meth:`.GenericStorage.to_object` on the returned group.  This is so that power users and
     developers can access sub objects efficiently without having to load all the containing objects first.
+
+    If :meth:`_set` raises a `TypeError` indicating that it does not know how to store an object of a certain type,
+    :meth:`.__setitem__` will pickle it automatically and try to write it again.  Such an object can be retrieved with
+    :meth:`.to_object`.  The same is done for lists that contain elements which are not trivially storable in the
+    storage implementation, e.g. lists of :class:`.Atoms` or other complex objects.
     """
 
     @abc.abstractmethod
@@ -115,7 +116,10 @@ class GenericStorage(abc.ABC):
             try:
                 self._set(item, value)
             except TypeError:
-                self[item] = PickleStorable(value)
+                if isinstance(value, list):
+                    self[item] = ListStorable(value)
+                else:
+                    self[item] = PickleStorable(value)
 
     @abc.abstractmethod
     def create_group(self, name):
@@ -155,6 +159,14 @@ class GenericStorage(abc.ABC):
             return self._prev
         except AttributeError:
             return self
+
+    # compatibility with ProjectHDFio, so that implementations of GenericStorage can be used as a drop-in replacement
+    # for it
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
 
     @abc.abstractmethod
     def list_nodes(self) -> list[str]:
@@ -262,6 +274,13 @@ class ProjectHDFioStorageAdapter(GenericStorage):
     def name(self):
         return self._hdf.name
 
+    def to_object(self):
+        try:
+            # Since we try to store object with _hdf[item] = value, which might trigger HasHDF functionality, we have to
+            # try here to restore the object via that functionality as well
+            return self._hdf.to_object()
+        except:
+            return super().to_object()
 
 class DataContainerAdapter(GenericStorage):
     """
@@ -408,3 +427,31 @@ class PickleStorable(Storable):
     @classmethod
     def _restore(cls, storage, version):
         return pickle_load(storage["pickle"])
+
+class ListStorable(Storable):
+    """
+    Trivial implementation of :class:`.Storable` for lists with potentially complex objects inside.
+
+    Used by :class:`.GenericStorage` as a fallback if storing the list with h5py/h5io as it is fails.
+    """
+    def __init__(self, value):
+        self._value = value
+
+    def _store(self, storage):
+        for i, v in enumerate(self._value):
+            storage[f"index_{i}"] = v
+
+    @classmethod
+    def _restore(cls, storage, version):
+        keys = sorted(
+                  [v for v in storage.list_nodes() if v.startswith("index_")]
+                + [v for v in storage.list_groups() if v.startswith("index_")],
+                key=lambda k: int(k.split("_")[1])
+        )
+        value = []
+        for k in keys:
+            v = storage[k]
+            if isinstance(v, GenericStorage):
+                v = v.to_object()
+            value.append(v)
+        return value

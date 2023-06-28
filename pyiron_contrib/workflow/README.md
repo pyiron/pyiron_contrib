@@ -129,7 +129,7 @@ Ultimately, one will be able to automatically extract this information from the 
     - Holds a class method `wrap_as` that gives access to other node classes, e.g. `HasNodes.wrap_as.FastNode(some_callable)` 
       - This is critical for the `Workflow` child class so it can function as a single point of entry for notebook users who want to make new node classes in their jupyter notebook, and helpful for `Macro` devs who want to define new nodes for their macro in some .py file.
     - `on_run()` by default, invokes `run()` on all held `nodes` without input connections, but can be overridden by specifying some other list of nodes to run (maybe??? I'm not sure what this should do)
-    - `Macro(Node, HasNodes)` (not implemented)
+    - `Macro(Composite)` (not implemented)
       - Holds a statically defined graph with a static IO interface
       - Intended to be sub-classed, where a single computational graph is defined at the child class level and all instances have the same graph (with different interface connections and data values throughout, obviously)
       - `input` and `output` are defined statically to provide particular access to the IO of held nodes
@@ -140,7 +140,7 @@ Ultimately, one will be able to automatically extract this information from the 
           - Gets invoked during initialization to populate `nodes: list[Node]`
       - Provided
         - `???() -> ???` constructs the macro's IO panel by creating links to node IO (all unconnected IO by default, but can be overridden in child classes)
-    - `Workflow(Node, HasNodes)`
+    - `Workflow(Composite)`
       - This is our single-point of entry for imports!
       - Holds a _dynamically_ defined collections of nodes
       - Not intended to be sub-classed, rather should be instantiated and the graph should be modified on the instance directly

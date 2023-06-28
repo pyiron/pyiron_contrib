@@ -117,31 +117,28 @@ Ultimately, one will be able to automatically extract this information from the 
     - Best practices: node function should be functional and idempotent
     - `Fast(Node)`
       - Always 
-  - `Macro(Node, HasNodes)` (not implemented)
-    - Holds a statically defined graph with a static IO interface
-    - Intended to be sub-classed, where a single computational graph is defined at the child class level and all instances have the same graph (with different interface connections and data values throughout, obviously)
-    - `input` and `output` are defined statically to provide particular access to the IO of held nodes
+  - `Composite(Node)` (not implemented, replaces the current `HasNodes` mix-in)
+    - A class of nodes that store and run a sub-graph of `nodes: list[Node]`
+    - `add` and `add(node: Node)`
+      - A callable class attribute that lets you add to `nodes` by either directly providing a node or accessing constructors for any registered node packages
+    - Holds a class method `wrap_as` that gives access to other node classes, e.g. `HasNodes.wrap_as.FastNode(some_callable)` 
+      - This is critical for the `Workflow` child class so it can function as a single point of entry for notebook users who want to make new node classes in their jupyter notebook, and helpful for `Macro` devs who want to define new nodes for their macro in some .py file.
+    - `on_run()` by default, invokes `run()` on all held `nodes` without input connections, but can be overridden by specifying some other list of nodes to run (maybe??? I'm not sure what this should do)
+    - `Macro(Node, HasNodes)` (not implemented)
+      - Holds a statically defined graph with a static IO interface
+      - Intended to be sub-classed, where a single computational graph is defined at the child class level and all instances have the same graph (with different interface connections and data values throughout, obviously)
+      - `input` and `output` are defined statically to provide particular access to the IO of held nodes
       - Default is to give access to unconnected IO, but this can be explicitly specified instead.
-    - Required
-      - `???() -> DotDict[Nodes]` builds the nodes to be held, assigns any non-standard 
-        - Don't forget to also make any necessary internal `connections` between these nodes
-        - Gets invoked during initialization to populate `nodes: list[Node]`
-    - Provided
-      - `???() -> ???` constructs the macro's IO panel by creating links to node IO (all unconnected IO by default, but can be overridden in child classes)
-      - `on_run()` by default, invokes `run()` on all held `nodes` without input connections, but can be overridden by specifying some other list of nodes to run (maybe??? I'm not sure what this should do) 
-  - `Workflow(Node, HasNodes)`
-    - This is our single-point of entry for imports!
-    - Holds a dynamically defined collections of nodes
-    - Not intended to be sub-classed, rather should be instantiated and the graph should be modified on the instance directly
-    - `input` and `output` are dynamically generated on request from the _unconnected_ IO of held nodes (`signals` still belongs to the workflow object itself)
-    - `on_run()` by default, invokes `run()` on all held `nodes` without input connections, but can be overridden by specifying some other list of nodes to run (maybe??? I'm not sure what this should do) 
-    - `to_macro(class_name: Optional[str] = None) -> type[Macro]` takes the current `nodes` with all their connections, the current IO, and current node IO values as defaults, and dynamically creates a `Macro` from it; this locks-in the current `Workflow` behaviour and packages it for use as a node in other workflows
-      - The new node class takes its name from the workflow `label` by default, but can be explicitly specified
-- `HasNodes(ABC)`
-  - A mix-in class for an object that holds a collection `nodes: list[Node]`
-  - `add` and `add(node: Node)`
-    - A callable class attribute that lets you add to `nodes` by either directly providing a node or accessing constructors for any registered node packages
-  - Holds a class method `wrap_as` that gives access to other node classes, e.g. `HasNodes.wrap_as.FastNode(some_callable)` 
-    - This is critical for the `Workflow` child class so it can function as a single point of entry for notebook users who want to make new node classes in their jupyter notebook, and helpful for `Macro` devs who want to define new nodes for their macro in some .py file.
-- `???`
-  - Is there room for another super class connecting `Workflow` and `Macro` to invoke, e.g., shared `run` behaviour? I kind of want to keep `HasNodes` specifically for objects that hold `list[Nodes]` and not make assumptions that something with `HasNodes` also _is_ `Node`...
+      - Required
+        - `???() -> DotDict[Nodes]` builds the nodes to be held, assigns any non-standard 
+          - Don't forget to also make any necessary internal `connections` between these nodes
+          - Gets invoked during initialization to populate `nodes: list[Node]`
+      - Provided
+        - `???() -> ???` constructs the macro's IO panel by creating links to node IO (all unconnected IO by default, but can be overridden in child classes)
+    - `Workflow(Node, HasNodes)`
+      - This is our single-point of entry for imports!
+      - Holds a _dynamically_ defined collections of nodes
+      - Not intended to be sub-classed, rather should be instantiated and the graph should be modified on the instance directly
+      - `input` and `output` are dynamically generated on request from the _unconnected_ IO of held nodes (`signals` still belongs to the workflow object itself)
+      - `to_macro(class_name: Optional[str] = None) -> type[Macro]` takes the current `nodes` with all their connections, the current IO, and current node IO values as defaults, and dynamically creates a `Macro` from it; this locks-in the current `Workflow` behaviour and packages it for use as a node in other workflows
+        - The new node class takes its name from the workflow `label` by default, but can be explicitly specified

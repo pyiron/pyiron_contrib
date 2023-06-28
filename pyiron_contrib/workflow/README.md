@@ -99,7 +99,6 @@ Ultimately, one will be able to automatically extract this information from the 
   - Demands from children:
     - `input: InputData`
     - `output: OutputData`
-    - `update()`
     - `on_run: callable[..., tuple]`
       - May take `self: Node` as the 0th argument to reference this node
     - `run_args: dict`

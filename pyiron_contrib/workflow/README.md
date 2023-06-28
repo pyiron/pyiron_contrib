@@ -110,33 +110,33 @@ Ultimately, one will be able to automatically extract this information from the 
     - Serialization
       - Including executor instance data in case a reconnection needs to be made
     - White-listing(?) what data should be stored on serialization 
-- `Function(Node)`
-  - Wraps an arbitrary python function call assigned to `on_run` 
-  - `input` and (not implemented yet) `output` channels automatically created, named, and typed from the function
-  - `run_args` automatically generated from the `input`
-  - Best practices: node function should be functional and idempotent
-  - `Fast(Node)`
-    - Always 
-- `Macro(Node, HasNodes)` (not implemented)
-  - Holds a statically defined graph with a static IO interface
-  - Intended to be sub-classed, where a single computational graph is defined at the child class level and all instances have the same graph (with different interface connections and data values throughout, obviously)
-  - `input` and `output` are defined statically to provide particular access to the IO of held nodes
-    - Default is to give access to unconnected IO, but this can be explicitly specified instead.
-  - Required
-    - `???() -> DotDict[Nodes]` builds the nodes to be held, assigns any non-standard 
-      - Don't forget to also make any necessary internal `connections` between these nodes
-      - Gets invoked during initialization to populate `nodes: list[Node]`
-  - Provided
-    - `???() -> ???` constructs the macro's IO panel by creating links to node IO (all unconnected IO by default, but can be overridden in child classes)
+  - `Function(Node)`
+    - Wraps an arbitrary python function call assigned to `on_run` 
+    - `input` and (not implemented yet) `output` channels automatically created, named, and typed from the function
+    - `run_args` automatically generated from the `input`
+    - Best practices: node function should be functional and idempotent
+    - `Fast(Node)`
+      - Always 
+  - `Macro(Node, HasNodes)` (not implemented)
+    - Holds a statically defined graph with a static IO interface
+    - Intended to be sub-classed, where a single computational graph is defined at the child class level and all instances have the same graph (with different interface connections and data values throughout, obviously)
+    - `input` and `output` are defined statically to provide particular access to the IO of held nodes
+      - Default is to give access to unconnected IO, but this can be explicitly specified instead.
+    - Required
+      - `???() -> DotDict[Nodes]` builds the nodes to be held, assigns any non-standard 
+        - Don't forget to also make any necessary internal `connections` between these nodes
+        - Gets invoked during initialization to populate `nodes: list[Node]`
+    - Provided
+      - `???() -> ???` constructs the macro's IO panel by creating links to node IO (all unconnected IO by default, but can be overridden in child classes)
+      - `on_run()` by default, invokes `run()` on all held `nodes` without input connections, but can be overridden by specifying some other list of nodes to run (maybe??? I'm not sure what this should do) 
+  - `Workflow(Node, HasNodes)`
+    - This is our single-point of entry for imports!
+    - Holds a dynamically defined collections of nodes
+    - Not intended to be sub-classed, rather should be instantiated and the graph should be modified on the instance directly
+    - `input` and `output` are dynamically generated on request from the _unconnected_ IO of held nodes (`signals` still belongs to the workflow object itself)
     - `on_run()` by default, invokes `run()` on all held `nodes` without input connections, but can be overridden by specifying some other list of nodes to run (maybe??? I'm not sure what this should do) 
-- `Workflow(Node, HasNodes)`
-  - This is our single-point of entry for imports!
-  - Holds a dynamically defined collections of nodes
-  - Not intended to be sub-classed, rather should be instantiated and the graph should be modified on the instance directly
-  - `input` and `output` are dynamically generated on request from the _unconnected_ IO of held nodes (`signals` still belongs to the workflow object itself)
-  - `on_run()` by default, invokes `run()` on all held `nodes` without input connections, but can be overridden by specifying some other list of nodes to run (maybe??? I'm not sure what this should do) 
-  - `to_macro(class_name: Optional[str] = None) -> type[Macro]` takes the current `nodes` with all their connections, the current IO, and current node IO values as defaults, and dynamically creates a `Macro` from it; this locks-in the current `Workflow` behaviour and packages it for use as a node in other workflows
-    - The new node class takes its name from the workflow `label` by default, but can be explicitly specified
+    - `to_macro(class_name: Optional[str] = None) -> type[Macro]` takes the current `nodes` with all their connections, the current IO, and current node IO values as defaults, and dynamically creates a `Macro` from it; this locks-in the current `Workflow` behaviour and packages it for use as a node in other workflows
+      - The new node class takes its name from the workflow `label` by default, but can be explicitly specified
 - `HasNodes(ABC)`
   - A mix-in class for an object that holds a collection `nodes: list[Node]`
   - `add` and `add(node: Node)`

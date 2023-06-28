@@ -115,8 +115,13 @@ Ultimately, one will be able to automatically extract this information from the 
     - `input` and (not implemented yet) `output` channels automatically created, named, and typed from the function
     - `run_args` automatically generated from the `input`
     - Best practices: node function should be functional and idempotent
-    - `Fast(Node)`
-      - Always 
+    - `Fast(Function)`
+      - Like a regular node, but _all_ input channels _must_ have default values provided, and the initialization signature forces `run_on_updates` and `update_on_instantiation` to be `True`.
+      - `SingleValue(Function)`
+        - A fast node that _must_ return only a single value.
+        - Gives special access to its output
+          - Attribute and item access is modified to finally attempt access on the output value
+          - Has a `channel` attribute pointing to its single output channel, allowing the node to be used _directly_ when making new channel connections
   - `Composite(Node)` (not implemented, replaces the current `HasNodes` mix-in)
     - A class of nodes that store and run a sub-graph of `nodes: list[Node]`
     - `add` and `add(node: Node)`

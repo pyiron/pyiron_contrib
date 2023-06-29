@@ -57,6 +57,10 @@ setup(
             'python>=3.10',
             'ipython',
             'typeguard==4.0.0'
+        ],
+        'tinybase': [
+            'distributed==2023.5.0',
+            'pympipool==0.5.1'
         ]
     },
     cmdclass=versioneer.get_cmdclass(),

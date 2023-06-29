@@ -20,5 +20,7 @@ dependencies:
 - pycp2k =0.2.2
 - typeguard =4.0.0
 - aws-sam-translator =1.68.0
+- pympipool =0.5.1
+- distributed =2023.5.0
 - python >= 3.10
 - lammps

@@ -14,6 +14,13 @@ This information can be "data" of any type, i.e. the necessary input for a node 
 In the current implementation, execution flow is push-based, using both the signals described above and by output data channels updating the values of input data channels. 
 By forming connections between different channels, nodes form a computational graph.
 
+Data channels support type hints.
+These do not prevent value assignment, but do prohibit connections between channels whose type hints are incompatible (this can be turned off to allow arbitrary connections).
+In this case, "compatible" means that the type hint of the sending channel (`OutputData`) should be as-or-more specific than the type hint of the receiving channel (`InputData`).
+These type hints _do_ get used to check the "readiness" of a channel, such that a channel whose value does not match its hint is not `ready`.
+Further, the initial value of all data channels is set to a special `NotData` class, which forces the channel to be not ready regardless of the presence or absense of type hinting.
+This readiness then gets used further down the pipeline, where nodes are in turn `ready` if and only if _all_ of their input channels are `ready`, and readiness filters whether a node that receives an `update()` call will actually proceed to a `run()` call.
+
 (Not implemented) Nodes can be grouped together in macros, which appear to the outside as a single node, but internally have their own graph structure.
 Such macro construction can be nested arbitrarily deeply, allowing for powerful abstraction of workflows.
 

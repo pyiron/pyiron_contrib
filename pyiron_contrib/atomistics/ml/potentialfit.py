@@ -253,3 +253,35 @@ class PotentialPlots:
         annotated_vline(high, f"HIGH = {high:.02}", linestyle="-")
         annotated_vline(low, f"LOW = {low:.02}", linestyle="-")
         plt.xlabel("Training Error [eV/$\mathrm{\AA}$]")
+
+    def force_angle(
+            self,
+            bins: int = 180,
+            logy: bool = True,
+            tol: float = 1e-6,
+            angle_in_degrees=True
+    ):
+        """
+        Plot histogram of the angle between training and predicted forces.
+
+        Args:
+            bins (int): number of bins
+            logy (bool): Use log scale for histogram heights
+            tol (float): consider forces smaller than this zero (and obmit them from the histogram)
+            angle_in_degrees (bool): if True use degrees, otherwise radians
+        """
+        force_train = self._training_data["forces"]
+        force_pred = self._predicted_data["forces"]
+
+        force_norm_train = np.linalg.norm(force_train, axis=-1).reshape(-1, 1)
+        force_norm_pred  = np.linalg.norm(force_pred,  axis=-1).reshape(-1, 1)
+
+        I = ( (force_norm_train > tol) & (force_norm_train > tol) ).reshape(-1)
+
+        force_dir_train = force_train[I]/force_norm_train[I]
+        force_dir_pred = force_pred[I]/force_norm_pred[I]
+
+        err = np.arccos( (force_dir_train * force_dir_pred).sum(axis=-1).round(8) )
+        if angle_in_degrees:
+            err = np.rad2deg(err)
+        plt.hist(err, bins=bins, log=logy)

@@ -108,9 +108,12 @@ class PotentialPlots:
         self._training_data = training_data
         self._predicted_data = predicted_data
 
-    def energy_scatter_histogram(self):
+    def energy_scatter_histogram(self, logy=False):
         """
         Plots correlation and (training) error histograms.
+
+        Args:
+            logy (bool): Use log scale for histogram heights
         """
         energy_train = self._training_data["energy"] / self._training_data["length"]
         energy_pred = self._predicted_data["energy"] / self._predicted_data["length"]
@@ -122,7 +125,7 @@ class PotentialPlots:
         plt.plot()
 
         plt.subplot(1, 2, 2)
-        plt.hist(energy_train - energy_pred)
+        plt.hist(energy_train - energy_pred, log=logy)
         plt.xlabel("Training Error [eV / atom]")
 
     def energy_log_histogram(self, bins=20, logy=False):
@@ -168,13 +171,13 @@ class PotentialPlots:
         annotated_vline(low, f"LOW = {low:.02}", linestyle="-")
         plt.xlabel("Training Error [eV/atom]")
 
-    def force_scatter_histogram(self, axis=None):
+    def force_scatter_histogram(self, axis=None, logy=False):
         """
         Plots correlation and (training) error histograms.
 
         Args:
             axis (None, int): Whether to plot for an axis or norm
-
+            logy (bool): Use log scale for histogram heights
         """
         force_train = self._training_data["forces"]
         force_pred = self._predicted_data["forces"]
@@ -191,5 +194,5 @@ class PotentialPlots:
         plt.xlabel("True Forces [eV/$\mathrm{\AA}$]")
         plt.ylabel("Predicted Forces [eV/$\AA$]")
         plt.subplot(1, 2, 2)
-        plt.hist(ft - fp)
+        plt.hist(ft - fp, log=logy)
         plt.xlabel("Training Error [eV/$\AA$]")

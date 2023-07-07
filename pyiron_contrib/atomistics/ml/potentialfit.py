@@ -2,7 +2,7 @@
 Abstract base class for fitting interactomic potentials.
 """
 
-from typing import List
+from typing import List, Optional
 
 import abc
 
@@ -196,3 +196,60 @@ class PotentialPlots:
         plt.subplot(1, 2, 2)
         plt.hist(ft - fp, log=logy)
         plt.xlabel("Training Error [eV/$\AA$]")
+
+    def force_log_histogram(
+            self,
+            bins: int = 20,
+            logy: bool = False,
+            axis: Optional[int] = None
+    ):
+        """
+        Plots a histogram of logarithmic training errors.
+
+        Bins are created automatically using the minimum and maximum absolute
+        errors with the given number of bins.
+
+        Arguments:
+            bins (int, optional): number of bins for the histogram
+            logy (bool, optional): if True use a log scale also for the y-axis
+            axis (int, optional): which axis of the forces to plot; if not given plot force magnitude
+        """
+
+        force_train = self._training_data["forces"]
+        force_pred = self._predicted_data["forces"]
+
+        if axis is None:
+            ft = np.linalg.norm(force_train, axis=1)
+            fp = np.linalg.norm(force_pred, axis=1)
+        else:
+            ft = force_train[:, axis]
+            fp = force_pred[:, axis]
+
+        df = abs(force_train - force_pred)
+        rmse = np.sqrt((df**2).mean())
+        mae = df.mean()
+        high = df.max()
+        low = df.min()
+
+        ax = plt.gca()
+        trafo = ax.get_xaxis_transform()
+
+        def annotated_vline(x, text, linestyle="--"):
+            plt.axvline(x, color="k", linestyle=linestyle)
+            plt.text(
+                x=x,
+                y=0.5,
+                s=text,
+                transform=trafo,
+                rotation="vertical",
+                horizontalalignment="center",
+                path_effects=[withStroke(linewidth=4, foreground="w")],
+            )
+
+        plt.hist(df, bins=np.logspace(np.log10(low), np.log10(high), bins), log=logy)
+        plt.xscale("log")
+        annotated_vline(rmse, f"RMSE = {rmse:.02}")
+        annotated_vline(mae, f"MAE = {mae:.02}")
+        annotated_vline(high, f"HIGH = {high:.02}", linestyle="-")
+        annotated_vline(low, f"LOW = {low:.02}", linestyle="-")
+        plt.xlabel("Training Error [eV/$\mathrm{\AA}$]")

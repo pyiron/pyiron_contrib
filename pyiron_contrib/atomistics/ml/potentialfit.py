@@ -225,7 +225,7 @@ class PotentialPlots:
             ft = force_train[:, axis]
             fp = force_pred[:, axis]
 
-        df = abs(force_train - force_pred)
+        df = abs(ft - fp)
         rmse = np.sqrt((df**2).mean())
         mae = df.mean()
         high = df.max()
@@ -246,7 +246,7 @@ class PotentialPlots:
                 path_effects=[withStroke(linewidth=4, foreground="w")],
             )
 
-        plt.hist(df, bins=np.logspace(np.log10(low), np.log10(high), bins), log=logy)
+        plt.hist(df, bins=np.logspace(np.log10(low + 1e-8), np.log10(high), bins), log=logy)
         plt.xscale("log")
         annotated_vline(rmse, f"RMSE = {rmse:.02}")
         annotated_vline(mae, f"MAE = {mae:.02}")
@@ -254,12 +254,13 @@ class PotentialPlots:
         annotated_vline(low, f"LOW = {low:.02}", linestyle="-")
         plt.xlabel("Training Error [eV/$\mathrm{\AA}$]")
 
-    def force_angle(
+    def force_angle_histogram(
             self,
             bins: int = 180,
             logy: bool = True,
             tol: float = 1e-6,
-            angle_in_degrees=True
+            angle_in_degrees=True,
+            cumulative = False
     ):
         """
         Plot histogram of the angle between training and predicted forces.
@@ -284,4 +285,8 @@ class PotentialPlots:
         err = np.arccos( (force_dir_train * force_dir_pred).sum(axis=-1).round(8) )
         if angle_in_degrees:
             err = np.rad2deg(err)
-        plt.hist(err, bins=bins, log=logy)
+        if cumulative:
+            logy = False
+        plt.hist(err, bins=bins, log=logy, cumulative=cumulative)
+        plt.xlabel("Angular Deviation of Force [" + ["rad", "deg"][angle_in_degrees] + "]")
+        plt.ylabel("Count")

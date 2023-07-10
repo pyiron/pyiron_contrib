@@ -166,9 +166,7 @@ class StructureCreator(Creator):
     def bulk(self, *args, **kwargs):
         return ase_to_pyiron(ase.build.bulk(*args, **kwargs))
 
-    @wraps(Atoms)
-    def atoms(self, *args, **kwargs):
-        return Atoms(*args, **kwargs)
+    atoms = Atoms
 
 
 class ExecutorCreator(Creator):

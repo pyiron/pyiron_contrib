@@ -90,7 +90,7 @@ class JobCreator(Creator):
                 else:
                     if not isinstance(job.task, task):
                         raise ValueError(
-                            f"Job with given name already exists, but is of different type!"
+                            "Job with given name already exists, but is of different type!"
                         )
                     return job
             except JobNotFoundError:

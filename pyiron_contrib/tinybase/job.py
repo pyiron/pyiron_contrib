@@ -167,7 +167,8 @@ class TinyJob(Storable):
         Raises:
             ValueError: if job status is not `finished` or `running`
         """
-        if self.status == "finished": return
+        if self.status == "finished":
+            return
         if self.status != "running":
             raise ValueError("Job not running!")
         self._executor.wait(timeout=timeout)

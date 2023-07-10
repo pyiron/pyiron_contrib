@@ -60,7 +60,7 @@ class Job(Base):
 # TODO: this will be pyiron_base.IsDatabase
 class GenericDatabase(abc.ABC):
     """
-    Defines the database interface used by the :class:`.ProjectInterface`.
+    Defines the abstract database interface used by all databases.
     """
 
     @abc.abstractmethod
@@ -69,6 +69,18 @@ class GenericDatabase(abc.ABC):
 
     @abc.abstractmethod
     def get_item(self, job_id: int) -> DatabaseEntry:
+        """
+        Return database entry of the specified job.
+
+        Args:
+            job_id (int): id of the job
+
+        Returns:
+            :class:`.DatabaseEntry`: database entry with the given id
+
+        Raises:
+            ValueError: if no job with the given id exists
+        """
         pass
 
     @abc.abstractmethod
@@ -175,19 +187,34 @@ class TinyDB(GenericDatabase):
         )
 
     def get_item(self, job_id: int) -> DatabaseEntry:
-        with Session(self.engine) as session:
-            job_data = (
-                session.query(
-                    Job.__table__, Project.location, JobStatus.status, JobType.type
+        """
+        Return database entry of the specified job.
+
+        Args:
+            job_id (int): id of the job
+
+        Returns:
+            :class:`.DatabaseEntry`: database entry with the given id
+
+        Raises:
+            ValueError: if no job with the given id exists
+        """
+        try:
+            with Session(self.engine) as session:
+                job_data = (
+                    session.query(
+                        Job.__table__, Project.location, JobStatus.status, JobType.type
+                    )
+                    .select_from(Job)
+                    .where(Job.id == job_id)
+                    .join(Project, Job.project_id == Project.id)
+                    .join(JobStatus, Job.status_id == JobStatus.id)
+                    .join(JobType, Job.jobtype_id == JobType.id)
+                    .one()
                 )
-                .select_from(Job)
-                .where(Job.id == job_id)
-                .join(Project, Job.project_id == Project.id)
-                .join(JobStatus, Job.status_id == JobStatus.id)
-                .join(JobType, Job.jobtype_id == JobType.id)
-                .one()
-            )
-            return self._row_to_entry(job_data)
+                return self._row_to_entry(job_data)
+        except NoResultFound:
+            raise ValueError(f"No job with id {job_id} found!") from None
 
     def get_item_id(self, job_name: str, project_id: int) -> Optional[int]:
         with Session(self.engine) as session:

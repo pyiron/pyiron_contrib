@@ -1,4 +1,5 @@
 from functools import partialmethod
+from pickle import PickleError
 from time import sleep
 import unittest
 
@@ -44,7 +45,11 @@ def dynamic_foo():
 
 
 class TestCloudpickleProcessPoolExecutor(unittest.TestCase):
-    def test_dynamic_classes(self):
+    def test_unpickleable_callable(self):
+        """
+        We should be able to use an unpickleable callable -- in this case, a method of
+        a dynamically defined class.
+        """
         fortytwo = 42  # No magic numbers; we use it in a couple places so give it a var
 
         @dynamic_foo()
@@ -68,6 +73,32 @@ class TestCloudpickleProcessPoolExecutor(unittest.TestCase):
         self.assertFalse(fs.done(), msg="Should be running on the executor")
         self.assertEqual(fortytwo, fs.result(), msg="Future must complete")
         self.assertEqual(fortytwo, dynamic_42.result, msg="Callback must get called")
+
+    def test_unpickleable_return(self):
+        """
+        We should _not_ be able to use an unpickleable return value -- in this case, a
+        method of a dynamically defined class.
+        """
+
+        @dynamic_foo()
+        def does_nothing():
+            return
+
+        @dynamic_foo()
+        def slowly_returns_unpickleable():
+            """
+            Returns a complex, dynamically defined variable
+            """
+            sleep(0.1)
+            inside_variable = does_nothing()
+            inside_variable.result = "it was an inside job!"
+            return inside_variable
+
+        dynamic_dynamic = slowly_returns_unpickleable()
+        executor = CloudpickleProcessPoolExecutor()
+        fs = executor.submit(dynamic_dynamic.run)
+        with self.assertRaises(PickleError):
+            print(fs.result())  # Can't (un)pickle the result
 
 
 if __name__ == '__main__':

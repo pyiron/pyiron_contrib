@@ -3,7 +3,7 @@ from concurrent.futures import TimeoutError
 from time import sleep
 import unittest
 
-from pyiron_contrib.executors.executors import CloudProcessPoolExecutor as CloudpickleProcessPoolExecutor
+from pyiron_contrib.executors.executors import CloudpickleProcessPoolExecutor
 
 
 class Foo:
@@ -45,6 +45,7 @@ def dynamic_foo():
 
 
 class TestCloudpickleProcessPoolExecutor(unittest.TestCase):
+
     def test_unpickleable_callable(self):
         """
         We should be able to use an unpickleable callable -- in this case, a method of

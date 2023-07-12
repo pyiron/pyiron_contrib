@@ -1,6 +1,6 @@
 import abc
 import logging
-from typing import Optional
+from typing import Optional, Union
 
 from pyiron_contrib.tinybase.task import AbstractTask
 from pyiron_contrib.tinybase.storage import (
@@ -11,6 +11,7 @@ from pyiron_contrib.tinybase.storage import (
 )
 from pyiron_contrib.tinybase.executor import (
     Executor,
+    ExecutionContext,
     BackgroundExecutor,
     ProcessExecutor,
 )
@@ -19,7 +20,7 @@ from pyiron_contrib.tinybase.project import ProjectInterface, ProjectAdapter
 from pyiron_base.state import state
 
 
-class TinyJob(Storable, abc.ABC):
+class TinyJob(Storable):
     """
     A tiny job unifies an executor, a task and its output.
 
@@ -43,22 +44,12 @@ class TinyJob(Storable, abc.ABC):
     You can use :class:`.GenericTinyJob` to dynamically specify which task the job should execute.
     """
 
-    _executors = {
-        "foreground": Executor(),
-        "background": BackgroundExecutor(max_threads=4),
-        "process": ProcessExecutor(max_processes=4),
-    }
-
-    def __init__(self, project: ProjectInterface, job_name: str):
+    def __init__(self, task: AbstractTask, project: ProjectInterface, job_name: str):
         """
         Create a new job.
 
-        If the given `job_name` is already present in the `project` it is reloaded.  No checks are performed that the
-        task type of the already present job and the current one match.  This is also not always necessary, e.g. when
-        reloading a :class:`.GenericTinyJob` it will automatically read the
-        correct task from storage.
-
         Args:
+            task (:class:`.AbstractTask`): the underlying task to run
             project (:class:`.ProjectInterface`): the project the job should live in
             job_name (str): the name of the job.
         """
@@ -66,19 +57,11 @@ class TinyJob(Storable, abc.ABC):
             project = ProjectAdapter(project)
         self._project = project
         self._name = job_name
-        self._task = None
+        self._task = task
         self._output = None
         self._storage = None
         self._executor = None
         self._id = None
-        # FIXME: this should go into the job creation logic on the project
-        if project.exists_storage(job_name):
-            try:
-                self.load()
-            except Exception as e:
-                raise RuntimeError(
-                    f"Failed to reload run job from storage: {e}"
-                ) from None
 
     @property
     def name(self):
@@ -95,19 +78,15 @@ class TinyJob(Storable, abc.ABC):
     def project(self):
         return self._project
 
-    @abc.abstractmethod
-    def _get_task(self) -> AbstractTask:
-        """
-        Return an instance of the :class:`.AbstractTask`.
-
-        The value return from here is saved automatically in :prop:`.task`.
-        """
-        pass
+    @property
+    def status(self):
+        try:
+            return self._project.database.get_item(self.id).status
+        except ValueError:
+            return "initialized"
 
     @property
     def task(self):
-        if self._task is None:
-            self._task = self._get_task()
         return self._task
 
     @property
@@ -146,14 +125,18 @@ class TinyJob(Storable, abc.ABC):
         self._executor._run_machine.observe("collect", self._update_status("collect"))
         self._executor._run_machine.observe("finished", self._update_status("finished"))
 
-    def run(self, how="foreground") -> Optional[Executor]:
+    def run(
+        self, executor: Union[Executor, str, None] = None
+    ) -> Optional[ExecutionContext]:
         """
         Start execution of the job.
 
         If the job already has a database id and is not in "ready" state, do nothing.
 
         Args:
-            how (string): specifies which executor to use
+            executor (:class:`~.Executor`, str): specifies which executor to
+                use, if `str` must be a method name of :class:`.ExecutorCreator`;
+                if not given use the last created executor
 
         Returns:
             :class:`.Executor`: the executor that is running the task or nothing.
@@ -162,12 +145,33 @@ class TinyJob(Storable, abc.ABC):
             self._id is None
             or self.project.database.get_item(self.id).status == "ready"
         ):
-            exe = self._executor = self._executors[how].submit(tasks=[self.task])
+            if executor is None:
+                executor = "most_recent"
+            if isinstance(executor, str):
+                executor = getattr(self.project.create.executor, executor)()
+            exe = self._executor = executor.submit(tasks=[self.task])
             self._setup_executor_callbacks()
             exe.run()
             return exe
         else:
             logging.info("Job already finished!")
+
+    def wait(self, timeout: Optional[float] = None):
+        """
+        Wait until job is finished.
+
+        Args:
+            timeout (float, optional): maximum time to wait in seconds; wait
+                indefinitely by default
+
+        Raises:
+            ValueError: if job status is not `finished` or `running`
+        """
+        if self.status == "finished":
+            return
+        if self.status != "running":
+            raise ValueError("Job not running!")
+        self._executor.wait(timeout=timeout)
 
     def remove(self):
         """
@@ -225,39 +229,7 @@ class TinyJob(Storable, abc.ABC):
 
     @classmethod
     def _restore(cls, storage, version):
-        job = cls(project=storage.project, job_name=storage.name)
+        task = pickle_load(storage["task"])
+        job = cls(task=task, project=storage.project, job_name=storage.name)
         job.load(storage=storage)
         return job
-
-
-# I'm not perfectly happy with this, but two thoughts led to this class:
-# 1. I want to be able to set any task on a tiny job without subclassing, to make the prototyping new jobs in the notebook
-#    easy
-# 2. I do *not* want people to accidently change the task instance/class while the job is running
-class GenericTinyJob(TinyJob):
-    """
-    A generic tiny job is a tiny job that allows to set any task class after instantiating it.
-
-    Set a task class via :attr:`.task_class`, e.g.
-
-    >>> from somewhere import MyTask
-    >>> job = GenericTinyJob(Project(...), "myjob")
-    >>> job.task_class = MyTask
-    >>> isinstance(job.input, type(MyTask.input))
-    True
-    """
-
-    def __init__(self, project, job_name):
-        super().__init__(project=project, job_name=job_name)
-        self._task_class = None
-
-    @property
-    def task_class(self):
-        return self._task_class
-
-    @task_class.setter
-    def task_class(self, cls):
-        self._task_class = cls
-
-    def _get_task(self):
-        return self.task_class()

@@ -4,6 +4,7 @@ from functools import partial
 from typing import Union, List
 import time
 import logging
+from math import inf
 
 from pyiron_contrib.tinybase.task import AbstractTask, TaskGenerator
 
@@ -114,12 +115,30 @@ class ExecutionContext:
     def run(self):
         self._run_machine.step()
 
-    def wait(self, until="finished", sleep=0.1):
+    def wait(self, until="finished", timeout=None, sleep=0.1):
         """
         Sleep until specified state of the run state machine is reached.
+
+        Before calling this method, the state of this context must be past
+        `init`, i.e. you have to call :meth:`.run` at least once.
+
+        Args:
+            until (str): wait until the executor has reached this state; must
+                be a valid state name of :class:`.RunMachine.Code`.
+            timeout (float): maximum amount of seconds to wait; wait
+                indefinitely by default
+            sleep (float): amount of seconds to sleep in between status checks
+
+        Raises:
+            ValueError: if the current state is `init`
         """
+        if timeout is None:
+            timeout = inf
+        if self._run_machine.state == RunMachine.Code("init"):
+            raise ValueError("Still in state 'init'! Call run() first!")
         until = RunMachine.Code(until)
-        while until != self._run_machine.state:
+        start = time.monotonic()
+        while until != self._run_machine.state and time.monotonic() - start < timeout:
             time.sleep(sleep)
 
     @property
@@ -268,3 +287,15 @@ class DaskExecutor(Executor):
 
     def submit(self, tasks):
         return FuturesExecutionContext(self._client, tasks)
+
+
+from pympipool import PoolExecutor
+
+
+class PyMPIExecutor(Executor):
+    def __init__(self, max_workers, **kwargs):
+        self._max_workers = max_workers
+        self._pool = PoolExecutor(max_workers=max_workers, **kwargs)
+
+    def submit(self, tasks):
+        return FuturesExecutionContext(self._pool, tasks)

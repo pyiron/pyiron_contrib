@@ -1,5 +1,5 @@
 from functools import partialmethod
-from pickle import PickleError
+from concurrent.futures import TimeoutError
 from time import sleep
 import unittest
 
@@ -129,7 +129,37 @@ class TestCloudpickleProcessPoolExecutor(unittest.TestCase):
         fs = executor.submit(dynamic_dynamic.run, unpicklable_object)
         self.assertEqual(fs.result().result, "input updated")
 
-    # TODO: Test timeout
+    def test_exception(self):
+        @dynamic_foo()
+        def raise_error():
+            raise RuntimeError
+
+        re = raise_error()
+        executor = CloudpickleProcessPoolExecutor()
+        fs = executor.submit(re.run)
+        with self.assertRaises(RuntimeError):
+            fs.result()
+
+    def test_timeout(self):
+        fortytwo = 42
+
+        @dynamic_foo()
+        def slow():
+            sleep(0.1)
+            return fortytwo
+
+        f = slow()
+        executor = CloudpickleProcessPoolExecutor()
+        fs = executor.submit(f.run)
+        self.assertEqual(
+            fs.result(timeout=30),
+            fortytwo,
+            msg="waiting long enough should get the result"
+        )
+
+        with self.assertRaises(TimeoutError):
+            fs = executor.submit(f.run)
+            fs.result(timeout=0.0001)
 
 
 if __name__ == '__main__':

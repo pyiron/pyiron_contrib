@@ -1,9 +1,11 @@
 from functools import partialmethod
-from pickle import PickleError
+from concurrent.futures import TimeoutError
 from time import sleep
 import unittest
 
-from pyiron_contrib.executors.executors import CloudpickleProcessPoolExecutor
+from pyiron_contrib.executors.cloudpickleprocesspool import (
+    CloudpickleProcessPoolExecutor
+)
 
 
 class Foo:
@@ -45,6 +47,7 @@ def dynamic_foo():
 
 
 class TestCloudpickleProcessPoolExecutor(unittest.TestCase):
+
     def test_unpickleable_callable(self):
         """
         We should be able to use an unpickleable callable -- in this case, a method of
@@ -76,7 +79,7 @@ class TestCloudpickleProcessPoolExecutor(unittest.TestCase):
 
     def test_unpickleable_return(self):
         """
-        We should _not_ be able to use an unpickleable return value -- in this case, a
+        We should be able to use an unpickleable return value -- in this case, a
         method of a dynamically defined class.
         """
 
@@ -97,8 +100,69 @@ class TestCloudpickleProcessPoolExecutor(unittest.TestCase):
         dynamic_dynamic = slowly_returns_unpickleable()
         executor = CloudpickleProcessPoolExecutor()
         fs = executor.submit(dynamic_dynamic.run)
-        with self.assertRaises(PickleError):
-            print(fs.result())  # Can't (un)pickle the result
+        self.assertIsInstance(
+            fs.result(),
+            Foo,
+            msg="The custom future should be unpickling the result"
+        )
+        self.assertEqual(fs.result().result, "it was an inside job!")
+
+    def test_unpickleable_args(self):
+        """
+        We should be able to use an unpickleable return value -- in this case, a
+        method of a dynamically defined class.
+        """
+
+        @dynamic_foo()
+        def does_nothing():
+            return
+
+        @dynamic_foo()
+        def slowly_returns_unpickleable(unpickleable_arg):
+            """
+            Returns a complex, dynamically defined variable
+            """
+            sleep(0.1)
+            unpickleable_arg.result = "input updated"
+            return unpickleable_arg
+
+        dynamic_dynamic = slowly_returns_unpickleable()
+        executor = CloudpickleProcessPoolExecutor()
+        unpicklable_object = does_nothing()
+        fs = executor.submit(dynamic_dynamic.run, unpicklable_object)
+        self.assertEqual(fs.result().result, "input updated")
+
+    def test_exception(self):
+        @dynamic_foo()
+        def raise_error():
+            raise RuntimeError
+
+        re = raise_error()
+        executor = CloudpickleProcessPoolExecutor()
+        fs = executor.submit(re.run)
+        with self.assertRaises(RuntimeError):
+            fs.result()
+
+    def test_timeout(self):
+        fortytwo = 42
+
+        @dynamic_foo()
+        def slow():
+            sleep(0.1)
+            return fortytwo
+
+        f = slow()
+        executor = CloudpickleProcessPoolExecutor()
+        fs = executor.submit(f.run)
+        self.assertEqual(
+            fs.result(timeout=30),
+            fortytwo,
+            msg="waiting long enough should get the result"
+        )
+
+        with self.assertRaises(TimeoutError):
+            fs = executor.submit(f.run)
+            fs.result(timeout=0.0001)
 
 
 if __name__ == '__main__':

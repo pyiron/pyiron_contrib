@@ -79,7 +79,7 @@ class GenericStorage(abc.ABC):
         """
         try:
             value = self[item]
-        except KeyError:
+        except (KeyError, ValueError):
             if default is not None:
                 return default
             else:

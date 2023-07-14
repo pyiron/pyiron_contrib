@@ -2,6 +2,7 @@ channels:
 - conda-forge
 dependencies:
 - ase =3.22.1
+- cloudpickle
 - coveralls
 - coverage
 - codacy-coverage

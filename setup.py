@@ -44,6 +44,9 @@ setup(
             'pyiron_atomistics==0.3.0',
             'pycp2k==0.2.2',
         ],
+        'executors': [
+            'cloudpickle',
+        ],
         'fenics': [
             'fenics==2019.1.0',
             'mshr==2019.1.0',
@@ -54,6 +57,7 @@ setup(
             'moto==4.1.12'
         ],
         'workflow': [
+            'cloudpickle',
             'python>=3.10',
             'ipython',
             'typeguard==4.0.0'

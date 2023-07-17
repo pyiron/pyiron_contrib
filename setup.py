@@ -55,6 +55,7 @@ setup(
         ],
         'workflow': [
             'python>=3.10',
+            'graphviz',
             'ipython',
             'typeguard==4.0.0'
         ],

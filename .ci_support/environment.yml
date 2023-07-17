@@ -18,6 +18,7 @@ dependencies:
 - boto3 =1.28.1
 - moto =4.1.12
 - pycp2k =0.2.2
+- python-graphviz
 - typeguard =4.0.0
 - aws-sam-translator =1.68.0
 - pympipool =0.5.1

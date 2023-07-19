@@ -25,7 +25,9 @@ setup(
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
-        'Programming Language :: Python :: 3.9'
+        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
     ],
 
     keywords='pyiron',
@@ -33,7 +35,7 @@ setup(
     install_requires=[        
         'matplotlib==3.7.1',
         'numpy==1.24.3',
-        'pyiron_base==0.6.1',
+        'pyiron_base==0.6.3',
         'scipy==1.10.1',
         'seaborn==0.12.2',
         'pyparsing==3.1.0'
@@ -51,7 +53,7 @@ setup(
         'image': ['scikit-image==0.19.3'],
         'generic': [
             'boto3==1.28.1', 
-            'moto==4.1.12'
+            'moto==4.1.13'
         ],
         'workflow': [
             'python>=3.10',
@@ -61,7 +63,7 @@ setup(
         ],
         'tinybase': [
             'distributed==2023.5.0',
-            'pympipool==0.5.1'
+            'pympipool==0.5.5'
         ]
     },
     cmdclass=versioneer.get_cmdclass(),

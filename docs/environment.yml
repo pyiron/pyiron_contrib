@@ -15,7 +15,7 @@ dependencies:
 - pyparsing =3.1.0
 - scipy =1.10.1
 - seaborn =0.12.2
-- scikit-image =0.19.3
+- scikit-image =0.21.0
 - randspg =0.0.1
 - boto3 =1.28.5
 - moto =4.1.13

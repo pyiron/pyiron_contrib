@@ -26,14 +26,14 @@ How to combine potentials:
 
 Example I: Hybrid potential for a single element
 
->>> from pyiron_atomistics.lammps.potentials import Library, Morse
+>>> from pyiron_contrib.atomistics.lammps.potentials import Library, Morse
 >>> eam = Library("Al")
 >>> morse = Morse("Al", D_0=0.5, alpha=1.1, r_0=2.1, cutoff=6)
 >>> lammps_job.potential = eam + morse
 
 Example II: Hybrid potential for multiple elements
 
->>> from pyiron_atomistics.lammps.potentials import Library, Morse
+>>> from pyiron_contrib.atomistics.lammps.potentials import Library, Morse
 >>> eam = Library("Al")
 >>> morse_Al_Ni = Morse("Al", "Ni", D_0=0.2, alpha=1.05, r_0=2.2, cutoff=6)
 >>> morse_Ni = Morse("Ni", D_0=0.7, alpha=1.15, r_0=2.15, cutoff=6)

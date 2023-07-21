@@ -20,7 +20,7 @@ from pyiron_base import (
 )
 from pyiron_atomistics import ase_to_pyiron, Atoms
 from pyiron_contrib.atomistics.ml.potentialfit import PotentialFit
-from pyiron_contrib.atomistics.mlip.cfgs import savecfgs, loadcfgs, Cfg
+from pyiron_contrib.atomistics.mlip.cfgs import savecfgs, loadcfgs, Cfg, load_grades_ids_and_timesteps
 from pyiron_contrib.atomistics.mlip.potential import MtpPotential
 
 __author__ = "Jan Janssen"
@@ -235,39 +235,17 @@ class Mlip(GenericJob, PotentialFit):
     def collect_output(self):
         file_name = os.path.join(self.working_directory, "diff.cfg")
         if os.path.exists(file_name):
-            _, _, _, _, _, _, _, job_id_diff_lst, timestep_diff_lst = read_cgfs(
-                file_name
-            )
+             _, job_id_diff_lst, timestep_diff_lst = load_grades_ids_and_timesteps(file_name)
         else:
             job_id_diff_lst, timestep_diff_lst = [], []
         file_name = os.path.join(self.working_directory, "selected.cfg")
         if os.path.exists(file_name):
-            (
-                _,
-                _,
-                _,
-                _,
-                _,
-                _,
-                _,
-                job_id_new_training_lst,
-                timestep_new_training_lst,
-            ) = read_cgfs(file_name)
+            _, job_id_new_training_lst, timestep_new_training_lst = load_grades_ids_and_timesteps(file_name)
         else:
             job_id_new_training_lst, timestep_new_training_lst = [], []
         file_name = os.path.join(self.working_directory, "grades.cfg")
         if os.path.exists(file_name):
-            (
-                _,
-                _,
-                _,
-                _,
-                _,
-                _,
-                grades_lst,
-                job_id_grades_lst,
-                timestep_grades_lst,
-            ) = read_cgfs(file_name)
+            grades_lst, job_id_grades_lst, timestep_grades_lst = load_grades_ids_and_timesteps(file_name)
         else:
             grades_lst, job_id_grades_lst, timestep_grades_lst = [], [], []
         try:
@@ -753,54 +731,3 @@ def write_cfg(
             cfg_object.desc = "pyiron\t" + track_str
         cfg_lst.append(cfg_object)
     savecfgs(filename=file_name, cfgs=cfg_lst, desc=None)
-
-
-def read_cgfs(file_name):
-    cgfs_lst = loadcfgs(filename=file_name, max_cfgs=None)
-    cell, positions, forces, stress, energy, indicies, grades, jobids, timesteps = (
-        [],
-        [],
-        [],
-        [],
-        [],
-        [],
-        [],
-        [],
-        [],
-    )
-    for cgf in cgfs_lst:
-        if cgf.pos is not None:
-            positions.append(cgf.pos)
-        if cgf.lat is not None:
-            cell.append(cgf.lat)
-        if cgf.types is not None:
-            indicies.append(cgf.types)
-        if cgf.energy is not None:
-            energy.append(cgf.energy)
-        if cgf.forces is not None:
-            forces.append(cgf.forces)
-        if cgf.stresses is not None:
-            stress.append(
-                [
-                    [cgf.stresses[0], cgf.stresses[5], cgf.stresses[4]],
-                    [cgf.stresses[5], cgf.stresses[1], cgf.stresses[3]],
-                    [cgf.stresses[4], cgf.stresses[3], cgf.stresses[2]],
-                ]
-            )
-        if cgf.grade is not None:
-            grades.append(cgf.grade)
-        if cgf.desc is not None:
-            job_id, timestep = cgf.desc.split("_")
-            jobids.append(int(job_id))
-            timesteps.append(int(timestep))
-    return [
-        np.array(cell),
-        np.array(positions),
-        np.array(forces),
-        np.array(stress),
-        np.array(energy),
-        np.array(indicies),
-        np.array(grades),
-        np.array(jobids),
-        np.array(timesteps),
-    ]

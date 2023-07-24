@@ -18,7 +18,12 @@ import abc
 import importlib
 from typing import Union
 from functools import wraps
-from os import sched_getaffinity
+
+try:
+    from os import sched_getaffinity
+    cpu_count = lambda: len(sched_getaffinity)
+except ImportError:
+    from multiprocessing import cpu_count
 
 import pyiron_contrib.tinybase.job
 from pyiron_contrib.tinybase.project import JobNotFoundError
@@ -170,7 +175,7 @@ class StructureCreator(Creator):
 
 
 class ExecutorCreator(Creator):
-    _DEFAULT_CPUS = min(int(0.5 * len(sched_getaffinity(0))), 8)
+    _DEFAULT_CPUS = min(int(0.5 * cpu_count()), 8)
 
     def __init__(self, project, config):
         self._most_recent = None

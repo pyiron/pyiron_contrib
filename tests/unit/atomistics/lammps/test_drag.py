@@ -12,7 +12,7 @@ class TestDrag(unittest.TestCase):
         self.assertRaises(ValueError, setup_lmp_input, self.lmp)
 
     def test_min_style(self):
-        sef.lmp.calc_minimize()
+        self.lmp.calc_minimize()
         self.assertEqual(self.lmp.input.control["min_style"], "quickmin")
 
 

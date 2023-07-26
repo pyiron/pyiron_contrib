@@ -1,12 +1,4 @@
 import numpy as np
-from hashlib import sha1
-from tqdm.auto import tqdm
-from .base import get_potential, ProjectContainer, Hydrogen
-from sklearn.gaussian_process import GaussianProcessRegressor
-
-
-def get_job_name(structure):
-    return sha1(structure.__repr__().encode()).hexdigest()
 
 
 def setup_lmp_input(lmp, n_atoms=None, direction=None, fix_id=-1):

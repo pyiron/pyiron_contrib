@@ -78,8 +78,11 @@ def setup_lmp_input(lmp, n_atoms=None, direction=None, fix_id=-1):
                     [
                         f"({ss}f{xxx}[{fix_id}]*({direction[ii][iii]}))"
                         for iii, xxx in enumerate(["x", "y", "z"])
+                        if not np.isclose(direction[ii][iii], 0)
                     ]
                 )
+                if txt == "":
+                    txt = 0
                 lmp.input.control[f"variable___f{xx}_{grp}"] = f" equal {txt}"
     lmp.input.control["variable___energy"] = "atom 0"
     for key in ["free", "fixed"]:

@@ -17,6 +17,11 @@ class TestDrag(unittest.TestCase):
         setup_lmp_input(self.lmp)
         self.assertEqual(self.lmp.input.control["min_style"], "quickmin")
 
+    def test_direction(self):
+        self.lmp.calc_minimize()
+        setup_lmp_input(self.lmp, direction=[0, 0, 1])
+        self.assertEqual(self.lmp.input.control["variable___fx_free"], " equal 0")
+
 
 if __name__ == '__main__':
     unittest.main()

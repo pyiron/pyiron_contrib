@@ -59,24 +59,30 @@ def setup_lmp_input(lmp, n_atoms=None, direction=None, fix_id=-1):
         except TypeError:
             raise AssertionError("either `n_atoms` or the structure must be set")
     fix_id = np.arange(n_atoms + 1)[fix_id] + 1
-    lmp.input.control['atom_modify'] = 'map array'
+    lmp.input.control["atom_modify"] = "map array"
     lmp.input.control["group___fixed"] = f"id {fix_id}"
     lmp.input.control["group___free"] = "subtract all fixed"
     if direction is None:
-        for ii, xx in enumerate(['x', 'y', 'z']):
-            lmp.input.control[f'variable___f{xx}_free'] = f'equal f{xx}[{fix_id}]/{n_atoms}'
-            lmp.input.control[f'variable___f{xx}_fixed'] = f'equal -f{xx}[{fix_id}]'
+        for ii, xx in enumerate(["x", "y", "z"]):
+            lmp.input.control[
+                f"variable___f{xx}_free"
+            ] = f"equal f{xx}[{fix_id}]/{n_atoms}"
+            lmp.input.control[f"variable___f{xx}_fixed"] = f"equal -f{xx}[{fix_id}]"
     else:
         direction = np.array(direction) / np.linalg.norm(direction)
         direction = np.outer(direction, direction)
         direction = np.around(direction, decimals=8)
         for grp, ss in zip(["free", "fixed"], [f"1/{n_atoms}*", "-"]):
-            for ii, xx in enumerate(['x', 'y', 'z']):
-                txt = "+".join([f"({ss}f{xxx}[{fix_id}]*({direction[ii][iii]}))" for iii, xxx in enumerate(['x', 'y', 'z'])])
-                lmp.input.control[f'variable___f{xx}_{grp}'] = f" equal {txt}"
-    lmp.input.control['variable___energy'] = "atom 0"
+            for ii, xx in enumerate(["x", "y", "z"]):
+                txt = "+".join(
+                    [
+                        f"({ss}f{xxx}[{fix_id}]*({direction[ii][iii]}))"
+                        for iii, xxx in enumerate(["x", "y", "z"])
+                    ]
+                )
+                lmp.input.control[f"variable___f{xx}_{grp}"] = f" equal {txt}"
+    lmp.input.control["variable___energy"] = "atom 0"
     for key in ["free", "fixed"]:
         txt = " ".join([f"v_f{x}_{key}" for x in ["x", "y", "z"]])
         lmp.input.control[f"fix___f_{key}"] = f"{key} addforce {txt} energy v_energy"
-    lmp.input.control['min_style'] = 'quickmin'
-
+    lmp.input.control["min_style"] = "quickmin"

@@ -4,7 +4,7 @@ from pyiron_contrib.atomistics.lammps.drag import setup_lmp_input
 
 class TestDrag(unittest.TestCase):
     def setUp(self):
-        pr = Project("DRAG")
+        pr = Project(".")
         bulk = pr.create.structure.bulk('Ni', cubic=True)
         self.lmp = pr.create.job.Lammps("test")
         self.lmp.structure = bulk.repeat(2)

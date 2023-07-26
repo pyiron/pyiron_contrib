@@ -25,6 +25,7 @@ def setup_lmp_input(lmp, n_atoms=None, direction=None, fix_id=-1):
     Exp: Hydrogen diffusion
 
     >>> from pyiron_atomistics import Project
+    >>> import numpy as np
     >>> pr = Project("DRAG")
     >>> bulk = pr.create.structure.bulk('Ni', cubic=True)
     >>> a_0 = bulk.cell[0, 0]
@@ -33,7 +34,8 @@ def setup_lmp_input(lmp, n_atoms=None, direction=None, fix_id=-1):
     >>> dx = x_tetra - x_octa
     >>> transition = np.linspace(0, 1, 101)
     >>> x_lst = transition[:, None] * dx + x_octa
-    >>> structure = bulk.repeat(4) + pr.create.structure.atoms(
+    >>> structure = bulk.repeat(4)
+    >>> structure += pr.create.structure.atoms(
     ...     positions=[x_octa],
     ...     elements=['H'],
     ...     cell=structure.cell

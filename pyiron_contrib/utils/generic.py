@@ -245,25 +245,28 @@ def extract_files_from_tarball(tarball_filepath, filenames, suffix=None, prefix=
         - If `suffix` is provided, the extracted file is renamed by appending the suffix to the base filename.
         - The function returns a list of the extracted filepaths.
     """
-    with tarfile.open(tarball_filepath, "r:gz") as tar:
+    try:
+        with tarfile.open(tarball_filepath, "r:gz") as tar:
+            extracted_filepaths = []
+            for filename in filenames:
+                matching_names = [name for name in tar.getnames() if name.endswith(filename)]
+                for name in matching_names:
+                    tar.extract(name, path=os.path.dirname(tarball_filepath))
+                    if name.startswith("./"):
+                        extracted_filepath = os.path.join(os.path.dirname(tarball_filepath), name[2:])
+                    else:
+                        extracted_filepath = os.path.join(os.path.dirname(tarball_filepath), name)
+                    if suffix:
+                        new_path = os.path.join(os.path.dirname(extracted_filepath), os.path.basename(extracted_filepath) + "_" + suffix)
+                        os.rename(extracted_filepath, new_path)
+                        extracted_filepath = new_path
+                    if prefix:
+                        new_path = os.path.join(prefix + "_" + os.path.dirname(extracted_filepath), os.path.basename(extracted_filepath))
+                        os.rename(extracted_filepath, new_path)
+                        extracted_filepath = new_path
+                    extracted_filepaths.append(extracted_filepath)
+    except:
         extracted_filepaths = []
-        for filename in filenames:
-            matching_names = [name for name in tar.getnames() if name.endswith(filename)]
-            for name in matching_names:
-                tar.extract(name, path=os.path.dirname(tarball_filepath))
-                if name.startswith("./"):
-                    extracted_filepath = os.path.join(os.path.dirname(tarball_filepath), name[2:])
-                else:
-                    extracted_filepath = os.path.join(os.path.dirname(tarball_filepath), name)
-                if suffix:
-                    new_path = os.path.join(os.path.dirname(extracted_filepath), os.path.basename(extracted_filepath) + "_" + suffix)
-                    os.rename(extracted_filepath, new_path)
-                    extracted_filepath = new_path
-                if prefix:
-                    new_path = os.path.join(prefix + "_" + os.path.dirname(extracted_filepath), os.path.basename(extracted_filepath))
-                    os.rename(extracted_filepath, new_path)
-                    extracted_filepath = new_path
-                extracted_filepaths.append(extracted_filepath)
 
     return extracted_filepaths
 

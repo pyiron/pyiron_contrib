@@ -2,7 +2,7 @@
 # Copyright (c) Max-Planck-Institut für Eisenforschung GmbH - Computational Materials Design (CM) Department
 # Distributed under the terms of "New BSD License", see the LICENSE file.
 
-from pyiron_atomistics.lammps.potentials import Library, Morse, CustomPotential, LammpsPotentials
+from pyiron_contrib.atomistics.lammps.potentials import Library, Morse, CustomPotential, LammpsPotentials
 import unittest
 import pandas as pd
 import numpy as np

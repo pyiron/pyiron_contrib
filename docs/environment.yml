@@ -10,15 +10,17 @@ dependencies:
 - ipython
 - matplotlib =3.7.1
 - numpy =1.24.3
-- pyiron_base =0.5.39
-- pyiron_atomistics =0.2.67
-- pyparsing =3.0.9
+- pyiron_base =0.6.3
+- pyiron_atomistics =0.3.0
+- pyparsing =3.1.0
 - scipy =1.10.1
 - seaborn =0.12.2
-- scikit-image =0.19.3
+- scikit-image =0.21.0
 - randspg =0.0.1
-- boto3 =1.26.142
-- moto =4.1.10
+- boto3 =1.28.9
+- moto =4.1.13
 - pycp2k =0.2.2
 - typeguard =4.0.0
-- aws-sam-translator =1.65.0
+- aws-sam-translator =1.71.0
+- pympipool =0.5.6
+- distributed =2023.5.0

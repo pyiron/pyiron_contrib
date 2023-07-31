@@ -20,7 +20,7 @@ dependencies:
 - boto3 =1.28.9
 - moto =4.1.13
 - pycp2k =0.2.2
-- typeguard =4.0.0
+- typeguard =4.1.0
 - aws-sam-translator =1.71.0
 - pympipool =0.5.6
 - distributed =2023.5.0

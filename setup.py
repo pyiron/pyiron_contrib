@@ -53,7 +53,7 @@ setup(
         'image': ['scikit-image==0.21.0'],
         'generic': [
             'boto3==1.28.9', 
-            'moto==4.1.13'
+            'moto==4.1.14'
         ],
         'workflow': [
             'python>=3.10',

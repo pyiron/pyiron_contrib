@@ -58,7 +58,7 @@ setup(
         'workflow': [
             'python>=3.10',
             'ipython',
-            'typeguard==4.0.0'
+            'typeguard==4.1.0'
         ],
         'tinybase': [
             'distributed==2023.5.0',

@@ -266,36 +266,6 @@ class LammpsPotentials:
             ]
 
         @property
-        def defined_pairs(self):
-            all_pair = []
-            for int_s, pre_s in zip(
-                self._interacting_species, self._preset_species
-            ):
-                pair = []
-                for ss in int_s:
-                    if ss == "*":
-                        pair.append(pre_s)
-                    else:
-                        pair.append([ss])
-                all_pair.extend(
-                    np.unique(
-                        [sorted([p1, p2]) for p1 in pair[0] for p2 in pair[1]],
-                        axis=0
-                    ).tolist()
-                )
-            return all_pair
-
-        @property
-        def undefined_pairs(self):
-            all_pairs = [
-                sorted(s) 
-                for s in itertools.combinations_with_replacement(
-                    self._species, 2
-                )
-            ]
-            return [p for p in all_pairs if p not in self.defined_pairs]
-
-        @property
         def s_dict(self):
             if self._s_dict is None:
                 self._s_dict = dict(

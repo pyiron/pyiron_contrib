@@ -18,6 +18,7 @@ from pyiron_atomistics.lammps.potential import LammpsPotentialFile
 import numpy as np
 import warnings
 import itertools
+from functools import wraps
 
 
 general_doc = """
@@ -514,6 +515,7 @@ class Library(LammpsPotentials):
 
 
 def check_cutoff(f):
+    @wraps(f)
     def wrapper(*args, **kwargs):
         if "cutoff" not in kwargs or kwargs["cutoff"] == 0:
             raise ValueError(

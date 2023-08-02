@@ -150,6 +150,7 @@ class TestPotentials(unittest.TestCase):
         )
         self.assertEqual(pot.pair_style, "pair_style a\n")
 
+
 class TestPairCoeff(unittest.TestCase):
     def setUp(cls):
         cls.pot = LammpsPotentials()
@@ -185,6 +186,8 @@ class TestPairCoeff(unittest.TestCase):
         self.assertEqual(pc.counter, ["1", "2", ""])
         self.assertTrue(pc.is_hybrid)
         self.assertEqual(pc.pair_style, ["my_style", "my_style", "another_style"])
+        self.assertEqual(pc.s_dict, {'Al': '1', 'Fe': '2', '*': '*'})
+        self.assertEqual(pc.interacting_species, 3 * ["1 2"])
 
     def test_results(self):
         pc = self.pot._PairCoeff(
@@ -202,14 +205,16 @@ class TestPairCoeff(unittest.TestCase):
             ]
         )
 
-    def test_pairs(self):
-        pc = self.pot._PairCoeff(
-            pair_style=["style_one", "style_two"],
-            interacting_species=[["Al", "Fe"], ["Al", "Al"]],
-            pair_coeff=["arg_one", "arg_two"],
-            species=["Al", "Fe"],
-            preset_species=2 * [[]],
-        )
+
+class TestMorse(unittest.TestCase):
+    def test_incomplete_init(self):
+        self.assertRaises(ValueError, Morse, "Al")
+        self.assertRaises(TypeError, Morse, "Al", cutoff=1)
+
+    def test_pair_coeff(self):
+        morse = Morse("Al", D_0=0.5, alpha=1.1, r_0=2.1, cutoff=6)
+        self.assertEqual(morse.pair_coeff, ['pair_coeff 1 1 0.5 1.1 2.1 6\n'])
+
 
 if __name__ == "__main__":
     unittest.main()

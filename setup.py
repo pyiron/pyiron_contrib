@@ -22,9 +22,6 @@ setup(
         'License :: OSI Approved :: BSD License',
         'Intended Audience :: Science/Research',
         'Operating System :: OS Independent',
-        'Programming Language :: Python :: 3.6',
-        'Programming Language :: Python :: 3.7',
-        'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: 3.11',
@@ -38,7 +35,7 @@ setup(
         'pyiron_base==0.6.3',
         'scipy==1.10.1',
         'seaborn==0.12.2',
-        'pyparsing==3.1.0'
+        'pyparsing==3.1.1'
     ],
     extras_require={
         'atomistic': [
@@ -46,24 +43,28 @@ setup(
             'pyiron_atomistics==0.3.0',
             'pycp2k==0.2.2',
         ],
+        'executors': [
+            'cloudpickle',
+        ],
         'fenics': [
             'fenics==2019.1.0',
             'mshr==2019.1.0',
         ],
-        'image': ['scikit-image==0.19.3'],
+        'image': ['scikit-image==0.21.0'],
         'generic': [
-            'boto3==1.28.1', 
-            'moto==4.1.13'
+            'boto3==1.28.15', 
+            'moto==4.1.14'
         ],
         'workflow': [
+            'cloudpickle',
             'python>=3.10',
             'graphviz',
             'ipython',
-            'typeguard==4.0.0'
+            'typeguard==4.1.0'
         ],
         'tinybase': [
             'distributed==2023.5.0',
-            'pympipool==0.5.5'
+            'pympipool==0.6.1'
         ]
     },
     cmdclass=versioneer.get_cmdclass(),

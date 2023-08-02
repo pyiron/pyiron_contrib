@@ -2,6 +2,7 @@ channels:
 - conda-forge
 dependencies:
 - ase =3.22.1
+- cloudpickle
 - coveralls
 - coverage
 - codacy-coverage
@@ -10,18 +11,18 @@ dependencies:
 - numpy =1.24.3
 - pyiron_base =0.6.3
 - pyiron_atomistics =0.3.0
-- pyparsing =3.1.0
+- pyparsing =3.1.1
 - scipy =1.10.1
 - seaborn =0.12.2
-- scikit-image =0.19.3
+- scikit-image =0.21.0
 - randspg =0.0.1
-- boto3 =1.28.1
-- moto =4.1.13
+- boto3 =1.28.15
+- moto =4.1.14
 - pycp2k =0.2.2
 - python-graphviz
-- typeguard =4.0.0
+- typeguard =4.1.0
 - aws-sam-translator =1.71.0
-- pympipool =0.5.5
+- pympipool =0.6.1
 - distributed =2023.5.0
 - python >= 3.10
 - lammps

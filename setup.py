@@ -33,7 +33,7 @@ setup(
         'matplotlib==3.7.2',
         'numpy==1.24.3',
         'pyiron_base==0.6.3',
-        'scipy==1.10.1',
+        'scipy==1.11.1',
         'seaborn==0.12.2',
         'pyparsing==3.0.9',
     ],

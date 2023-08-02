@@ -56,7 +56,7 @@ doc_pyiron_df = """
 Example
 
 >>> import pandas as pd
->>> return pd.DataFrame(
+>>> pd.DataFrame(
 ...     {
 ...         "Config": [[
 ...             'pair_style my_potential 3.2\n',
@@ -437,16 +437,13 @@ class Library(LammpsPotentials):
                     ["pair_coeff" in c for c in config]
                 )
         raise ValueError(
-            f"""
-            pair_style could not determined: {config}.
-
-            The reason why you are seeing this error is most likely because
-            the potential you chose had a corrupt config. It is
-            supposed to have at least one item which starts with "pair_style".
-            If you are using the standard pyiron database, feel free to
-            submit an issue on {issue_page}
-            Typically you can get a reply within 24h.
-            """
+            f"pair_style could not determined: {config}.\n\n"
+            "The reason why you are seeing this error is most likely because "
+            "the potential you chose had a corrupt config. It is "
+            "supposed to have at least one item which starts with 'pair_style'.\n"
+            "If you are using the standard pyiron database, feel free to "
+            f"submit an issue on {issue_page}. "
+            "Typically you can get a reply within 24h.\n"
         )
 
     @staticmethod
@@ -520,17 +517,12 @@ def check_cutoff(f):
     def wrapper(*args, **kwargs):
         if "cutoff" not in kwargs or kwargs["cutoff"] == 0:
             raise ValueError(
-                f"""
-                It is not possible to set cutoff=0 for parameter-based
-                potentials. If you think this should be possible, you have the
-                following options:
-
-                - Open an issue on our GitHub page: {issue_page}
-
-                - Write your own potential in pyiron format. Here's how:
-
-                {doc_pyiron_df}
-            """
+                "It is not possible to set cutoff=0 for parameter-based "
+                "potentials. If you think this should be possible, you have the "
+                "following options:\n\n"
+                f"- Open an issue on our GitHub page: {issue_page}\n"
+                "- Write your own potential in pyiron format. Here's how:\n"
+                f"{doc_pyiron_df}\n"
             )
         return f(*args, **kwargs)
 

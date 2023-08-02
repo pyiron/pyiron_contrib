@@ -265,7 +265,6 @@ class LammpsPotentials:
                 )
             ]
 
-        @property
         def s_dict(self):
             if self._s_dict is None:
                 self._s_dict = dict(

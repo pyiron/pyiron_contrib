@@ -30,12 +30,12 @@ setup(
     keywords='pyiron',
     packages=find_packages(exclude=["*tests*"]),
     install_requires=[        
-        'matplotlib==3.7.1',
+        'matplotlib==3.7.2',
         'numpy==1.24.3',
         'pyiron_base==0.6.3',
-        'scipy==1.10.1',
+        'scipy==1.11.1',
         'seaborn==0.12.2',
-        'pyparsing==3.1.1'
+        'pyparsing==3.0.9',
     ],
     extras_require={
         'atomistic': [
@@ -59,11 +59,10 @@ setup(
             'cloudpickle',
             'python>=3.10',
             'graphviz',
-            'ipython',
             'typeguard==4.1.0'
         ],
         'tinybase': [
-            'distributed==2023.5.0',
+            'distributed==2023.7.1',
             'pympipool==0.6.1'
         ]
     },

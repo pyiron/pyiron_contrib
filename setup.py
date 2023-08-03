@@ -58,7 +58,6 @@ setup(
         'workflow': [
             'cloudpickle',
             'python>=3.10',
-            'ipython',
             'typeguard==4.1.0'
         ],
         'tinybase': [

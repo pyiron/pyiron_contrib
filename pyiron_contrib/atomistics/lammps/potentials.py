@@ -590,6 +590,7 @@ class CustomPotential(LammpsPotentials):
             interacting_species=[self._harmonize_species(chemical_elements)],
             pair_coeff=[" ".join([str(cc) for cc in kwargs.values()]) + f" {cutoff}"],
             cutoff=cutoff,
+            **kwargs
         )
 
 

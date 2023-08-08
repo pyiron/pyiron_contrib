@@ -52,7 +52,7 @@ setup(
         ],
         'image': ['scikit-image==0.21.0'],
         'generic': [
-            'boto3==1.28.15', 
+            'boto3==1.28.20', 
             'moto==4.1.14'
         ],
         'workflow': [
@@ -62,8 +62,8 @@ setup(
             'typeguard==4.1.0'
         ],
         'tinybase': [
-            'distributed==2023.7.1',
-            'pympipool==0.6.1'
+            'distributed==2023.8.0',
+            'pympipool==0.6.2'
         ]
     },
     cmdclass=versioneer.get_cmdclass(),

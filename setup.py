@@ -59,7 +59,7 @@ setup(
             'cloudpickle',
             'python>=3.10',
             'graphviz',
-            'typeguard==4.1.0'
+            'typeguard==4.1.2'
         ],
         'tinybase': [
             'distributed==2023.8.0',

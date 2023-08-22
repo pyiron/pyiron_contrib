@@ -167,8 +167,8 @@ class IPiCore(LammpsInteractive):
         return np.array(cell_abc), np.array(cell_ABC), np.array(trajectory)
 
     def collect_trajectory(self):
-        positions_out = self._collect_traj_helper(self.working_directory + '/ipi_out.pos.xyz')
-        forces_out = self._collect_traj_helper(self.working_directory + '/ipi_out.for.xyz')
+        positions_out = self._collect_traj_helper(self.working_directory + '/ipi_out.x_pos.xyz')
+        forces_out = self._collect_traj_helper(self.working_directory + '/ipi_out.x_for.xyz')
         self.custom_output.cell_abc = np.array(positions_out[0])
         self.custom_output.cell_ABC = np.array(positions_out[1])
         self.custom_output.positions = np.array(positions_out[2])
@@ -179,7 +179,12 @@ class IPiCore(LammpsInteractive):
         self.collect_trajectory()
 
     def collect_rdf(self):
-        f=open(self.working_directory + '/ipi_out.AlAl.rdf.dat', "r")
+        element = self.structure.get_chemical_symbols()[0]
+        try:
+            f=open(self.working_directory + '/ipi_out.' + element + element + '.rdf.dat', "r")
+        except FileNotFoundError:
+            raise FileNotFoundError('No compiled fortran module for fast calculations have been found. '
+                                    'Proceeding the calculations is not possible.')
         lines=f.readlines()
         rdf_r = []
         rdf_g_r = []

@@ -25,7 +25,7 @@ class PiMD(IPiCore):
 
     def calc_npt_md(self, temperature=300., pressure=101325e-9, n_beads=4, timestep=1.,
                     temperature_damping_timescale=100., pressure_damping_timescale=1000.,
-                    n_ionic_steps=100, n_print=1, seed=None, port=31415, constrain_ids=None, *args, **kwargs):
+                    n_ionic_steps=100, n_print=1, seed=None, port=31415, constrain_ids=None, bead_trajectory=False, *args, **kwargs):
         if not seed:
             random.seed(self.job_name)
             seed = random.randint(1, 99999)
@@ -40,6 +40,7 @@ class PiMD(IPiCore):
         self.custom_input.seed = seed
         self.custom_input.port = port
         self.custom_input.constrain_ids = constrain_ids
+        self.custom_input.bead_trajectory = bead_trajectory
 
     def write_template_file(self):
         copy(self._templates_directory + '/pimd_template.xml', self.working_directory + '/pimd_template.xml')
@@ -50,9 +51,12 @@ class PiMD(IPiCore):
         tree = ElementTree.parse(self.working_directory + '/' + xml_filename)
         root = tree.getroot()
         filepath = self.working_directory + '/ipi_input.xml'
-        for i in range(0, 3):
+        for i in range(0, 5):
             root[0][i].attrib['stride'] = str(self.custom_input.n_print)
-        root[0][3].attrib['stride'] = str(self.custom_input.n_ionic_steps)
+        root[0][5].attrib['stride'] = str(self.custom_input.n_ionic_steps)
+        if self.custom_input.bead_trajectory:
+            root[0][3].text = 'positions{angstrom}'
+            root[0][4].text = 'forces{ev/ang}'
         root[1].text = str(self.custom_input.n_ionic_steps)
         root[2][0].text = str(self.custom_input.seed)
         root[3][0].text = self.job_name

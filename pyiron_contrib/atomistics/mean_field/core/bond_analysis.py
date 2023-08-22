@@ -224,7 +224,7 @@ class StaticBondAnalysis(_BondAnalysisParent):
         # get all the rotations from spglib
         data = self.input.structure.get_symmetry()
         # account for only 0 translation rotations
-        all_rotations = data['rotations'][np.argwhere(data['translations'][:48].sum(-1) < 1e-10).flatten()]
+        all_rotations = data['rotations'][np.argwhere(data['translations'].sum(-1) < 1e-8).flatten()]
         # and sort them doing the following:
         per_shell_0K_rotations = []
         all_nn_bond_vectors_list = []
@@ -236,7 +236,7 @@ class StaticBondAnalysis(_BondAnalysisParent):
                 # collect the arguments of the rotations that that give the unique bonds
                 args = []
                 for i, bd in enumerate(np.dot(b[1], all_rotations)):
-                    if np.array_equal(np.round(bd, decimals=5), np.round(bond, decimals=5)):
+                    if np.array_equal(np.round(bd, decimals=3), np.round(bond, decimals=3)):
                         args.append(i)
                 args_list.append(args[0])
             # sort the arguments and append the rotations to a list...
@@ -399,12 +399,9 @@ class MDBondAnalysis(_BondAnalysisParent):
     def __init__(self, project, job_name):
         super(MDBondAnalysis, self).__init__(project, job_name)
         self.input.md_job = None
-        self.input.thermalize_snapshots = 20
         self.input.md_trajectory = None
         self.input.md_cells = None
-        self._structure = None
-        self._md_trajectory = None
-        self._md_cells = None
+        self.input.thermalize_snapshots = 20
         
     @staticmethod
     def _find_mic(cell, vectors, pbc=[True, True, True]):
@@ -429,9 +426,14 @@ class MDBondAnalysis(_BondAnalysisParent):
         if self.input.md_job is not None:
             self.input.md_trajectory = self.input.md_job.output.unwrapped_positions[self.input.thermalize_snapshots:]
             self.input.md_cells = self.input.md_job.output.cells[self.input.thermalize_snapshots:]
-        elif self.input.md_trajectory is None:
-            raise AttributeError('Either <job>.input.md_job or <job>.input.md_trajectory must be set')
-            
+            self.input.structure = self.input.md_job.structure.copy()
+        
+        if (self.input.md_trajectory is None) | (self.input.md_cells is None):
+            raise AttributeError('Either <job>.input.md_job or <job>.input.md_trajectory and <job>.input.md_cells must be set')
+        
+        if self.input.structure is None:
+            raise AttributeError('Either <job>.input.md_job or <job>.input.structure must be set')
+        
         static = StaticBondAnalysis(project=self.project_hdf5, job_name=self.job_name + '_static')
         static.input = self.input
         static.analyze_bonds()
@@ -506,28 +508,16 @@ class MDBondAnalysis(_BondAnalysisParent):
         else:
             return per_shell_r_t1_t2_bond_vectors 
 
-#     @staticmethod
-#     def _cartesian_to_cylindrical(vector):
-#         """
-#         Helper method for get_md_cylindrical_long_t1_t2.
-#         """
-#         if len(vector.shape) == 1:
-#             vector = np.array([vector])
-#         r = np.linalg.norm(vector[:, -2:], axis=1)
-#         phi = np.arctan2(vector[:, 2], vector[:, 1])
-#         return np.array([vector[:, 0], r, phi]).T
-
-#     def _get_long_r_phi_bond_vectors(self):
-#         """
-#         Convert the [longitudinal, transverse1 and transverse2] which are cartesian axes to cylindrical axes
-#             [longitudinal, r and phi].
-#         """
-#         self.output.per_shell_long_r_phi_bond_vectors = []
-#         for shell in self.output.per_shell_long_t1_t2_bond_vectors:
-#             per_bond = []
-#             for bond in shell:
-#                 per_bond.append(self._cartesian_to_cylindrical(bond))
-#             self.output.per_shell_long_r_phi_bond_vectors.append(np.array(per_bond))
+    @staticmethod
+    def _cartesian_to_cylindrical(vector):
+        """
+        Helper method for get_md_cylindrical_long_t1_t2.
+        """
+        if len(vector.shape) == 1:
+            vector = np.array([vector])
+        r = np.linalg.norm(vector[:, -2:], axis=1)
+        phi = np.arctan2(vector[:, 2], vector[:, 1])
+        return np.array([vector[:, 0], r, phi]).T
 
     def run_static(self):
         self.status.running = True
@@ -555,12 +545,6 @@ class MDBondAnalysis(_BondAnalysisParent):
                                                          bond=bond, n_bins=n_bins, d_range=d_range, density=density,
                                                          axis=axis, moment=moment)
 
-#     def get_1d_histogram_long_r_phi(self, shell=0, bond=None, n_bins=20, d_range=None, density=True, axis=0,
-#                                     moment=True):
-#         return self.histogram.get_per_shell_1d_histogram(self.output.per_shell_long_r_phi_bond_vectors, shell=shell,
-#                                                          bond=bond, n_bins=n_bins, d_range=d_range, density=density,
-#                                                          axis=axis, moment=moment)
-
     def get_3d_histogram_xyz(self, shell=0, bond=None, n_bins=20, d_range=None, density=True):
         per_shell_xyz_bond_vectors = self.get_xyz_bond_vectors()
         return self.histogram.get_per_shell_3d_histogram(per_shell_xyz_bond_vectors, supp_data=None, shell=shell, bond=bond,
@@ -577,37 +561,6 @@ class MDBondAnalysis(_BondAnalysisParent):
         return self.histogram.get_per_shell_3d_histogram(per_shell_r_t1_t2_bond_vectors, 
                                                          supp_data=per_shell_xyz_bond_vectors, shell=shell,
                                                          bond=bond, n_bins=n_bins, d_range=d_range, density=density)
-
-#     def get_3d_histogram_long_r_phi(self, shell=0, bond=None, n_bins=20, d_range=None, density=True):
-#         return self.histogram.get_per_shell_3d_histogram(self.output.per_shell_long_r_phi_bond_vectors, shell=shell, supp_data=None,
-#                                                          bond=bond, n_bins=n_bins, d_range=d_range, density=density)
-
-#     def get_potential_long_r_phi(self, temperature=300., shell=0, bond=None, n_bins=20, d_range=None, density=True):
-#         pd, bins = self.get_3d_histogram_long_r_phi(shell=shell, bond=bond, n_bins=n_bins, d_range=d_range,
-#                                                     density=density)
-#         r_bins = bins[1][0, :, 0]
-#         delta_r = (r_bins[1] - r_bins[0]) / 2
-#         mean_over_phi_pd = pd.mean(axis=-1)
-#         # since in cylindrical coordinates, the pd of r needs to be divided by the bins,
-#         mean_over_phi_pd /= np.outer(np.ones(n_bins), r_bins + delta_r)
-#         mean_over_phi_pd /= mean_over_phi_pd.sum()
-#         potential = -KB * temperature * np.log(mean_over_phi_pd + 1e-10)
-#         potential = potential.T
-#         return potential - potential.min(), np.meshgrid(bins[0][:, 0, 0], bins[1][0, :, 0])
-
-#     def get_potential_long_t1_t2(self, temperature=300., shell=0, bond=None, n_bins=20, d_range=None, density=True,
-#                                  mean_over_final_axis=False):
-#         pd, bins = self.get_3d_histogram_long_t1_t2(shell=shell, bond=bond, n_bins=n_bins, d_range=d_range,
-#                                                     density=density)
-#         if mean_over_final_axis:
-#             pd = pd.mean(axis=-1)
-#         pd /= pd.sum()
-#         potential = -KB * temperature * np.log(pd + 1e-10)
-#         if mean_over_final_axis:
-#             return (potential - potential.min()).T, np.meshgrid(bins[0][:, 0, 0], bins[1][0, :, 0])
-#         else:
-#             return potential - potential.min(), bins
-
 
     @staticmethod
     def _get_rho_corr_and_uncorr(x_data, y_data, n_bins=101):

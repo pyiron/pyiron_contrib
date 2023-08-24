@@ -1200,7 +1200,7 @@ class GenerateLAPotential():
                 job_name = tag + '_' + str(i)
                 if job_name not in job_list:
                     self._run_job(project=pr_tag, job_name=job_name, position=pos)
-                elif job_status[i] != 'finished' or self.delete_existing_jobs:
+                elif job_status[i] not in ['finished', 'warning', 'running'] or self.delete_existing_jobs:
                     pr_tag.remove_job(job_name)
                     self._run_job(project=pr_tag, job_name=job_name, position=pos) 
         
@@ -1296,7 +1296,7 @@ class GenerateLAPotential():
         F_ij = (jth_atom_forces*ij_direcs).sum(axis=-1)
         return r, F_ij, ij_direcs
     
-    def get_t_bond_force(self, jth_atom_id, jth_atom_forces, tag='t1'):
+    def get_t_bond_force(self, jth_atom_id, jth_atom_forces, tag='t1', return_prime=False):
         """
         Compute the bonding forces along a transversal direction.
         
@@ -1313,6 +1313,7 @@ class GenerateLAPotential():
         - jth_atom_id (array-like): id of the jth atom.
         - j_atom_forces (array-like): Forces on the jth atom.
         - tag (str): 't1' or 't2'.
+        - return_prime (bool): Whether to return the t_prime directions, for debugging. 
 
         Returns:
         - tuple: A tuple containing the displacements u and bond forces F_t_prime along the 'tag' direction.
@@ -1329,12 +1330,15 @@ class GenerateLAPotential():
             raise ValueError
         F_t = jth_atom_forces-ij_direcs*F_ij[:, np.newaxis]
         F_t_prime = []
+        prime = []
         for ij_dir, f_t in zip(ij_direcs, F_t):
             basis[0] = ij_dir
             t_prime = self.orthogonalize(basis.copy())[1]
             F_t_prime.append(f_t@t_prime)
-        F_t_prime = np.array(F_t_prime)
-        return u, F_t_prime
+            prime.append(t_prime)
+        if return_prime:
+            return u, np.array(F_t_prime), np.array(prime)
+        return u, np.array(F_t_prime)
     
     def _bond_force(self, tag='long'):
         if tag == 'long':

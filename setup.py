@@ -53,7 +53,7 @@ setup(
         'image': ['scikit-image==0.21.0'],
         'generic': [
             'boto3==1.28.25', 
-            'moto==4.1.14'
+            'moto==4.2.0'
         ],
         'workflow': [
             'cloudpickle',

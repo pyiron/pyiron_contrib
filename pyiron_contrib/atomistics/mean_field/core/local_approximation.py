@@ -1332,9 +1332,11 @@ class GenerateLAPotential():
         F_t_prime = []
         prime = []
         for ij_dir, f_t in zip(ij_direcs, F_t):
-            basis[0] = ij_dir
-            t_prime = self.orthogonalize(basis.copy())[1]
-            F_t_prime.append(f_t@t_prime)
+            new_basis = basis.copy()
+            new_basis[0] = ij_dir
+            t_prime = self.orthogonalize(new_basis)[1]
+            # F_t_prime.append(f_t@t_prime)
+            F_t_prime.append(f_t@basis[1])
             prime.append(t_prime)
         if return_prime:
             return u, np.array(F_t_prime), np.array(prime)

@@ -357,7 +357,7 @@ def python_script(
             return "python " + script + " " + " ".join(inputs_list)
 
         macro.command = inputs_to_command(macro.input_collator)
-        macro.script = macro.create.standard.shell_command(cmd=macro.command)
+        macro.script = macro.create.standard.ShellCommand(cmd=macro.command)
         node_directory = str(macro.script.working_directory.path.absolute())
         macro.script.inputs.cwd = node_directory
 

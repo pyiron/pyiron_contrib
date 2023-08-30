@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 from inspect import isclass
+import subprocess
 from typing import Optional
 
 import numpy as np
 from matplotlib import pyplot as plt
 
 from pyiron_contrib.workflow.channels import NotData, OutputSignal
-from pyiron_contrib.workflow.function import SingleValue, single_value_node
+from pyiron_contrib.workflow.function import (
+    function_node, SingleValue, single_value_node
+)
 
 
 @single_value_node(output_labels="fig")
@@ -16,6 +19,28 @@ def scatter(
 ):
     return plt.scatter(x, y)
 
+
+@function_node()
+def shell_command(
+        cmd: str,
+        cwd: Optional[str] = None,
+        timeout: Optional[float | int] = None,
+        check: bool = True,
+):
+    out = subprocess.run(
+        cmd,
+        cwd=cwd,
+        timeout=timeout,
+        shell=True,
+        capture_output=True,
+        universal_newlines=True,
+        check=check,
+
+    )
+    stdout = out.stdout
+    stderr = out.stderr
+    returncode = out.returncode
+    return stdout, stderr, returncode
 
 @single_value_node()
 def user_input(user_input):
@@ -53,6 +78,7 @@ class If(SingleValue):
 
 nodes = [
     scatter,
+    shell_command,
     user_input,
     If,
 ]

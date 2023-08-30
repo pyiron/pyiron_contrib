@@ -372,7 +372,8 @@ def python_script(
 
         for process_output in macro.script.outputs.labels:
             macro.outputs_map[
-                f"{macro.script.label}__{process_output}"] = process_output
+                f"{macro.script.label}__{process_output}"
+            ] = process_output
 
     return type(
         script.title().replace("_", "").replace(" ", ""),  # fnc_name to CamelCase

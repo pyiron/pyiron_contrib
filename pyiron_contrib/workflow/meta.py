@@ -363,7 +363,7 @@ def python_script(
 
         for channel_label, filename in output_files.items():
             fout = macro.create.standard.UserInput(
-                os.path.join(filename, node_directory),
+                os.path.join(node_directory, filename),
                 label=channel_label,
                 run_on_updates=False,
             )

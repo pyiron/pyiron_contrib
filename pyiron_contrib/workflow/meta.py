@@ -4,6 +4,10 @@ Meta nodes are callables that create a node class instead of a node instance.
 
 from __future__ import annotations
 
+from functools import partialmethod
+import os
+from typing import Any, Optional
+
 from pyiron_contrib.workflow.function import (
     Function,
     SingleValue,
@@ -295,11 +299,99 @@ def while_loop(
     return macro_node()(make_loop)
 
 
+def meta_python_script(
+        script: str,
+        args: Optional[dict[str, type[Any]]] = None,
+        kwargs: Optional[dict[str, Any]] = None,
+        output_files: Optional[dict[str, str]] = None
+):
+    """
+    Creates a node class that runs a particular python script.
+    Output (assumed to be files), command line args, and command line kwargs
+    can all be set up as channels from/to the node.
+    """
+    args = {} if args is None else args
+    kwargs = {} if kwargs is None else kwargs
+    output_files = {} if output_files is None else output_files
+
+    def make_graph(macro):
+        macro.inputs_map = {}
+        macro.outputs_map = {}
+
+        InputCollator = macro.create.meta.input_to_list(len(args) + len(kwargs))
+        macro.input_collator = InputCollator(
+            output_labels="output",
+            update_on_instantiation=False,
+        )
+        i = 0
+
+        for positional_label, type_hint in args.items():
+            node = macro.create.standard.UserInput(
+                label=positional_label,
+                update_on_instantiation=False
+            )
+            node.inputs.user_input.type_hint = type_hint
+            macro.inputs_map[f"{positional_label}__user_input"] = positional_label
+            macro.input_collator.inputs[f"inp{i}"] = node
+            i += 1
+
+        keyword_input_nodes = []
+        for keyword_label, default in kwargs.items():
+            clean_label = keyword_label.lstrip("-")
+            user_node = macro.create.standard.UserInput(user_input=default,
+                                                        label=clean_label)
+            macro.inputs_map[f"{clean_label}__user_input"] = clean_label
+
+            @macro.wrap_as.single_value_node()
+            def kwarg_creator(value):
+                as_string = keyword_label + "=" + str(value)
+                return as_string
+
+            internal_node = kwarg_creator(user_node, label=keyword_label, parent=macro)
+            macro.input_collator.inputs[f"inp{i}"] = internal_node
+            i += 1
+
+        @macro.wrap_as.single_value_node()
+        def inputs_to_command(inputs_list: list):
+            inputs_list = [str(i) for i in inputs_list]
+            return "python " + script + " " + " ".join(inputs_list)
+
+        macro.command = inputs_to_command(macro.input_collator)
+        macro.script = macro.create.standard.shell_command(cmd=macro.command)
+        node_directory = str(macro.script.working_directory.path.absolute())
+        macro.script.inputs.cwd = node_directory
+
+        for channel_label, filename in output_files.items():
+            fout = macro.create.standard.UserInput(
+                os.path.join(filename, node_directory),
+                label=channel_label,
+                run_on_updates=False,
+            )
+            fout.signals.input.run = macro.script.signals.output.ran
+            macro.outputs_map[f"{channel_label}__user_input"] = channel_label
+
+        for process_output in macro.script.outputs.labels:
+            macro.outputs_map[
+                f"{macro.script.label}__{process_output}"] = process_output
+
+    return type(
+        script.title().replace("_", "").replace(" ", ""),  # fnc_name to CamelCase
+        (Macro,),  # Define parentage
+        {
+            "__init__": partialmethod(
+                Macro.__init__,
+                make_graph,
+            )
+        },
+    )
+
+
 meta_nodes = DotDict(
     {
         for_loop.__name__: for_loop,
         input_to_list.__name__: input_to_list,
         list_to_output.__name__: list_to_output,
+        meta_python_script.__name__: meta_python_script,
         while_loop.__name__: while_loop,
     }
 )

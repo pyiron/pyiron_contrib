@@ -299,7 +299,7 @@ def while_loop(
     return macro_node()(make_loop)
 
 
-def meta_python_script(
+def python_script(
         script: str,
         args: Optional[dict[str, type[Any]]] = None,
         kwargs: Optional[dict[str, Any]] = None,
@@ -391,7 +391,7 @@ meta_nodes = DotDict(
         for_loop.__name__: for_loop,
         input_to_list.__name__: input_to_list,
         list_to_output.__name__: list_to_output,
-        meta_python_script.__name__: meta_python_script,
+        python_script.__name__: python_script,
         while_loop.__name__: while_loop,
     }
 )

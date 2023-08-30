@@ -15,8 +15,7 @@ class TestPythonScriptCLI(unittest.TestCase):
         my_plot = MyPlot()
         my_plot(x_max=5.5, n_points=10, linestyle="'--'", linecolor="'green'")
 
-        print(my_plot.outputs.plot.value)
         self.assertTrue(os.path.isfile(my_plot.outputs.plot.value))
 
-        # my_plot.working_directory.delete()
+        my_plot.working_directory.delete()
 

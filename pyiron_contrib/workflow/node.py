@@ -358,3 +358,46 @@ class Node(HasToDict, ABC):
             f"{str(self.outputs)}\n"
             f"{str(self.signals)}"
         )
+
+    def get_kwargs(self):
+        kwargs = {}
+        for k, v in self.inputs.channel_dict.items():
+            kwargs[k] = v.value
+        #     print(k, v.value)
+        # for k in self.inputs.to_dict()['channels']:
+        #     kwargs[k] = self.inputs.__getattr__(k).value
+        return kwargs
+
+    def set_kwargs(self, kwargs:dict):
+        for k, v in kwargs.items():
+            self.inputs.__setattr__(k, v)
+
+    def __getstate__(self):
+        return (self._function, self.get_kwargs())
+
+    def __setstate__(self, state):
+        function, kwargs = state
+        print(kwargs)
+        self.__init__(function)
+        assert isinstance(kwargs, dict)
+        self.set_kwargs(kwargs)
+
+    def exec_pool(self, max_workers = 1, ** kwargs):
+        from pympipool import Pool
+
+        key = list(kwargs.keys())[0]
+        val = kwargs[key]
+
+        def _run(y):
+            self.inputs[key] = y
+            return self.run()
+
+        with Pool(max_workers=max_workers) as p:
+            out = p.map(func=_run, iterable=val)
+
+        return out
+
+    def __gt__(self, next_node):
+        print (next_node.label, '>', self.label)
+        self.signals.output.ran = next_node.signals.input.run
+        return next_node

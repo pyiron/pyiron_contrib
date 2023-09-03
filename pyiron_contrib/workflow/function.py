@@ -616,6 +616,16 @@ class Function(Node):
         """For drawing the graph"""
         return SeabornColors.green
 
+    def __getstate__(self):
+        return (self.node_function, self.get_kwargs())
+
+    def __setstate__(self, state):
+        function, kwargs = state
+        print(kwargs)
+        self.__init__(function, update_on_instantiation=False, run_on_updates=False)
+        assert isinstance(kwargs, dict)
+        self.set_kwargs(kwargs)
+
 
 class Slow(Function):
     """

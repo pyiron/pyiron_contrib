@@ -133,6 +133,7 @@ class Macro(Composite):
         )
         graph_creator(self)
 
+        self._function = graph_creator
         self._inputs: Inputs = self._build_inputs()
         self._outputs: Outputs = self._build_outputs()
 
@@ -140,6 +141,7 @@ class Macro(Composite):
 
         if update_on_instantiation:
             self.update()
+        print ('Macro: ', run_on_updates)
 
     @property
     def inputs(self) -> Inputs:

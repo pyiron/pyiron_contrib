@@ -68,6 +68,16 @@ class Creator(metaclass=Singleton):
             return self._standard
 
     @property
+    def lammps(self):
+        try:
+            return self._lammps
+        except AttributeError:
+            from pyiron_contrib.workflow.node_library.lammps import nodes
+
+            self.register("_lammps", *nodes)
+            return self._lammps
+
+    @property
     def atomistics(self):
         try:
             return self._atomistics

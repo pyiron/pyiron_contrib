@@ -12,6 +12,17 @@ from pyiron_contrib.workflow.function import single_value_node, slow_node
 
 Bulk = single_value_node(output_labels="structure")(_StructureFactory().bulk)
 
+@single_value_node(output_labels="structure")
+def repeat(structure: Optional[Atoms] = None, repeat_scalar: int = 1) -> Optional[Atoms]:
+    return structure.repeat(repeat_scalar)
+
+@single_value_node(output_labels="structure")
+def apply_strain(structure: Optional[Atoms] = None, strain: float = 1) -> Optional[Atoms]:
+    print ('apply strain: ', strain)
+    struct = structure.copy()
+    struct.cell *= strain
+    return struct
+
 
 @single_value_node(output_labels="job")
 def lammps(structure: Optional[Atoms] = None) -> LammpsJob:
@@ -195,6 +206,8 @@ def calc_min(
 
 nodes = [
     Bulk,
+    repeat,
+    apply_strain,
     calc_md,
     calc_min,
     calc_static,

@@ -62,7 +62,7 @@ setup(
             'typeguard==4.1.0'
         ],
         'tinybase': [
-            'distributed==2023.8.0',
+            'distributed==2023.9.0',
             'pympipool==0.6.2'
         ]
     },

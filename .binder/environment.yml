@@ -16,7 +16,7 @@ dependencies:
 - scikit-image =0.21.0
 - randspg =0.0.1
 - boto3 =1.28.25
-- moto =4.1.14
+- moto =4.2.2
 - pycp2k =0.2.2
 - python-graphviz
 - typeguard =4.1.0

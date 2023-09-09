@@ -59,6 +59,7 @@ setup(
             'cloudpickle',
             'python>=3.10',
             'graphviz',
+            'toposort',
             'typeguard==4.1.0'
         ],
         'tinybase': [

@@ -2,7 +2,7 @@
 Abstract base class for fitting interactomic potentials.
 """
 
-from typing import List
+from typing import List, Optional
 
 import abc
 
@@ -108,9 +108,12 @@ class PotentialPlots:
         self._training_data = training_data
         self._predicted_data = predicted_data
 
-    def energy_scatter_histogram(self):
+    def energy_scatter_histogram(self, logy=False):
         """
         Plots correlation and (training) error histograms.
+
+        Args:
+            logy (bool): Use log scale for histogram heights
         """
         energy_train = self._training_data["energy"] / self._training_data["length"]
         energy_pred = self._predicted_data["energy"] / self._predicted_data["length"]
@@ -122,7 +125,7 @@ class PotentialPlots:
         plt.plot()
 
         plt.subplot(1, 2, 2)
-        plt.hist(energy_train - energy_pred)
+        plt.hist(energy_train - energy_pred, log=logy)
         plt.xlabel("Training Error [eV / atom]")
 
     def energy_log_histogram(self, bins=20, logy=False):
@@ -168,13 +171,13 @@ class PotentialPlots:
         annotated_vline(low, f"LOW = {low:.02}", linestyle="-")
         plt.xlabel("Training Error [eV/atom]")
 
-    def force_scatter_histogram(self, axis=None):
+    def force_scatter_histogram(self, axis=None, logy=False):
         """
         Plots correlation and (training) error histograms.
 
         Args:
             axis (None, int): Whether to plot for an axis or norm
-
+            logy (bool): Use log scale for histogram heights
         """
         force_train = self._training_data["forces"]
         force_pred = self._predicted_data["forces"]
@@ -191,5 +194,99 @@ class PotentialPlots:
         plt.xlabel("True Forces [eV/$\mathrm{\AA}$]")
         plt.ylabel("Predicted Forces [eV/$\AA$]")
         plt.subplot(1, 2, 2)
-        plt.hist(ft - fp)
+        plt.hist(ft - fp, log=logy)
         plt.xlabel("Training Error [eV/$\AA$]")
+
+    def force_log_histogram(
+            self,
+            bins: int = 20,
+            logy: bool = False,
+            axis: Optional[int] = None
+    ):
+        """
+        Plots a histogram of logarithmic training errors.
+
+        Bins are created automatically using the minimum and maximum absolute
+        errors with the given number of bins.
+
+        Arguments:
+            bins (int, optional): number of bins for the histogram
+            logy (bool, optional): if True use a log scale also for the y-axis
+            axis (int, optional): which axis of the forces to plot; if not given plot force magnitude
+        """
+
+        force_train = self._training_data["forces"]
+        force_pred = self._predicted_data["forces"]
+
+        if axis is None:
+            ft = np.linalg.norm(force_train, axis=1)
+            fp = np.linalg.norm(force_pred, axis=1)
+        else:
+            ft = force_train[:, axis]
+            fp = force_pred[:, axis]
+
+        df = abs(ft - fp)
+        rmse = np.sqrt((df**2).mean())
+        mae = df.mean()
+        high = df.max()
+        low = df.min()
+
+        ax = plt.gca()
+        trafo = ax.get_xaxis_transform()
+
+        def annotated_vline(x, text, linestyle="--"):
+            plt.axvline(x, color="k", linestyle=linestyle)
+            plt.text(
+                x=x,
+                y=0.5,
+                s=text,
+                transform=trafo,
+                rotation="vertical",
+                horizontalalignment="center",
+                path_effects=[withStroke(linewidth=4, foreground="w")],
+            )
+
+        plt.hist(df, bins=np.logspace(np.log10(low + 1e-8), np.log10(high), bins), log=logy)
+        plt.xscale("log")
+        annotated_vline(rmse, f"RMSE = {rmse:.02}")
+        annotated_vline(mae, f"MAE = {mae:.02}")
+        annotated_vline(high, f"HIGH = {high:.02}", linestyle="-")
+        annotated_vline(low, f"LOW = {low:.02}", linestyle="-")
+        plt.xlabel("Training Error [eV/$\mathrm{\AA}$]")
+
+    def force_angle_histogram(
+            self,
+            bins: int = 180,
+            logy: bool = True,
+            tol: float = 1e-6,
+            angle_in_degrees=True,
+            cumulative = False
+    ):
+        """
+        Plot histogram of the angle between training and predicted forces.
+
+        Args:
+            bins (int): number of bins
+            logy (bool): Use log scale for histogram heights
+            tol (float): consider forces smaller than this zero (and obmit them from the histogram)
+            angle_in_degrees (bool): if True use degrees, otherwise radians
+        """
+        force_train = self._training_data["forces"]
+        force_pred = self._predicted_data["forces"]
+
+        force_norm_train = np.linalg.norm(force_train, axis=-1).reshape(-1, 1)
+        force_norm_pred  = np.linalg.norm(force_pred,  axis=-1).reshape(-1, 1)
+
+        I = ( (force_norm_train > tol) & (force_norm_train > tol) ).reshape(-1)
+
+        force_dir_train = force_train[I]/force_norm_train[I]
+        force_dir_pred = force_pred[I]/force_norm_pred[I]
+
+        err = np.arccos( (force_dir_train * force_dir_pred).sum(axis=-1).round(8) )
+        if angle_in_degrees:
+            err = np.rad2deg(err)
+        if cumulative:
+            logy = False
+        plt.hist(err, bins=bins, log=logy, cumulative=cumulative)
+        plt.xlabel("Angular Deviation of Force [" + ["rad", "deg"][angle_in_degrees] + "]")
+        plt.ylabel("Count")

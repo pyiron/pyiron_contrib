@@ -150,8 +150,8 @@ class AlgorithmFactory(PyironFactory):
         )
 
     @staticmethod
-    def ar_spa(spa_iterations=20, seed=42):
-        return SpaMinimizer(spa_iterations=spa_iterations, seed=seed)
+    def ar_spa(max_iter=20, seed=42):
+        return SpaMinimizer(max_iter=max_iter, seed=seed)
 
     @staticmethod
     def ld_lbfgs(

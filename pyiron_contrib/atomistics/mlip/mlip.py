@@ -20,7 +20,12 @@ from pyiron_base import (
 )
 from pyiron_atomistics import ase_to_pyiron, Atoms
 from pyiron_contrib.atomistics.ml.potentialfit import PotentialFit
-from pyiron_contrib.atomistics.mlip.cfgs import savecfgs, loadcfgs, Cfg, load_grades_ids_and_timesteps
+from pyiron_contrib.atomistics.mlip.cfgs import (
+    savecfgs,
+    loadcfgs,
+    Cfg,
+    load_grades_ids_and_timesteps,
+)
 from pyiron_contrib.atomistics.mlip.potential import MtpPotential
 
 __author__ = "Jan Janssen"
@@ -235,17 +240,27 @@ class Mlip(GenericJob, PotentialFit):
     def collect_output(self):
         file_name = os.path.join(self.working_directory, "diff.cfg")
         if os.path.exists(file_name):
-             _, job_id_diff_lst, timestep_diff_lst = load_grades_ids_and_timesteps(file_name)
+            _, job_id_diff_lst, timestep_diff_lst = load_grades_ids_and_timesteps(
+                file_name
+            )
         else:
             job_id_diff_lst, timestep_diff_lst = [], []
         file_name = os.path.join(self.working_directory, "selected.cfg")
         if os.path.exists(file_name):
-            _, job_id_new_training_lst, timestep_new_training_lst = load_grades_ids_and_timesteps(file_name)
+            (
+                _,
+                job_id_new_training_lst,
+                timestep_new_training_lst,
+            ) = load_grades_ids_and_timesteps(file_name)
         else:
             job_id_new_training_lst, timestep_new_training_lst = [], []
         file_name = os.path.join(self.working_directory, "grades.cfg")
         if os.path.exists(file_name):
-            grades_lst, job_id_grades_lst, timestep_grades_lst = load_grades_ids_and_timesteps(file_name)
+            (
+                grades_lst,
+                job_id_grades_lst,
+                timestep_grades_lst,
+            ) = load_grades_ids_and_timesteps(file_name)
         else:
             grades_lst, job_id_grades_lst, timestep_grades_lst = [], [], []
         try:

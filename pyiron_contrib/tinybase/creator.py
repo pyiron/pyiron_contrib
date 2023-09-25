@@ -22,7 +22,7 @@ from functools import wraps
 try:
     from os import sched_getaffinity
 
-    cpu_count = lambda: len(sched_getaffinity)
+    cpu_count = lambda: len(sched_getaffinity(0))
 except ImportError:
     from multiprocessing import cpu_count
 

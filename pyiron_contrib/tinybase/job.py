@@ -6,8 +6,6 @@ from pyiron_contrib.tinybase.task import AbstractTask
 from pyiron_contrib.tinybase.storage import (
     Storable,
     GenericStorage,
-    pickle_load,
-    pickle_dump,
 )
 from pyiron_contrib.tinybase.executor import (
     Executor,
@@ -202,11 +200,9 @@ class TinyJob(Storable):
 
     # Storable Impl'
     def _store(self, storage):
-        # preferred solution, but not everything that can be pickled can go into HDF atm
-        # self._executor.output[-1].store(storage, "output")
-        storage["task"] = pickle_dump(self.task)
+        storage["task"] = self.task
         if self._output is not None:
-            storage["output"] = pickle_dump(self._output)
+            storage["output"] = self._output
 
     def load(self, storage: GenericStorage = None):
         """
@@ -220,16 +216,13 @@ class TinyJob(Storable):
         self._update_id()
         if storage is None:
             storage = self.storage
-        self._task = pickle_load(storage["task"])
-        # this would be correct, but since we pickle output and put it into a
-        # HDF task it doesn't appear here yet!
-        # if "output" in storage.list_groups():
-        if "output" in storage.list_nodes():
-            self._output = pickle_load(storage["output"])
+        self._task = storage["task"].to_object()
+        if "output" in storage.list_groups():
+            self._output = storage["output"].to_object()
 
     @classmethod
     def _restore(cls, storage, version):
-        task = pickle_load(storage["task"])
+        task = storage["task"].to_object()
         job = cls(task=task, project=storage.project, job_name=storage.name)
         job.load(storage=storage)
         return job

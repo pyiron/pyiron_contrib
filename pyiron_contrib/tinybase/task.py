@@ -5,7 +5,7 @@ from typing import Optional, Callable, List, Generator, Tuple
 
 from pyiron_base.interfaces.object import HasStorage
 
-from pyiron_contrib.tinybase.storage import Storable, pickle_dump, pickle_load
+from pyiron_contrib.tinybase.storage import Storable
 from pyiron_contrib.tinybase.container import (
     AbstractInput,
     AbstractOutput,
@@ -139,14 +139,12 @@ class AbstractTask(Storable, abc.ABC):
     # Storable Impl'
     # We might even avoid this by deriving from HasStorage and put _input in there
     def _store(self, storage):
-        # right now not all ASE objects can be stored in HDF, so let's just pickle for now
-        storage["input"] = pickle_dump(self.input)
-        # self.input.store(storage, "input")
+        storage["input"] = self.input
 
     @classmethod
     def _restore(cls, storage, version):
         task = cls()
-        task._input = pickle_load(storage["input"])
+        task._input = storage["input"].to_object()
         return task
 
 

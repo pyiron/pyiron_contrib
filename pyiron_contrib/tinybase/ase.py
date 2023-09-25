@@ -31,6 +31,7 @@ class AseInput(AbstractInput):
 class AseStaticInput(AseInput, StructureInput):
     pass
 
+
 class AseStaticTask(AbstractTask):
     def _get_input(self):
         return AseStaticInput()

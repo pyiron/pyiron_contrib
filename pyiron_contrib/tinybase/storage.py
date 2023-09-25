@@ -248,7 +248,7 @@ class ProjectHDFioStorageAdapter(GenericStorage):
         else:
             try:
                 self._hdf[item] = value
-            except TypeError: # HDF layer doesn't know how to write value
+            except TypeError:  # HDF layer doesn't know how to write value
                 # h5io bug, when triggering an error in the middle of a write
                 # some residual data maybe left in the file
                 del self._hdf[item]
@@ -281,6 +281,7 @@ class ProjectHDFioStorageAdapter(GenericStorage):
             return self._hdf.to_object()
         except:
             return super().to_object()
+
 
 class DataContainerAdapter(GenericStorage):
     """
@@ -385,6 +386,7 @@ class Storable(abc.ABC):
         except Exception as e:
             raise ValueError(f"Failed to restore object with: {e}")
 
+
 class HasHDFAdapaterMixin(Storable):
     """
     Implements :class:`.Storable` in terms of HasHDF.  Make any sub class of it a subclass :class:`.Storable` as well by
@@ -428,12 +430,14 @@ class PickleStorable(Storable):
     def _restore(cls, storage, version):
         return pickle_load(storage["pickle"])
 
+
 class ListStorable(Storable):
     """
     Trivial implementation of :class:`.Storable` for lists with potentially complex objects inside.
 
     Used by :class:`.GenericStorage` as a fallback if storing the list with h5py/h5io as it is fails.
     """
+
     def __init__(self, value):
         self._value = value
 
@@ -444,9 +448,9 @@ class ListStorable(Storable):
     @classmethod
     def _restore(cls, storage, version):
         keys = sorted(
-                  [v for v in storage.list_nodes() if v.startswith("index_")]
-                + [v for v in storage.list_groups() if v.startswith("index_")],
-                key=lambda k: int(k.split("_")[1])
+            [v for v in storage.list_nodes() if v.startswith("index_")]
+            + [v for v in storage.list_groups() if v.startswith("index_")],
+            key=lambda k: int(k.split("_")[1]),
         )
         value = []
         for k in keys:

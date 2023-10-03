@@ -13,8 +13,6 @@ from pyiron_contrib.workflow.io import Inputs, Outputs
 
 
 if TYPE_CHECKING:
-    from bidict import bidict
-
     from pyiron_contrib.workflow.node import Node
 
 
@@ -168,8 +166,8 @@ class Workflow(Composite):
         label: str,
         *nodes: Node,
         strict_naming: bool = True,
-        inputs_map: Optional[dict | bidict] = None,
-        outputs_map: Optional[dict | bidict] = None,
+        inputs_map: Optional[dict] = None,
+        outputs_map: Optional[dict] = None,
         automate_execution: bool = True,
     ):
         super().__init__(

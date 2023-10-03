@@ -56,7 +56,6 @@ setup(
             'moto==4.1.14'
         ],
         'workflow': [
-            'bidict',
             'cloudpickle',
             'python>=3.10',
             'graphviz',

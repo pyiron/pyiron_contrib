@@ -6,13 +6,10 @@ interface and are not intended to be internally modified after instantiation.
 from __future__ import annotations
 
 from functools import partialmethod
-from typing import Optional, TYPE_CHECKING
+from typing import Optional
 
 from pyiron_contrib.workflow.composite import Composite
 from pyiron_contrib.workflow.io import Outputs, Inputs
-
-if TYPE_CHECKING:
-    from bidict import bidict
 
 
 class Macro(Composite):
@@ -141,8 +138,8 @@ class Macro(Composite):
         label: Optional[str] = None,
         parent: Optional[Composite] = None,
         strict_naming: bool = True,
-        inputs_map: Optional[dict | bidict] = None,
-        outputs_map: Optional[dict | bidict] = None,
+        inputs_map: Optional[dict] = None,
+        outputs_map: Optional[dict] = None,
         **kwargs,
     ):
         self._parent = None

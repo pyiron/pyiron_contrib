@@ -52,6 +52,7 @@ setup(
         ],
         'image': ['scikit-image==0.21.0'],
         'generic': [
+            'aws-sam-translator==1.75.0'
             'boto3==1.28.60',
             'moto==4.2.5'
         ],

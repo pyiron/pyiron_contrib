@@ -22,6 +22,6 @@ dependencies:
 - pycp2k =0.2.2
 - python-graphviz
 - typeguard =4.1.0
-- aws-sam-translator =1.71.0
+- aws-sam-translator =1.75.0
 - pympipool =0.7.1
 - distributed =2023.8.0

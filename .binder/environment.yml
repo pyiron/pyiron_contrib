@@ -12,7 +12,7 @@ dependencies:
 - pyiron_atomistics =0.3.4
 - pyparsing =3.0.9
 - scipy =1.11.3
-- seaborn =0.12.2
+- seaborn =0.13.0
 - scikit-image =0.21.0
 - toposort
 - randspg =0.0.1

@@ -11,14 +11,14 @@ dependencies:
 - numpy =1.26.0
 - pyiron_base =0.6.7
 - pyiron_atomistics =0.3.4
-- pyparsing =3.0.9
+- pyparsing =3.1.1
 - scipy =1.11.3
-- seaborn =0.12.2
+- seaborn =0.13.0
 - scikit-image =0.21.0
 - toposort
 - randspg =0.0.1
-- boto3 =1.28.25
-- moto =4.1.14
+- boto3 =1.28.60
+- moto =4.2.5
 - pycp2k =0.2.2
 - python-graphviz
 - typeguard =4.1.0

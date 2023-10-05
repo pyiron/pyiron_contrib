@@ -34,8 +34,8 @@ setup(
         'numpy==1.26.0',
         'pyiron_base==0.6.7',
         'scipy==1.11.3',
-        'seaborn==0.12.2',
-        'pyparsing==3.0.9',
+        'seaborn==0.13.0',
+        'pyparsing==3.1.1',
     ],
     extras_require={
         'atomistic': [
@@ -52,15 +52,15 @@ setup(
         ],
         'image': ['scikit-image==0.21.0'],
         'generic': [
-            'boto3==1.28.25', 
-            'moto==4.1.14'
+            'boto3==1.28.60',
+            'moto==4.2.5'
         ],
         'workflow': [
             'cloudpickle',
             'python>=3.10',
             'graphviz',
             'toposort',
-            'typeguard==4.1.0'
+            'typeguard==4.1.5'
         ],
         'tinybase': [
             'distributed==2023.8.0',

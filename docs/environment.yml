@@ -11,8 +11,8 @@ dependencies:
 - codacy-coverage
 - matplotlib =3.7.2
 - numpy =1.24.3
-- pyiron_base =0.6.6
-- pyiron_atomistics =0.3.3
+- pyiron_base =0.6.7
+- pyiron_atomistics =0.3.4
 - pyparsing =3.0.9
 - scipy =1.11.2
 - seaborn =0.12.2
@@ -25,5 +25,5 @@ dependencies:
 - python-graphviz
 - typeguard =4.1.0
 - aws-sam-translator =1.71.0
-- pympipool =0.7.0
+- pympipool =0.7.1
 - distributed =2023.8.0

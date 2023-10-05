@@ -31,7 +31,7 @@ setup(
     packages=find_packages(exclude=["*tests*"]),
     install_requires=[        
         'matplotlib==3.7.2',
-        'numpy==1.24.3',
+        'numpy==1.26.0',
         'pyiron_base==0.6.7',
         'scipy==1.11.2',
         'seaborn==0.12.2',

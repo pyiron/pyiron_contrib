@@ -6,23 +6,24 @@ dependencies:
 - coveralls
 - coverage
 - codacy-coverage
-- matplotlib =3.7.2
-- numpy =1.24.3
-- pyiron_base =0.6.3
-- pyiron_atomistics =0.3.0
+- matplotlib =3.8.0
+- numpy =1.26.0
+- pyiron_base =0.6.7
+- pyiron_atomistics =0.3.4
 - pyparsing =3.0.9
-- scipy =1.11.2
-- seaborn =0.12.2
+- scipy =1.11.3
+- seaborn =0.13.0
 - scikit-image =0.21.0
 - toposort
 - randspg =0.0.1
-- boto3 =1.28.25
-- moto =4.1.14
+- boto3 =1.28.60
+- moto =4.2.5
 - pycp2k =0.2.2
 - python-graphviz
-- typeguard =4.1.0
-- aws-sam-translator =1.71.0
-- pympipool =0.6.2
-- distributed =2023.8.0
+- typeguard =4.1.5
+- aws-sam-translator =1.77.0
+- pympipool =0.7.1
+- distributed =2023.9.3
 - python >= 3.10
 - lammps
+- nglview >=3.0.8

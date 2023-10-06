@@ -8,10 +8,8 @@ from pyiron_contrib.tinybase.storage import (
     GenericStorage,
 )
 from pyiron_contrib.tinybase.executor import (
-    Executor,
+    Submitter,
     ExecutionContext,
-    BackgroundExecutor,
-    ProcessExecutor,
 )
 from pyiron_contrib.tinybase.database import DatabaseEntry
 from pyiron_contrib.tinybase.project import ProjectInterface, ProjectAdapter
@@ -124,7 +122,7 @@ class TinyJob(Storable):
         self._executor._run_machine.observe("finished", self._update_status("finished"))
 
     def run(
-        self, executor: Union[Executor, str, None] = None
+        self, submitter: Union[Submitter, str, None] = None
     ) -> Optional[ExecutionContext]:
         """
         Start execution of the job.
@@ -132,12 +130,12 @@ class TinyJob(Storable):
         If the job already has a database id and is not in "ready" state, do nothing.
 
         Args:
-            executor (:class:`~.Executor`, str): specifies which executor to
+            submitter (:class:`~.Submitter`, str): specifies which executor to
                 use, if `str` must be a method name of :class:`.ExecutorCreator`;
                 if not given use the last created executor
 
         Returns:
-            :class:`.Executor`: the executor that is running the task or nothing.
+            :class:`.ExecutionContext`: the executor that is running the task or nothing.
         """
         if (
             self._id is None

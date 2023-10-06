@@ -8,7 +8,6 @@ from math import inf
 
 from pyiron_contrib.tinybase.task import AbstractTask, TaskGenerator
 
-
 class RunMachine:
     class Code(enum.Enum):
         INIT = "init"
@@ -150,7 +149,13 @@ class ExecutionContext:
         return self._run_machine._data["output"]
 
 
-class Executor:
+class Submitter:
+    """
+    Simple wrapper around ExecutionContext and its sub classes.
+
+    Exists only to have a single object from which multiple contexts can be
+    spawned.
+    """
     def submit(self, tasks: List[AbstractTask]) -> ExecutionContext:
         return ExecutionContext(tasks)
 
@@ -247,55 +252,11 @@ class FuturesExecutionContext(ExecutionContext):
         else:
             logging.info("Some tasks are still executing!")
 
-
-class BackgroundExecutor(Executor):
-    def __init__(self, max_threads):
-        self._max_threads = max_threads
-        self._pool = None
+class FuturesSubmitter(Submitter):
+    def __init__(self, executor):
+        self._executor = executor
 
     def submit(self, tasks):
-        if self._pool is None:
-            self._pool = ThreadPoolExecutor(max_workers=self._max_threads)
-        return FuturesExecutionContext(self._pool, tasks)
-
-
-class ProcessExecutor(Executor):
-    def __init__(self, max_processes):
-        self._max_processes = max_processes
-        self._pool = None
-
-    def submit(self, tasks):
-        if self._pool is None:
-            self._pool = ProcessPoolExecutor(max_workers=self._max_processes)
-        return FuturesExecutionContext(self._pool, tasks)
-
-
-from dask.distributed import Client, LocalCluster
-
-
-class DaskExecutor(Executor):
-    def __init__(self, client):
-        self._client = client
-
-    @classmethod
-    def from_cluster(cls, cluster):
-        return cls(Client(cluster))
-
-    @classmethod
-    def from_localcluster(cls, max_processes=None, **kwargs):
-        return cls(Client(LocalCluster(n_workers=max_processes, **kwargs)))
-
-    def submit(self, tasks):
-        return FuturesExecutionContext(self._client, tasks)
-
-
-from pympipool import PoolExecutor
-
-
-class PyMPIExecutor(Executor):
-    def __init__(self, max_workers, **kwargs):
-        self._max_workers = max_workers
-        self._pool = PoolExecutor(max_workers=max_workers, **kwargs)
-
-    def submit(self, tasks):
-        return FuturesExecutionContext(self._pool, tasks)
+        return FuturesExecutionContext(
+                self._executor, tasks
+        )

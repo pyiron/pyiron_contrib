@@ -18,6 +18,10 @@ import abc
 import importlib
 from typing import Union
 from functools import wraps
+from concurrent.futures import (
+        ProcessPoolExecutor,
+        ThreadPoolExecutor
+)
 
 try:
     from os import sched_getaffinity
@@ -28,15 +32,13 @@ except ImportError:
 
 import pyiron_contrib.tinybase.job
 from pyiron_contrib.tinybase.project import JobNotFoundError
-from pyiron_contrib.tinybase.executor import (
-    Executor,
-    ProcessExecutor,
-    BackgroundExecutor,
-    DaskExecutor,
-)
+from pyiron_contrib.tinybase.executor import Submitter, FuturesSubmitter
 from pyiron_atomistics import ase_to_pyiron, Atoms
 
 import ase.build
+
+from pympipool import PoolExecutor as PyMPIPoolExecutor
+from dask.distributed import Client, LocalCluster
 
 
 class Creator(abc.ABC):
@@ -194,25 +196,44 @@ class ExecutorCreator(Creator):
 
         return f
 
-    @wraps(ProcessExecutor)
+    @wraps(ProcessPoolExecutor)
     @_save
-    def process(self, max_processes=_DEFAULT_CPUS):
-        return ProcessExecutor(max_processes=max_processes)
+    def process(self, max_processes=_DEFAULT_CPUS, **kwargs):
+        return FuturesSubmitter(
+                ProcessPoolExecutor(max_processes=max_processes, **kwargs)
+        )
 
-    @wraps(BackgroundExecutor)
     @_save
-    def background(self, max_threads=4):
-        return BackgroundExecutor(max_threads=max_threads)
+    def foreground(self):
+        return Submitter()
 
-    @wraps(DaskExecutor.from_localcluster)
+    @wraps(ThreadPoolExecutor)
     @_save
-    def dask_local(self, max_workers=_DEFAULT_CPUS, **kwargs):
-        return DaskExecutor.from_localcluster(max_workers=max_workers, **kwargs)
+    def background(self, max_workers=4, **kwargs):
+        return FuturesSubmitter(
+                ThreadPoolExecutor(max_workers=max_workers, **kwargs)
+        )
 
-    @wraps(DaskExecutor.from_cluster)
+    @wraps(LocalCluster)
     @_save
-    def dask_cluster(self, cluster):
-        return DaskExecutor.from_cluster(cluster)
+    def dask_local(self, n_workers=_DEFAULT_CPUS, **kwargs):
+        return FuturesSubmitter(
+                LocalCluster(n_workers=n_workers, **kwargs)
+        )
+
+    @wraps(Client)
+    @_save
+    def dask_cluster(self, cluster, **kwargs):
+        return FuturesSubmitter(
+                Client(cluster, **kwargs)
+        )
+
+    @wraps(PyMPIPoolExecutor)
+    @_save
+    def pympipool(self, max_workers=_DEFAULT_CPUS, **kwargs):
+        return FuturesSubmitter(
+                PyMPIPoolExecutor(max_workers=max_workers, **kwargs)
+        )
 
     del _save
 

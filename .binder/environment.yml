@@ -26,3 +26,4 @@ dependencies:
 - distributed =2023.9.3
 - python >= 3.10
 - lammps
+- nglview >=3.0.8

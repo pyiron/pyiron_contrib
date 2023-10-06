@@ -43,9 +43,6 @@ setup(
             'pyiron_atomistics==0.3.4',
             'pycp2k==0.2.2',
         ],
-        'executors': [
-            'cloudpickle',
-        ],
         'fenics': [
             'fenics==2019.1.0',
             'mshr==2019.1.0',
@@ -54,13 +51,6 @@ setup(
         'generic': [
             'boto3==1.28.60', 
             'moto==4.2.5'
-        ],
-        'workflow': [
-            'cloudpickle',
-            'python>=3.10',
-            'graphviz',
-            'toposort',
-            'typeguard==4.1.5'
         ],
         'tinybase': [
             'distributed==2023.9.3',

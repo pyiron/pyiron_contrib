@@ -18,7 +18,7 @@ dependencies:
 - scikit-image =0.21.0
 - toposort
 - randspg =0.0.1
-- boto3 =1.28.60
+- boto3 =1.28.62
 - moto =4.2.5
 - pycp2k =0.2.2
 - python-graphviz

@@ -373,6 +373,29 @@ class TrainingPlots(StructurePlots):
         plt.xlabel(r"Force [eV/$\mathrm{\AA}$]")
 
 
+_HDF_KEYS = {
+        "energy": "output/generic/energy_pot",
+        "forces": "output/generic/forces",
+        "stress": "output/generic/pressures",
+        "indices": "output/generic/indices",
+        "species": "input/structure/species",
+        "cell": "output/generic/cells",
+        "positions": "output/generic/positions",
+        "pbc": "input/structure/cell/pbc",
+}
+
+_JOB_HDF_OVERLAY_KEYS = {
+        "Vasp": {
+            # For DFT one should use the smeared energy to obtain values
+            # consistent with the forces, but the default energy_pot of DFT
+            # jobs is the energy extrapolated to zero smearing
+            "energy": "output/generic/dft/energy_free",
+            # HACK: VASP work-around, current contents of pressures are meaningless, correct values are in
+            # output/generic/stresses
+            "stress": "output/generic/stresses",
+        }
+}
+
 class TrainingStorage(StructureStorage):
     def __init__(self):
         super().__init__()
@@ -416,7 +439,11 @@ class TrainingStorage(StructureStorage):
             ]
         return self._table_cache
 
-    def include_job(self, job, iteration_step=-1):
+    def include_job(self,
+                    job,
+                    iteration_step=-1,
+                    hdf_keys=None,
+    ):
         """
         Add structure, energy, forces and pressures from an inspected or loaded job.
 
@@ -424,23 +451,48 @@ class TrainingStorage(StructureStorage):
 
         Forces and stresses are only added if present in the output.
 
+        The locations in the job HDF5 file from which the training data is read
+        can be customized by passing a dictionary as `hdf_keys`, where the
+        values must be paths inside the job HDF5 file.  The available keys are
+        given below together with their default values.
+
+        * `energy`: `output/generic/energy_pot`
+        * `forces`: `output/generic/forces`
+        * `stress`: `output/generic/pressures`
+        * `indices`: `output/generic/indices`
+        * `cell`: `output/generic/cells`
+        * `positions`: `output/generic/positions`
+        * `species`: `input/structure/species`
+        * `pbc`: `input/structure/cell/pbc`
+
+        Other keys are ignored.  All entries except `pbc` and `species` must
+        lead to arrays that can be indexed by `iteration_step`.
+
+        For `Vasp` jobs the defaults are changed like this
+
+        * `energy`: `output/generic/dft/energy_free`
+        * `stress`: `output/generic/stresses`
+
+        to ensure that by default energies, forces and stresses are consistent.
+
         Args:
             job (:class:`.JobPath`, :class:`.AtomisticGenericJob`): job (path) to take structure from
             iteration_step (int, optional): if job has multiple steps, this selects which to add
+            hdf_keys (dict of str): customize where values are read from the
+                                    job HDF5 file
         """
 
+        hdf_keys = _HDF_KEYS.copy()
+        hdf_keys.update(_JOB_HDF_OVERLAY_KEYS.get(job["NAME"], {}))
+
         kwargs = {
-            "energy": job["output/generic/energy_pot"][iteration_step],
+            "energy": job[hdf_keys["energy"]][iteration_step],
         }
-        ff = job["output/generic/forces"]
+        ff = job[hdf_keys["forces"]]
         if ff is not None:
             kwargs["forces"] = ff[iteration_step]
 
-        # HACK: VASP work-around, current contents of pressures are meaningless, correct values are in
-        # output/generic/stresses
-        pp = job["output/generic/stresses"]
-        if pp is None:
-            pp = job["output/generic/pressures"]
+        pp = job[hdf_keys["stress"]]
         if pp is not None and len(pp) > 0:
             stress = np.asarray(pp[iteration_step])
             if stress.shape == (3, 3):
@@ -456,15 +508,17 @@ class TrainingStorage(StructureStorage):
                 )
             kwargs["stress"] = stress
 
-        ii = job["output/generic/indices"]
+        ii = job[hdf_keys["indices"]]
         if ii is not None:
             indices = ii[iteration_step]
         else:
+            # not all jobs save indices again in the output, but all atomistic
+            # jobs do it in the input
             indices = job["input/structure/indices"]
-        species = np.asarray(job["input/structure/species"])
-        cell = job["output/generic/cells"][iteration_step]
-        positions = job["output/generic/positions"][iteration_step]
-        pbc = job["input/structure/cell/pbc"]
+        species = np.asarray(job[hdf_keys["species"]])
+        cell = job[hdf_keys["cell"]][iteration_step]
+        positions = job[hdf_keys["positions"]][iteration_step]
+        pbc = job[hdf_keys["pbc"]]
 
         self.add_chunk(
             len(indices),

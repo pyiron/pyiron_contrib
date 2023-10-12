@@ -604,7 +604,7 @@ class GenerateLAPotentialv2():
         Run static bond analysis on the reference job.
         """
         self._stat_ba = self._project.create_job(StaticBondAnalysis, 'stat_ba', 
-                                                 delete_existing_job=self.delete_existing_jobs)
+                                                 delete_existing_job=True)
         self._stat_ba.input.structure = self.structure.copy()
         self._stat_ba.input.n_shells = 2
         self._stat_ba.run()
@@ -657,7 +657,7 @@ class GenerateLAPotentialv2():
             samples = np.linspace(0., self.disp, self.n_disps)
         
         ith_atom_pos = self.structure.positions[self.ith_atom_id]
-        self._disp_pos = np.array([ith_atom_pos-self._long_hat*s for s in samples])
+        self._disp_pos = np.array([ith_atom_pos+self._long_hat*s for s in samples])
         if output:
             return self._disp_pos
     
@@ -680,10 +680,10 @@ class GenerateLAPotentialv2():
         job_list = self._project.job_table().job.to_list()
         job_status = self._project.job_table().status.to_list()
         for i, pos in enumerate(self._disp_pos):
-            job_name = 'disp_' + str(i)
+            job_name = 'long_' + str(i)
             if job_name not in job_list:
                 _run_job(position=pos)
-            elif job_status[i] != 'finished' or self.delete_existing_jobs:
+            elif job_status[i] not in ['finished', 'warning', 'running'] or self.delete_existing_jobs:
                 self._project.remove_job(job_name)
                 _run_job(position=pos) 
         
@@ -696,7 +696,7 @@ class GenerateLAPotentialv2():
             self.get_nn_bond_info()
         if self._disp_pos is None:
             self.generate_atom_positions()
-        self._disp_jobs = [self._project.inspect('disp_' + str(i)) for i in range(self.n_disps)]
+        self._disp_jobs = [self._project.inspect('long_' + str(i)) for i in range(self.n_disps)]
     
     def get_plane_neighbors(self, output=False):
         """
@@ -708,7 +708,7 @@ class GenerateLAPotentialv2():
         anti_t1_id = np.argwhere(np.isclose(a=nn_bond_vecs@self._t1_hat, b=-1., atol=1e-10))[-1][-1]
         t2_id = np.argwhere(np.all(np.isclose(a=nn_bond_vecs, b=self._t2_hat, atol=1e-10), axis=-1))[-1][-1]
         anti_t2_id = np.argwhere(np.isclose(a=nn_bond_vecs@self._t2_hat, b=-1., atol=1e-10))[-1][-1]
-        self._plane_nn = np.array([self._nn_atom_ids[i] for i in [self.ith_atom_id, anti_long_id,  
+        self._plane_nn = np.array([self._nn_atom_ids[i] for i in [anti_long_id, 0,
                                                                   t1_id, anti_t1_id, t2_id, anti_t2_id]])
         if output:
             return self._plane_nn
@@ -828,13 +828,13 @@ class GenerateLAPotentialv2():
         elif tag == 't1':
             out = [self.get_t_bond_force(jth_atom_forces=forces, jth_atom_id=atom_id, tag=tag) 
                    for forces, atom_id in zip(self._force_on_j_list[2:4], self._plane_nn[2:4])]
-            bonds = np.concatenate((-np.flip(out[1][0]), out[0][0][1:]))
-            force = np.concatenate((-np.flip(out[1][1]), out[0][1][1:]))
+            bonds = np.concatenate((np.flip(out[1][0]), -out[0][0][1:]))
+            force = np.concatenate((np.flip(out[1][1]), -out[0][1][1:]))
         elif tag == 't2':
             out = [self.get_t_bond_force(jth_atom_forces=forces, jth_atom_id=atom_id, tag=tag) 
                    for forces, atom_id in zip(self._force_on_j_list[4:], self._plane_nn[4:])]
-            bonds = np.concatenate((-np.flip(out[1][0]), out[0][0][1:]))
-            force = np.concatenate((-np.flip(out[1][1]), out[0][1][1:]))
+            bonds = np.concatenate((np.flip(out[1][0]), -out[0][0][1:]))
+            force = np.concatenate((np.flip(out[1][1]), -out[0][1][1:]))
         else:
             raise ValueError
         return bonds, force
@@ -1335,8 +1335,8 @@ class GenerateLAPotential():
             new_basis = basis.copy()
             new_basis[0] = ij_dir
             t_prime = self.orthogonalize(new_basis)[1]
-            # F_t_prime.append(f_t@t_prime)
-            F_t_prime.append(f_t@basis[1])
+            F_t_prime.append(f_t@t_prime)
+            # F_t_prime.append(f_t@basis[1])
             prime.append(t_prime)
         if return_prime:
             return u, np.array(F_t_prime), np.array(prime)

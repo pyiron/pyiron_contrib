@@ -35,7 +35,8 @@ class MeanField():
     - pressure_offset (float): A constant offset to the pressure. Defaults to 0.
     """
     
-    def __init__(self, b_0, basis, rotations, r_potential, t1_potential=None, t2_potential=None, energy_offset=0, pressure_offset=0):
+    def __init__(self, b_0, basis, rotations, r_potential, t1_potential=None, t2_potential=None, energy_offset=0, pressure_offset=0,
+                 energy_list=None, strain_list=None):
         self.b_0 = b_0
         self.basis = np.array(basis)
         self.rotations = rotations
@@ -44,6 +45,8 @@ class MeanField():
         self.t2_potential = t2_potential
         self.energy_offset = energy_offset
         self.pressure_offset = pressure_offset
+        self.energy_list = energy_list
+        self.strain_list = strain_list
         self._rho_1s = None
         self._dV1 = None
         
@@ -169,7 +172,7 @@ class MeanField():
             res = np.abs(np.log((rho*long_mesh).sum()/rho.sum()/aa)).sum()
             return res
         brho = np.exp(-(Veff-Veff.min())/temperature/KB)
-        solver = root_scalar(f, x0=0., x1=0.001, rtol=1e-10)
+        solver = root_scalar(f, x0=0., x1=0.001, rtol=1e-20)
         lm = solver.root
         return lm
     
@@ -251,13 +254,35 @@ class MeanField():
                 sel_2 = ((db >= 0.) & (db <= cutoff))
                 t_db = np.concatenate((-np.flip(db[sel_2]), db[sel_2]))
                 t_pot = np.concatenate((np.flip(Veff[:, d_t, d_t][sel_2]), Veff[:, d_t, d_t][sel_2]))
-                t_fit = np.poly1d(np.polyfit(t_db, t_pot-t_pot.min(), deg=2))
+                #t_fit = CubicSpline(t_db, t_pot-t_pot.min())
+                t2_fit = np.poly1d(np.polyfit(t_db, t_pot-t_pot.min(), deg=2))
+                t1_fit = t2_fit
             elif fix[0]:
-                t_fit = CubicSpline(t2_mesh[d_l, d_t, :][np.isfinite(Veff[d_l, d_t, :])], 
-                                    Veff[d_l, d_t, :][np.isfinite(Veff[d_l, d_t, :])])
-            new_Veff = long_fit(long_mesh)+t_fit(t1_mesh)+t_fit(t2_mesh)
+                t2_fit = CubicSpline(t2_mesh[d_l, d_t, :][np.isfinite(Veff[d_l, d_t, :])], 
+                                     Veff[d_l, d_t, :][np.isfinite(Veff[d_l, d_t, :])])
+                #t1_fit = CubicSpline(t1_mesh[d_l, :, d_t][np.isfinite(Veff[d_l, :, d_t])], 
+                #                     Veff[d_l, :, d_t][np.isfinite(Veff[d_l, :, d_t])])
+                t1_fit = t2_fit
+            new_Veff = long_fit(long_mesh)+t1_fit(t1_mesh)+t2_fit(t2_mesh)
         
         return new_Veff
+    
+    def get_epsilon_pressure(self, eps=1.):
+        if (np.any(self.energy_list) == None) and (np.any(self.strain_list) == None):
+            if isinstance(eps, (int, float)):
+                return 0., 0.
+            else:
+                return np.array([0.]*len(eps)), np.array([0.]*len(eps))
+        else:
+            # md
+            strains = 1+self.strain_list
+            u_md_fit_eqn = np.poly1d(np.polyfit(strains, self.energy_list, deg=4))
+            du_md_fit = u_md_fit_eqn.deriv(m=1)(eps)
+            # mf
+            u_mf = 6.*self.r_potential(strains*self.b_0)
+            u_mf_fit_eqn = np.poly1d(np.polyfit(strains, u_mf, deg=4))
+            du_mf_fit = u_mf_fit_eqn.deriv(m=1)(eps)
+            return -4./(3.*eps**2*(np.sqrt(2)*self.b_0)**3)*(du_md_fit-du_mf_fit), (u_md_fit_eqn(eps)-u_mf_fit_eqn(eps)) 
 
     def find_virial_quant(self, bonds, meshes, temperature=100., eps=1., lm=0., fix=[1, 1, 1], Veff=None, return_rho_1=False):
         """
@@ -288,7 +313,7 @@ class MeanField():
         a_dV = b_eps*dV[0]+(t1_mesh*rho_1).sum()*dV[1]+(t2_mesh*rho_1)*dV[2]
         N_by_V = 4./(b_eps*np.sqrt(2))**3 
         T_vir = 2./KB*(db_dV*rho_1).sum()
-        P_vir = -2.*N_by_V*(a_dV*rho_1).sum()+self.pressure_offset
+        P_vir = -2.*N_by_V*(a_dV*rho_1).sum()+self.pressure_offset+self.get_epsilon_pressure(eps=eps)[0]
         if return_rho_1:
             return T_vir, P_vir, b_eps, rho_1
         return T_vir, P_vir, b_eps
@@ -317,14 +342,14 @@ class MeanField():
                 T_vir, _, b_eps = self.find_virial_quant(bonds=bonds, meshes=meshes, temperature=args[0], eps=eps, lm=args[1], 
                                                          fix=fix, Veff=Veff)
                 return [abs(temperature-T_vir), np.abs(self.b_0*eps-b_eps)]
-            solver = root(virial, x0=(temperature, 0.), method='lm', tol=1e-10)
+            solver = root(virial, x0=(temperature, 0.), method='lm', tol=1e-20)
             eff_temp, lm = solver.x
         else:
             def virial(args):
                 _, _, b_eps = self.find_virial_quant(bonds=bonds, meshes=meshes, temperature=temperature, eps=eps, lm=args, 
                                                      fix=fix, Veff=Veff)
                 return np.abs(self.b_0*eps-b_eps)
-            solver = root_scalar(virial, x0=0., x1=0.001, rtol=1e-10)
+            solver = root_scalar(virial, x0=0., x1=0.001, rtol=1e-20)
             eff_temp, lm = temperature, solver.root
         virial_q = self.find_virial_quant(bonds=bonds, meshes=meshes, temperature=eff_temp, eps=eps, lm=lm, fix=fix, 
                                           Veff=Veff, return_rho_1=True)
@@ -353,14 +378,14 @@ class MeanField():
                 T_vir, P_vir, b_eps = self.find_virial_quant(bonds=bonds, meshes=meshes, temperature=args[0], eps=args[1], 
                                                              lm=args[2], fix=fix)
                 return [abs(temperature-T_vir), abs(pressure-P_vir), np.abs(self.b_0*args[1]-b_eps)]
-            solver = root(virial, x0=(temperature, 1., 0.), method='lm', tol=1e-10)
+            solver = root(virial, x0=(temperature, 1., 0.), method='lm', tol=1e-20)
             eff_temp, eps, lm = solver.x
         else:
             def virial(args):
                 _, P_vir, b_eps = self.find_virial_quant(bonds=bonds, meshes=meshes, temperature=temperature, eps=args[0], 
                                                          lm=args[1], fix=fix)
                 return [abs(pressure-P_vir), np.abs(self.b_0*args[0]-b_eps)]
-            solver = root(virial, x0=(1., 0.), method='lm', tol=1e-10)
+            solver = root(virial, x0=(1., 0.), method='lm', tol=1e-20)
             eff_temp, eps, lm = temperature, solver.x[0], solver.x[1]
         virial_q = self.find_virial_quant(bonds=bonds, meshes=meshes, temperature=eff_temp, eps=eps, lm=lm, fix=fix, return_rho_1=True)
         print('T: {}\nT_eff: {}\nT_vir: {}\nP_vir: {}\neps: {}\nlm: {}\n'.format(temperature, eff_temp, *virial_q[:2], eps, lm))
@@ -415,13 +440,16 @@ class MeanField():
                                                                for i, temp in enumerate(temperatures)])
         # save for visualization
         self._rho_1s = rho_1s
+        
+        # energy_volume_offsets
+        ev_offsets = self.get_epsilon_pressure(eps=np.array(eps))[1]
 
         # collect anharmonic internal energy in meV/atom
         ah_U = []
         b_xyz = self.b_0*self.basis[0]
-        for i, temp in enumerate(T_virs):
+        for i, (temp, ev_off) in enumerate(zip(T_virs, ev_offsets)):
             per_bond_energy = (self.V1(bonds=bonds[i])*rho_1s[i]).sum()-self.V1(bonds=b_xyz)
-            ah_U.append((6*per_bond_energy+self.energy_offset-1.5*KB*temp)*1000)
+            ah_U.append((6*per_bond_energy+self.energy_offset+ev_off-1.5*KB*temp)*1000)
 
         return {
             'ah_U': np.array(ah_U),

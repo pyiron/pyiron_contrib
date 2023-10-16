@@ -1,0 +1,1 @@
+from pyiron_potentialfit.atomistics.job.trainingcontainer import TrainingContainer

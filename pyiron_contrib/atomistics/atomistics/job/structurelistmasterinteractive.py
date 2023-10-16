@@ -1,1 +1,3 @@
-from pyiron_potentialfit.atomistics.job.structurelistmasterinteractive import StructureMasterInt
+from pyiron_potentialfit.atomistics.job.structurelistmasterinteractive import (
+    StructureMasterInt,
+)

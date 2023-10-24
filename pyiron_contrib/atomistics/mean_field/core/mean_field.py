@@ -1,7 +1,3 @@
-# coding: utf-8
-# Copyright (c) Max-Planck-Institut für Eisenforschung GmbH - Computational Materials Design (CM) Department
-# Distributed under the terms of "New BSD License", see the LICENSE file.
-
 import numpy as np
 
 from scipy.interpolate import CubicSpline
@@ -195,6 +191,7 @@ class MeanField():
         if Veff is None:
             Veff = self.Vmfc(bonds=bonds, eps=eps)
         Veff -= Veff.min()
+        lm += 1e-10
         rho_1 = np.exp(-(Veff+lm*(long_mesh-self.b_0*eps))/KB/temperature)
         return rho_1/rho_1.sum()
     
@@ -239,7 +236,9 @@ class MeanField():
             long_grad = np.gradient(Veff[:, d_t, d_t], long_mesh[:, d_t, d_t], edge_order=2)
             long_grad_fit = CubicSpline(long_mesh[:, d_t, d_t], long_grad)
             fine_long = np.linspace(long_mesh[:, d_t, d_t][0], long_mesh[:, d_t, d_t][-1], 10000)
-            cutoff = fine_long[argrelextrema(long_grad_fit(fine_long), np.greater, order=5)[0][0]]-self.b_0*eps
+            cutoff = fine_long[argrelextrema(long_grad_fit(fine_long), np.greater, order=1)[0][0]]-self.b_0*eps
+            if cutoff < 0:
+                cutoff = -cutoff
             db = long_mesh[:, d_t, d_t]-self.b_0*eps
 
             if fix[2]:
@@ -254,12 +253,10 @@ class MeanField():
                 sel_2 = ((db >= 0.) & (db <= cutoff))
                 t_db = np.concatenate((-np.flip(db[sel_2]), db[sel_2]))
                 t_pot = np.concatenate((np.flip(Veff[:, d_t, d_t][sel_2]), Veff[:, d_t, d_t][sel_2]))
-                #t_fit = CubicSpline(t_db, t_pot-t_pot.min())
-                t2_fit = np.poly1d(np.polyfit(t_db, t_pot-t_pot.min(), deg=2))
+                t2_fit = np.poly1d(np.polyfit(t_db, t_pot, deg=2))
                 t1_fit = t2_fit
             elif fix[0]:
-                t2_fit = CubicSpline(t2_mesh[d_l, d_t, :][np.isfinite(Veff[d_l, d_t, :])], 
-                                     Veff[d_l, d_t, :][np.isfinite(Veff[d_l, d_t, :])])
+                t2_fit = CubicSpline(t2_mesh[d_l, d_t, :], Veff[d_l, d_t, :])
                 #t1_fit = CubicSpline(t1_mesh[d_l, :, d_t][np.isfinite(Veff[d_l, :, d_t])], 
                 #                     Veff[d_l, :, d_t][np.isfinite(Veff[d_l, :, d_t])])
                 t1_fit = t2_fit
@@ -304,7 +301,8 @@ class MeanField():
         long_mesh, t1_mesh, t2_mesh = meshes
         rho_1 = self.get_rho(bonds=bonds, long_mesh=long_mesh, temperature=temperature, eps=eps, lm=lm, Veff=Veff)
         if fix:
-            Veff_w_lm = -KB*temperature*np.log(rho_1)
+            num_offset = np.min(rho_1[rho_1 > 0])
+            Veff_w_lm = -KB*temperature*np.log(rho_1+num_offset)
             fixed_Veff = self.fix_Veff(meshes=meshes, temperature=temperature, eps=eps, fix=fix, Veff=Veff_w_lm)
             rho_1 = self.get_rho(bonds=bonds, long_mesh=long_mesh, temperature=temperature, Veff=fixed_Veff, eps=eps, lm=0.)
         b_eps = (long_mesh*rho_1).sum()
@@ -318,7 +316,7 @@ class MeanField():
             return T_vir, P_vir, b_eps, rho_1
         return T_vir, P_vir, b_eps
     
-    def run_nvt(self, bonds, temperature=100., eps=1., fix=[1, 1, 1], fix_T=False):
+    def run_nvt(self, bonds, temperature=100., eps=1., lm=0., fix=[1, 1, 1], fix_T=False):
         """
         Consider the NVT case. If strain (eps) != 1., then the structure is strained, and the calculation is done at this 'strained' bond.
         The optimization converges the virial temperature to the target temperature and bond length (b_0*eps) to the target bond length.
@@ -327,12 +325,13 @@ class MeanField():
             bonds (ndarray): (n_long x n_t1 x n_t2 x 3) bond vectors. Note the 'x 3' at the end, these are cartesian 'xyz' bond vectors.
             temperature (float, optional): Temperature value. Defaults to 100.
             eps (float, optional): Strain on bond b_0. Defaults to 1, no strain.
+            lm (float, optional): Lagrange multiplier. Defaults to 0.
             fix (list of booleans): Default [1, 1, 1] correspond to fixes 1, 2 and 3 respectively. Fixes 2 and 3 assume fix 1 to be True.
 
         Returns:
             rho_1 (ndarray): Normalized bond density.
             eps (float, optional): Strain on bond b_0.
-            lm (float): Lagrange multiplier.root_scalar(f, x0=0., x1=0.001, rtol=1e-10)
+            lm (float): Lagrange multiplier
         """
         Veff = self.Vmfc(bonds=bonds, eps=eps)
         meshes = self.get_meshes(bonds)
@@ -342,21 +341,21 @@ class MeanField():
                 T_vir, _, b_eps = self.find_virial_quant(bonds=bonds, meshes=meshes, temperature=args[0], eps=eps, lm=args[1], 
                                                          fix=fix, Veff=Veff)
                 return [abs(temperature-T_vir), np.abs(self.b_0*eps-b_eps)]
-            solver = root(virial, x0=(temperature, 0.), method='lm', tol=1e-20)
+            solver = root(virial, x0=(temperature, lm), method='lm', tol=1e-20)
             eff_temp, lm = solver.x
         else:
             def virial(args):
                 _, _, b_eps = self.find_virial_quant(bonds=bonds, meshes=meshes, temperature=temperature, eps=eps, lm=args, 
                                                      fix=fix, Veff=Veff)
                 return np.abs(self.b_0*eps-b_eps)
-            solver = root_scalar(virial, x0=0., x1=0.001, rtol=1e-20)
+            solver = root_scalar(virial, x0=lm, x1=lm+0.001, method='lm', rtol=1e-20)
             eff_temp, lm = temperature, solver.root
         virial_q = self.find_virial_quant(bonds=bonds, meshes=meshes, temperature=eff_temp, eps=eps, lm=lm, fix=fix, 
                                           Veff=Veff, return_rho_1=True)
         print('T: {}\nT_eff: {}\nT_vir: {}\nP_vir: {}\neps: {}\nlm: {}\n'.format(temperature, eff_temp, *virial_q[:2], eps, lm))
         return *virial_q, eff_temp, eps, lm
     
-    def run_npt(self, bonds, temperature=100., pressure=1e-4, fix=[1, 1, 1], fix_T=False):
+    def run_npt(self, bonds, temperature=100., pressure=1e-4, eps=1., lm=0., fix=[1, 1, 1], fix_T=False):
         """
         Consider the NPT case. The optimization converges the virial temperature to the target temperature, the virial pressure to the target pressure and the bond length (b_0*eps) to the target bond length. The converged value of 'eps' is then the strain at the target temperture and pressure. 
 
@@ -364,6 +363,8 @@ class MeanField():
             bonds (ndarray): (n_long x n_t1 x n_t2 x 3) bond vectors. Note the 'x 3' at the end, these are cartesian 'xyz' bond vectors.
             temperature (float, optional): Temperature value. Defaults to 100.
             pressure (float, optional): Pressure value. Defaults to 1e-4 (1 atm).
+            eps (float, optional): Strain on bond b_0. Defaults to 1, no strain.
+            lm (float, optional): Lagrange multiplier. Defaults to 0.
             fix (list of booleans): Default [1, 1, 1] correspond to fixes 1, 2 and 3 respectively. Fixes 2 and 3 assume fix 1 to be True.
 
         Returns:
@@ -377,15 +378,15 @@ class MeanField():
             def virial(args):
                 T_vir, P_vir, b_eps = self.find_virial_quant(bonds=bonds, meshes=meshes, temperature=args[0], eps=args[1], 
                                                              lm=args[2], fix=fix)
-                return [abs(temperature-T_vir), abs(pressure-P_vir), np.abs(self.b_0*args[1]-b_eps)]
-            solver = root(virial, x0=(temperature, 1., 0.), method='lm', tol=1e-20)
+                return [abs(temperature-T_vir), (pressure-P_vir), np.abs(self.b_0*args[1]-b_eps)]
+            solver = root(virial, x0=(temperature, eps, lm), method='lm', tol=1e-20)
             eff_temp, eps, lm = solver.x
         else:
             def virial(args):
                 _, P_vir, b_eps = self.find_virial_quant(bonds=bonds, meshes=meshes, temperature=temperature, eps=args[0], 
                                                          lm=args[1], fix=fix)
                 return [abs(pressure-P_vir), np.abs(self.b_0*args[0]-b_eps)]
-            solver = root(virial, x0=(1., 0.), method='lm', tol=1e-20)
+            solver = root(virial, x0=(eps, lm), method='lm', tol=1e-20)
             eff_temp, eps, lm = temperature, solver.x[0], solver.x[1]
         virial_q = self.find_virial_quant(bonds=bonds, meshes=meshes, temperature=eff_temp, eps=eps, lm=lm, fix=fix, return_rho_1=True)
         print('T: {}\nT_eff: {}\nT_vir: {}\nP_vir: {}\neps: {}\nlm: {}\n'.format(temperature, eff_temp, *virial_q[:2], eps, lm))
@@ -434,10 +435,18 @@ class MeanField():
         bonds, temperatures, pressures, epsilons = self._validate(bonds=bonds, temperatures=temperatures, pressures=pressures,
                                                                   epsilons=epsilons)
         
-        # run npt or nvt
-        T_virs, P_virs, _, rho_1s, eff_temps, eps, lms = zip(*[self.run_ensemble(bonds=bonds[i], temperature=temp, pressure=pressures[i], 
-                                                               eps=epsilons[i], ensemble=ensemble, fix=fix, fix_T=fix_T) 
-                                                               for i, temp in enumerate(temperatures)])
+        # do this little bit to set the eps and lm values from the previous temperature as the starting point for the next one
+        outs = []
+        epsi, lm = epsilons[0], 0.
+        for i, temp in enumerate(temperatures):
+            if ensemble == 'nvt':
+                epsi = epsilons[i]
+            out = self.run_ensemble(bonds=bonds[i], temperature=temp, pressure=pressures[i], eps=epsi, lm=lm, 
+                                    ensemble=ensemble, fix=fix, fix_T=fix_T)
+            epsi, lm = out[5], out[6]
+            outs.append(out)
+        T_virs, P_virs, _, rho_1s, eff_temps, eps, lms = zip(*outs)
+    
         # save for visualization
         self._rho_1s = rho_1s
         
@@ -460,7 +469,7 @@ class MeanField():
             'lm': np.array(lms)
         }
 
-    def run_ensemble(self, bonds, temperature, pressure, eps, ensemble, fix, fix_T):
+    def run_ensemble(self, bonds, temperature, pressure, eps, lm, ensemble, fix, fix_T):
         """
         Run the appropriate ensemble simulation based on the ensemble type.
 
@@ -469,6 +478,7 @@ class MeanField():
             temperature (float): Target temperature.
             pressure (float): Target pressure.
             eps (float): Strain on bond b_0.
+            lm (float): Lagrange multiplier.
             ensemble (str): Ensemble type ('nvt' or 'npt').
             fix (bool): Whether to fix the single bond density.
 
@@ -476,9 +486,9 @@ class MeanField():
             tuple: Tuple containing the properties: rho_1, epsilon, lm.
         """
         if ensemble == 'nvt':
-            return self.run_nvt(bonds=bonds, temperature=temperature, eps=eps, fix=fix, fix_T=fix_T)
+            return self.run_nvt(bonds=bonds, temperature=temperature, eps=eps, lm=lm, fix=fix, fix_T=fix_T)
         elif ensemble == 'npt':
-            return self.run_npt(bonds=bonds, temperature=temperature, pressure=pressure, fix=fix, fix_T=fix_T)
+            return self.run_npt(bonds=bonds, temperature=temperature, pressure=pressure, eps=eps, lm=lm, fix=fix, fix_T=fix_T)
 
     @staticmethod
     def get_ah_F(ah_U, temperatures, n_fine_samples=10000):

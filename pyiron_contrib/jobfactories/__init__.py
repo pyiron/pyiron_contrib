@@ -46,7 +46,7 @@ class JobFactory(HasStorage, ABC):
     >>> strains = np.linspace(-0.5, 1.5, 500)
 
     >>> for eps in strains:
-    ...   j.run(f'my_lammps_{eps}', modify=lambda: None, structure=cu)
+    ...   j.run(f'my_lammps_{eps}', modify=lambda j: j['user/strain'] := eps and j, structure=cu.apply_strain(eps-1, return_box=True))
 
     is much easier to understand than a loop around the above "standard"
     construct.  While one could use functions to save a similar amount of

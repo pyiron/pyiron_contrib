@@ -32,7 +32,7 @@ setup(
     install_requires=[        
         'matplotlib==3.8.0',
         'numpy==1.26.0',
-        'pyiron_base==0.6.7',
+        'pyiron_base==0.6.8',
         'scipy==1.11.3',
         'seaborn==0.13.0',
         'pyparsing==3.1.1',
@@ -40,7 +40,7 @@ setup(
     extras_require={
         'atomistic': [
             'ase==3.22.1',
-            'pyiron_atomistics==0.3.4',
+            'pyiron_atomistics==0.3.5',
             'pycp2k==0.2.2',
         ],
         'fenics': [

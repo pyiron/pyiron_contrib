@@ -7,8 +7,8 @@ dependencies:
 - codacy-coverage
 - matplotlib =3.8.0
 - numpy =1.26.0
-- pyiron_base =0.6.7
-- pyiron_atomistics =0.3.4
+- pyiron_base =0.6.8
+- pyiron_atomistics =0.3.5
 - pyparsing =3.1.1
 - scipy =1.11.3
 - seaborn =0.13.0
@@ -23,3 +23,4 @@ dependencies:
 - python >= 3.10
 - lammps
 - nglview >=3.0.8
+- pyiron-data >=0.0.25

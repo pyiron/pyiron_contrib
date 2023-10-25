@@ -7,6 +7,7 @@ from scipy.interpolate import splrep, splev
 from scipy.integrate import cumtrapz
 from scipy.constants import physical_constants
 KB = physical_constants['Boltzmann constant in eV/K'][0]
+bar_to_GPa = 1e-4
 
 from jinja2 import Template
 from io import StringIO
@@ -46,11 +47,10 @@ variable         t_traj equal {{ n_traj }} # dump trajectory frequency
 
 # Integrator and thermostat.
 timestep         ${ts}
-fix              f1 all nph iso {{ pressure }} {{ pressure }} 1.0
+fix              f1 all nve
 fix              f2 all langevin {{ T_start }} {{ T_start }} 0.1 ${rnd} zero yes
 
 compute          c1 all temp/com
-fix_modify       f1 temp c1
 fix_modify       f2 temp c1
 
 # Initial temperature to accelerate equilibration.
@@ -72,12 +72,19 @@ dump_modify      1 sort id format line "%d %d %20.15g %20.15g %20.15g %20.15g %2
 thermo_style     custom step temp pe etotal pxx pxy pxz pyy pyz pzz vol
 thermo           0
 
-# Unfix and run forward ramping.
+# Refix and run forward ramping.
+unfix            f1
 unfix            f2
+{% if pressure is not none %}
+fix              f1 all nph iso {{ pressure }} {{ pressure }} 1.0
+fix_modify       f1 temp c1
+{% else %}
+fix              f1 all nve
+{% endif %}
 fix              f2 all langevin {{ T_start }} {{ T_stop }} 0.1 ${rnd} zero yes
 fix_modify       f2 temp c1
 compute          msd all msd com yes average yes
-fix              f3 all print ${t_print} "$(step) $(temp) $(pe) $(ke) $(enthalpy) $(vol) $(c_msd[4])" title "# Step Temp[K] PE[eV] KE[eV] H[eV] Vol[Ang^3] msd[Ang^2]" screen no file forward.dat
+fix              f3 all print ${t_print} "$(step) $(temp) $(pe) $(ke) $(enthalpy) $(vol) $(press) $(c_msd[4])" title "# Step Temp[K] PE[eV] KE[eV] H[eV] Vol[Ang^3] P[eV/Ang^2] msd[Ang^2]" screen no file forward.dat
 run              ${t}
 """
 
@@ -98,6 +105,8 @@ class TemperatureRampMD():
         self._job_names = ['sample_' + str(i) for i in range(self.n_samples)]
         self._n_atoms = self.ref_job.structure.get_number_of_atoms()
         self._raw_temperatures = np.linspace(self.temperatures[0], self.temperatures[-1], int(self.n_ramp_steps/self.n_print)+1)
+        if self.pressure is not None:
+            self.pressure *= 1/bar_to_GPa
     
     def _generate_input_script(self):
         template = Template(lammps_input)
@@ -110,7 +119,7 @@ class TemperatureRampMD():
             n_print=self.n_print,
             n_traj=self.n_traj_print,
             time_step=self.time_step,
-            pressure=self.pressure*1e4
+            pressure=self.pressure
         )
         return input_script
         
@@ -132,7 +141,7 @@ class TemperatureRampMD():
     def _collect_output(self, job_name):
         job = self._project.inspect(job_name)
         job.decompress()
-        nest = {'steps': None, 'temp': None, 'en_pot': None, 'en_kin': None, 'H': None, 'vol': None, 'msd': None}
+        nest = {'steps': None, 'temp': None, 'en_pot': None, 'en_kin': None, 'H': None, 'vol': None, 'press': None, 'msd': None}
         data_dict= {'forward': nest.copy()}
         forward = np.loadtxt(os.path.join(job.working_directory, "forward.dat"), unpack=True)
         data_dict['forward'].update(zip(data_dict['forward'], forward))
@@ -145,12 +154,14 @@ class TemperatureRampMD():
     
     def _get_raw_properties(self):
         output_dicts = [self._collect_output(job_name) for job_name in self._job_names]
-        T_raw, U_raw, H_raw, V_raw = zip(*[(val[1], val[7]/self._n_atoms, val[4]/self._n_atoms, val[5]/self._n_atoms) 
-                                           for val in [self._get_values(data_dict) for data_dict in output_dicts]])
+        T_raw, U_raw, H_raw, V_raw, P_raw = zip(*[(val[1], val[7]/self._n_atoms, val[4]/self._n_atoms, val[5]/self._n_atoms,
+                                                   val[6]*bar_to_GPa) for val in [self._get_values(data_dict) 
+                                                                                  for data_dict in output_dicts]])
         return {'T_raw': T_raw,
                 'U_raw': U_raw,
                 'H_raw': H_raw,
-                'V_raw': V_raw
+                'V_raw': V_raw,
+                'P_raw': P_raw
                }
     
     def _get_mean_properties(self):
@@ -159,10 +170,12 @@ class TemperatureRampMD():
                 'U_mean': np.mean(raw_dict['U_raw'], axis=0),
                 'H_mean': np.mean(raw_dict['H_raw'], axis=0),
                 'V_mean': np.mean(raw_dict['V_raw'], axis=0),
+                'P_mean': np.mean(raw_dict['P_raw'], axis=0),
                 'T_se': np.std(raw_dict['T_raw'], axis=0)/np.sqrt(self.n_samples),
                 'U_se': np.std(raw_dict['U_raw'], axis=0)/np.sqrt(self.n_samples),
                 'H_se': np.std(raw_dict['H_raw'], axis=0)/np.sqrt(self.n_samples),
-                'V_se': np.std(raw_dict['V_raw'], axis=0)/np.sqrt(self.n_samples)
+                'V_se': np.std(raw_dict['V_raw'], axis=0)/np.sqrt(self.n_samples),
+                'P_se': np.std(raw_dict['P_raw'], axis=0)/np.sqrt(self.n_samples)
                }
     
     @staticmethod
@@ -189,6 +202,7 @@ class TemperatureRampMD():
         U = self._get_mapped_quantity(mean_dict['U_mean'], self.temperatures, poly_order=poly_order, spline=spline)
         H = self._get_mapped_quantity(mean_dict['H_mean'], self.temperatures, poly_order=poly_order, spline=spline)
         V = self._get_mapped_quantity(mean_dict['V_mean'], self.temperatures, poly_order=poly_order, spline=spline)
+        P = self._get_mapped_quantity(mean_dict['P_mean'], self.temperatures, poly_order=poly_order, spline=spline)
         Cp, S, G = self._get_properties(H)
         return {'T': self.temperatures.tolist(),
                 'U': U.tolist(),
@@ -196,13 +210,15 @@ class TemperatureRampMD():
                 'Cp': Cp.tolist(),
                 'S': S.tolist(),
                 'G': G.tolist(),
-                'V': V.tolist()}
+                'V': V.tolist(),
+                'P': P.tolist()}
         
     def get_remapped_properties(self, remapped_temperatures, poly_order=5, spline=True):
         mean_dict = self._get_mean_properties()
         U = self._get_mapped_quantity(mean_dict['U_mean'], remapped_temperatures, poly_order=poly_order, spline=spline)
         H = self._get_mapped_quantity(mean_dict['H_mean'], remapped_temperatures, poly_order=poly_order, spline=spline)
         V = self._get_mapped_quantity(mean_dict['V_mean'], remapped_temperatures, poly_order=poly_order, spline=spline)
+        P = self._get_mapped_quantity(mean_dict['P_mean'], remapped_temperatures, poly_order=poly_order, spline=spline)
         H_unmapped = self._get_mapped_quantity(mean_dict['H_mean'], self.temperatures, poly_order=poly_order, spline=spline)
         Cp, S, G = self._get_properties(H)
         return {'T': self.temperatures.tolist(),
@@ -212,4 +228,5 @@ class TemperatureRampMD():
                 'remapped_S': S.tolist(),
                 'remapped_G': G.tolist(),
                 'remapped_V': V.tolist(),
+                'remapped_P': P.tolist(),
                 'unmapped_H': H_unmapped.tolist()}

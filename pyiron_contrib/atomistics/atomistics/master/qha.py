@@ -588,7 +588,7 @@ class Thermodynamics:
         if self._free_energy is None:
             self._free_energy = np.array(
                 [
-                    get_helmholtz_free_energy(nu, self.temperature, E)
+                    get_helmholtz_free_energy(np.sort(nu)[3:], self.temperature, E)
                     for nu, E in zip(self.nu, self.E)
                 ]
             )

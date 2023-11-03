@@ -123,7 +123,7 @@ class AbstractPotential(DataContainer):
         """
         try:
             self._randomize_parameters(rng=rng, filter_func=filter_func)
-        except NotImplemented:
+        except:
             raise NotImplementedError('Subclass needs to implement _randomize_parameters')
 
 class BOPAbstract(AbstractPotential):

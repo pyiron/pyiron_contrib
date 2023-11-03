@@ -120,12 +120,11 @@ class AbstractPotential(DataContainer):
         to sample global parameter space in a very simple manner.
         Only applies to cases where filer_func returns True if set.
         Requires a numpy.random.Generator (np.random.default_rng(seed)) to generate values.
-        """        
-        self._randomize_parameters(rng=rng, filter_func=filter_func)
-
-    def _randomize_parameters(self, rng, filter_func=None):
-        raise NotImplementedError("Should be implemented in the subclass")
-
+        """
+        try:
+            self._randomize_parameters(rng=rng, filter_func=filter_func)
+        except NotImplemented:
+            raise NotImplementedError('Subclass needs to implement _randomize_parameters')
 
 class BOPAbstract(AbstractPotential):
     def __init__(self, init=None, elements=None, export_file=None, identifier=None):

@@ -113,18 +113,7 @@ class AbstractPotential(DataContainer):
 
     def _plot_final_potential(self):
         raise NotImplementedError("Should be implemented in the subclass")
-
-    def randomize_parameters(self, rng, filter_func=None):
-        """
-        Randomize values of potential parameters
-        to sample global parameter space in a very simple manner.
-        Only applies to cases where filer_func returns True if set.
-        Requires a numpy.random.Generator (np.random.default_rng(seed)) to generate values.
-        """
-        try:
-            self._randomize_parameters(rng=rng, filter_func=filter_func)
-        except:
-            raise NotImplementedError('Subclass needs to implement _randomize_parameters')
+    
 
 class BOPAbstract(AbstractPotential):
     def __init__(self, init=None, elements=None, export_file=None, identifier=None):
@@ -572,7 +561,7 @@ class EAMlikeMixin:
             for f in functions.values():
                 f.copy_final_to_initial_params(filter_func=filter_func)
                 
-    def _randomize_parameters(self, rng, filter_func=None):
+    def randomize_parameters(self, rng, filter_func=None):
         for functions in self._function_tuple:
             for f in functions.values():
                 f.randomize_parameters(rng=rng, filter_func=filter_func)

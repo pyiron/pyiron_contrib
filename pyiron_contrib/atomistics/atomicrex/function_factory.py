@@ -345,6 +345,11 @@ class BaseFunctionMixin:
         for param in self.parameters.values():
             param.lock(filter_func=filter_func)
 
+    def randomize_parameters(self, rng, filter_func=None):
+        for param in self.parameters.values():
+            param.randomize(rng=rng, filter_func=filter_func)
+
+
     def set_max_values(self, constant=None, factor=None, filter_func=None):
         """
         Convenience function so set max values for all parameters at once.
@@ -411,6 +416,10 @@ class MetaFunctionMixin:
     def lock_parameters(self, filter_func=None):
         for f in self.functions.values():
             f.lock_parameters(filter_func=filter_func)
+
+    def randomize_parameters(self, rng, filter_func=None):
+        for f in self.functions.values():
+            f.radomize_parameters(rng=rng, filter_func=filter_func)
 
     def set_max_values(self, constant=None, factor=None, filter_func=None):
         """
@@ -1459,6 +1468,13 @@ class FunctionParameter(DataContainer):
                 return
         self.enabled = False
 
+    def randomize(self, rng, filter_func=None,):
+        if filter_func is not None:
+            if not filter_func(self):
+                return
+        if self.min_val is None or self.max_val is None:
+            raise ValueError(f"Min and/or max val not set for {self.param}, can't randomize")
+        self.start_val = rng.random(self.min_val, self.max_val)
 
 class FunctionParameterList(DataContainer):
     def __init__(self):

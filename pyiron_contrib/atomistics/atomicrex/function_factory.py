@@ -1472,9 +1472,12 @@ class FunctionParameter(DataContainer):
         if filter_func is not None:
             if not filter_func(self):
                 return
-        if self.min_val is None or self.max_val is None:
-            raise ValueError(f"Min and/or max val not set for {self.param}, can't randomize")
-        self.start_val = rng.random(self.min_val, self.max_val)
+
+        if self.enabled:
+            if self.min_val is None or self.max_val is None:
+                raise ValueError(f"Min and/or max val not set for {self.param}, can't randomize")
+
+            self.start_val = rng.random(self.min_val, self.max_val)
 
 class FunctionParameterList(DataContainer):
     def __init__(self):

@@ -121,7 +121,7 @@ class AbstractPotential(DataContainer):
         Only applies to cases where filer_func returns True if set.
         Requires a numpy.random.Generator (np.random.default_rng(seed)) to generate values.
         """        
-        self._randomize_parameters(self, rng=rng, filter_func=filter_func)
+        self._randomize_parameters(rng=rng, filter_func=filter_func)
 
     def _randomize_parameters(self, rng, filter_func=None):
         raise NotImplementedError("Should be implemented in the subclass")

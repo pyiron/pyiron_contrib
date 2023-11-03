@@ -1477,7 +1477,7 @@ class FunctionParameter(DataContainer):
             if self.min_val is None or self.max_val is None:
                 raise ValueError(f"Min and/or max val not set for {self.param}, can't randomize")
 
-            self.start_val = rng.random(self.min_val, self.max_val)
+            self.start_val = rng.uniform(self.min_val, self.max_val)
 
 class FunctionParameterList(DataContainer):
     def __init__(self):

@@ -419,7 +419,7 @@ class MetaFunctionMixin:
 
     def randomize_parameters(self, rng, filter_func=None):
         for f in self.functions.values():
-            f.radomize_parameters(rng=rng, filter_func=filter_func)
+            f.randomize_parameters(rng=rng, filter_func=filter_func)
 
     def set_max_values(self, constant=None, factor=None, filter_func=None):
         """

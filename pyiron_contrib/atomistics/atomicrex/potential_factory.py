@@ -561,6 +561,11 @@ class EAMlikeMixin:
             for f in functions.values():
                 f.copy_final_to_initial_params(filter_func=filter_func)
 
+    def randomize_parameters(self, rng, filter_func=None):
+        for functions in self._function_tuple:
+            for f in functions.values():
+                f.randomize_parameters(rng=rng, filter_func=filter_func)
+
     def lock_parameters(self, filter_func=None):
         for functions in self._function_tuple:
             for f in functions.values():

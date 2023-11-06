@@ -113,7 +113,7 @@ class AbstractPotential(DataContainer):
 
     def _plot_final_potential(self):
         raise NotImplementedError("Should be implemented in the subclass")
-    
+
 
 class BOPAbstract(AbstractPotential):
     def __init__(self, init=None, elements=None, export_file=None, identifier=None):
@@ -560,7 +560,7 @@ class EAMlikeMixin:
         for functions in self._function_tuple:
             for f in functions.values():
                 f.copy_final_to_initial_params(filter_func=filter_func)
-                
+
     def randomize_parameters(self, rng, filter_func=None):
         for functions in self._function_tuple:
             for f in functions.values():

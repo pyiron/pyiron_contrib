@@ -54,7 +54,7 @@ setup(
         ],
         'tinybase': [
             'distributed==2023.10.1',
-            'pympipool==0.7.1'
+            'pympipool==0.7.2'
         ]
     },
     cmdclass=versioneer.get_cmdclass(),

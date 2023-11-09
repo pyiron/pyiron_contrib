@@ -426,7 +426,8 @@ class MDBondAnalysis(_BondAnalysisParent):
         if self.input.md_job is not None:
             self.input.md_trajectory = self.input.md_job.output.unwrapped_positions[self.input.thermalize_snapshots:]
             self.input.md_cells = self.input.md_job.output.cells[self.input.thermalize_snapshots:]
-            self.input.structure = self.input.md_job.structure.copy()
+            if self.input.structure is None:
+                self.input.structure = self.input.md_job.structure.copy()
         
         if (self.input.md_trajectory is None) | (self.input.md_cells is None):
             raise AttributeError('Either <job>.input.md_job or <job>.input.md_trajectory and <job>.input.md_cells must be set')

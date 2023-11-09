@@ -348,7 +348,7 @@ class MeanField():
                 _, _, b_eps = self.find_virial_quant(bonds=bonds, meshes=meshes, temperature=temperature, eps=eps, lm=args, 
                                                      fix=fix, Veff=Veff)
                 return np.abs(self.b_0*eps-b_eps)
-            solver = root_scalar(virial, x0=lm, x1=lm+0.001, method='lm', rtol=1e-20)
+            solver = root_scalar(virial, x0=lm, x1=lm+0.001, rtol=1e-20)
             eff_temp, lm = temperature, solver.root
         virial_q = self.find_virial_quant(bonds=bonds, meshes=meshes, temperature=eff_temp, eps=eps, lm=lm, fix=fix, 
                                           Veff=Veff, return_rho_1=True)

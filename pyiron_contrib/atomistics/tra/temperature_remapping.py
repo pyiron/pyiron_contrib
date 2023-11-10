@@ -21,6 +21,7 @@ class _TRInput(DataContainer):
         super().__init__(**kwargs)
         self._ref_job = None
         self._temperatures = None
+        self._interaction_range = 10
 
     @property
     def ref_job(self):
@@ -37,6 +38,14 @@ class _TRInput(DataContainer):
     @temperatures.setter
     def temperatures(self, temps):
         self._temperatures = temps
+        
+    @property
+    def interaction_range(self):
+        return self._interaction_range
+
+    @interaction_range.setter
+    def interaction_range(self, i_range):
+        self._interaction_range = i_range
         
 class TemperatureRemapping(GenericJob):
     def __init__(self, project, job_name):
@@ -58,6 +67,7 @@ class TemperatureRemapping(GenericJob):
             sub_pr = Project(self.working_directory)
             self.harm_job = sub_pr.create.job.PhonopyJob('ha_job', delete_existing_job=True)
             self.harm_job.ref_job = self.input.ref_job
+            self.harm_job.input['interaction_range'] = self.input.interaction_range
             self.harm_job.run()
         return self.harm_job
         
@@ -75,8 +85,10 @@ class TemperatureRemapping(GenericJob):
         return hessian
 
     def get_vibrational_frequencies(self, hessian, masses=None, return_eigenvectors=True):
+        n_atoms = hessian.shape[0] // 3
         if masses is None:
-            masses = self.structure.get_masses()
+            mass = self.structure.get_masses()[0]
+            masses = np.array([mass]*n_atoms)
         m = np.tile(masses, (3, 1)).T.flatten()
         mass_tensor = np.sqrt(m * m[:, np.newaxis])
         eigvals, eigvecs = np.linalg.eigh(hessian / mass_tensor)

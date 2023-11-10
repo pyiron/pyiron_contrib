@@ -50,9 +50,6 @@ timestep         ${ts}
 fix              f1 all nve
 fix              f2 all langevin {{ T_start }} {{ T_start }} 0.1 ${rnd} zero yes
 
-compute          c1 all temp/com
-fix_modify       f2 temp c1
-
 # Initial temperature to accelerate equilibration.
 variable         T_0 equal 2.0*{{ T_start }}
 velocity         all create ${T_0} ${rnd} dist gaussian
@@ -77,14 +74,11 @@ unfix            f1
 unfix            f2
 {% if pressure is not none %}
 fix              f1 all nph iso {{ pressure }} {{ pressure }} 1.0
-fix_modify       f1 temp c1
 {% else %}
 fix              f1 all nve
 {% endif %}
 fix              f2 all langevin {{ T_start }} {{ T_stop }} 0.1 ${rnd} zero yes
-fix_modify       f2 temp c1
-compute          msd all msd com yes average yes
-fix              f3 all print ${t_print} "$(step) $(temp) $(pe) $(ke) $(enthalpy) $(vol) $(press) $(c_msd[4])" title "# Step Temp[K] PE[eV] KE[eV] H[eV] Vol[Ang^3] P[eV/Ang^2] msd[Ang^2]" screen no file forward.dat
+fix              f3 all print ${t_print} "$(step) $(temp) $(pe) $(ke) $(enthalpy) $(vol) $(press)" title "# Step Temp[K] PE[eV] KE[eV] H[eV] Vol[Ang^3] P[eV/Ang^2]" screen no file forward.dat
 run              ${t}
 """
 
@@ -141,7 +135,7 @@ class TemperatureRampMD():
     def _collect_output(self, job_name):
         job = self._project.inspect(job_name)
         job.decompress()
-        nest = {'steps': None, 'temp': None, 'en_pot': None, 'en_kin': None, 'H': None, 'vol': None, 'press': None, 'msd': None}
+        nest = {'steps': None, 'temp': None, 'en_pot': None, 'en_kin': None, 'H': None, 'vol': None, 'press': None}
         data_dict= {'forward': nest.copy()}
         forward = np.loadtxt(os.path.join(job.working_directory, "forward.dat"), unpack=True)
         data_dict['forward'].update(zip(data_dict['forward'], forward))

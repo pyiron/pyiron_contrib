@@ -823,9 +823,13 @@ class EAMPotential(AbstractPotential, EAMlikeMixin):
                     ylim = (np.min(y) - 0.1, 2)
                     ax[i * 3 + k, V_count].plot(xdata, y)
                     ax[i * 3 + k, V_count].set(
-                        ylim=ylim, title=f"{el} {pot}", xlabel=xlabel
+                        ylim=ylim,
+                        title=f"{el} {pot}",
+                        xlabel=xlabel,
                     )
                     V_count += 1
+
+        fig.tight_layout()
         return fig, ax
 
     def count_local_extrema(

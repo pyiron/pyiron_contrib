@@ -22,41 +22,39 @@ setup(
         'License :: OSI Approved :: BSD License',
         'Intended Audience :: Science/Research',
         'Operating System :: OS Independent',
-        'Programming Language :: Python :: 3.6',
-        'Programming Language :: Python :: 3.7',
-        'Programming Language :: Python :: 3.8',
-        'Programming Language :: Python :: 3.9'
+        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
     ],
 
     keywords='pyiron',
     packages=find_packages(exclude=["*tests*"]),
     install_requires=[        
-        'matplotlib==3.7.1',
-        'numpy==1.24.3',
-        'pyiron_base==0.5.38',
-        'scipy==1.10.1',
-        'seaborn==0.12.2',
-        'pyparsing==3.0.9'
+        'matplotlib==3.8.1',
+        'numpy==1.26.0',
+        'pyiron_base==0.6.8',
+        'scipy==1.11.3',
+        'seaborn==0.13.0',
+        'pyparsing==3.1.1',
     ],
     extras_require={
         'atomistic': [
             'ase==3.22.1',
-            'pyiron_atomistics==0.2.67',
+            'pyiron_atomistics==0.3.5',
             'pycp2k==0.2.2',
         ],
         'fenics': [
             'fenics==2019.1.0',
             'mshr==2019.1.0',
         ],
-        'image': ['scikit-image==0.19.3'],
+        'image': ['scikit-image==0.22.0'],
         'generic': [
-            'boto3==1.26.137', 
-            'moto==4.1.10'
+            'boto3==1.28.78', 
+            'moto==4.2.7'
         ],
-        'workflow': [
-            'python>=3.10',
-            'ipython',
-            'typeguard==4.0.0'
+        'tinybase': [
+            'distributed==2023.10.1',
+            'pympipool==0.7.2'
         ]
     },
     cmdclass=versioneer.get_cmdclass(),

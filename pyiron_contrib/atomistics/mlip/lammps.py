@@ -7,7 +7,6 @@ from pyiron_atomistics.lammps.base import Input
 from pyiron_atomistics.lammps.interactive import LammpsInteractive
 from pyiron_atomistics.atomistics.structure.atoms import Atoms
 from pyiron_atomistics.atomistics.structure.structurestorage import StructureStorage
-from pyiron_contrib.atomistics.mlip.mlip import read_cgfs
 from pyiron_contrib.atomistics.mlip.cfgs import loadcfgs
 from pyiron_base import GenericParameters
 
@@ -121,7 +120,26 @@ write-cfgs:skip 0
         if "select:save-selected" in self.input.mlip._dataset["Parameter"]:
             file_name = self._get_selection_file()
             if os.path.exists(file_name):
+                cell = []
+                positions = []
+                forces = []
+                stress = []
+                energy = []
+                indicies = []
                 for cfg in loadcfgs(file_name):
+                    cell.append(cfg.lat)
+                    positions.append(cfg.pos)
+                    forces.append(cfg.forces)
+                    stress.append(
+                        [
+                            [cgf.stresses[0], cgf.stresses[5], cgf.stresses[4]],
+                            [cgf.stresses[5], cgf.stresses[1], cgf.stresses[3]],
+                            [cgf.stresses[4], cgf.stresses[3], cgf.stresses[2]],
+                        ]
+                    )
+                    energy.append(cfg.energy)
+                    indicies.append(cfg.types)
+
                     species = np.array(self.potential.Species.iloc[0])[
                         cfg.types.astype(int)
                     ]
@@ -134,24 +152,13 @@ write-cfgs:skip 0
                         ),
                         mv_grade=cfg.grade,
                     )
-                (
-                    cell,
-                    positions,
-                    forces,
-                    stress,
-                    energy,
-                    indicies,
-                    grades,
-                    jobids,
-                    timesteps,
-                ) = read_cgfs(file_name=file_name)
                 with self.project_hdf5.open("output/mlip") as hdf5_output:
-                    hdf5_output["forces"] = forces
-                    hdf5_output["energy_tot"] = energy
-                    hdf5_output["pressures"] = stress
-                    hdf5_output["cells"] = cell
-                    hdf5_output["positions"] = positions
-                    hdf5_output["indicies"] = indicies
+                    hdf5_output["forces"] = np.array(forces)
+                    hdf5_output["energy_tot"] = np.array(energy)
+                    hdf5_output["pressures"] = np.array(stress)
+                    hdf5_output["cells"] = np.array(cell)
+                    hdf5_output["positions"] = np.array(positions)
+                    hdf5_output["indicies"] = np.array(indicies)
             self.selected_structures.to_hdf(
                 self.project_hdf5.open("output"), "selected"
             )

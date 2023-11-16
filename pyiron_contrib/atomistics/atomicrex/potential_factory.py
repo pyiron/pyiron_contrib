@@ -561,6 +561,11 @@ class EAMlikeMixin:
             for f in functions.values():
                 f.copy_final_to_initial_params(filter_func=filter_func)
 
+    def randomize_parameters(self, rng, filter_func=None):
+        for functions in self._function_tuple:
+            for f in functions.values():
+                f.randomize_parameters(rng=rng, filter_func=filter_func)
+
     def lock_parameters(self, filter_func=None):
         for functions in self._function_tuple:
             for f in functions.values():
@@ -818,9 +823,13 @@ class EAMPotential(AbstractPotential, EAMlikeMixin):
                     ylim = (np.min(y) - 0.1, 2)
                     ax[i * 3 + k, V_count].plot(xdata, y)
                     ax[i * 3 + k, V_count].set(
-                        ylim=ylim, title=f"{el} {pot}", xlabel=xlabel
+                        ylim=ylim,
+                        title=f"{el} {pot}",
+                        xlabel=xlabel,
                     )
                     V_count += 1
+
+        fig.tight_layout()
         return fig, ax
 
     def count_local_extrema(

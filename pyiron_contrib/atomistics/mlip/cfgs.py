@@ -177,3 +177,18 @@ def savecfgs(filename, cfgs, desc=None):
         for cfg in cfgs:
             savecfg(file, cfg, desc)
             print("", file=file)
+
+
+def load_grades_ids_and_timesteps(filename):
+    ids = []
+    timesteps = []
+    grades = []
+    with open(filename) as f:
+        for line in f:
+            if line.startswith("FEATURE   MV_GRADE"):
+                grades.append(float(line.split()[-1]))
+            elif line.startswith("FEATURE   PYIRON"):
+                i, t = map(int, line.rsplit(maxsplit=1)[-1].split("_"))
+                ids.append(i)
+                timesteps.append(t)
+    return np.array(grades), np.array(ids), np.array(timesteps)

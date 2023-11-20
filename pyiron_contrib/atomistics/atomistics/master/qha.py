@@ -103,7 +103,7 @@ class Displacements:
     def get_displacements(self, positive=True):
         ind_x, ind_y = self.get_unique_indices(positive=positive)
         displacements = np.zeros((len(ind_x),) + self.structure.positions.shape)
-        displacements[np.arange(len(ind_x)), ind_x, ind_y] = 1
+        displacements[np.arange(len(ind_x)), ind_x, ind_y] = -1 + 2 * positive
         return displacements
 
     @property
@@ -405,6 +405,7 @@ class QuasiHarmonicApproximation(AtomisticParallelMaster):
                 include_zero_displacement=self.input["include_zero_displacement"],
                 second_order=self.input["second_order"],
                 symprec=self.input["symprec"],
+                dx=self.input["displacement"]
             )
         return self._hessian
 

@@ -599,6 +599,7 @@ class ARStructureContainer:
             self.fit_properties["atomic-energy"][val_str]
             * self._structures._per_chunk_arrays["length"]
         )
+        storage.add_array(name="forces", shape=(3,), per="element")
         storage._per_element_arrays["forces"][
             0 : storage.num_elements
         ] = self.fit_properties["atomic-forces"][val_str]

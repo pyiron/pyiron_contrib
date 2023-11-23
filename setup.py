@@ -30,9 +30,9 @@ setup(
     keywords='pyiron',
     packages=find_packages(exclude=["*tests*"]),
     install_requires=[        
-        'matplotlib==3.8.1',
+        'matplotlib==3.8.2',
         'numpy==1.26.0',
-        'pyiron_base==0.6.8',
+        'pyiron_base==0.6.9',
         'scipy==1.11.3',
         'seaborn==0.13.0',
         'pyparsing==3.1.1',
@@ -40,7 +40,7 @@ setup(
     extras_require={
         'atomistic': [
             'ase==3.22.1',
-            'pyiron_atomistics==0.3.5',
+            'pyiron_atomistics==0.3.7',
             'pycp2k==0.2.2',
         ],
         'fenics': [
@@ -50,11 +50,11 @@ setup(
         'image': ['scikit-image==0.22.0'],
         'generic': [
             'boto3==1.28.78', 
-            'moto==4.2.7'
+            'moto==4.2.9'
         ],
         'tinybase': [
-            'distributed==2023.10.1',
-            'pympipool==0.7.2'
+            'distributed==2023.11.0',
+            'pympipool==0.7.5'
         ]
     },
     cmdclass=versioneer.get_cmdclass(),

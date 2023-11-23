@@ -405,7 +405,7 @@ class QuasiHarmonicApproximation(AtomisticParallelMaster):
                 include_zero_displacement=self.input["include_zero_displacement"],
                 second_order=self.input["second_order"],
                 symprec=self.input["symprec"],
-                dx=self.input["displacement"]
+                dx=self.input["displacement"],
             )
         return self._hessian
 

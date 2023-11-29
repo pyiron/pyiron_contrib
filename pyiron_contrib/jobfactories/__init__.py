@@ -1,4 +1,4 @@
-from pyiron_base import HasHDF, HasStorage, GenericJob
+from pyiron_base import HasStorage, GenericJob
 from pyiron_atomistics import Atoms
 from pyiron_contrib import Project
 
@@ -82,14 +82,14 @@ class JobFactory(HasStorage, ABC):
         return self.storage.create_group('attributes')
 
     @property
-    def project(self):
+    def project(self) -> Project:
         """
         Project that jobs should be created in by :meth:`.make`.
         """
         return self._project
 
     @project.setter
-    def project(self, value):
+    def project(self, value: Project):
         self._project = value
         self._project_nodes = None
 

@@ -136,11 +136,6 @@ class JobFactory(HasStorage, ABC):
         copy.storage.update(self.storage.copy())
         copy.project = self.project
         return copy
-        # copy = self.__class__()
-        # for k in self.storage:
-        #     copy.storage[k] = self.storage[k]
-        # copy.project = self.project
-        # return copy
 
     def set_input(self, **kwargs):
         """

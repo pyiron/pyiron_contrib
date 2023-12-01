@@ -58,6 +58,7 @@ JOB_CLASS_DICT.update(
         "PigletMD": "pyiron_contrib.atomistics.ipi.ipi_jobs",
         "FitsnapJob": "pyiron_contrib.atomistics.fitsnap.job",
         "QuasiHarmonicApproximation": "pyiron_contrib.atomistics.atomistics.master.qha",
+        "XtbJob":"pyiron_contrib.atomistics.xtb.xtb"
     }
 )
 

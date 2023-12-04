@@ -20,5 +20,5 @@ dependencies:
 - moto =4.2.11
 - pycp2k =0.2.2
 - aws-sam-translator =1.77.0
-- pympipool =0.7.6
+- pympipool =0.7.9
 - distributed =2023.11.0

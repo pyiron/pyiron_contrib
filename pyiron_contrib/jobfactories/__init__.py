@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 import contextlib
 from typing import Optional, Callable
 
+
 class JobFactory(HasStorage, ABC):
     """
     A small class for high throughput job execution.
@@ -59,7 +60,7 @@ class JobFactory(HasStorage, ABC):
 
     def __init__(self):
         super().__init__()
-        self.storage.create_group('input')
+        self.storage.create_group("input")
         self._project_nodes = None
 
     @abstractmethod
@@ -79,7 +80,7 @@ class JobFactory(HasStorage, ABC):
         """
         Access to attributes, that should be set on the job after creation.
         """
-        return self.storage.create_group('attributes')
+        return self.storage.create_group("attributes")
 
     @property
     def project(self) -> Project:
@@ -101,11 +102,11 @@ class JobFactory(HasStorage, ABC):
             - cores
             - run_time
         """
-        return self.storage.create_group('server')
+        return self.storage.create_group("server")
 
     @property
     def cores(self):
-        return self.server.get('cores', self.storage.get('cores', None))
+        return self.server.get("cores", self.storage.get("cores", None))
 
     @cores.setter
     def cores(self, cores):
@@ -113,7 +114,7 @@ class JobFactory(HasStorage, ABC):
 
     @property
     def run_time(self):
-        return self.server.get('run_time', self.storage.get('run_time', None))
+        return self.server.get("run_time", self.storage.get("run_time", None))
 
     @run_time.setter
     def run_time(self, cores):
@@ -121,7 +122,7 @@ class JobFactory(HasStorage, ABC):
 
     @property
     def queue(self):
-        return self.server.get('queue', self.storage.get('queue', None))
+        return self.server.get("queue", self.storage.get("queue", None))
 
     @queue.setter
     def queue(self, cores):
@@ -150,12 +151,14 @@ class JobFactory(HasStorage, ABC):
         return self.storage.create_group("input")
 
     def __getattr__(self, name):
-        if name.startswith('__') and name.endswith('__'):
+        if name.startswith("__") and name.endswith("__"):
             raise AttributeError(name)
+
         def wrapper(*args, **kwargs):
-            d = self.storage.create_group(f'methods/{name}')
-            d['args'] = args
-            d['kwargs'] = kwargs
+            d = self.storage.create_group(f"methods/{name}")
+            d["args"] = args
+            d["kwargs"] = kwargs
+
         return wrapper
 
     def _prepare_job(self, job, structure):
@@ -169,10 +172,10 @@ class JobFactory(HasStorage, ABC):
             job.server.run_time = self.run_time
         for k, v in self.storage.input.items():
             job.input[k] = v
-        if 'methods' in self.storage:
+        if "methods" in self.storage:
             for meth, ka in self.storage.methods.items():
                 getattr(job, meth)(*ka.args, **ka.kwargs)
-        if 'attributes' in self.storage:
+        if "attributes" in self.storage:
             for attr, val in self.storage.attributes.items():
                 setattr(job, attr, val)
         return job
@@ -182,10 +185,13 @@ class JobFactory(HasStorage, ABC):
             self._project_nodes = self.project.list_nodes()
         return self._project_nodes
 
-    def make(self,
-             name: str, modify: Callable[[GenericJob], GenericJob],
-             structure: Atoms,
-             delete_existing_job=False, delete_aborted_job=True,
+    def make(
+        self,
+        name: str,
+        modify: Callable[[GenericJob], GenericJob],
+        structure: Atoms,
+        delete_existing_job=False,
+        delete_aborted_job=True,
     ) -> Optional[GenericJob]:
         """
         Create a new job if necessary.
@@ -202,17 +208,18 @@ class JobFactory(HasStorage, ABC):
         """
         # short circuit if job already successfully ran
         if not delete_existing_job and (
-                name in self._project_list_nodes() \
-                    and self.project.get_job_status(name) in ['finished', 'submitted']
+            name in self._project_list_nodes()
+            and self.project.get_job_status(name) in ["finished", "submitted"]
         ):
             return None
 
         job = getattr(self.project.create.job, self.hamilton)(
-                name,
-                delete_existing_job=delete_existing_job,
-                delete_aborted_job=delete_aborted_job
+            name,
+            delete_existing_job=delete_existing_job,
+            delete_aborted_job=delete_aborted_job,
         )
-        if not job.status.initialized: return None
+        if not job.status.initialized:
+            return None
 
         # FIXME: think about; when submitting large number of jobs with this
         # function that are all new, we can lose up 25% of run time by
@@ -224,11 +231,14 @@ class JobFactory(HasStorage, ABC):
         job = modify(job) or job
         return job
 
-    def run(self,
-            name: str, modify: Callable[[GenericJob], GenericJob],
-            structure: Atoms,
-            delete_existing_job: bool = False, delete_aborted_job: bool = True,
-            silence: bool = True
+    def run(
+        self,
+        name: str,
+        modify: Callable[[GenericJob], GenericJob],
+        structure: Atoms,
+        delete_existing_job: bool = False,
+        delete_aborted_job: bool = True,
+        silence: bool = True,
     ) -> Optional[GenericJob]:
         """
         First make a job, then run it if necessary.
@@ -245,20 +255,19 @@ class JobFactory(HasStorage, ABC):
             None: if job already existed and no action was taken
         """
         job = self.make(
-                name, modify, structure,
-                delete_existing_job, delete_aborted_job
+            name, modify, structure, delete_existing_job, delete_aborted_job
         )
         if job is None:
             return
         if silence:
-            with open('/dev/null', 'w') as f, contextlib.redirect_stdout(f):
+            with open("/dev/null", "w") as f, contextlib.redirect_stdout(f):
                 job.run()
         else:
             job.run()
         return job
 
-class GenericJobFactory(JobFactory):
 
+class GenericJobFactory(JobFactory):
     def __init__(self, hamilton=None):
         super().__init__()
         if hamilton is not None:
@@ -267,8 +276,8 @@ class GenericJobFactory(JobFactory):
     def _get_hamilton(self):
         return self.storage.hamilton
 
-class MasterJobFactory(GenericJobFactory):
 
+class MasterJobFactory(GenericJobFactory):
     def set_ref_job(self, ref_job):
         self.storage.ref_job = ref_job
 
@@ -277,17 +286,19 @@ class MasterJobFactory(GenericJobFactory):
         super()._prepare_job(job, structure)
         return job
 
-class DftFactory(JobFactory):
 
+class DftFactory(JobFactory):
     def set_empty_states(self, states_per_atom):
         self.storage.empty_states_per_atom = states_per_atom
 
     def _prepare_job(self, job, structure):
         job = super()._prepare_job(job, structure)
-        if 'empty_states_per_atom' in self.storage:
-            job.input['EmptyStates'] = \
-                    len(structure) * self.storage.empty_states_per_atom + 3
+        if "empty_states_per_atom" in self.storage:
+            job.input["EmptyStates"] = (
+                len(structure) * self.storage.empty_states_per_atom + 3
+            )
         return job
+
 
 class VaspFactory(DftFactory):
     def __init__(self):
@@ -303,14 +314,14 @@ class VaspFactory(DftFactory):
         self.storage.nband_nelec_map = nelec
 
     def _get_hamilton(self):
-        return 'Vasp'
+        return "Vasp"
 
     def minimize_volume(self):
         self.calc_minimize(pressure=0.0, volume_only=True)
 
     def minimize_cell(self):
         self.calc_minimize()
-        self.incar['ISIF'] = 5
+        self.incar["ISIF"] = 5
 
     def minimize_internal(self):
         self.calc_minimize()
@@ -325,18 +336,22 @@ class VaspFactory(DftFactory):
         if self.storage.nband_nelec_map is not None:
             # weird structure sometimes require more bands
             # HACK: for Mg/Al/Ca, since Ca needs a lot of electrons
-            elems = {'Mg', 'Al', 'Ca'}
+            elems = {"Mg", "Al", "Ca"}
             if elems.union(set(structure.get_chemical_symbols())) == elems:
-                nelect = sum(self.storage.nband_nelec_map[el] for el in structure.get_chemical_symbols())
-                job.input.incar['NBANDS'] = nelect + len(structure)
+                nelect = sum(
+                    self.storage.nband_nelec_map[el]
+                    for el in structure.get_chemical_symbols()
+                )
+                job.input.incar["NBANDS"] = nelect + len(structure)
         return job
+
 
 class SphinxFactory(DftFactory):
     def _get_hamilton(self):
-        return 'Sphinx'
+        return "Sphinx"
+
 
 class LammpsFactory(JobFactory):
-
     @property
     def potential(self):
         return self.storage.potential
@@ -353,7 +368,7 @@ class LammpsFactory(JobFactory):
         job.potential = self.potential
         return job
 
-class MlipFactory(LammpsFactory):
 
+class MlipFactory(LammpsFactory):
     def _get_hamilton(self):
         return "LammpsMlip"

@@ -148,6 +148,7 @@ class Hessian:
         symprec=1.0e-2,
         include_zero_displacement=True,
         second_order=True,
+        alphas=np.logspace(-10, 20, 50),
     ):
         """
         Calculation of the Hessian matrix
@@ -174,6 +175,7 @@ class Hessian:
         self._hessian = None
         self.include_zero_displacement = include_zero_displacement
         self.second_order = second_order
+        self._alphas = alphas
 
     @property
     def symmetry(self):
@@ -292,8 +294,12 @@ class Hessian:
     def _fit(self):
         E = self.energy + 0.5 * np.einsum("nij,nij->n", self.forces, self.displacements)
         E = np.repeat(E, len(self.symmetry.rotations))[self.inequivalent_indices]
-        reg = RidgeCV(alphas=np.logspace(-10, 20, 50))
+        reg = RidgeCV(alphas=self._alphas)
         reg.fit(self.inequivalent_forces, E)
+        if np.ptp(
+            E - reg.predict(self.inequivalent_forces)
+        ) > 1.0e-3 * len(self.structure):
+            warnings.warn("It may have found a wrong minimum energy structure!")
         return reg
 
     @property

@@ -296,9 +296,7 @@ class Hessian:
         E = np.repeat(E, len(self.symmetry.rotations))[self.inequivalent_indices]
         reg = RidgeCV(alphas=self._alphas)
         reg.fit(self.inequivalent_forces, E)
-        if np.ptp(
-            E - reg.predict(self.inequivalent_forces)
-        ) > 1.0e-3 * len(self.structure):
+        if np.ptp(E - reg.predict(self.inequivalent_forces)) > 1.0e-3:
             warnings.warn("It may have found a wrong minimum energy structure!")
         return reg
 

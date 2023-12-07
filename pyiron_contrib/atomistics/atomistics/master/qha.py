@@ -1,6 +1,6 @@
 import numpy as np
 import pint
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import RidgeCV
 from pyiron_atomistics.atomistics.master.parallel import AtomisticParallelMaster
 from pyiron_base import JobGenerator
 
@@ -292,7 +292,7 @@ class Hessian:
     def _fit(self):
         E = self.energy + 0.5 * np.einsum("nij,nij->n", self.forces, self.displacements)
         E = np.repeat(E, len(self.symmetry.rotations))[self.inequivalent_indices]
-        reg = LinearRegression()
+        reg = RidgeCV(alphas=np.logspace(-10, 20, 50))
         reg.fit(self.inequivalent_forces, E)
         return reg
 

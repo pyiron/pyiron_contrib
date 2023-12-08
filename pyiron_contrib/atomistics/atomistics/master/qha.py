@@ -298,6 +298,11 @@ class Hessian:
         reg.fit(self.inequivalent_forces, E)
         if np.ptp(E - reg.predict(self.inequivalent_forces)) > 1.0e-3:
             warnings.warn("It may have found a wrong minimum energy structure!")
+        if np.linalg.norm(reg.coef_) > self.dx:
+            warnings.warn(
+                "Predicted minimum energy structure is too far from the"
+                " original structure"
+            )
         return reg
 
     @property

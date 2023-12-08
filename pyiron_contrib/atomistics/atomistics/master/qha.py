@@ -2,6 +2,7 @@ import numpy as np
 import pint
 from sklearn.linear_model import RidgeCV
 from pyiron_atomistics.atomistics.master.parallel import AtomisticParallelMaster
+import warnings
 from pyiron_base import JobGenerator
 
 
@@ -148,7 +149,7 @@ class Hessian:
         symprec=1.0e-2,
         include_zero_displacement=True,
         second_order=True,
-        alphas=np.logspace(-10, 20, 50),
+        alphas=np.logspace(-20, 20, 50),
     ):
         """
         Calculation of the Hessian matrix
@@ -175,7 +176,7 @@ class Hessian:
         self._hessian = None
         self.include_zero_displacement = include_zero_displacement
         self.second_order = second_order
-        self._alphas = alphas
+        self.alphas = alphas
 
     @property
     def symmetry(self):
@@ -291,16 +292,18 @@ class Hessian:
         self._inequivalent_displacements = None
 
     @property
+    def E_fx(self):
+        return np.repeat(
+            self.energy, len(self.symmetry.rotations)
+        )[self.inequivalent_indices]
+
+    @property
     def _fit(self):
-        E = self.energy + 0.5 * np.einsum("nij,nij->n", self.forces, self.displacements)
-        E = np.repeat(E, len(self.symmetry.rotations))[self.inequivalent_indices]
-        reg = RidgeCV(alphas=self._alphas)
-        reg.fit(self.inequivalent_forces, E)
-        if np.ptp(E - reg.predict(self.inequivalent_forces)) > 1.0e-3:
-            warnings.warn("It may have found a wrong minimum energy structure!")
+        reg = RidgeCV(alphas=self.alphas)
+        reg.fit(self.inequivalent_forces, self.E_fx)
         if np.linalg.norm(reg.coef_) > self.dx:
             warnings.warn(
-                "Predicted minimum energy structure is too far from the"
+                "Predicted minimum energy structure might be too far from the"
                 " original structure"
             )
         return reg
@@ -313,7 +316,7 @@ class Hessian:
     def origin(self):
         if self.energy is None or self.forces is None:
             return np.zeros_like(self.structure.positions)
-        return 2 * self.symmetry.symmetrize_vectors(self._fit.coef_.reshape(-1, 3))
+        return self.symmetry.symmetrize_vectors(self._fit.coef_.reshape(-1, 3))
 
     @property
     def volume(self):

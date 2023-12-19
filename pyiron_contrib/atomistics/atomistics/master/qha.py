@@ -293,9 +293,9 @@ class Hessian:
 
     @property
     def E_fx(self):
-        return np.repeat(
-            self.energy, len(self.symmetry.rotations)
-        )[self.inequivalent_indices]
+        return np.repeat(self.energy, len(self.symmetry.rotations))[
+            self.inequivalent_indices
+        ]
 
     @property
     def _fit(self):

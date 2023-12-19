@@ -53,7 +53,7 @@ setup(
             'moto==4.2.12'
         ],
         'tinybase': [
-            'distributed==2023.12.0',
+            'distributed==2023.12.1',
             'pympipool==0.7.9'
         ]
     },

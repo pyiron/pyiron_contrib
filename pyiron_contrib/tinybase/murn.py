@@ -1,9 +1,13 @@
 from pyiron_contrib.tinybase.container import (
+    AbstractInput,
     AbstractOutput,
     StructureInput,
-    StorageAttribute,
+    field,
+    USER_REQUIRED,
 )
+
 from pyiron_contrib.tinybase.task import (
+    AbstractTask,
     ListTaskGenerator,
     ListInput,
     ReturnStatus,
@@ -12,23 +16,25 @@ from pyiron_contrib.tinybase.task import (
 from copy import deepcopy
 
 import numpy as np
+import numpy.typing as npt
 import matplotlib.pyplot as plt
 import scipy.interpolate as si
 import scipy.optimize as so
 
+from ase import Atoms
 from pyiron_atomistics.atomistics.structure.has_structure import HasStructure
 
 
 class MurnaghanInput(StructureInput, ListInput):
-    strains = StorageAttribute()
-    task = StorageAttribute()
+    task: AbstractTask = USER_REQUIRED
+    strains: npt.NDArray[float] = field(default_factory=lambda: np.linspace(-0.2, 0.2, 7))
 
     def check_ready(self):
-        structure_ready = self.structure is not None
+        if not super().check_ready(): return False
         strain_ready = len(self.strains) > 0
         task = self.task
         task.input.structure = self.structure
-        return structure_ready and strain_ready and task.input.check_ready()
+        return strain_ready and task.input.check_ready()
 
     def set_strain_range(self, volume_range, steps):
         self.strains = (1 + np.linspace(-volume_range, volume_range, steps)) ** (1 / 3)
@@ -45,9 +51,9 @@ class MurnaghanInput(StructureInput, ListInput):
 
 
 class MurnaghanOutput(AbstractOutput, HasStructure):
-    base_structure = StorageAttribute()
-    volumes = StorageAttribute().type(np.ndarray)
-    energies = StorageAttribute().type(np.ndarray)
+    base_structure: Atoms
+    volumes: npt.NDArray[float]
+    energies: npt.NDArray[float]
 
     def plot(self, per_atom=True):
         N = len(self.base_structure) if per_atom else 1
@@ -73,14 +79,18 @@ class MurnaghanTask(ListTaskGenerator):
     def _get_input(self):
         return MurnaghanInput()
 
-    def _get_output(self):
-        out = MurnaghanOutput()
-        out.energies = np.zeros(len(self.input.strains))
-        out.volumes = np.zeros(len(self.input.strains))
-        out.base_structure = self.input.structure
-        return out
-
-    def _extract_output(self, output, step, task, ret, task_output):
+    def _extract_output(self, step, task, ret, output):
         if ret.is_done():
-            output.energies[step] = task_output.energy_pot
-            output.volumes[step] = task.input.structure.get_volume()
+            return {'step': step, 'energy_pot': output.energy_pot, 'volume': task.input.structure.get_volume()}
+
+    def _join_output(self, outputs):
+        energies = np.full(self.input.strains.shape, np.nan)
+        volumes = np.full(self.input.strains.shape, np.nan)
+        for output in outputs:
+            energies[output["step"]] = output["energy_pot"]
+            volumes[output["step"]] = output["volume"]
+        return MurnaghanOutput(
+                base_structure=self.input.structure.copy(),
+                energies=energies,
+                volumes=volumes,
+        )

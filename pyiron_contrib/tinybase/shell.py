@@ -7,7 +7,8 @@ from pyiron_base.state import state
 from pyiron_contrib.tinybase.container import (
     AbstractInput,
     AbstractOutput,
-    StorageAttribute,
+    USER_REQUIRED,
+    field
 )
 
 from pyiron_contrib.tinybase.task import AbstractTask, ReturnStatus
@@ -104,17 +105,17 @@ class ExecutablePathResolver:
 
 
 class ShellInput(AbstractInput):
-    command = StorageAttribute()
-    arguments = StorageAttribute().type(list).constructor(list)
-    environ = StorageAttribute().type(dict).constructor(dict)
-    working_directory = StorageAttribute().type(str)
-    allowed_returncode = StorageAttribute().type(list)
+    command: str = USER_REQUIRED
+    working_directory: str = USER_REQUIRED
+    arguments: list = field(default_factory=list)
+    environ: dict = field(default_factory=dict)
+    allowed_returncode: list = [0]
 
 
 class ShellOutput(AbstractOutput):
-    stdout = StorageAttribute()
-    stderr = StorageAttribute()
-    returncode = StorageAttribute().type(int)
+    stdout: str
+    stderr: str
+    returncode: int
 
 
 class ShellTask(AbstractTask):

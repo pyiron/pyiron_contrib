@@ -185,7 +185,7 @@ class ExecutorCreator(Creator):
 
     def most_recent(self):
         if self._most_recent is None:
-            self._most_recent = Executor()
+            self._most_recent = Submitter()
         return self._most_recent
 
     def _save(func):
@@ -200,7 +200,7 @@ class ExecutorCreator(Creator):
     @_save
     def process(self, max_processes=_DEFAULT_CPUS, **kwargs):
         return FuturesSubmitter(
-                ProcessPoolExecutor(max_processes=max_processes, **kwargs)
+                ProcessPoolExecutor(max_workers=max_processes, **kwargs)
         )
 
     @_save

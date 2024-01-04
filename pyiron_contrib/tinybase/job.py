@@ -97,7 +97,9 @@ class TinyJob(Storable):
         self._output = data["output"][0]
 
     def _setup_submitter_callbacks(self):
-        self._submitter._run_machine.observe("ready", lambda _: self.store(self.storage))
+        self._submitter._run_machine.observe(
+            "ready", lambda _: self.store(self.storage)
+        )
         self._submitter._run_machine.observe("finished", self._set_output)
         self._submitter._run_machine.observe(
             "finished", lambda _: self.store(self.storage)
@@ -106,7 +108,9 @@ class TinyJob(Storable):
         self._submitter._run_machine.observe("ready", self._add_to_database)
         self._submitter._run_machine.observe("running", self._update_status("running"))
         self._submitter._run_machine.observe("collect", self._update_status("collect"))
-        self._submitter._run_machine.observe("finished", self._update_status("finished"))
+        self._submitter._run_machine.observe(
+            "finished", self._update_status("finished")
+        )
 
     def run(
         self, submitter: Union[Submitter, str, None] = None

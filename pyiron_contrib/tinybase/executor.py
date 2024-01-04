@@ -8,6 +8,7 @@ from math import inf
 
 from pyiron_contrib.tinybase.task import AbstractTask, TaskGenerator
 
+
 class RunMachine:
     class Code(enum.Enum):
         INIT = "init"
@@ -156,6 +157,7 @@ class Submitter:
     Exists only to have a single object from which multiple contexts can be
     spawned.
     """
+
     def submit(self, tasks: List[AbstractTask]) -> ExecutionContext:
         return ExecutionContext(tasks)
 
@@ -252,11 +254,10 @@ class FuturesExecutionContext(ExecutionContext):
         else:
             logging.info("Some tasks are still executing!")
 
+
 class FuturesSubmitter(Submitter):
     def __init__(self, executor):
         self._executor = executor
 
     def submit(self, tasks):
-        return FuturesExecutionContext(
-                self._executor, tasks
-        )
+        return FuturesExecutionContext(self._executor, tasks)

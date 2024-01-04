@@ -1,5 +1,7 @@
 import abc
+import codecs
 import importlib
+import pickle
 from typing import Any, Union, Optional
 
 from pyiron_base import DataContainer
@@ -7,9 +9,7 @@ from pyiron_base.interfaces.has_groups import HasGroups
 from pyiron_base.storage.hdfio import ProjectHDFio
 from pyiron_contrib.tinybase import __version__ as base__version__
 
-import pickle
-import codecs
-
+from h5io_browser import Pointer as Hdf5Pointer
 
 class GenericStorage(HasGroups, abc.ABC):
     """
@@ -308,6 +308,65 @@ class DataContainerAdapter(GenericStorage):
     def name(self):
         return self._name
 
+class H5ioStorage(GenericStorage):
+    """
+    Store objects in HDF5 files.
+
+    Maybe created with a non existing file path or HDF5 group.  Those will be created on first write access.
+    """
+
+    def __init__(self, pointer: Hdf5Pointer, project):
+        """
+        Args:
+            pointer (:class:`h5io_browser.Pointer`): open pointer object to HDF5 storage
+            project (:class:`.tinybase.ProjectInterface`): project this storage belongs to
+        """
+        if not isinstance(pointer, Hdf5Pointer):
+            raise TypeError("pointer must be a h5io_browser.Pointer!")
+        self._project = project
+        self._pointer = pointer
+
+    @classmethod
+    def from_file(cls, project, file: str, path: str = None):
+        """
+        Open a storage from the given file and HDF group within.
+
+        Args:
+            project (:class:`.tinybase.ProjectInterface`): project this storage belongs to
+            file (str): file path to the HDF5 file
+            path (str): group path within the HDF5 file
+        """
+        pointer = Hdf5Pointer(file)
+        if path is not None:
+            pointer = pointer[path]
+        return cls(project, pointer)
+
+    def __getitem__(self, item):
+        value = self._pointer[item]
+        if isinstance(value, Hdf5Pointer):
+            return type(self)(value, project=self._project)
+        else:
+            return value
+
+    def _set(self, item, value):
+        self._pointer[item] = value
+
+    def create_group(self, name):
+        return type(self)(self._pointer[name], project=self._project)
+
+    def _list_nodes(self):
+        return self._pointer.list_h5_path()["nodes"]
+
+    def _list_groups(self):
+        return self._pointer.list_h5_path()["groups"]
+
+    @property
+    def project(self):
+        return self._project
+
+    @property
+    def name(self):
+        return self._pointer.h5_path.rsplit("/", maxsplit=1)[1]
 
 # DESIGN: equivalent of HasHDF but with generalized language
 class Storable(abc.ABC):

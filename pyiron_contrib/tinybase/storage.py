@@ -111,6 +111,8 @@ class GenericStorage(HasGroups, abc.ABC):
             item (str): name of the value
             value (object): value to store
         """
+        if item in self.list_groups():
+            del self[item]
         if isinstance(value, Storable):
             value.store(self, group_name=item)
         else:
@@ -121,6 +123,16 @@ class GenericStorage(HasGroups, abc.ABC):
                     self[item] = ListStorable(value)
                 else:
                     self[item] = PickleStorable(value)
+
+    @abc.abstractmethod
+    def __delitem__(self, item: str):
+        """
+        Remove a group or node.
+
+        Args:
+            item (str): name of the item to delete
+        """
+        pass
 
     @abc.abstractmethod
     def create_group(self, name):
@@ -238,6 +250,9 @@ class ProjectHDFioStorageAdapter(GenericStorage):
             del self._hdf[item]
             raise
 
+    def __delitem__(self, item):
+        del self._hdf[item]
+
     def create_group(self, name):
         return ProjectHDFioStorageAdapter(self._project, self._hdf.create_group(name))
 
@@ -286,6 +301,9 @@ class DataContainerAdapter(GenericStorage):
 
     def _set(self, item: str, value: Any):
         self._cont[item] = value
+
+    def __delitem__(self, item):
+        del self._cont[item]
 
     def create_group(self, name):
         if name not in self._cont:
@@ -339,7 +357,7 @@ class H5ioStorage(GenericStorage):
         pointer = Hdf5Pointer(file)
         if path is not None:
             pointer = pointer[path]
-        return cls(project, pointer)
+        return cls(pointer, project=project)
 
     def __getitem__(self, item):
         value = self._pointer[item]
@@ -350,6 +368,9 @@ class H5ioStorage(GenericStorage):
 
     def _set(self, item, value):
         self._pointer[item] = value
+
+    def __delitem__(self, item):
+        del self._pointer[item]
 
     def create_group(self, name):
         return type(self)(self._pointer[name], project=self._project)

@@ -230,16 +230,13 @@ class ProjectHDFioStorageAdapter(GenericStorage):
             return value
 
     def _set(self, item, value):
-        if isinstance(value, Storable):
-            value.store(self, item)
-        else:
-            try:
-                self._hdf[item] = value
-            except TypeError:  # HDF layer doesn't know how to write value
-                # h5io bug, when triggering an error in the middle of a write
-                # some residual data maybe left in the file
-                del self._hdf[item]
-                raise
+        try:
+            self._hdf[item] = value
+        except TypeError:  # HDF layer doesn't know how to write value
+            # h5io bug, when triggering an error in the middle of a write
+            # some residual data maybe left in the file
+            del self._hdf[item]
+            raise
 
     def create_group(self, name):
         return ProjectHDFioStorageAdapter(self._project, self._hdf.create_group(name))

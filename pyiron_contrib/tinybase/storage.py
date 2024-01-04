@@ -3,6 +3,7 @@ import importlib
 from typing import Any, Union, Optional
 
 from pyiron_base import DataContainer
+from pyiron_base.interfaces.has_groups import HasGroups
 from pyiron_base.storage.hdfio import ProjectHDFio
 from pyiron_contrib.tinybase import __version__ as base__version__
 
@@ -10,7 +11,7 @@ import pickle
 import codecs
 
 
-class GenericStorage(abc.ABC):
+class GenericStorage(HasGroups, abc.ABC):
     """
     Generic interface to store things.
 
@@ -168,20 +169,6 @@ class GenericStorage(abc.ABC):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
 
-    @abc.abstractmethod
-    def list_nodes(self) -> list[str]:
-        """
-        List names of values inside group.
-        """
-        pass
-
-    @abc.abstractmethod
-    def list_groups(self) -> list[str]:
-        """
-        List name of sub groups.
-        """
-        pass
-
     # DESIGN: this mostly exists to help to_object()ing GenericTinyJob, but it introduces a circular-ish connection.
     # Maybe there's another way to do it?
     @property
@@ -257,14 +244,14 @@ class ProjectHDFioStorageAdapter(GenericStorage):
     def create_group(self, name):
         return ProjectHDFioStorageAdapter(self._project, self._hdf.create_group(name))
 
-    def list_nodes(self):
+    def _list_nodes(self):
         return self._hdf.list_nodes()
 
-    def list_groups(self):
+    def _list_groups(self):
         return self._hdf.list_groups()
 
     # compat with small bug in base ProjectHDFio
-    list_dirs = list_groups
+    list_dirs = _list_groups
 
     @property
     def project(self):
@@ -310,10 +297,10 @@ class DataContainerAdapter(GenericStorage):
             d = self._cont[name]
         return self.__class__(self._project, d, name)
 
-    def list_nodes(self):
+    def _list_nodes(self):
         return self._cont.list_nodes()
 
-    def list_groups(self):
+    def _list_groups(self):
         return self._cont.list_groups()
 
     @property

@@ -64,8 +64,8 @@ class AbstractTask(Storable, abc.ABC):
     """
     Basic unit of calculations.
 
-    Subclasses must implement :meth:`._get_input()`, :meth:`._make_output()` and :meth:`._execute()` and generally supply
-    their own :class:`.AbstractInput` and :class:`.AbstractOutput`.
+    Subclasses must implement :meth:`._get_input()` and :meth:`._execute()` and generally supply
+    their own :class:`.AbstractInput` and :class:`.AbstractOutput` (as returned from `_execute()`).
     """
 
     def __init__(self, capture_exceptions=True):

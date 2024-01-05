@@ -59,6 +59,12 @@ class ReturnStatus:
         """
         return self.code == self.Code.DONE
 
+class ComputeContext(AbstractInput):
+    cores: int = None
+    gpus:  int = None
+    runtime: float = None
+    memory: float = None
+    working_directory: str = None
 
 class AbstractTask(Storable, abc.ABC):
     """
@@ -70,7 +76,12 @@ class AbstractTask(Storable, abc.ABC):
 
     def __init__(self, capture_exceptions=True):
         self._input = None
+        self._context = ComputeContext()
         self._capture_exceptions = capture_exceptions
+
+    @property
+    def context(self):
+        return self._context
 
     @abc.abstractmethod
     def _get_input(self) -> AbstractInput:
@@ -102,8 +113,15 @@ class AbstractTask(Storable, abc.ABC):
     def execute(self) -> Tuple[ReturnStatus, Optional[AbstractOutput]]:
         if not self.input.check_ready():
             return ReturnStatus.aborted("Input not ready!"), None
+        cwd = os.getcwd()
+        if self.context.working_directory is not None:
+            nwd = contextlib.nullcontext(self.context.working_directory)
+        else:
+            nwd = TemporaryDirectory()
         try:
-            ret = self._execute()
+            with nwd as path, contextlib.chdir(path):
+                self.context.working_directory = path
+                ret = self._execute()
             if isinstance(ret, tuple):
                 ret, output = ret
             elif isinstance(ret, AbstractOutput):
@@ -132,11 +150,13 @@ class AbstractTask(Storable, abc.ABC):
     # We might even avoid this by deriving from HasStorage and put _input in there
     def _store(self, storage):
         storage["input"] = self.input
+        storage["context"] = self.context
 
     @classmethod
     def _restore(cls, storage, version):
         task = cls()
         task._input = storage["input"].to_object()
+        task._context = storage["context"].to_object()
         return task
 
     def then(self, body, task = None):

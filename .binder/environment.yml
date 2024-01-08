@@ -20,6 +20,7 @@ dependencies:
 - aws-sam-translator =1.77.0
 - pympipool =0.7.9
 - distributed =2023.12.1
+- h5io_browser =0.0.5
 - python >= 3.10
 - lammps
 - nglview >=3.0.8

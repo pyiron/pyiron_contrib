@@ -6,7 +6,7 @@ dependencies:
 - coverage
 - codacy-coverage
 - matplotlib =3.8.2
-- numpy =1.26.2
+- numpy =1.26.3
 - pyiron_base =0.6.20
 - pyiron_atomistics =0.4.4
 - pyparsing =3.1.1

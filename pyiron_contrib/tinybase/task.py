@@ -1,7 +1,9 @@
 import abc
 from copy import deepcopy
+import contextlib
 from dataclasses import asdict
 import enum
+from tempfile import TemporaryDirectory
 from typing import Optional, Callable, List, Generator, Tuple, Any, Union
 
 from pyiron_base.interfaces.object import HasStorage
@@ -113,7 +115,6 @@ class AbstractTask(Storable, abc.ABC):
     def execute(self) -> Tuple[ReturnStatus, Optional[AbstractOutput]]:
         if not self.input.check_ready():
             return ReturnStatus.aborted("Input not ready!"), None
-        cwd = os.getcwd()
         if self.context.working_directory is not None:
             nwd = contextlib.nullcontext(self.context.working_directory)
         else:

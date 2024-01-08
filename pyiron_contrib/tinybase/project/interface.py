@@ -29,6 +29,10 @@ class ProjectInterface(abc.ABC):
         pass
 
     @abc.abstractmethod
+    def request_directory(self, name):
+        pass
+
+    @abc.abstractmethod
     def _get_database(self) -> GenericDatabase:
         pass
 

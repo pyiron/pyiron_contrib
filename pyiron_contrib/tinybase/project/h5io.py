@@ -28,7 +28,7 @@ class FilesystemProject(ProjectInterface):
         return cls(path)
 
     def _get_job_file(self, name):
-        return os.path.join(self._path, name) + ".h5"
+        return os.path.join(self._path, name, "storage.h5")
 
     def create_storage(self, name):
         if not os.path.exists(self.path):
@@ -45,6 +45,11 @@ class FilesystemProject(ProjectInterface):
             os.remove(self._get_job_file(name))
         except FileNotFoundError:
             pass
+
+    def request_directory(self, name):
+        path = os.path.join(self.path, name, "files")
+        os.makedirs(path, exist_ok=True)
+        return path
 
     def _get_database(self):
         if self._database is None:

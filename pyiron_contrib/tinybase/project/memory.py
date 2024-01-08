@@ -1,3 +1,5 @@
+import tempfile
+
 from pyiron_base import DataContainer
 from pyiron_contrib.tinybase.project.interface import ProjectInterface
 from pyiron_contrib.tinybase.storage import GenericStorage, DataContainerAdapter
@@ -28,6 +30,9 @@ class InMemoryProject(ProjectInterface):
 
     def remove_storage(self, name):
         self._storage[self._location].pop(name)
+
+    def request_directory(self, name):
+        return tempfile.mkdtemp()
 
     def _get_database(self) -> GenericDatabase:
         return self._db

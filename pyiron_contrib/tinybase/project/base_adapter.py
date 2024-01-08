@@ -26,6 +26,11 @@ class ProjectAdapter(ProjectInterface):
     def remove_storage(self, name):
         self._project.create_hdf(self._project.path, name).remove_file()
 
+    def request_directory(self, name):
+        path = os.path.join(self._project.path, name + "_hdf5", name)
+        os.makedirs(path, exist_ok=True)
+        return path
+
     def _get_database(self) -> GenericDatabase:
         if self._database is None:
             self._database = TinyDB(os.path.join(self._project.path, "pyiron.db"))

@@ -150,30 +150,26 @@ class LammpsStaticTask(AbstractTask):
     def _get_input(self):
         return LammpsInput()
 
-    def _get_output(self):
-        return LammpsStaticOutput()
+    def _execute(self):
+        inp = LammpsInputTask(capture_exceptions=self._capture_exceptions)
+        inp.input.working_directory = self.context.working_directory
+        inp.input.structure = self.input.structure
+        inp.input.potential = self.input.potential
+        inp.input.calc_static()
+        ret, out = inp.execute()
+        if not ret.is_done():
+            return ReturnStatus.aborted(f"Writing input failed: {ret.msg}")
 
-    def _execute(self, output):
-        with TemporaryDirectory() as tmp_dir:
-            inp = LammpsInputTask(capture_exceptions=self._capture_exceptions)
-            inp.input.working_directory = tmp_dir
-            inp.input.structure = self.input.structure
-            inp.input.potential = self.input.potential
-            inp.input.calc_static()
-            ret, out = inp.execute()
-            if not ret.is_done():
-                return ReturnStatus.aborted(f"Writing input failed: {ret.msg}")
+        lmp = ShellTask(capture_exceptions=self._capture_exceptions)
+        lmp.input.command = ExecutablePathResolver("lammps", "lammps")
+        lmp.input.working_directory = self.context.working_directory
+        ret, out = lmp.execute()
+        if not ret.is_done():
+            return ReturnStatus.aborted(f"Running lammps failed: {ret.msg}")
 
-            lmp = ShellTask(capture_exceptions=self._capture_exceptions)
-            lmp.input.command = ExecutablePathResolver("lammps", "lammps")
-            lmp.input.working_directory = tmp_dir
-            ret, out = lmp.execute()
-            if not ret.is_done():
-                return ReturnStatus.aborted(f"Running lammps failed: {ret.msg}")
-
-            psr = LammpsStaticParserTask(capture_exceptions=self._capture_exceptions)
-            psr.input.working_directory = tmp_dir
-            ret, out = psr.execute()
-            if not ret.is_done():
-                return ReturnStatus.aborted(f"Parsing failed: {ret.msg}")
-            output.take(out)
+        psr = LammpsStaticParserTask(capture_exceptions=self._capture_exceptions)
+        psr.input.working_directory = self.context.working_directory
+        ret, out = psr.execute()
+        if not ret.is_done():
+            return ReturnStatus.aborted(f"Parsing failed: {ret.msg}")
+        return out

@@ -132,6 +132,7 @@ class TinyJob(Storable):
                 submitter = "most_recent"
             if isinstance(submitter, str):
                 submitter = getattr(self.project.create.executor, submitter)()
+            self.task.context.working_directory = self.project.request_directory(self.name)
             exe = self._submitter = submitter.submit(tasks=[self.task])
             self._setup_submitter_callbacks()
             exe.run()

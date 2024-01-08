@@ -6,7 +6,7 @@ from dataclasses import dataclass, field, fields
 from copy import deepcopy
 from typing import TypeVar, List
 
-from pyiron_contrib.tinybase.storage import HasHDFAdapaterMixin, Storable
+from pyiron_contrib.tinybase.storage import Storable, GenericStorage
 
 from pyiron_base.interfaces.object import HasStorage
 from pyiron_atomistics.atomistics.structure.has_structure import HasStructure
@@ -147,7 +147,11 @@ class StorableDataclass(Storable, metaclass=_MakeDataclass):
             state[name] = storage[name]
 
         for name in storage.list_groups():
-            state[name] = storage[name].to_object()
+            value = storage[name]
+            if isinstance(value, GenericStorage):
+                state[name] = value.to_object()
+            else:
+                state[name] = value
 
         return cls(**state)
 

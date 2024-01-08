@@ -200,9 +200,6 @@ class TrainingContainer(GenericJob, HasStructure):
         """
         return self._container.to_list(filter_function)
 
-    def to_dict(self):
-        return self._container.to_dict()
-
     def write_input(self):
         pass
 

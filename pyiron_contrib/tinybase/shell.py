@@ -8,7 +8,7 @@ from pyiron_contrib.tinybase.container import (
     AbstractInput,
     AbstractOutput,
     USER_REQUIRED,
-    field
+    field,
 )
 
 from pyiron_contrib.tinybase.task import AbstractTask, ReturnStatus

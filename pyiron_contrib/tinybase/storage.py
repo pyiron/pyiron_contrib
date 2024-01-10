@@ -11,6 +11,7 @@ from pyiron_contrib.tinybase import __version__ as base__version__
 
 from h5io_browser import Pointer as Hdf5Pointer
 
+
 class GenericStorage(HasGroups, abc.ABC):
     """
     Generic interface to store things.
@@ -326,6 +327,7 @@ class DataContainerAdapter(GenericStorage):
     def name(self):
         return self._name
 
+
 class H5ioStorage(GenericStorage):
     """
     Store objects in HDF5 files.
@@ -388,6 +390,7 @@ class H5ioStorage(GenericStorage):
     @property
     def name(self):
         return self._pointer.h5_path.rsplit("/", maxsplit=1)[1]
+
 
 # DESIGN: equivalent of HasHDF but with generalized language
 class Storable(abc.ABC):

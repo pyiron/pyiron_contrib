@@ -8,7 +8,7 @@ from pyiron_contrib.tinybase.container import (
     EnergyPotOutput,
     MDOutput,
     field,
-    USER_REQUIRED
+    USER_REQUIRED,
 )
 from pyiron_contrib.tinybase.task import AbstractTask, ReturnStatus
 
@@ -87,13 +87,15 @@ class AseMDTask(AbstractTask):
         dyn.run(self.input.steps)
 
         return MDOutput(
-                structures=structures,
-                pot_energies=np.array(pot_energies),
-                kin_energies=np.array(kin_energies),
-                forces=np.array(forces),
+            structures=structures,
+            pot_energies=np.array(pot_energies),
+            kin_energies=np.array(kin_energies),
+            forces=np.array(forces),
         )
 
+
 _ASE_OPTIMIZER_MAP = {"LBFGS": LBFGS, "FIRE": FIRE, "GPMIN": GPMin}
+
 
 class AseMinimizeInput(AseInput, StructureInput, MinimizeInput):
     algo: Literal[list(_ASE_OPTIMIZER_MAP.keys())] = "LBFGS"
@@ -115,9 +117,7 @@ class AseMinimizeInput(AseInput, StructureInput, MinimizeInput):
         self.minimizer_kwargs = {}
 
     def get_ase_optimizer(self, structure):
-        return _ASE_OPTIMIZER_MAP.get(self.algo)(
-            structure, **self.minimizer_kwargs
-        )
+        return _ASE_OPTIMIZER_MAP.get(self.algo)(structure, **self.minimizer_kwargs)
 
 
 class AseMinimizeTask(AbstractTask):
@@ -146,18 +146,21 @@ class AseMinimizeTask(AbstractTask):
         parse()
 
         output = MDOutput(
-                structures=structures,
-                pot_energies=np.array(pot_energies),
-                kin_energies=np.array(kin_energies),
-                forces=np.array(forces),
+            structures=structures,
+            pot_energies=np.array(pot_energies),
+            kin_energies=np.array(kin_energies),
+            forces=np.array(forces),
         )
 
         max_force = abs(output.forces[-1]).max()
         force_tolerance = self.input.ionic_force_tolerance
         if max_force > force_tolerance:
-            return ReturnStatus(
-                "not_converged",
-                f"force in last step ({max_force}) is larger than tolerance ({force_tolerance})!",
-            ), output
+            return (
+                ReturnStatus(
+                    "not_converged",
+                    f"force in last step ({max_force}) is larger than tolerance ({force_tolerance})!",
+                ),
+                output,
+            )
         else:
             return output

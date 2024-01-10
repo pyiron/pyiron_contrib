@@ -27,10 +27,13 @@ from pyiron_atomistics.atomistics.structure.has_structure import HasStructure
 
 class MurnaghanInput(StructureInput, ListInput):
     task: AbstractTask = USER_REQUIRED
-    strains: npt.NDArray[float] = field(default_factory=lambda: np.linspace(-0.2, 0.2, 7))
+    strains: npt.NDArray[float] = field(
+        default_factory=lambda: np.linspace(-0.2, 0.2, 7)
+    )
 
     def check_ready(self):
-        if not super().check_ready(): return False
+        if not super().check_ready():
+            return False
         strain_ready = len(self.strains) > 0
         task = self.task
         task.input.structure = self.structure
@@ -81,7 +84,11 @@ class MurnaghanTask(ListTaskGenerator):
 
     def _extract_output(self, step, task, ret, output):
         if ret.is_done():
-            return {'step': step, 'energy_pot': output.energy_pot, 'volume': task.input.structure.get_volume()}
+            return {
+                "step": step,
+                "energy_pot": output.energy_pot,
+                "volume": task.input.structure.get_volume(),
+            }
 
     def _join_output(self, outputs):
         energies = np.full(self.input.strains.shape, np.nan)
@@ -90,7 +97,7 @@ class MurnaghanTask(ListTaskGenerator):
             energies[output["step"]] = output["energy_pot"]
             volumes[output["step"]] = output["volume"]
         return MurnaghanOutput(
-                base_structure=self.input.structure.copy(),
-                energies=energies,
-                volumes=volumes,
+            base_structure=self.input.structure.copy(),
+            energies=energies,
+            volumes=volumes,
         )

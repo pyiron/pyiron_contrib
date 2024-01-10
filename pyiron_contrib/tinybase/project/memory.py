@@ -5,6 +5,7 @@ from pyiron_contrib.tinybase.project.interface import ProjectInterface
 from pyiron_contrib.tinybase.storage import GenericStorage, DataContainerAdapter
 from pyiron_contrib.tinybase.database import GenericDatabase, TinyDB
 
+
 class InMemoryProject(ProjectInterface):
     def __init__(self, location, db=None, storage=None):
         if db is None:

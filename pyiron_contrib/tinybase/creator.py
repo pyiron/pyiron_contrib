@@ -18,10 +18,7 @@ import abc
 import importlib
 from typing import Union
 from functools import wraps
-from concurrent.futures import (
-        ProcessPoolExecutor,
-        ThreadPoolExecutor
-)
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 
 try:
     from os import sched_getaffinity
@@ -200,7 +197,7 @@ class ExecutorCreator(Creator):
     @_save
     def process(self, max_processes=_DEFAULT_CPUS, **kwargs):
         return FuturesSubmitter(
-                ProcessPoolExecutor(max_workers=max_processes, **kwargs)
+            ProcessPoolExecutor(max_workers=max_processes, **kwargs)
         )
 
     @_save
@@ -210,30 +207,22 @@ class ExecutorCreator(Creator):
     @wraps(ThreadPoolExecutor)
     @_save
     def background(self, max_workers=4, **kwargs):
-        return FuturesSubmitter(
-                ThreadPoolExecutor(max_workers=max_workers, **kwargs)
-        )
+        return FuturesSubmitter(ThreadPoolExecutor(max_workers=max_workers, **kwargs))
 
     @wraps(LocalCluster)
     @_save
     def dask_local(self, n_workers=_DEFAULT_CPUS, **kwargs):
-        return FuturesSubmitter(
-                LocalCluster(n_workers=n_workers, **kwargs)
-        )
+        return FuturesSubmitter(LocalCluster(n_workers=n_workers, **kwargs))
 
     @wraps(Client)
     @_save
     def dask_cluster(self, cluster, **kwargs):
-        return FuturesSubmitter(
-                Client(cluster, **kwargs)
-        )
+        return FuturesSubmitter(Client(cluster, **kwargs))
 
     @wraps(PyMPIPoolExecutor)
     @_save
     def pympipool(self, max_workers=_DEFAULT_CPUS, **kwargs):
-        return FuturesSubmitter(
-                PyMPIPoolExecutor(max_workers=max_workers, **kwargs)
-        )
+        return FuturesSubmitter(PyMPIPoolExecutor(max_workers=max_workers, **kwargs))
 
     del _save
 

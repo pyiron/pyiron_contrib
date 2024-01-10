@@ -6,6 +6,7 @@ from pyiron_contrib.tinybase.storage import GenericStorage
 from pyiron_contrib.tinybase.project.interface import ProjectInterface
 from pyiron_contrib.tinybase.database import GenericDatabase, TinyDB
 
+
 class ProjectAdapter(ProjectInterface):
     def __init__(self, project):
         self._project = project

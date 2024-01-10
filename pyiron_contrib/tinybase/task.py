@@ -61,12 +61,14 @@ class ReturnStatus:
         """
         return self.code == self.Code.DONE
 
+
 class ComputeContext(AbstractInput):
     cores: int = None
-    gpus:  int = None
+    gpus: int = None
     runtime: float = None
     memory: float = None
     working_directory: str = None
+
 
 class AbstractTask(Storable, abc.ABC):
     """
@@ -160,7 +162,7 @@ class AbstractTask(Storable, abc.ABC):
         task._context = storage["context"].to_object()
         return task
 
-    def then(self, body, task = None):
+    def then(self, body, task=None):
         series = SeriesTask()
         series.input.first(self)
         series.input.then(FunctionTask(body), lambda inp, out: inp.args.append(out))
@@ -289,11 +291,9 @@ class ListTaskGenerator(TaskGenerator, abc.ABC):
 
         extracted_outputs = []
         for i, (task, ret, output) in enumerate(zip(tasks, returns, outputs)):
-            extracted_outputs.append(
-                self._extract_output(i, task, ret, output)
-            )
+            extracted_outputs.append(self._extract_output(i, task, ret, output))
 
-        return ReturnStatus("done"), self._join_output(extracted_outputs )
+        return ReturnStatus("done"), self._join_output(extracted_outputs)
 
 
 class SeriesInput(AbstractInput):
@@ -315,9 +315,12 @@ class SeriesInput(AbstractInput):
     connections: list = USER_REQUIRED
 
     def check_ready(self):
-        if not super().check_ready(): return False
-        if not (0 < len(self.tasks) == len(self.connections) + 1): return False
-        if not self.tasks[0].input.check_ready(): return False
+        if not super().check_ready():
+            return False
+        if not (0 < len(self.tasks) == len(self.connections) + 1):
+            return False
+        if not self.tasks[0].input.check_ready():
+            return False
         return True
 
     def first(self, task):

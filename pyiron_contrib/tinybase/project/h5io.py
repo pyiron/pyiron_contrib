@@ -2,10 +2,15 @@ import os
 import os.path
 
 from pyiron_contrib.tinybase.project.interface import ProjectInterface
-from pyiron_contrib.tinybase.storage import GenericStorage, DataContainerAdapter, H5ioStorage
+from pyiron_contrib.tinybase.storage import (
+    GenericStorage,
+    DataContainerAdapter,
+    H5ioStorage,
+)
 from pyiron_contrib.tinybase.database import GenericDatabase, TinyDB
 
 from h5io_browser import Pointer as Hdf5Pointer
+
 
 class FilesystemProject(ProjectInterface):
     """
@@ -33,9 +38,7 @@ class FilesystemProject(ProjectInterface):
     def create_storage(self, name):
         if not os.path.exists(self.path):
             os.makedirs(self.path, exist_ok=True)
-        return H5ioStorage.from_file(
-                self, self._get_job_file(name), name
-        )
+        return H5ioStorage.from_file(self, self._get_job_file(name), name)
 
     def exists_storage(self, name):
         return os.path.exists(self._get_job_file(name))
@@ -63,6 +66,7 @@ class FilesystemProject(ProjectInterface):
     @property
     def path(self):
         return self._path
+
 
 class SingleHdfProject(FilesystemProject):
     """

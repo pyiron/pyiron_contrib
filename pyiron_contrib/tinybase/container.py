@@ -117,12 +117,14 @@ class StorageAttribute:
         self.__doc__ = text
         return self
 
+
 # derives from ABCMeta instead of type, so that other classes can use it as a metaclass and still derive from Storable
 # (which derives from ABC and therefor already has a metaclass)
 class _MakeDataclass(abc.ABCMeta):
     def __new__(meta, name, bases, ns, **kwargs):
         cls = super().__new__(meta, name, bases, ns)
         return dataclass(cls)
+
 
 class StorableDataclass(Storable, metaclass=_MakeDataclass):
     """
@@ -183,20 +185,27 @@ class Sentinel:
     def __str__(self):
         return self._name
 
+
 USER_REQUIRED = Sentinel("USERINPUT")
+
 
 class AbstractInput(StorableDataclass):
     def check_ready(self):
-        return all(getattr(self, field.name) is not USER_REQUIRED for field in fields(self))
+        return all(
+            getattr(self, field.name) is not USER_REQUIRED for field in fields(self)
+        )
+
 
 class StructureInput(AbstractInput):
     structure: Atoms = USER_REQUIRED
+
 
 class MDInput(AbstractInput):
     steps: int = USER_REQUIRED
     timestep: float = USER_REQUIRED
     temperature: float = USER_REQUIRED
     output_steps: int = USER_REQUIRED
+
 
 class MinimizeInput(AbstractInput):
     ionic_force_tolerance: float = 1e-5
@@ -207,14 +216,18 @@ class MinimizeInput(AbstractInput):
 class AbstractOutput(StorableDataclass):
     pass
 
+
 class EnergyPotOutput(AbstractOutput):
     energy_pot: float
+
 
 class EnergyKinOutput(AbstractOutput):
     energy_kin: float
 
+
 class ForceOutput(AbstractOutput):
     forces: npt.NDArray[float]
+
 
 class StaticOutput(EnergyPotOutput, EnergyKinOutput):
     pass
@@ -222,10 +235,12 @@ class StaticOutput(EnergyPotOutput, EnergyKinOutput):
 
 T = TypeVar("T")
 
+
 class StaticMode(abc.ABC):
     @abc.abstractmethod
     def select(self, array: npt.NDArray[T]) -> T:
         pass
+
 
 class MDOutput(HasStructure, AbstractOutput):
     pot_energies: npt.NDArray[float]
@@ -250,21 +265,25 @@ class MDOutput(HasStructure, AbstractOutput):
         """
         Average over the given range of steps.
         """
+
         __slots__ = ("_start", "_stop")
+
         def __init__(self, start: float, stop: float = 1.0):
             assert 0 <= start <= 1 and 0 <= stop <= 1, "Range check!"
             self._start, self._stop = start, stop
 
         def select(self, array):
-            na = int( (len(array) - 1) * self._start)
-            no = int( (len(array) - 1) * self._stop)
+            na = int((len(array) - 1) * self._start)
+            no = int((len(array) - 1) * self._stop)
             return array[na:no].mean(axis=0)
 
     class Last(StaticMode):
         """
         Return the last step.
         """
+
         __slots__ = ()
+
         def select(self, array):
             return array[-1]
 

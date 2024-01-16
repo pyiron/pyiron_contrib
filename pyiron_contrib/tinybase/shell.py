@@ -107,6 +107,7 @@ class ExecutablePathResolver:
 def _zero_list():
     return [0]
 
+
 class ShellInput(AbstractInput):
     command: str = USER_REQUIRED
     working_directory: str = USER_REQUIRED

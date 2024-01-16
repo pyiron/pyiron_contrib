@@ -104,12 +104,16 @@ class ExecutablePathResolver:
         return self.path()
 
 
+def _zero_list():
+    return [0]
+
+
 class ShellInput(AbstractInput):
     command: str = USER_REQUIRED
     working_directory: str = USER_REQUIRED
     arguments: list = field(default_factory=list)
     environ: dict = field(default_factory=dict)
-    allowed_returncode: list = [0]
+    allowed_returncode: list = field(default_factory=_zero_list)
 
 
 class ShellOutput(AbstractOutput):

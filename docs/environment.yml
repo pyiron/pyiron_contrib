@@ -2,7 +2,10 @@ channels:
 - conda-forge
 dependencies:
 - ipykernel
+- myst-parser
 - nbsphinx
+- sphinx-gallery
+- sphinx-rtd-theme
 - ase =3.22.1
 - coveralls
 - coverage
@@ -16,7 +19,7 @@ dependencies:
 - seaborn =0.13.1
 - scikit-image =0.22.0
 - randspg =0.0.1
-- boto3 =1.34.11
+- boto3 =1.34.23
 - moto =4.2.13
 - pycp2k =0.2.2
 - aws-sam-translator =1.77.0

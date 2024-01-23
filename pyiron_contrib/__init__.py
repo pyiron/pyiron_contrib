@@ -8,8 +8,10 @@ from pyiron_base import Project as BaseProject, JOB_CLASS_DICT
 
 class Project(BaseProject):
     def __init__(self, *args, **kwargs):
-        warnings.warn("Importing Project from pyiron_contrib is deprecated. "
-                      "Import from appropriate pyiron module (e.g. pyiron) instead.")
+        warnings.warn(
+            "Importing Project from pyiron_contrib is deprecated. "
+            "Import from appropriate pyiron module (e.g. pyiron) instead."
+        )
         super().__init__(*args, **kwargs)
 
 

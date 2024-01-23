@@ -8,4 +8,5 @@ except:
     from pyiron_base import Project
 
 from pyiron_contrib.generic.storage_interface_toolkit import StorageInterfaceFactory
+
 Project.register_tools("storage_interface", StorageInterfaceFactory)

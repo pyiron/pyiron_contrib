@@ -580,35 +580,37 @@ class MDBondAnalysis(_BondAnalysisParent):
         else:
             raise ValueError("choose between long, t1, and t2")
 
-    def _get_correlations(self, shell, bond_x, bond_y, axis_x, axis_y, n_bins):
-        per_shell_r_t1_t2_bond_vectors = self.get_r_t1_t2_bond_vectors()
-        all_bonds = per_shell_r_t1_t2_bond_vectors[shell]
-        n_bonds = len(all_bonds)
-        if (bond_x >= n_bonds) or (bond_y >= n_bonds):
-            raise ValueError("there are only {} bonds in shell {}".format(n_bonds, shell))
+    def _get_correlations(self, shell_x, shell_y, bond_x, bond_y, axis_x, axis_y, n_bins):
+        per_shell_l_t1_t2_bond_vectors = self.get_l_t1_t2_bond_vectors()
+        all_bonds_x = per_shell_l_t1_t2_bond_vectors[shell_x]
+        all_bonds_y = per_shell_l_t1_t2_bond_vectors[shell_y]
+        if (bond_x >= len(all_bonds_x)):
+            raise ValueError("there are only {} bonds in shell {}".format(len(all_bonds_x), shell_x))
+        elif (bond_y >= len(all_bonds_y)):
+            raise ValueError("there are only {} bonds in shell {}".format(len(all_bonds_y), shell_y))
         axis_0 = self._get_corr_column_value(axis_x)
         axis_1 = self._get_corr_column_value(axis_y)
-        return self._get_rho_corr_and_uncorr(x_data=all_bonds[bond_y, :, axis_0], y_data=all_bonds[bond_x, :, axis_1],
+        return self._get_rho_corr_and_uncorr(x_data=all_bonds_x[bond_x, :, axis_0], y_data=all_bonds_y[bond_y, :, axis_1],
                                              n_bins=n_bins)
 
-    def get_mutual_information(self, shell=0, bond_x=0, bond_y=0, axis_x='long', axis_y='long', n_bins=101):
-        rho_corr, rho_uncorr, _, _ = self._get_correlations(shell=shell, bond_x=bond_x, bond_y=bond_y, axis_x=axis_x,
+    def get_mutual_information(self, shell_x=0, shell_y=0, bond_x=0, bond_y=0, axis_x='long', axis_y='long', n_bins=101):
+        rho_corr, rho_uncorr, _, _ = self._get_correlations(shell_x=shell_x, shell_y=shell_y, bond_x=bond_x, bond_y=bond_y, axis_x=axis_x,
                                                             axis_y=axis_y, n_bins=n_bins)
         sel = (rho_uncorr>0.0)*(rho_corr>0.0)
         return np.sum(rho_corr[sel]*np.log(rho_corr[sel]/rho_uncorr[sel]))
 
-    def plot_correlations(self, shell=0, bond_x=0, bond_y=0, axis_x='long', axis_y='long', n_bins=101):
-        rho_corr, rho_uncorr, x_edges, y_edges = self._get_correlations(shell=shell, bond_x=bond_x,
-                                                                        bond_y=bond_y, axis_x=axis_x,
-                                                                        axis_y=axis_y, n_bins=n_bins)
+    def plot_correlations(self, shell_x=0, shell_y=0, bond_x=0, bond_y=0, axis_x='long', axis_y='long', n_bins=101):
+        rho_corr, rho_uncorr, x_edges, y_edges = self._get_correlations(shell_x=shell_x, shell_y=shell_y,
+                                                                        bond_x=bond_x, bond_y=bond_y, 
+                                                                        axis_x=axis_x, axis_y=axis_y, n_bins=n_bins)
         rho_diff = rho_corr - rho_uncorr
         cm = LinearSegmentedColormap.from_list('my_spec', [myc['b'], (1, 1, 1), myc['o']], N=n_bins)
         plims = x_edges.min(), x_edges.max(), y_edges.min(), y_edges.max()  # plot limits
         plt.imshow(rho_diff[::-1, :], cmap=cm, extent=plims)
         plt.xticks(np.around(np.linspace(plims[0], plims[1], 5), decimals=2))
         plt.yticks(np.around(np.linspace(plims[2], plims[3], 5), decimals=2))
-        plt.xlabel(axis_x + '_' + str(bond_x))
-        plt.ylabel(axis_y + '_' + str(bond_y))
+        plt.xlabel('shell_' + str(shell_x) + '_' + axis_x + '_' + str(bond_x))
+        plt.ylabel('shell_' + str(shell_y) + '_' + axis_y + '_' + str(bond_y))
         plt.show()
 
 

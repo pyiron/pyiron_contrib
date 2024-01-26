@@ -123,7 +123,6 @@ class AbstractTask(Storable, abc.ABC):
             nwd = TemporaryDirectory()
         try:
             with nwd as path, contextlib.chdir(path):
-                self.context.working_directory = path
                 ret = self._execute()
             if isinstance(ret, tuple):
                 ret, output = ret
@@ -222,8 +221,8 @@ class FunctionTask(AbstractTask):
     `**kwargs` respectively.  The return value is set to :attr:`.FunctionOutput.result`.
     """
 
-    def __init__(self, function):
-        super().__init__()
+    def __init__(self, function, **kwargs):
+        super().__init__(**kwargs)
         self._function = function
 
     def _get_input(self):

@@ -152,7 +152,8 @@ class LammpsStaticTask(AbstractTask):
 
     def _execute(self):
         inp = LammpsInputTask(capture_exceptions=self._capture_exceptions)
-        inp.input.working_directory = self.context.working_directory
+        cwd = os.getcwd()
+        inp.input.working_directory = cwd
         inp.input.structure = self.input.structure
         inp.input.potential = self.input.potential
         inp.input.calc_static()
@@ -162,13 +163,13 @@ class LammpsStaticTask(AbstractTask):
 
         lmp = ShellTask(capture_exceptions=self._capture_exceptions)
         lmp.input.command = ExecutablePathResolver("lammps", "lammps")
-        lmp.input.working_directory = self.context.working_directory
+        lmp.input.working_directory = cwd
         ret, out = lmp.execute()
         if not ret.is_done():
             return ReturnStatus.aborted(f"Running lammps failed: {ret.msg}")
 
         psr = LammpsStaticParserTask(capture_exceptions=self._capture_exceptions)
-        psr.input.working_directory = self.context.working_directory
+        psr.input.working_directory = cwd
         ret, out = psr.execute()
         if not ret.is_done():
             return ReturnStatus.aborted(f"Parsing failed: {ret.msg}")

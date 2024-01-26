@@ -1,5 +1,4 @@
 import os
-from tempfile import TemporaryDirectory
 
 from pymatgen.io.lammps.outputs import (
     parse_lammps_dumps,
@@ -16,7 +15,7 @@ from pyiron_atomistics.lammps.control import LammpsControl
 from pyiron_contrib.tinybase.container import (
     AbstractInput,
     AbstractOutput,
-    StorageAttribute,
+    USER_REQUIRED,
     StructureInput,
     EnergyPotOutput,
     EnergyKinOutput,
@@ -30,9 +29,8 @@ from pyiron_contrib.tinybase.shell import ShellTask, ExecutablePathResolver
 
 
 class LammpsInputInput(AbstractInput):
-    working_directory = StorageAttribute().type(str)
-
-    calc_type = StorageAttribute()
+    working_directory: str = USER_REQUIRED
+    calc_type: str = USER_REQUIRED
 
     def calc_static(self):
         self.calc_type = "static"
@@ -46,7 +44,7 @@ class LammpsInputInput(AbstractInput):
 
 
 class LammpsInputOutput(AbstractOutput):
-    working_directory = StorageAttribute().type(str)
+    working_directory: str
 
 
 class LammpsInputTask(AbstractTask):
@@ -64,10 +62,7 @@ class LammpsInputTask(AbstractTask):
     def _get_input(self):
         return LammpsInputInput()
 
-    def _get_output(self):
-        return LammpsInputOutput()
-
-    def _execute(self, output):
+    def _execute(self):
         with open(
             os.path.join(self.input.working_directory, "structure.inp"), "w"
         ) as f:
@@ -85,11 +80,13 @@ class LammpsInputTask(AbstractTask):
         control.calc_static()
         control.write_file(file_name="control.inp", cwd=self.input.working_directory)
 
-        output.working_directory = self.input.working_directory
+        return LammpsInputOutput(
+                working_directory = self.input.working_directory
+        )
 
 
 class LammpsStaticParserInput(AbstractInput):
-    working_directory = StorageAttribute().type(str)
+    working_directory: str = USER_REQUIRED
 
     def check_ready(self):
         return self.working_directory is not None and super().check_ready()
@@ -109,23 +106,23 @@ class LammpsStaticParserTask(AbstractTask):
     def _get_input(self):
         return LammpsStaticParserInput()
 
-    def _get_output(self):
-        return LammpsStaticOutput()
-
-    def _execute(self, output):
+    def _execute(self):
         log = parse_lammps_log(
             os.path.join(self.input.working_directory, "log.lammps")
         )[-1]
-        output.energy_pot = energy_pot = log["PotEng"].iloc[-1]
-        output.energy_kin = log["TotEng"].iloc[-1] - energy_pot
+        energy_pot = log["PotEng"].iloc[-1]
         dump = list(
             parse_lammps_dumps(os.path.join(self.input.working_directory, "dump.out"))
         )[-1]
-        output.forces = dump.data[["fx", "fy", "fz"]].to_numpy()
+        return LammpsStaticOutput(
+                energy_pot=energy_pot,
+                energy_kin = log["TotEng"].iloc[-1] - energy_pot,
+                forces = dump.data[["fx", "fy", "fz"]].to_numpy()
+        )
 
 
 class LammpsInput(StructureInput):
-    potential = StorageAttribute().type(str)
+    potential: str = USER_REQUIRED
 
     def list_potentials(self):
         """
@@ -159,18 +156,18 @@ class LammpsStaticTask(AbstractTask):
         inp.input.calc_static()
         ret, out = inp.execute()
         if not ret.is_done():
-            return ReturnStatus.aborted(f"Writing input failed: {ret.msg}")
+            return ReturnStatus.aborted(f"Writing input failed: {ret.msg}"), out
 
         lmp = ShellTask(capture_exceptions=self._capture_exceptions)
         lmp.input.command = ExecutablePathResolver("lammps", "lammps")
         lmp.input.working_directory = cwd
         ret, out = lmp.execute()
         if not ret.is_done():
-            return ReturnStatus.aborted(f"Running lammps failed: {ret.msg}")
+            return ReturnStatus.aborted(f"Running lammps failed: {ret.msg}"), out
 
         psr = LammpsStaticParserTask(capture_exceptions=self._capture_exceptions)
         psr.input.working_directory = cwd
         ret, out = psr.execute()
         if not ret.is_done():
-            return ReturnStatus.aborted(f"Parsing failed: {ret.msg}")
+            return ReturnStatus.aborted(f"Parsing failed: {ret.msg}"), out
         return out

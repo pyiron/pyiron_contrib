@@ -126,10 +126,7 @@ class ShellTask(AbstractTask):
     def _get_input(self):
         return ShellInput()
 
-    def _get_output(self):
-        return ShellOutput()
-
-    def _execute(self, output):
+    def _execute(self):
         environ = dict(os.environ)
         environ.update({k: str(v) for k, v in self.input.environ.items()})
         proc = subprocess.run(
@@ -139,11 +136,15 @@ class ShellTask(AbstractTask):
             encoding="utf8",
             env=environ,
         )
-        output.stdout = proc.stdout
-        output.stderr = proc.stderr
-        output.returncode = proc.returncode
+        output = ShellOutput(
+            stdout = proc.stdout,
+            stderr = proc.stderr,
+            returncode = proc.returncode,
+        )
         allowed_returncode = self.input.allowed_returncode
         if allowed_returncode is None:
             allowed_returncode = [0]
         if proc.returncode not in allowed_returncode:
-            return ReturnStatus("aborted", f"non-zero error code {proc.returncode}")
+            return ReturnStatus("aborted", f"non-zero error code {proc.returncode}"), output
+        else:
+            return output

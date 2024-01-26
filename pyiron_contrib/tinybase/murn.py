@@ -64,7 +64,7 @@ class MurnaghanOutput(AbstractOutput, HasStructure):
 
     @property
     def equilibrium_volume(self):
-        inter = si.interp1d(self.volumes, self.energies)
+        inter = si.interp1d(self.volumes, self.energies, kind='cubic')
         return so.minimize_scalar(
             inter, bounds=(np.min(self.volumes), np.max(self.volumes))
         ).x

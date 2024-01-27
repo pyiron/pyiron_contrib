@@ -4,7 +4,7 @@ from pyiron_contrib import Project
 
 from abc import ABC, abstractmethod
 import contextlib
-from typing import Optional, Callable
+from typing import Optional, Callable, Dict
 
 
 class JobFactory(HasStorage, ABC):
@@ -310,7 +310,14 @@ class VaspFactory(DftFactory):
     def incar(self):
         return self.storage.incar
 
-    def enable_nband_hack(self, nelec: dict):
+    def enable_nband_hack(self, nelec: Dict[str, int]):
+        """
+        Set a per element NBANDS estimate.
+        
+        Structures far from (global) equilibrium may require more empty states than the default VASP provides.
+        This allows to provide a mapping between elements and integers that give a "per element" NBAND that is summed
+        over all atoms in a structure.
+        """
         self.storage.nband_nelec_map = nelec
 
     def _get_hamilton(self):
@@ -334,9 +341,8 @@ class VaspFactory(DftFactory):
         for k, v in self.incar.items():
             job.input.incar[k] = v
         if self.storage.nband_nelec_map is not None:
-            # weird structure sometimes require more bands
-            # HACK: for Mg/Al/Ca, since Ca needs a lot of electrons
-            elems = {"Mg", "Al", "Ca"}
+            # ensure we apply the hack only for structures where we know an NBAND estimate for all elements
+            elems = set(self.storage.nband_nelec_map.keys())
             if elems.union(set(structure.get_chemical_symbols())) == elems:
                 nelect = sum(
                     self.storage.nband_nelec_map[el]

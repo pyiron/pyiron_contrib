@@ -1392,6 +1392,7 @@ class FunctionParameter(DataContainer):
         fitable=True,
         tag=None,
     ):
+        super().__init__()
         self.param = param
         self.start_val = start_val
         self.enabled = enabled

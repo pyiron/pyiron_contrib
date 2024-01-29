@@ -567,9 +567,9 @@ class ARStructureContainer:
         atomic_forces_storage._per_chunk_arrays["tolerance"][
             0 : storage.num_chunks
         ] = 0.01
-        atomic_forces_storage._per_element_arrays[
-            "target_val"
-        ] = storage._per_element_arrays["forces"][0 : storage.num_elements]
+        atomic_forces_storage._per_element_arrays["target_val"] = (
+            storage._per_element_arrays["forces"][0 : storage.num_elements]
+        )
 
         if "atomic-energy" not in self.fit_properties:
             self.fit_properties["atomic-energy"] = FlattenedARScalarProperty(
@@ -600,9 +600,9 @@ class ARStructureContainer:
             * self._structures._per_chunk_arrays["length"]
         )
         storage.add_array(name="forces", shape=(3,), per="element")
-        storage._per_element_arrays["forces"][
-            0 : storage.num_elements
-        ] = self.fit_properties["atomic-forces"][val_str]
+        storage._per_element_arrays["forces"][0 : storage.num_elements] = (
+            self.fit_properties["atomic-forces"][val_str]
+        )
         return storage
 
     def get_training_data(self) -> TrainingStorage:

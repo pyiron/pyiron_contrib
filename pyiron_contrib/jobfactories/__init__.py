@@ -313,7 +313,7 @@ class VaspFactory(DftFactory):
     def enable_nband_hack(self, nelec: Dict[str, int]):
         """
         Set a per element NBANDS estimate.
-        
+
         Structures far from (global) equilibrium may require more empty states than the default VASP provides.
         This allows to provide a mapping between elements and integers that give a "per element" NBAND that is summed
         over all atoms in a structure.

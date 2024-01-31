@@ -496,7 +496,10 @@ class Library(LammpsPotentials):
             df = self._df_candidates.iloc[0]
             if len(self._df_candidates) > 1:
                 warnings.warn(
-                    f"Potential not uniquely specified - use default {df.Name}"
+                    f"Potential not uniquely specified - use default {df.Name}\n"
+                    "In order to choose a potential, call `list_potentials` or"
+                    " `view_potentials` and redefine the library by setting the"
+                    " argument `name`, i.e. `Library(name=potential_name)`."
                 )
             self._initialize_df(
                 pair_style=self._get_pair_style(df.Config),

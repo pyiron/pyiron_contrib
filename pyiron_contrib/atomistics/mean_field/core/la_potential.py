@@ -31,10 +31,11 @@ class GenerateFccLAPotential():
       (default is False)
     """
     
-    def __init__(self, project_name, ref_job, ith_atom_id=0, shells=1, disp=1., n_disps=5, uneven=False, 
+    def __init__(self, project_name, potential, ref_job, ith_atom_id=0, shells=1, disp=1., n_disps=5, uneven=False, 
                  delete_existing_jobs=False):
         
         self.project_name = project_name
+        self.potential = potential
         self.ref_job = ref_job
         self.ith_atom_id = ith_atom_id
         self.shells = shells
@@ -101,17 +102,26 @@ class GenerateFccLAPotential():
             roll_arg = np.argwhere(np.all(np.isclose(a=(basis_2nn@self._rotations[1])[:, 0], b=self._basis[0][2], atol=1e-10), axis=-1))[-1][-1]
             roll_id = int(len(self._rotations[1]) - roll_arg)
             self._basis.append(self._stat_ba.output.per_shell_transformation_matrices[1][roll_arg])
+            # now that we've selected a new basis, the rotations also have to be changed. We find new rotation matrices
             rolled_vecs = np.roll(basis_2nn[0]@self._rotations[1], roll_id, axis=0)
-            self._rotations[1] = np.array([self._get_rotation_matrix(rolled_vecs[0], rolled_vecs[i]) for i in range(len(self._rotations[1]))])
+            self._rotations[1] = np.array([self._get_rotation_matrix(rolled_vecs[i], rolled_vecs[0]) for i in range(len(self._rotations[1]))])
+            # rearrange the atom ids and bond vectors
             self._nn_atom_ids += np.roll(atom_ids[1], roll_id).tolist()
-            self._nn_bond_vecs += (self._basis[1][0]@self._rotations[1]).tolist()
+            self._nn_bond_vecs += (rolled_vecs).tolist()
             self.disp_dir.append(self._basis[1][0])
 
         if self.shells in [3]:
-        # 3nn basis, strightforward
-            self._basis.append(self._stat_ba.output.per_shell_transformation_matrices[2][0])
-            self._nn_atom_ids += atom_ids[2].tolist()
-            self._nn_bond_vecs += (self._basis[2][0]@self._rotations[2]).tolist()
+        # 3nn basis, also needs rearranging such that l_2nn_x == l_3nn_x
+            basis_3nn = self._stat_ba.output.per_shell_transformation_matrices[2][0]
+            ref_array = np.array([basis_3nn[0].max(), basis_3nn[0].min(), basis_3nn[0].min()])
+            roll_arg = np.argwhere(np.all(np.isclose(a=((basis_3nn@self._rotations[2])[:, 0])/ref_array, b=np.ones(3), atol=1e-10), axis=-1))[-1][-1]
+            roll_id = int(len(self._rotations[2]) - roll_arg)
+            self._basis.append(self._stat_ba.output.per_shell_transformation_matrices[2][roll_arg])
+            # same as 2nd shell
+            rolled_vecs = np.roll(basis_3nn[0]@self._rotations[2], roll_id, axis=0)
+            self._rotations[2] = np.array([self._get_rotation_matrix(rolled_vecs[i], rolled_vecs[0]) for i in range(len(self._rotations[2]))])
+            self._nn_atom_ids += np.roll(atom_ids[2], roll_id).tolist()
+            self._nn_bond_vecs += (rolled_vecs).tolist()
             # because t1 and t2 of the 3NN are in a new direction
             self.disp_dir.extend([self._basis[2][0], self._basis[2][1], self._basis[2][2]])
             
@@ -194,6 +204,7 @@ class GenerateFccLAPotential():
     def _run_job(self, project, job_name, position):
         job = self.ref_job.copy_template(project=project, new_job_name=job_name)
         job.structure.positions[self.ith_atom_id] = position
+        job.potential = self.potential
         job.calc_static()
         job.run()
     
@@ -495,8 +506,8 @@ class GenerateFccLAPotential():
         Returns:
         - tuple: A tuple containing the cubic spline functions for bond force and potential.
         """
-        force = CubicSpline(data[0], data[1])
-        potential = CubicSpline(data[0], data[2])
+        force = CubicSpline(data[0], data[1], bc_type='natural')
+        potential = CubicSpline(data[0], data[2], bc_type='natural')
         return force, potential
     
     def get_poly_fit(self, data, deg=4):

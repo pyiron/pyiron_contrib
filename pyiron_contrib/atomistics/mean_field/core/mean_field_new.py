@@ -6,23 +6,8 @@ from scipy.integrate import cumtrapz
 from scipy.signal import argrelextrema
 from scipy.constants import physical_constants
 KB = physical_constants['Boltzmann constant in eV/K'][0]
-
-class GenerateBonds():
-    """
-    """
-    
-    def __init__(self, b_0, basis, long_disp_lims, t1_disps_lims, t2_disps_lims, n_shells=1, 
-                 n_bins_long=100, n_bins_t1=50, n_bins_t2=50):
-        self.b_0 = b_0
-        self.basis = np.array(basis)
-        self.long_disps = np.array(long_disps)
-        self.t1_disps = np.array(t1_disps)
-        self.t2_disps = np.array(t2_disps)
-        self.n_bins_long = n_bins_long
-        self.n_bins_t1 = n_bins_t1
-        self.n_bins_t2 = n_bins_t2
         
-class MeanField2():
+class MeanField():
     """
     !!! This class is currently in an experimental state and undergoes frequent updates. 
         Please be cautious when using it -rads !!!

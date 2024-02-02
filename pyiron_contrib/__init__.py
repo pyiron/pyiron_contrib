@@ -3,16 +3,17 @@ __all__ = []
 
 import warnings
 
-try:
-    from pyiron import Project
-except:
-    warnings.warn("pyiron module not found, importing Project from pyiron_base")
-    from pyiron_base import Project
+from pyiron_base import Project as BaseProject, JOB_CLASS_DICT
 
-from pyiron_base import JOB_CLASS_DICT
-from pyiron_contrib.generic.storage_interface_toolkit import StorageInterfaceFactory
 
-Project.register_tools("storage_interface", StorageInterfaceFactory)
+class Project(BaseProject):
+    def __init__(self, *args, **kwargs):
+        warnings.warn(
+            "Importing Project from pyiron_contrib is deprecated. "
+            "Import from appropriate pyiron module (e.g. pyiron) instead."
+        )
+        super().__init__(*args, **kwargs)
+
 
 # Make classes available for new pyiron version
 JOB_CLASS_DICT.update(

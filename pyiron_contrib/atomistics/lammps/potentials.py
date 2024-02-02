@@ -252,7 +252,7 @@ class LammpsPotentials:
         def pair_style(self):
             """pair_style to be output only in hybrid"""
             if self.is_hybrid:
-                return self._pair_style
+                return [p.split()[0] for p in self._pair_style]
             else:
                 return len(self._pair_style) * [""]
 
@@ -603,12 +603,38 @@ CustomPotential.__doc__ += general_doc
 
 
 class Table(LammpsPotentials):
-    def __init__(self, *chemical_elements, distance, energy, force=None, cutoff=None, pair_style="table", style="linear"):
+    """
+    Tabulated pairwise interactions. More information can be found on this
+    page: https://docs.lammps.org/pair_table.html
+    """
+    def __init__(
+        self,
+        *chemical_elements,
+        distance,
+        energy,
+        force=None,
+        cutoff=None,
+        pair_style="table",
+        style="linear"
+    ):
+        """
+        Args:
+            chemical_elements (str): Chemical elements
+            distance (list/numpy.ndarray): List/array of distances
+            energy (list/numpy.ndarray): List/array of energy
+            force (list/numpy.ndarray): List/array of forces. If not specified,
+                it will be computed from energy and distances via
+                numpy.gradient
+            cutoff (float): Cutoff length. If not specified, it takes the
+                largest value from the distance
+            pair_style (str): pair_style name (default: "table")
+            style (str): lookup or linear or spline or bitmap = method of
+                interpolation
+        """
         self._initialize_df(
             pair_style=[f"{pair_style} {style} {len(distance)}"],
             interacting_species=[self._harmonize_species(chemical_elements)],
             pair_coeff=["undefined ENTRY"],
-            # cutoff=np.max(distance),
         )
         self.distance = np.array(distance)
         self.energy = np.array(energy)

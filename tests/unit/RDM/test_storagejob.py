@@ -4,7 +4,8 @@ import os
 from shutil import rmtree
 from moto import mock_s3
 import boto3
-from pyiron_contrib import Project
+from pyiron_base import Project
+import pyiron_contrib
 from pyiron_contrib.RDM.storagejob import StorageJob
 from pyiron_contrib.generic.s3io import FileS3IO
 from pyiron_base._tests import TestWithCleanProject

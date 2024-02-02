@@ -137,14 +137,17 @@ class ShellTask(AbstractTask):
             env=environ,
         )
         output = ShellOutput(
-            stdout = proc.stdout,
-            stderr = proc.stderr,
-            returncode = proc.returncode,
+            stdout=proc.stdout,
+            stderr=proc.stderr,
+            returncode=proc.returncode,
         )
         allowed_returncode = self.input.allowed_returncode
         if allowed_returncode is None:
             allowed_returncode = [0]
         if proc.returncode not in allowed_returncode:
-            return ReturnStatus("aborted", f"non-zero error code {proc.returncode}"), output
+            return (
+                ReturnStatus("aborted", f"non-zero error code {proc.returncode}"),
+                output,
+            )
         else:
             return output

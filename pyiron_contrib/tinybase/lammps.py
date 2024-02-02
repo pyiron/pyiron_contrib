@@ -80,9 +80,7 @@ class LammpsInputTask(AbstractTask):
         control.calc_static()
         control.write_file(file_name="control.inp", cwd=self.input.working_directory)
 
-        return LammpsInputOutput(
-                working_directory = self.input.working_directory
-        )
+        return LammpsInputOutput(working_directory=self.input.working_directory)
 
 
 class LammpsStaticParserInput(AbstractInput):
@@ -115,9 +113,9 @@ class LammpsStaticParserTask(AbstractTask):
             parse_lammps_dumps(os.path.join(self.input.working_directory, "dump.out"))
         )[-1]
         return LammpsStaticOutput(
-                energy_pot=energy_pot,
-                energy_kin = log["TotEng"].iloc[-1] - energy_pot,
-                forces = dump.data[["fx", "fy", "fz"]].to_numpy()
+            energy_pot=energy_pot,
+            energy_kin=log["TotEng"].iloc[-1] - energy_pot,
+            forces=dump.data[["fx", "fy", "fz"]].to_numpy(),
         )
 
 

@@ -310,16 +310,16 @@ class MeamFit(GenericJob):
         super(MeamFit, self).to_hdf(hdf=hdf, group_name=group_name)
         with self.project_hdf5.open("input") as hdf5_input:
             self.input.to_hdf(hdf5_input)
-            hdf5_input[
-                "calculation"
-            ] = self._calculation_dataframe.reset_index().to_dict(orient="list")
+            hdf5_input["calculation"] = (
+                self._calculation_dataframe.reset_index().to_dict(orient="list")
+            )
         with self.project_hdf5.open("output") as hdf5_output:
             hdf5_output["performance"] = self._potential_performance_dataframe.to_dict(
                 orient="list"
             )
-            hdf5_output[
-                "timings"
-            ] = self._potential_timings_dataframe.reset_index().to_dict(orient="list")
+            hdf5_output["timings"] = (
+                self._potential_timings_dataframe.reset_index().to_dict(orient="list")
+            )
 
     def from_hdf(self, hdf=None, group_name=None):
         super(MeamFit, self).from_hdf(hdf=hdf, group_name=group_name)

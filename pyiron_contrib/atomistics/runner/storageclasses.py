@@ -214,9 +214,7 @@ class RunneraseHDFMixin(HasHDF):
         for prop in self.runnerase_properties:
             hdf[f"{prop}"] = self.__dict__[prop]
 
-    def _from_hdf(
-        self, hdf: ProjectHDFio, version: Optional[str] = None
-    ) -> Union[
+    def _from_hdf(self, hdf: ProjectHDFio, version: Optional[str] = None) -> Union[
         RunnerSplitTrainTest,
         RunnerWeights,
         RunnerScaling,

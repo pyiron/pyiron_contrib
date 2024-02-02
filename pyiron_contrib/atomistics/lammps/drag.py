@@ -64,9 +64,9 @@ def setup_lmp_input(lmp, n_atoms=None, direction=None, fix_id=-1):
     lmp.input.control["group___free"] = "subtract all fixed"
     if direction is None:
         for ii, xx in enumerate(["x", "y", "z"]):
-            lmp.input.control[
-                f"variable___f{xx}_free"
-            ] = f"equal f{xx}[{fix_id}]/{n_atoms}"
+            lmp.input.control[f"variable___f{xx}_free"] = (
+                f"equal f{xx}[{fix_id}]/{n_atoms}"
+            )
             lmp.input.control[f"variable___f{xx}_fixed"] = f"equal -f{xx}[{fix_id}]"
     else:
         direction = np.array(direction) / np.linalg.norm(direction)

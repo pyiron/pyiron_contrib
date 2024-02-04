@@ -148,10 +148,10 @@ class MeanFieldModel():
         shell = self.ref_shell if shell is None else shell
         r = np.linalg.norm(bond_grid, axis=-1)
         v1 = self.r_potentials[shell](r)
-        if self.t1_potentials is not None:
+        if self.t1_potentials[shell] is not None:
             t1 = np.dot(bond_grid, self.basis[shell][1]@rotation)
             v1 += self.t1_potentials[shell](t1)
-        if self.t2_potentials is not None:
+        if self.t2_potentials[shell] is not None:
             t2 = np.dot(bond_grid, self.basis[shell][2]@rotation)
             v1 += self.t2_potentials[shell](t2)
         return v1
@@ -228,7 +228,10 @@ class VirialQuantities():
         self.crystal = crystal
 
         self.meshes = get_meshes(self.bond_grid, self.basis)
-        assert self.crystal in ['fcc'], 'crystal must be fcc.'   
+        assert self.crystal in ['fcc'], 'crystal must be fcc.'
+
+        # set the number of bonds per shell.
+        self._n_bonds_per_shell = np.array([12, 6, 24, 12, 24])  
 
     def get_rho(self, Veff, temperature=100., eps=1., lm=0.):
         """
@@ -252,7 +255,7 @@ class VirialQuantities():
         num_offset = np.min(rho_1[rho_1>0])  # add a numerical offset to avoid divide by zero errors
         return rho_1+num_offset
 
-    def get_virial_quantities(self, Veff, dV1, temperature=100., eps=1., lm=0., shell=1, return_rho_1=False):
+    def get_virial_quantities(self, Veff, dV1, temperature=100., eps=1., lm=0., shell=0, return_rho_1=False):
         """
         Calculate virial temperature, pressure, and equilibrium bond at the given strain.
 
@@ -262,7 +265,7 @@ class VirialQuantities():
             temperature (float, optional): Temperature value. Defaults to 100.
             eps (float, optional): Strain on bond b_0. Defaults to 1, no strain.
             lm (float, optional): Lagrange multiplier. Defaults to 0.
-            shell (int, optional): Shell with respect to which the volume will be calculated. Defaults to 1, the 1st shell.
+            shell (int, optional): Shell with respect to which the volume will be calculated. Defaults to 0, the 1st shell.
             return_rho_1 (boolean): Whether or not to return the bond density.
 
         Returns:
@@ -279,17 +282,18 @@ class VirialQuantities():
         # for each shell, we have a different number of nn bonds and determine volume differently based off of b_eps
         if shell == 0:
             N_by_V = 4/(b_eps*np.sqrt(2))**3
-            n_bonds = 12
         elif shell == 1:
             N_by_V = 4/(b_eps)**3
-            n_bonds = 6
         elif shell == 2:
             N_by_V = 4/(b_eps*np.sqrt(2/3))**3
-            n_bonds = 24
+        elif shell == 3:
+            N_by_V = 4/(b_eps*np.sqrt(1/2))**3
+        elif shell == 4:
+            N_by_V = 4/(b_eps*np.sqrt(2/5))**3
         else:
-            raise ValueError('shell must be 0, 1, or 2.')
-        T_vir = n_bonds/6/KB*(db_dV1*rho_1).sum()
-        P_vir = -n_bonds/6*N_by_V*(a_dV1*rho_1).sum()
+            raise ValueError('shell must be 0, 1, 2, or 3.')
+        T_vir = self._n_bonds_per_shell[shell]/6/KB*(db_dV1*rho_1).sum()
+        P_vir = -self._n_bonds_per_shell[shell]/6*N_by_V*(a_dV1*rho_1).sum()
         if not return_rho_1:
             rho_1 = np.array([None])  
         return T_vir, P_vir, b_eps, rho_1
@@ -318,10 +322,6 @@ class Optimizer():
 
         self.check_inputs()
 
-        if self.crystal == 'fcc':
-            # set the number of bonds per shell.
-            self._n_bonds = np.array([12, 6, 24])
-
     def check_inputs(self):
         """
         Check if the inputs are properly defined.
@@ -335,7 +335,7 @@ class Optimizer():
             assert len(self.energy_list) == len(self.strain_list), 'length of energy_list and strain_list must be equal.'
             assert isinstance(vq, VirialQuantities), 'vq_instance must be a VirialQuantities instance.'
             assert isinstance(mfm, MeanFieldModel), 'mfm_instance must be a MeanFieldModel instance.'
-
+        
     def get_epsilon_pressure(self, eps=1.):
         """
         From the energy_list and strain_list inputs, determine the pressure and energy offsets from the mean-field model.
@@ -356,17 +356,16 @@ class Optimizer():
             # from static calculations
             strains = 1+self.strain_list
             u_md_fit_eqn = np.poly1d(np.polyfit(strains, self.energy_list, deg=4))
+            du_md_fit_eqn = u_md_fit_eqn.deriv(m=1)
             # from mean-field model
+            n_bonds_per_shell = self.vq_instances[0]._n_bonds_per_shell
             u_mf = 0.
             for shell in range(self.shells):
-                u_mf += self._n_bonds[shell]/2.*self.mfm_instances[shell].r_potentials[shell](strains*self.b_0s[shell])
+                u_mf += n_bonds_per_shell[shell]/2.*self.mfm_instances[shell].r_potentials[shell](strains*self.b_0s[shell])
             u_mf_fit_eqn = np.poly1d(np.polyfit(strains, u_mf, deg=4))
-            E_offset = u_md_fit_eqn(eps)-u_mf_fit_eqn(eps)
-            
-            e_offset_fit = np.poly1d(np.polyfit(strains, self.energy_list-u_mf, deg=4))
-            de_offset_fit = e_offset_fit.deriv(m=1)(eps)
-            P_offset = -1./(3.*eps**2*(self.b_0s[0]*np.sqrt(2))**3)*de_offset_fit
-            
+            du_mf_fit_eqn = u_mf_fit_eqn.deriv(m=1)
+            E_offset = u_md_fit_eqn(eps)-u_mf_fit_eqn(eps)-(u_md_fit_eqn(1.)-u_mf_fit_eqn(1.))
+            P_offset = -4./(3.*eps**2*(self.b_0s[0]*np.sqrt(2))**3)*(du_md_fit_eqn(eps)-du_mf_fit_eqn(eps)-(du_md_fit_eqn(1.)-du_mf_fit_eqn(1.)))
             return P_offset, E_offset
 
     def collect_properties(self, temperature, lms, eps, Veffs=None, dV1s=None, return_rho_1=False):
@@ -477,7 +476,9 @@ class Optimizer():
                 _, p_vir, b_eps, _ = self.vq_instances[shell].get_virial_quantities(Veff=Veff, dV1=dV1s[shell], temperature=temperature, eps=args[-1], lm=args[shell], shell=shell)
                 P_virs.append(p_vir)
                 b_eps_diff.append(self.b_0s[shell]*args[-1]-b_eps)
-            P_diff = np.abs(np.sum(P_virs)-pressure)
+            # P_offset, _ = self.get_epsilon_pressure(eps=args[-1])
+            P_offset = 0.
+            P_diff = np.abs(np.sum(P_virs)+P_offset-pressure)
             print(args)
             return np.concatenate((np.array(b_eps_diff), np.array([P_diff])))
         x0 = np.concatenate((np.zeros(self.shells), np.array([1.])))
@@ -545,7 +546,7 @@ class MeanFieldJob():
 
         if self.crystal == 'fcc':
             # set the number of bonds per shell.
-            self._n_bonds = np.array([12, 6, 24])
+            self._n_bonds_per_shell = np.array([12, 6, 24, 12, 24])
 
         self.generate_alphas()
         self.initialize_instances()
@@ -576,6 +577,10 @@ class MeanFieldJob():
                 factor = 1.
             elif shell == 2:
                 factor = np.sqrt(3/2)
+            elif shell == 3:
+                factor = np.sqrt(2)
+            elif shell == 4:
+                factor = np.sqrt(5/2)
             nn_shifts.append(self.basis[shell][0]@self.rotations[shell]*factor)
         shifts = np.vstack((np.zeros((1, 3)), *nn_shifts))
 
@@ -587,7 +592,7 @@ class MeanFieldJob():
             bond_0_corr = model.correlation(ref_bond, ref_bond, shift=np.array([0.0, 0.0, 0.0]))
             inv_bond_0_corr = np.linalg.inv(bond_0_corr)
 
-            alphas_nn = [[], [], []]  # each shell with a reference bond has correlations with 1NN, 2NN, 3NN bonds.
+            alphas_nn = [[] for _ in range(self.shells)]  # each shell with a reference bond has correlations with 1NN, 2NN, 3NN, 4NN, 5NN bonds.
             for shift in shifts:
                 for shl, nn in enumerate(nn_shifts):
                     for bond_1 in nn:
@@ -595,7 +600,7 @@ class MeanFieldJob():
                         alphas_nn[shl].append(bond_1_corr@inv_bond_0_corr)
             
             for shell in range(self.shells):  # reshape the alphas to be (no. of shifts, neighbors in a shell, 3, 3)
-                alphas_nn[shell] = np.array(alphas_nn[shell]).reshape(len(shifts), self._n_bonds[shell], 3, 3)
+                alphas_nn[shell] = np.array(alphas_nn[shell]).reshape(len(shifts), self._n_bonds_per_shell[shell], 3, 3)
             alphas.append(alphas_nn)
         self.alphas = alphas
         print('Alphas generated.')
@@ -670,7 +675,7 @@ class MeanFieldJob():
         assert self.output is not None, 'run_ensemble() must be run first.'
         
         per_bond_energy = np.array([(self._mfms[s].V1(bond_grid=self.bond_grids[s], shell=s)*self.rho_1s[s]).sum() for s in range(self.shells)])
-        per_atom_energy = (self._n_bonds[:self.shells]/2*per_bond_energy)
+        per_atom_energy = (self._n_bonds_per_shell[:self.shells]/2*per_bond_energy)
         per_shell_ah_U = per_atom_energy-1.5*KB*self.output['T_vir']
         ah_U = per_shell_ah_U.sum()+self.output['E_offset']
         if return_components:

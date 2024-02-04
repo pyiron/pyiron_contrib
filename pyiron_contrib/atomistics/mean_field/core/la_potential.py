@@ -31,8 +31,8 @@ class GenerateFccLAPotential():
       (default is False)
     """
     
-    def __init__(self, project_name, potential, ref_job, ith_atom_id=0, shells=1, disp=1., n_disps=5, uneven=False, 
-                 delete_existing_jobs=False):
+    def __init__(self, project_name, ref_job, potential=None, ith_atom_id=0, shells=1, disp=1., n_disps=5, uneven=False, 
+                 delete_existing_jobs=False, delete_static_job=False):
         
         self.project_name = project_name
         self.potential = potential
@@ -43,6 +43,7 @@ class GenerateFccLAPotential():
         self.n_disps = n_disps
         self.uneven = uneven
         self.delete_existing_jobs = delete_existing_jobs
+        self.delete_static_job = delete_static_job
         self.structure = ref_job.structure.copy()
         self.disp_dir = None
         
@@ -60,7 +61,7 @@ class GenerateFccLAPotential():
         self._data = None
         self._tags = np.arange(self.shells).astype(str).tolist()
         if self.shells == 3:
-            self._tags.extend(['3', '4'])
+            self._tags.extend(['3'])
 
     @staticmethod
     def _get_rotation_matrix(vec1, vec2):
@@ -80,7 +81,9 @@ class GenerateFccLAPotential():
         """
         Run static bond analysis on the reference job and assign hidden variables.
         """
-        self._stat_ba = self._project.create_job(StaticBondAnalysis, 'static_ba', delete_existing_job=self.delete_existing_jobs)
+        if self.delete_existing_jobs:
+            self.delete_static_job = True
+        self._stat_ba = self._project.create_job(StaticBondAnalysis, 'static_ba', delete_existing_job=self.delete_static_job)
         self._stat_ba.input.structure = self.structure.copy()
         self._stat_ba.input.n_shells = self.shells
         self._stat_ba.run()
@@ -96,7 +99,7 @@ class GenerateFccLAPotential():
         self._nn_bond_vecs = (self._basis[0][0]@self._rotations[0]).tolist()
         self.disp_dir = [self._basis[0][0]]
 
-        if self.shells in [2, 3]:
+        if self.shells >= 2:
         # 2nn basis, needs rearranging such that t2_1nn == l_2nn
             basis_2nn = self._stat_ba.output.per_shell_transformation_matrices[1][0]
             roll_arg = np.argwhere(np.all(np.isclose(a=(basis_2nn@self._rotations[1])[:, 0], b=self._basis[0][2], atol=1e-10), axis=-1))[-1][-1]
@@ -110,11 +113,10 @@ class GenerateFccLAPotential():
             self._nn_bond_vecs += (rolled_vecs).tolist()
             self.disp_dir.append(self._basis[1][0])
 
-        if self.shells in [3]:
+        if self.shells >= 3:
         # 3nn basis, also needs rearranging such that l_2nn_x == l_3nn_x
             basis_3nn = self._stat_ba.output.per_shell_transformation_matrices[2][0]
-            ref_array = np.array([basis_3nn[0].max(), basis_3nn[0].min(), basis_3nn[0].min()])
-            roll_arg = np.argwhere(np.all(np.isclose(a=((basis_3nn@self._rotations[2])[:, 0])/ref_array, b=np.ones(3), atol=1e-10), axis=-1))[-1][-1]
+            roll_arg = np.argwhere(np.all(np.isclose(a=((basis_3nn@self._rotations[2])[:, 1]), b=self._basis[0][0], atol=1e-10), axis=-1))[-1][-1]
             roll_id = int(len(self._rotations[2]) - roll_arg)
             self._basis.append(self._stat_ba.output.per_shell_transformation_matrices[2][roll_arg])
             # same as 2nd shell
@@ -123,7 +125,20 @@ class GenerateFccLAPotential():
             self._nn_atom_ids += np.roll(atom_ids[2], roll_id).tolist()
             self._nn_bond_vecs += (rolled_vecs).tolist()
             # because t1 and t2 of the 3NN are in a new direction
-            self.disp_dir.extend([self._basis[2][0], self._basis[2][1], self._basis[2][2]])
+            self.disp_dir.extend([self._basis[2][0], self._basis[2][2]])
+
+        if self.shells >= 4:
+        # 4nn basis is the same as the 1nn basis, but with different atom_ids
+            self._basis.append(self._stat_ba.output.per_shell_transformation_matrices[3][0])
+            self._nn_atom_ids += (atom_ids[3]).tolist()
+            self._nn_bond_vecs += (self._basis[3][0]@self._rotations[3]).tolist()
+
+        if self.shells == 5:
+         # 5nn basis is similar to the 1nn basis, but needs an additional displacement in a new direction
+            self._basis.append(self._stat_ba.output.per_shell_transformation_matrices[4][0])
+            self._nn_atom_ids += (atom_ids[4]).tolist()
+            self._nn_bond_vecs += (self._basis[4][0]@self._rotations[4]).tolist()
+            self.disp_dir.append(self._basis[4][0])
             
         self._nn_bond_vecs = np.array(self._nn_bond_vecs)
         self._nn_atom_ids = np.array(self._nn_atom_ids)
@@ -132,21 +147,33 @@ class GenerateFccLAPotential():
         """
         Retrieve atom indices (jth atom) for in-plane and out-of-plane NNs. 
         """
-        anti_l_id_1nn = np.argwhere(np.isclose(a=self._nn_bond_vecs@self._basis[0][0], b=-1., atol=1e-10))[-1][-1]
-        t1_id_1nn = np.argwhere(np.all(np.isclose(a=self._nn_bond_vecs, b=self._basis[0][1], atol=1e-10), axis=-1))[-1][-1]
+        anti_l_id_1nn = np.argwhere(np.isclose(a=self._nn_bond_vecs[:12]@self._basis[0][0], b=-1., atol=1e-10))[-1][-1]
+        t1_id_1nn = np.argwhere(np.all(np.isclose(a=self._nn_bond_vecs[:12], b=self._basis[0][1], atol=1e-10), axis=-1))[-1][-1]
         self._plane_nn = [[self._nn_atom_ids[i] for i in [anti_l_id_1nn, 0, t1_id_1nn]]]
         
-        if self.shells in [2, 3]:
-            anti_l_id_2nn = np.argwhere(np.isclose(a=self._nn_bond_vecs@self._basis[1][0], b=-1., atol=1e-10))[-1][-1]
-            l_id_2nn = np.argwhere(np.isclose(a=self._nn_bond_vecs@self._basis[1][0], b=1., atol=1e-10))[-1][-1]
-            t1_id_2nn = np.argwhere(np.all(np.isclose(a=self._nn_bond_vecs, b=self._basis[1][1], atol=1e-10), axis=-1))[-1][-1]
-            t2_id_2nn = np.argwhere(np.all(np.isclose(a=self._nn_bond_vecs, b=self._basis[1][2], atol=1e-10), axis=-1))[-1][-1]
+        if self.shells >= 2:
+            anti_l_id_2nn = np.argwhere(np.isclose(a=self._nn_bond_vecs[:18]@self._basis[1][0], b=-1., atol=1e-10))[-1][-1]
+            l_id_2nn = np.argwhere(np.isclose(a=self._nn_bond_vecs[:18]@self._basis[1][0], b=1., atol=1e-10))[-1][-1]
+            t1_id_2nn = np.argwhere(np.all(np.isclose(a=self._nn_bond_vecs[:18], b=self._basis[1][1], atol=1e-10), axis=-1))[-1][-1]
+            t2_id_2nn = np.argwhere(np.all(np.isclose(a=self._nn_bond_vecs[:18], b=self._basis[1][2], atol=1e-10), axis=-1))[-1][-1]
             self._plane_nn.append([self._nn_atom_ids[i] for i in [anti_l_id_2nn, l_id_2nn, t1_id_2nn, t2_id_2nn]])
         
-        if self.shells in [3]:
-            anti_l_id_3nn = np.argwhere(np.isclose(a=self._nn_bond_vecs@self._basis[2][0], b=-1., atol=1e-10))[-1][-1]
-            l_id_3nn = np.argwhere(np.isclose(a=self._nn_bond_vecs@self._basis[2][0], b=1., atol=1e-10))[-1][-1]
+        if self.shells >= 3:
+            anti_l_id_3nn = np.argwhere(np.isclose(a=self._nn_bond_vecs[:42]@self._basis[2][0], b=-1., atol=1e-10))[-1][-1]
+            l_id_3nn = np.argwhere(np.isclose(a=self._nn_bond_vecs[:42]@self._basis[2][0], b=1., atol=1e-10))[-1][-1]
             self._plane_nn.append([self._nn_atom_ids[i] for i in [anti_l_id_3nn, l_id_3nn]])
+
+        if self.shells >= 4:
+            anti_l_id_4nn = np.argwhere(np.isclose(a=self._nn_bond_vecs@self._basis[3][0], b=-1., atol=1e-10))[-1][-1]
+            l_id_4nn = np.argwhere(np.isclose(a=self._nn_bond_vecs@self._basis[3][0], b=1., atol=1e-10))[-1][-1]
+            t1_id_4nn = np.argwhere(np.all(np.isclose(a=self._nn_bond_vecs, b=self._basis[3][1], atol=1e-10), axis=-1))[-1][-1]
+            self._plane_nn.append([self._nn_atom_ids[i] for i in [anti_l_id_4nn, l_id_4nn, t1_id_4nn]])
+
+        if self.shells == 5:
+            anti_l_id_5nn = np.argwhere(np.isclose(a=self._nn_bond_vecs[54:]@self._basis[4][0], b=-1., atol=1e-10))[-1][-1]
+            l_id_5nn = np.argwhere(np.isclose(a=self._nn_bond_vecs[54:]@self._basis[4][0], b=1., atol=1e-10))[-1][-1]
+            t1_id_5nn = np.argwhere(np.all(np.isclose(a=self._nn_bond_vecs[54:], b=self._basis[4][1], atol=1e-10), axis=-1))[-1][-1]
+            self._plane_nn.append([self._nn_atom_ids[i+54] for i in [anti_l_id_5nn, l_id_5nn, t1_id_5nn]])
         
         if output:
             return self._plane_nn
@@ -194,17 +221,21 @@ class GenerateFccLAPotential():
         if self._pos is None:
             self._pos = [self.generate_atom_positions(direction=self.disp_dir[0])]
             
-            if self.shells in [2, 3]:
+            if self.shells >= 2:
                 self._pos.append(self.generate_atom_positions(direction=self.disp_dir[1]))
                 
-            if self.shells in [3]:
-                pos = [self.generate_atom_positions(direction=self.disp_dir[i]) for i in range(2, 5)]
+            if self.shells >= 3:
+                pos = [self.generate_atom_positions(direction=self.disp_dir[i]) for i in range(2, 4)]
                 self._pos.extend(pos)
+
+            if self.shells == 5:
+                self._pos.append(self.generate_atom_positions(direction=self.disp_dir[4]))
             
     def _run_job(self, project, job_name, position):
         job = self.ref_job.copy_template(project=project, new_job_name=job_name)
         job.structure.positions[self.ith_atom_id] = position
-        job.potential = self.potential
+        if self.potential is not None:
+            job.potential = self.potential
         job.calc_static()
         job.run()
     
@@ -256,15 +287,25 @@ class GenerateFccLAPotential():
         force_on_j_list = [self._force_on_j(i, tag='0') for i in self._plane_nn[0]]
         force_on_j_list.append(self._force_on_j(self._plane_nn[0][1], tag='1'))
         
-        if self.shells in [2, 3]:
+        if self.shells >= 2:
             for i in self._plane_nn[1]:
                 force_on_j_list.append(self._force_on_j(i, tag='1'))
                 
-        if self.shells in [3]:
+        if self.shells >= 3:
             for i in self._plane_nn[2]:
                 force_on_j_list.append(self._force_on_j(i, tag='2'))
+            force_on_j_list.append(self._force_on_j(self._plane_nn[2][1], tag='0'))
             force_on_j_list.append(self._force_on_j(self._plane_nn[2][1], tag='3'))
-            force_on_j_list.append(self._force_on_j(self._plane_nn[2][1], tag='4'))
+
+        if self.shells >= 4:
+            for i in self._plane_nn[3]:
+                force_on_j_list.append(self._force_on_j(i, tag='0'))
+            force_on_j_list.append(self._force_on_j(self._plane_nn[3][1], tag='1'))
+
+        if self.shells == 5:
+            for i in self._plane_nn[4]:
+                force_on_j_list.append(self._force_on_j(i, tag='4'))
+            force_on_j_list.append(self._force_on_j(self._plane_nn[4][1], tag='1'))
         
         self._force_on_j_list = np.array(force_on_j_list)
         if output:
@@ -320,8 +361,8 @@ class GenerateFccLAPotential():
         Returns:
         - tuple: A tuple containing the magnitudes of displacements, bond forces, and displacement directions.
         """
-        j_position = self.structure.positions[jth_atom_id]
-        ij = self.find_mic(self.structure, j_position-ith_atom_positions)
+        jth_atom_position = self.structure.positions[jth_atom_id]
+        ij = self.find_mic(self.structure, jth_atom_position-ith_atom_positions)
         r = np.linalg.norm(ij, axis=-1)
         ij_direcs = ij/r[:, np.newaxis]
         F_ij = (jth_atom_forces*ij_direcs).sum(axis=-1)
@@ -357,12 +398,18 @@ class GenerateFccLAPotential():
             pos_t1, pos_t2 = self._pos[1], self._pos[1]
         elif nn == '3':
             l_hat, t1_hat, t2_hat = self._basis[2]
-            pos_t1, pos_t2 = self._pos[3], self._pos[4]
+            pos_t1, pos_t2 = self._pos[0], self._pos[3]
+        elif nn == '4':
+            l_hat, t1_hat, t2_hat = self._basis[3]
+            pos_t1, pos_t2 = self._pos[0], self._pos[1]
+        elif nn == '5':
+            l_hat, t1_hat, t2_hat = self._basis[4]
+            pos_t1, pos_t2 = self._pos[4], self._pos[1]
         else:
             raise ValueError
         
         if tag == '1':
-            if nn in ['1', '2']:
+            if nn in ['1', '2', '4', '5']:
                 r, F_ij, ij_direcs = self.get_ij_bond_force(jth_atom_id, jth_atom_forces, pos_t1)
                 u = ij_direcs*r[:, np.newaxis]@l_hat
                 basis = np.array([t1_hat, l_hat, t2_hat])
@@ -370,20 +417,14 @@ class GenerateFccLAPotential():
                 r, F_ij, ij_direcs = self.get_ij_bond_force(jth_atom_id, jth_atom_forces, pos_t1)
                 u = ij_direcs*r[:, np.newaxis]@t1_hat
                 basis = np.array([l_hat, t1_hat, t2_hat])
-            else:
-                raise ValueError
         elif tag == '2':
             r, F_ij, ij_direcs = self.get_ij_bond_force(jth_atom_id, jth_atom_forces, pos_t2)
-            if nn == '1':
+            if nn in ['1', '3', '4', '5']:
                 u = ij_direcs*r[:, np.newaxis]@t2_hat
                 basis = np.array([l_hat, t2_hat, t1_hat])
             elif nn == '2':
                 u = ij_direcs*r[:, np.newaxis]@l_hat
                 basis = np.array([t2_hat, l_hat, t1_hat])
-            elif nn == '3':
-                r, F_ij, ij_direcs = self.get_ij_bond_force(jth_atom_id, jth_atom_forces, pos_t2)
-                u = ij_direcs*r[:, np.newaxis]@t2_hat
-                basis = np.array([l_hat, t2_hat, t1_hat])
             else:
                 raise ValueError
         else:
@@ -441,6 +482,32 @@ class GenerateFccLAPotential():
             out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[11], jth_atom_id=self._plane_nn[2][1], tag='2', nn='3') 
             bonds = np.concatenate((np.flip(out[0]), -out[0][1:]))
             force = np.concatenate((np.flip(out[1]), -out[1][1:]))
+        elif tag == 'l_4nn':
+            out = [self.get_ij_bond_force(jth_atom_forces=forces, jth_atom_id=atom_id, ith_atom_positions=self._pos[0]) 
+                   for forces, atom_id in zip(self._force_on_j_list[12:14], self._plane_nn[3][:2])]
+            bonds = np.concatenate((np.flip(out[1][0]), out[0][0][1:]))
+            force = np.concatenate((np.flip(out[1][1]), out[0][1][1:]))
+        elif tag == 't1_4nn':
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[14], jth_atom_id=self._plane_nn[3][2], tag='1', nn='4')
+            bonds = np.concatenate((np.flip(out[0]), -out[0][1:]))
+            force = np.concatenate((np.flip(out[1]), -out[1][1:]))
+        elif tag == 't2_4nn':
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[15], jth_atom_id=self._plane_nn[3][1], tag='2', nn='4')
+            bonds = np.concatenate((np.flip(out[0]), -out[0][1:]))
+            force = np.concatenate((np.flip(out[1]), -out[1][1:]))
+        elif tag == 'l_5nn':
+            out = [self.get_ij_bond_force(jth_atom_forces=forces, jth_atom_id=atom_id, ith_atom_positions=self._pos[4]) 
+                   for forces, atom_id in zip(self._force_on_j_list[16:18], self._plane_nn[4][:2])]
+            bonds = np.concatenate((np.flip(out[1][0]), out[0][0][1:]))
+            force = np.concatenate((np.flip(out[1][1]), out[0][1][1:]))
+        elif tag == 't1_5nn':
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[18], jth_atom_id=self._plane_nn[4][2], tag='1', nn='5')
+            bonds = np.concatenate((np.flip(out[0]), -out[0][1:]))
+            force = np.concatenate((np.flip(out[1]), -out[1][1:]))
+        elif tag == 't2_5nn':
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[19], jth_atom_id=self._plane_nn[4][1], tag='2', nn='5')
+            bonds = np.concatenate((np.flip(out[0]), -out[0][1:]))
+            force = np.concatenate((np.flip(out[1]), -out[1][1:]))
         else:
             raise ValueError
         return bonds, force
@@ -450,12 +517,16 @@ class GenerateFccLAPotential():
     
         if tag == 'l_1nn':
             arg_b_0 = np.argmin(abs(bonds-self._b0[0]))
-        elif tag in ['t1_1nn', 't2_1nn', 't1_2nn', 't2_2nn', 't1_3nn', 't2_3nn']:
+        elif tag in ['t1_1nn', 't2_1nn', 't1_2nn', 't2_2nn', 't1_3nn', 't2_3nn', 't1_4nn', 't2_4nn', 't1_5nn', 't2_5nn']:
             arg_b_0 = np.argmin(abs(bonds))
         elif tag == 'l_2nn':
             arg_b_0 = np.argmin(abs(bonds-self._b0[1]))
         elif tag == 'l_3nn':
             arg_b_0 = np.argmin(abs(bonds-self._b0[2]))
+        elif tag == 'l_4nn':
+            arg_b_0 = np.argmin(abs(bonds-self._b0[3]))
+        elif tag == 'l_5nn':
+            arg_b_0 = np.argmin(abs(bonds-self._b0[4]))
         else:
             raise ValueError
             
@@ -471,30 +542,20 @@ class GenerateFccLAPotential():
         Returns:
         - list: A list of lists containing the bond lengths, bond forces, and potentials for each direction.
         """
-        l_1nn_bonds, l_1nn_forces, l_1nn_potential = self._bond_force_pot(tag='l_1nn')
-        t1_1nn_bonds, t1_1nn_forces, t1_1nn_potential = self._bond_force_pot(tag='t1_1nn')
-        t2_1nn_bonds, t2_1nn_forces, t2_1nn_potential = self._bond_force_pot(tag='t2_1nn')
-        self._data = [[l_1nn_bonds , -l_1nn_forces , l_1nn_potential ],
-                      [t1_1nn_bonds, -t1_1nn_forces, t1_1nn_potential],
-                      [t2_1nn_bonds, -t2_1nn_forces, t2_1nn_potential]]
+        directions = ['l', 't1', 't2']
+        self._data = []
         
-        if self.shells in [2, 3]:
-            l_2nn_bonds, l_2nn_forces, l_2nn_potential = self._bond_force_pot(tag='l_2nn')
-            t1_2nn_bonds, t1_2nn_forces, t1_2nn_potential = self._bond_force_pot(tag='t1_2nn')
-            t2_2nn_bonds, t2_2nn_forces, t2_2nn_potential = self._bond_force_pot(tag='t2_2nn')
-            self._data.extend([[l_2nn_bonds , -l_2nn_forces , l_2nn_potential ],
-                               [t1_2nn_bonds, -t1_2nn_forces, t1_2nn_potential],
-                               [t2_2nn_bonds, -t2_2nn_forces, t2_2nn_potential]])
+        for shell in range(1, self.shells+1):
+            shell_data = []
+            
+            for direction in directions:
+                tag = f'{direction}_{shell}nn'
+                bonds, forces, potential = self._bond_force_pot(tag=tag)
+                shell_data.append([bonds, -forces, potential])
+            
+            self._data.extend(shell_data)
         
-        if self.shells in [3]:
-            l_3nn_bonds, l_3nn_forces, l_3nn_potential = self._bond_force_pot(tag='l_3nn')
-            t1_3nn_bonds, t1_3nn_forces, t1_3nn_potential = self._bond_force_pot(tag='t1_3nn')
-            t2_3nn_bonds, t2_3nn_forces, t2_3nn_potential = self._bond_force_pot(tag='t2_3nn')
-            self._data.extend([[l_3nn_bonds , -l_3nn_forces , l_3nn_potential ],
-                               [t1_3nn_bonds, -t1_3nn_forces, t1_3nn_potential],
-                               [t2_3nn_bonds, -t2_3nn_forces, t2_3nn_potential]])
-        if output:
-            return self._data
+        return self._data if output else None
     
     def get_spline_fit(self, data):
         """
@@ -525,7 +586,7 @@ class GenerateFccLAPotential():
         potential = np.poly1d(np.polyfit(data[0], data[2], deg=deg))
         return force, potential
 
-    def get_bonding_functions(self):
+    def get_bonding_functions(self, deg=None):
         """
         Retrieve functions for the bonding forces and potentials along the longitudinal and 2 transversal directions.
 
@@ -536,30 +597,20 @@ class GenerateFccLAPotential():
         - tuple: A tuple containing the longitudinal, t1, and t2 bonding forces and potential functions.
         """
         self.get_force_on_j()
-        data = self.get_all_bond_force_pot()
-        l_1nn_force, l_1nn_potential = self.get_spline_fit(data=self._data[0])
-        t_1nn_forces, t_1nn_potentials = zip(*[self.get_spline_fit(data=self._data[i]) for i in [1, 2]])
-        potential_func = [[l_1nn_potential], [t_1nn_potentials[0]], [t_1nn_potentials[1]]]
-        force_func = [[l_1nn_force], [t_1nn_forces[0]], [t_1nn_forces[1]]]
-        
-        if self.shells in [2, 3]:
-            l_2nn_force, l_2nn_potential = self.get_spline_fit(data=self._data[3])
-            t_2nn_forces, t_2nn_potentials = zip(*[self.get_spline_fit(data=self._data[i]) for i in [4, 5]])
-            potential_func[0].append(l_2nn_potential)
-            potential_func[1].append(t_2nn_potentials[0])
-            potential_func[2].append(t_2nn_potentials[1])
-            force_func[0].append(l_2nn_force)
-            force_func[1].append(t_2nn_forces[0])
-            force_func[2].append(t_2nn_forces[1])
-            
-        if self.shells in [3]:
-            l_3nn_force, l_3nn_potential = self.get_spline_fit(data=self._data[6])
-            t_3nn_forces, t_3nn_potentials = zip(*[self.get_spline_fit(data=self._data[i]) for i in [7, 8]])
-            potential_func[0].append(l_3nn_potential)
-            potential_func[1].append(t_3nn_potentials[0])
-            potential_func[2].append(t_3nn_potentials[1])
-            force_func[0].append(l_3nn_force)
-            force_func[1].append(t_3nn_forces[0])
-            force_func[2].append(t_3nn_forces[1])
+        self.get_all_bond_force_pot()
+
+        potential_func = [[], [], []]
+        force_func = [[], [], []]
+
+        for i in range(self.shells):
+            l_nn_force, l_nn_potential = self.get_spline_fit(data=self._data[i*3])
+            t_nn_forces, t_nn_potentials = zip(*[self.get_spline_fit(data=self._data[i*3+j]) for j in range(1, 3)])
+
+            potential_func[0].append(l_nn_potential)
+            potential_func[1].append(t_nn_potentials[0])
+            potential_func[2].append(t_nn_potentials[1])
+            force_func[0].append(l_nn_force)
+            force_func[1].append(t_nn_forces[0])
+            force_func[2].append(t_nn_forces[1])
 
         return potential_func, force_func

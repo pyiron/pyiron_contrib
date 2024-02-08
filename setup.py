@@ -40,7 +40,7 @@ setup(
     extras_require={
         'atomistic': [
             'ase==3.22.1',
-            'pyiron_atomistics==0.4.11',
+            'pyiron_atomistics==0.4.12',
             'pycp2k==0.2.2',
         ],
         'fenics': [

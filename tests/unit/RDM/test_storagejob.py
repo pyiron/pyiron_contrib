@@ -2,7 +2,7 @@ import unittest
 import os
 
 from shutil import rmtree
-from moto import mock_s3
+from moto import mock_aws
 import boto3
 from pyiron_base import Project
 import pyiron_contrib
@@ -30,7 +30,7 @@ class TestStorageJob(TestWithCleanProject):
         with open(cls.file2, 'w') as f:
             f.write('Some other text')
 
-        cls.moto = mock_s3()
+        cls.moto = mock_aws()
         cls.moto.start()
         cls.res = boto3.resource('s3', **aws_credentials)
         cls.bucket = cls.res.create_bucket(Bucket=full_bucket)

@@ -18,6 +18,6 @@ dependencies:
 - moto =5.0.1
 - pycp2k =0.2.2
 - aws-sam-translator =1.77.0
-- pympipool =0.7.11
+- pympipool =0.7.13
 - distributed =2024.2.0
 - h5io_browser =0.0.7

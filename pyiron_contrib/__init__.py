@@ -80,8 +80,6 @@ moved_potential_modules = [
         "mlip.masters",
         "mlip.mlip",
         "mlip.mlipdescriptors",
-        "mlip.mlipjob",
-        "mlip.mlipselect",
         "mlip.parser",
         "mlip.potential",
         "pacemaker",

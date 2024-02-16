@@ -1,28 +1,4 @@
 channels:
 - conda-forge
 dependencies:
-- ipykernel
-- myst-parser
-- nbsphinx
-- sphinx-gallery
-- sphinx-rtd-theme
-- ase =3.22.1
-- coveralls
-- coverage
-- codacy-coverage
-- matplotlib =3.8.2
-- numpy =1.26.4
-- pyiron_base =0.7.8
-- pyiron_atomistics =0.4.15
-- pyparsing =3.1.1
-- scipy =1.12.0
-- seaborn =0.13.2
-- scikit-image =0.22.0
-- randspg =0.0.1
-- boto3 =1.34.39
-- moto =5.0.1
-- pycp2k =0.2.2
-- aws-sam-translator =1.77.0
-- pympipool =0.7.13
-- distributed =2024.2.0
-- h5io_browser =0.0.9
+- pip: []

@@ -7,8 +7,8 @@ dependencies:
 - codacy-coverage
 - matplotlib =3.8.2
 - numpy =1.26.4
-- pyiron_base =0.7.5
-- pyiron_atomistics =0.4.14
+- pyiron_base =0.7.8
+- pyiron_atomistics =0.4.15
 - pyparsing =3.1.1
 - scipy =1.12.0
 - seaborn =0.13.2
@@ -20,7 +20,7 @@ dependencies:
 - aws-sam-translator =1.77.0
 - pympipool =0.7.13
 - distributed =2024.2.0
-- h5io_browser =0.0.8
+- h5io_browser =0.0.9
 - python >= 3.10
 - lammps
 - nglview >=3.0.8

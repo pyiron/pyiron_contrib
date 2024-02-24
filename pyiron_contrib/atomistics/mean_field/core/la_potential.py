@@ -33,7 +33,7 @@ class GenerateLAPotential():
       (default is False)
     """
     
-    def __init__(self, project_name, ref_job, potential=None, ith_atom_id=0, shells=1, disp=1., n_disps=5, uneven=False, 
+    def __init__(self, project_name, ref_job, potential, ith_atom_id=0, shells=1, disp=1., n_disps=5, uneven=False, 
                  delete_existing_jobs=False, delete_static_job=False):
         
         self.project_name = project_name
@@ -77,10 +77,23 @@ class GenerateLAPotential():
         else:
             return np.eye(3) # if vectors are in the same direction
         
+    @staticmethod
+    def _find_rotation_matrix(A, B):
+        """
+        Find the rotation matrix that rotates matrix A to matrix B.
+        """
+        # Compute the covariance matrix
+        H = np.dot(B.T, A)
+        # Perform Singular Value Decomposition (SVD)
+        U, _, Vt = np.linalg.svd(H)
+        # Compute the rotation matrix
+        R = np.dot(Vt.T, U.T)
+        return R
+        
     def run_static_analysis(self):
         pass
         
-    def get_plane_neighbors(self, output=False):
+    def get_plane_neighbors(self):
         pass
         
     @staticmethod
@@ -105,15 +118,20 @@ class GenerateLAPotential():
             dx = 1.0/(steps)
         return np.array([lb+(i*dx)**spacing*span for i in range(steps)])
     
-    def generate_atom_positions(self, direction):
+    def generate_atom_positions(self, direction, low_disp=0, spacing=None):
         """
         Generate atom positions corresponding to the displacements from equilibrium.
         """
-        if self.uneven:
-            samples = self.uneven_linspace(0., self.disp, self.n_disps, spacing=self.uneven)
+        if spacing:
+            samples = self.uneven_linspace(low_disp, self.disp, self.n_disps, spacing=spacing)
         else:
-            samples = np.linspace(0., self.disp, self.n_disps)
-        
+            samples = np.linspace(low_disp, self.disp, self.n_disps)
+            
+        # make sure there is always a 0 displacement
+        if not np.any(np.isclose(samples, 0., atol=1e-10)):
+            samples = np.insert(samples, np.argmin(abs(samples)), 0.)
+            samples = np.delete(samples, -1)
+
         ith_atom_pos = self.structure.positions[self.ith_atom_id]
         positions = np.array([ith_atom_pos+direction*s for s in samples])
         return positions
@@ -165,7 +183,7 @@ class GenerateLAPotential():
             raise ValueError
         return np.array([job['output/generic/forces'][-1][atom_id] for job in self._jobs[int(tag)]])
     
-    def get_force_on_j(self, output=False):
+    def get_force_on_j(self):
         pass
     
     @staticmethod
@@ -225,10 +243,10 @@ class GenerateLAPotential():
         F_ij = (jth_atom_forces*ij_direcs).sum(axis=-1)
         return r, F_ij, ij_direcs
     
-    def get_t_bond_force(self, jth_atom_id, jth_atom_forces, tag='1', nn='1', return_prime=False):
+    def get_t_bond_force(self):
        pass
     
-    def _bond_force(self, tag='l_1nn'):
+    def _bond_force(self):
         pass
     
     def _bond_force_pot(self, tag):
@@ -244,7 +262,13 @@ class GenerateLAPotential():
             arg_b_0 = np.argmin(abs(bonds-self._b0[3]))
         elif tag == 'l_5nn':
             arg_b_0 = np.argmin(abs(bonds-self._b0[4]))
-        elif tag in ['t1_1nn', 't2_1nn', 't1_2nn', 't2_2nn', 't1_3nn', 't2_3nn', 't1_4nn', 't2_4nn', 't1_5nn', 't2_5nn']:
+        elif tag == 'l_6nn':
+            arg_b_0 = np.argmin(abs(bonds-self._b0[5]))
+        elif tag == 'l_7nn':
+            arg_b_0 = np.argmin(abs(bonds-self._b0[6]))
+        elif tag == 'l_8nn':
+            arg_b_0 = np.argmin(abs(bonds-self._b0[7]))
+        elif tag in ['t1_1nn', 't2_1nn', 't1_2nn', 't2_2nn', 't1_3nn', 't2_3nn', 't1_4nn', 't2_4nn', 't1_5nn', 't2_5nn', 't1_6nn', 't2_6nn', 't1_7nn', 't2_7nn', 't1_8nn', 't2_8nn']:
             arg_b_0 = np.argmin(abs(bonds))
         else:
             raise ValueError
@@ -339,6 +363,10 @@ class GenerateLAPotential():
         return np.concatenate((np.flip(out[0]), -out[0][1:])), np.concatenate((np.flip(out[1]), -out[1][1:]))
     
     @staticmethod
+    def _concatenate_t_special(out):
+        return -out[0], -out[1]
+    
+    @staticmethod
     def _concatenate_l(out):
         return np.concatenate((np.flip(out[1][0]), out[0][0][1:])), np.concatenate((np.flip(out[1][1]), out[0][1][1:]))
     
@@ -390,46 +418,111 @@ class FccLAPotential(GenerateLAPotential):
         self._nn_bond_vecs = (self._basis[0][0]@self._rotations[0]).tolist()
         self.disp_dir = [self._basis[0][0]]
 
-        if self.shells >= 2:
-        # 2nn basis, needs rearranging such that t2_1nn == l_2nn
-            basis_2nn = self._stat_ba.output.per_shell_transformation_matrices[1][0]
-            roll_arg = np.argwhere(np.all(np.isclose(a=(basis_2nn@self._rotations[1])[:, 0], b=self._basis[0][2], atol=1e-10), axis=-1))[-1][-1]
-            roll_id = int(len(self._rotations[1]) - roll_arg)
-            self._basis.append(self._stat_ba.output.per_shell_transformation_matrices[1][roll_arg])
-            # now that we've selected a new basis, the rotations also have to be changed. We find new rotation matrices
-            rolled_vecs = np.roll(basis_2nn[0]@self._rotations[1], roll_id, axis=0)
-            self._rotations[1] = np.array([self._get_rotation_matrix(rolled_vecs[i], rolled_vecs[0]) for i in range(len(self._rotations[1]))])
-            # rearrange the atom ids and bond vectors
-            self._nn_atom_ids += np.roll(atom_ids[1], roll_id).tolist()
+        def update_basis_rotations(s, basis, atom_ids, a, b):
+            """
+            Update the basis rotations.
+
+            Args:
+                s (int): Index of the shell.
+                basis (numpy.ndarray): Basis array.
+                atom_ids (list): List of atom IDs.
+                a (int): Index of the column in the basis array.
+                b (float): Value to compare with.
+
+            Returns:
+                None
+            """
+            roll_arg = np.argwhere(np.all(np.isclose(a=(basis@self._rotations[s])[:, a], b=b, atol=1e-10), axis=-1))[0][-1]
+            roll_id = int(len(self._rotations[s]) - roll_arg)
+            self._basis.append((basis@self._rotations[s])[roll_arg])
+            rolled_vecs = np.roll(basis[0]@self._rotations[s], roll_id, axis=0)
+            rolled_basis = np.roll(basis@self._rotations[s], roll_id, axis=0)
+            self._rotations[s] = np.array([self._find_rotation_matrix(rolled_basis[0], rb) for rb in rolled_basis])
+            self._nn_atom_ids += np.roll(atom_ids[s], roll_id).tolist()
             self._nn_bond_vecs += (rolled_vecs).tolist()
-            self.disp_dir.append(self._basis[1][0])
+
+        if self.shells >= 2:
+            s = 1
+            basis = self._stat_ba.output.per_shell_transformation_matrices[s][0]
+            update_basis_rotations(s, basis, atom_ids, a=0, b=self._basis[0][2])
+            self.disp_dir.append(self._basis[s][0])
 
         if self.shells >= 3:
-        # 3nn basis, also needs rearranging such that l_2nn_x == l_3nn_x
-            basis_3nn = self._stat_ba.output.per_shell_transformation_matrices[2][0]
-            roll_arg = np.argwhere(np.all(np.isclose(a=((basis_3nn@self._rotations[2])[:, 1]), b=self._basis[0][0], atol=1e-10), axis=-1))[-1][-1]
-            roll_id = int(len(self._rotations[2]) - roll_arg)
-            self._basis.append(self._stat_ba.output.per_shell_transformation_matrices[2][roll_arg])
-            # same as 2nd shell
-            rolled_vecs = np.roll(basis_3nn[0]@self._rotations[2], roll_id, axis=0)
-            self._rotations[2] = np.array([self._get_rotation_matrix(rolled_vecs[i], rolled_vecs[0]) for i in range(len(self._rotations[2]))])
-            self._nn_atom_ids += np.roll(atom_ids[2], roll_id).tolist()
-            self._nn_bond_vecs += (rolled_vecs).tolist()
-            # because t1 and t2 of the 3NN are in a new direction
-            self.disp_dir.extend([self._basis[2][0], self._basis[2][2]])
+            s = 2
+            basis = self._stat_ba.output.per_shell_transformation_matrices[s][0]
+            update_basis_rotations(s, basis, atom_ids, a=1, b=self._basis[0][0])
+            self.disp_dir.extend([self._basis[s][0], self._basis[s][2]])
 
         if self.shells >= 4:
-        # 4nn basis is the same as the 1nn basis, but with different atom_ids
-            self._basis.append(self._stat_ba.output.per_shell_transformation_matrices[3][0])
-            self._nn_atom_ids += (atom_ids[3]).tolist()
-            self._nn_bond_vecs += (self._basis[3][0]@self._rotations[3]).tolist()
+            s = 3
+            self._basis.append(self._stat_ba.output.per_shell_transformation_matrices[s][0])
+            self._nn_atom_ids += (atom_ids[s]).tolist()
+            self._nn_bond_vecs += (self._basis[s][0]@self._rotations[s]).tolist()
 
-        if self.shells == 5:
-         # 5nn basis is similar to the 1nn basis, but needs an additional displacement in a new direction
-            self._basis.append(self._stat_ba.output.per_shell_transformation_matrices[4][0])
-            self._nn_atom_ids += (atom_ids[4]).tolist()
-            self._nn_bond_vecs += (self._basis[4][0]@self._rotations[4]).tolist()
-            self.disp_dir.append(self._basis[4][0])
+        if self.shells >= 5:
+            s = 4
+            self._basis.append(self._stat_ba.output.per_shell_transformation_matrices[s][0])
+            self._nn_atom_ids += (atom_ids[s]).tolist()
+            self._nn_bond_vecs += (self._basis[s][0]@self._rotations[s]).tolist()
+            self.disp_dir.append(self._basis[s][0])
+
+        if self.shells == 6:
+            s = 5
+            basis = self._stat_ba.output.per_shell_transformation_matrices[s][0]
+            update_basis_rotations(s, basis, atom_ids, a=0, b=self._basis[2][2])
+
+        # if self.shells >= 2:
+        # # 2nn basis, needs rearranging such that t2_1nn == l_2nn
+        #     basis_2nn = self._stat_ba.output.per_shell_transformation_matrices[1][0]
+        #     roll_arg = np.argwhere(np.all(np.isclose(a=(basis_2nn@self._rotations[1])[:, 0], b=self._basis[0][2], atol=1e-10), axis=-1))[-1][-1]
+        #     roll_id = int(len(self._rotations[1]) - roll_arg)
+        #     self._basis.append(self._stat_ba.output.per_shell_transformation_matrices[1][roll_arg])
+        #     # now that we've selected a new basis, the rotations also have to be changed. We find new rotation matrices
+        #     rolled_vecs = np.roll(basis_2nn[0]@self._rotations[1], roll_id, axis=0)
+        #     self._rotations[1] = np.array([self._get_rotation_matrix(rolled_vecs[i], rolled_vecs[0]) for i in range(len(self._rotations[1]))])
+        #     # rearrange the atom ids and bond vectors
+        #     self._nn_atom_ids += np.roll(atom_ids[1], roll_id).tolist()
+        #     self._nn_bond_vecs += (rolled_vecs).tolist()
+        #     self.disp_dir.append(self._basis[1][0])
+
+        # if self.shells >= 3:
+        # # 3nn basis, also needs rearranging such that l_2nn_x == l_3nn_x
+        #     basis_3nn = self._stat_ba.output.per_shell_transformation_matrices[2][0]
+        #     roll_arg = np.argwhere(np.all(np.isclose(a=((basis_3nn@self._rotations[2])[:, 1]), b=self._basis[0][0], atol=1e-10), axis=-1))[-1][-1]
+        #     roll_id = int(len(self._rotations[2]) - roll_arg)
+        #     self._basis.append(self._stat_ba.output.per_shell_transformation_matrices[2][roll_arg])
+        #     # same as 2nd shell
+        #     rolled_vecs = np.roll(basis_3nn[0]@self._rotations[2], roll_id, axis=0)
+        #     self._rotations[2] = np.array([self._get_rotation_matrix(rolled_vecs[i], rolled_vecs[0]) for i in range(len(self._rotations[2]))])
+        #     self._nn_atom_ids += np.roll(atom_ids[2], roll_id).tolist()
+        #     self._nn_bond_vecs += (rolled_vecs).tolist()
+        #     # because t1 and t2 of the 3NN are in a new direction
+        #     self.disp_dir.extend([self._basis[2][0], self._basis[2][2]])
+
+        # if self.shells >= 4:
+        # # 4nn basis is the same as the 1nn basis, but with different atom_ids
+        #     self._basis.append(self._stat_ba.output.per_shell_transformation_matrices[3][0])
+        #     self._nn_atom_ids += (atom_ids[3]).tolist()
+        #     self._nn_bond_vecs += (self._basis[3][0]@self._rotations[3]).tolist()
+
+        # if self.shells >= 5:
+        #  # 5nn basis is similar to the 1nn basis, but needs an additional displacement in a new direction
+        #     self._basis.append(self._stat_ba.output.per_shell_transformation_matrices[4][0])
+        #     self._nn_atom_ids += (atom_ids[4]).tolist()
+        #     self._nn_bond_vecs += (self._basis[4][0]@self._rotations[4]).tolist()
+        #     self.disp_dir.append(self._basis[4][0])
+
+        # if self.shells == 6:
+        # # 6nn basis, is the same as 3nn basis but with the vectors rearranged
+        #     basis_6nn = self._stat_ba.output.per_shell_transformation_matrices[5][0]
+        #     roll_arg = np.argwhere(np.all(np.isclose(a=((basis_6nn@self._rotations[5])[:, 0]), b=self._basis[2][2], atol=1e-10), axis=-1))[-1][-1]
+        #     roll_id = int(len(self._rotations[5]) - roll_arg)
+        #     self._basis.append(self._stat_ba.output.per_shell_transformation_matrices[5][roll_arg])
+        #     # same as 2nd shell
+        #     rolled_vecs = np.roll(basis_6nn[0]@self._rotations[5], roll_id, axis=0)
+        #     self._rotations[5] = np.array([self._get_rotation_matrix(rolled_vecs[i], rolled_vecs[0]) for i in range(len(self._rotations[5]))])
+        #     self._nn_atom_ids += np.roll(atom_ids[5], roll_id).tolist()
+        #     self._nn_bond_vecs += (rolled_vecs).tolist()
             
         self._nn_bond_vecs = np.array(self._nn_bond_vecs)
         self._nn_atom_ids = np.array(self._nn_atom_ids)
@@ -460,11 +553,16 @@ class FccLAPotential(GenerateLAPotential):
             t1_id_4nn = np.argwhere(np.all(np.isclose(a=self._nn_bond_vecs, b=self._basis[3][1], atol=1e-10), axis=-1))[-1][-1]
             self._plane_nn.append([self._nn_atom_ids[i] for i in [anti_l_id_4nn, l_id_4nn, t1_id_4nn]])
 
-        if self.shells == 5:
+        if self.shells >= 5:
             anti_l_id_5nn = np.argwhere(np.isclose(a=self._nn_bond_vecs[54:]@self._basis[4][0], b=-1., atol=1e-10))[-1][-1]
             l_id_5nn = np.argwhere(np.isclose(a=self._nn_bond_vecs[54:]@self._basis[4][0], b=1., atol=1e-10))[-1][-1]
             t1_id_5nn = np.argwhere(np.all(np.isclose(a=self._nn_bond_vecs[54:], b=self._basis[4][1], atol=1e-10), axis=-1))[-1][-1]
             self._plane_nn.append([self._nn_atom_ids[i+54] for i in [anti_l_id_5nn, l_id_5nn, t1_id_5nn]])
+
+        if self.shells == 6:
+            anti_l_id_6nn = np.argwhere(np.isclose(a=self._nn_bond_vecs[54:]@self._basis[5][0], b=-1., atol=1e-10))[-1][-1]
+            l_id_6nn = np.argwhere(np.isclose(a=self._nn_bond_vecs[54:]@self._basis[5][0], b=1., atol=1e-10))[-1][-1]
+            self._plane_nn.append([self._nn_atom_ids[i+54] for i in [anti_l_id_6nn, l_id_6nn]])
         
         if output:
             return self._plane_nn
@@ -475,17 +573,17 @@ class FccLAPotential(GenerateLAPotential):
         if self._stat_ba is None:
             self.run_static_analysis()
         if self._pos is None:
-            self._pos = [self.generate_atom_positions(direction=self.disp_dir[0])]
+            self._pos = [self.generate_atom_positions(direction=self.disp_dir[0], spacing=self.uneven)]
             
             if self.shells >= 2:
-                self._pos.append(self.generate_atom_positions(direction=self.disp_dir[1]))
+                self._pos.append(self.generate_atom_positions(direction=self.disp_dir[1], spacing=self.uneven))
                 
             if self.shells >= 3:
-                pos = [self.generate_atom_positions(direction=self.disp_dir[i]) for i in range(2, 4)]
+                pos = [self.generate_atom_positions(direction=self.disp_dir[i], spacing=self.uneven) for i in range(2, 4)]
                 self._pos.extend(pos)
 
-            if self.shells == 5:
-                self._pos.append(self.generate_atom_positions(direction=self.disp_dir[4]))
+            if self.shells >= 5:
+                self._pos.append(self.generate_atom_positions(direction=self.disp_dir[4], spacing=self.uneven))
 
         # set the tags to correspond to the directions along which static calcuations are actually performed
         self._tags = np.arange(len(self._pos)).astype(str).tolist()
@@ -517,10 +615,16 @@ class FccLAPotential(GenerateLAPotential):
                 force_on_j_list.append(self._force_on_j(i, tag='0'))
             force_on_j_list.append(self._force_on_j(self._plane_nn[3][1], tag='1'))
 
-        if self.shells == 5:
+        if self.shells >= 5:
             for i in self._plane_nn[4]:
                 force_on_j_list.append(self._force_on_j(i, tag='4'))
             force_on_j_list.append(self._force_on_j(self._plane_nn[4][1], tag='1'))
+
+        if self.shells == 6:
+            for i in self._plane_nn[5]:
+                force_on_j_list.append(self._force_on_j(i, tag='3'))
+            force_on_j_list.append(self._force_on_j(self._plane_nn[5][1], tag='0'))
+            force_on_j_list.append(-self._force_on_j(self._plane_nn[5][1], tag='2'))  # the displacements for 6nn_t2 point away from 3nn_l
         
         self._force_on_j_list = np.array(force_on_j_list)
         if output:
@@ -548,36 +652,33 @@ class FccLAPotential(GenerateLAPotential):
         Returns:
         - tuple: A tuple containing the displacements u and bond forces F_t_prime along the 'tag' direction.
         """
+        l_hat, t1_hat, t2_hat = self._basis[int(nn)-1]
         if nn == '1':
-            l_hat, t1_hat, t2_hat = self._basis[0]
             pos_t1, pos_t2 = self._pos[0], self._pos[1]
         elif nn == '2':
-            l_hat, t1_hat, t2_hat = self._basis[1]
             pos_t1, pos_t2 = self._pos[1], self._pos[1]
         elif nn == '3':
-            l_hat, t1_hat, t2_hat = self._basis[2]
             pos_t1, pos_t2 = self._pos[0], self._pos[3]
         elif nn == '4':
-            l_hat, t1_hat, t2_hat = self._basis[3]
             pos_t1, pos_t2 = self._pos[0], self._pos[1]
         elif nn == '5':
-            l_hat, t1_hat, t2_hat = self._basis[4]
             pos_t1, pos_t2 = self._pos[4], self._pos[1]
+        elif nn == '6':
+            pos_t1, pos_t2 = self._pos[0], -self._pos[2]  # the displacements for 6nn_t2 point away from 3nn_l
         else:
             raise ValueError
         
         if tag == '1':
+            r, F_ij, ij_direcs = self.get_ij_bond_force(jth_atom_id, jth_atom_forces, pos_t1)
             if nn in ['1', '2', '4', '5']:
-                r, F_ij, ij_direcs = self.get_ij_bond_force(jth_atom_id, jth_atom_forces, pos_t1)
                 u = ij_direcs*r[:, np.newaxis]@l_hat
                 basis = np.array([t1_hat, l_hat, t2_hat])
-            elif nn == '3':
-                r, F_ij, ij_direcs = self.get_ij_bond_force(jth_atom_id, jth_atom_forces, pos_t1)
+            elif nn in ['3', '6']:
                 u = ij_direcs*r[:, np.newaxis]@t1_hat
                 basis = np.array([l_hat, t1_hat, t2_hat])
         elif tag == '2':
             r, F_ij, ij_direcs = self.get_ij_bond_force(jth_atom_id, jth_atom_forces, pos_t2)
-            if nn in ['1', '3', '4', '5']:
+            if nn in ['1', '3', '4', '5', '6']:
                 u = ij_direcs*r[:, np.newaxis]@t2_hat
                 basis = np.array([l_hat, t2_hat, t1_hat])
             elif nn == '2':
@@ -651,6 +752,16 @@ class FccLAPotential(GenerateLAPotential):
         elif tag == 't2_5nn':
             out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[19], jth_atom_id=self._plane_nn[4][1], tag='2', nn='5')
             bonds, force = self._concatenate_t(out=out) 
+        elif tag == 'l_6nn':
+            out = [self.get_ij_bond_force(jth_atom_forces=forces, jth_atom_id=atom_id, ith_atom_positions=self._pos[3]) 
+                   for forces, atom_id in zip(self._force_on_j_list[20:22], self._plane_nn[5][:2])]
+            bonds, force = self._concatenate_l(out=out) 
+        elif tag == 't1_6nn':
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[22], jth_atom_id=self._plane_nn[5][1], tag='1', nn='6')
+            bonds, force = self._concatenate_t(out=out) 
+        elif tag == 't2_6nn':
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[23], jth_atom_id=self._plane_nn[5][1], tag='2', nn='6')
+            bonds, force = self._concatenate_t(out=out) 
         else:
             raise ValueError
         return bonds, force
@@ -702,52 +813,69 @@ class BccLAPotential(GenerateLAPotential):
         self._nn_atom_ids = (atom_ids[0]).tolist()
         self._nn_bond_vecs = (self._basis[0][0]@self._rotations[0]).tolist()
         self.disp_dir = [self._basis[0][0], self._basis[0][1], self._basis[0][2]]
+        
+        def update_basis_rotations(s, basis, atom_ids, a, b):
+            """
+            Update the basis rotations.
+
+            Args:
+                s (int): Index of the shell.
+                basis (numpy.ndarray): Basis array.
+                atom_ids (list): List of atom IDs.
+                a (int): Index of the column in the basis array.
+                b (float): Value to compare with.
+
+            Returns:
+                None
+            """
+            roll_arg = np.argwhere(np.all(np.isclose(a=(basis@self._rotations[s])[:, a], b=b, atol=1e-10), axis=-1))[-1][-1]
+            roll_id = int(len(self._rotations[s]) - roll_arg)
+            self._basis.append((basis@self._rotations[s])[roll_arg])
+            rolled_vecs = np.roll(basis[0]@self._rotations[s], roll_id, axis=0)
+            rolled_basis = np.roll(basis@self._rotations[s], roll_id, axis=0)
+            self._rotations[s] = np.array([self._find_rotation_matrix(rolled_basis[0], rb) for rb in rolled_basis])
+            self._nn_atom_ids += np.roll(atom_ids[s], roll_id).tolist()
+            self._nn_bond_vecs += (rolled_vecs).tolist()
 
         if self.shells >= 2:
-        # 2nn basis, we rearrange to have [-1., 0., 0.] as the l_2nn direction, to keep consistent with t2_3nn
-            basis_2nn = self._stat_ba.output.per_shell_transformation_matrices[1][0]
-            roll_arg = np.argwhere(np.all(np.isclose(a=(basis_2nn@self._rotations[1])[:, 0], b=np.array([-1., 0., 0.]), atol=1e-10), axis=-1))[-1][-1]
-            roll_id = int(len(self._rotations[1]) - roll_arg)
-            self._basis.append(self._stat_ba.output.per_shell_transformation_matrices[1][roll_arg])
-            # now that we've selected a new basis, the rotations also have to be changed. We find new rotation matrices
-            rolled_vecs = np.roll(basis_2nn[0]@self._rotations[1], roll_id, axis=0)
-            self._rotations[1] = np.array([self._get_rotation_matrix(rolled_vecs[i], rolled_vecs[0]) for i in range(len(self._rotations[1]))])
-            # rearrange the atom ids and bond vectors
-            self._nn_atom_ids += np.roll(atom_ids[1], roll_id).tolist()
-            self._nn_bond_vecs += (rolled_vecs).tolist()
-            self.disp_dir.append(self._basis[1][0])
+            s = 1
+            basis = self._stat_ba.output.per_shell_transformation_matrices[s][0]
+            update_basis_rotations(s, basis, atom_ids, a=0, b=np.array([-1., 0., 0.]))
+            self.disp_dir.append(self._basis[s][0])
 
         if self.shells >= 3:
-        # 3nn basis, rearrange to have l_3nn along the t1_2nn direction
-            basis_3nn = self._stat_ba.output.per_shell_transformation_matrices[2][0]
-            roll_arg = np.argwhere(np.all(np.isclose(a=((basis_3nn@self._rotations[2])[:, 0]), b=self._basis[0][1], atol=1e-10), axis=-1))[-1][-1]
-            roll_id = int(len(self._rotations[2]) - roll_arg)
-            self._basis.append(self._stat_ba.output.per_shell_transformation_matrices[2][roll_arg])
-            # same as 2nd shell
-            rolled_vecs = np.roll(basis_3nn[0]@self._rotations[2], roll_id, axis=0)
-            self._rotations[2] = np.array([self._get_rotation_matrix(rolled_vecs[i], rolled_vecs[0]) for i in range(len(self._rotations[2]))])
-            self._nn_atom_ids += np.roll(atom_ids[2], roll_id).tolist()
-            self._nn_bond_vecs += (rolled_vecs).tolist()
+            s = 2
+            basis = self._stat_ba.output.per_shell_transformation_matrices[s][0]
+            update_basis_rotations(s, basis, atom_ids, a=0, b=self._basis[0][1])
 
         if self.shells >= 4:
-        # 4nn basis, rearrange to have t1_4nn along the t1_1nn direction
-            basis_4nn = self._stat_ba.output.per_shell_transformation_matrices[3][0]
-            roll_arg = np.argwhere(np.all(np.isclose(a=((basis_4nn@self._rotations[3])[:, 1]), b=self._basis[0][1], atol=1e-10), axis=-1))[-1][-1]
-            roll_id = int(len(self._rotations[3]) - roll_arg)
-            self._basis.append(self._stat_ba.output.per_shell_transformation_matrices[3][roll_arg])
-            # same as 2nd shell
-            rolled_vecs = np.roll(basis_4nn[0]@self._rotations[3], roll_id, axis=0)
-            self._rotations[3] = np.array([self._get_rotation_matrix(rolled_vecs[i], rolled_vecs[0]) for i in range(len(self._rotations[3]))])
-            self._nn_atom_ids += np.roll(atom_ids[3], roll_id).tolist()
-            self._nn_bond_vecs += (rolled_vecs).tolist()
-            # because l and t2 of the 4NN are in a new direction
-            self.disp_dir.extend([self._basis[3][0], self._basis[3][2]])
+            s = 3
+            basis = self._stat_ba.output.per_shell_transformation_matrices[s][0]
+            update_basis_rotations(s, basis, atom_ids, a=1, b=self._basis[0][1])
+            self.disp_dir.extend([self._basis[s][0], self._basis[s][2]])
 
-        if self.shells == 5:
-         # 5nn basis is the same as the 1nn basis
-            self._basis.append(self._stat_ba.output.per_shell_transformation_matrices[4][0])
-            self._nn_atom_ids += (atom_ids[4]).tolist()
-            self._nn_bond_vecs += (self._basis[4][0]@self._rotations[4]).tolist()
+        if self.shells >= 5:
+            s = 4
+            self._basis.append(self._stat_ba.output.per_shell_transformation_matrices[s][0])
+            self._nn_atom_ids += (atom_ids[s]).tolist()
+            self._nn_bond_vecs += (self._basis[s][0]@self._rotations[s]).tolist()
+
+        if self.shells >= 6:
+            s = 5
+            basis = self._stat_ba.output.per_shell_transformation_matrices[s][0]
+            update_basis_rotations(s, basis, atom_ids, a=0, b=np.array([-1., 0., 0.]))
+
+        if self.shells >= 7:
+            s = 6
+            basis = self._stat_ba.output.per_shell_transformation_matrices[s][0]
+            update_basis_rotations(s, basis, atom_ids, a=1, b=self._basis[0][1])
+            self.disp_dir.extend([self._basis[s][0], self._basis[s][2]])
+
+        if self.shells == 8:
+            s = 7
+            basis = self._stat_ba.output.per_shell_transformation_matrices[s][0]
+            update_basis_rotations(s, basis, atom_ids, a=2, b=np.array([-1., 0., 0.]))
+            self.disp_dir.append(self._basis[s][0])
             
         self._nn_bond_vecs = np.array(self._nn_bond_vecs)
         self._nn_atom_ids = np.array(self._nn_atom_ids)
@@ -777,10 +905,28 @@ class BccLAPotential(GenerateLAPotential):
             l_id_4nn = np.argwhere(np.isclose(a=self._nn_bond_vecs[:50]@self._basis[3][0], b=1., atol=1e-10))[-1][-1]
             self._plane_nn.append([self._nn_atom_ids[i] for i in [anti_l_id_4nn, l_id_4nn]])
 
-        if self.shells == 5:
+        if self.shells >= 5:
             anti_l_id_5nn = np.argwhere(np.isclose(a=self._nn_bond_vecs[50:]@self._basis[4][0], b=-1., atol=1e-10))[-1][-1]
             l_id_5nn = np.argwhere(np.isclose(a=self._nn_bond_vecs[50:]@self._basis[4][0], b=1., atol=1e-10))[-1][-1]
             self._plane_nn.append([self._nn_atom_ids[i+50] for i in [anti_l_id_5nn, l_id_5nn]])
+
+        if self.shells >= 6:
+            anti_l_id_6nn = np.argwhere(np.isclose(a=self._nn_bond_vecs[50:]@self._basis[5][0], b=-1., atol=1e-10))[-1][-1]
+            l_id_6nn = np.argwhere(np.isclose(a=self._nn_bond_vecs[50:]@self._basis[5][0], b=1., atol=1e-10))[-1][-1]
+            t1_id_6nn = np.argwhere(np.all(np.isclose(a=self._nn_bond_vecs[50:], b=self._basis[5][1], atol=1e-10), axis=-1))[-1][-1]
+            t2_id_6nn = np.argwhere(np.all(np.isclose(a=self._nn_bond_vecs[50:], b=self._basis[5][2], atol=1e-10), axis=-1))[-1][-1]
+            self._plane_nn.append([self._nn_atom_ids[i+50] for i in [anti_l_id_6nn, l_id_6nn, t1_id_6nn, t2_id_6nn]])
+
+        if self.shells >= 7:
+            anti_l_id_7nn = np.argwhere(np.isclose(a=self._nn_bond_vecs[50:]@self._basis[6][0], b=-1., atol=1e-10))[-1][-1]
+            l_id_7nn = np.argwhere(np.isclose(a=self._nn_bond_vecs[50:]@self._basis[6][0], b=1., atol=1e-10))[-1][-1]
+            self._plane_nn.append([self._nn_atom_ids[i+50] for i in [anti_l_id_7nn, l_id_7nn]])
+        
+        if self.shells == 8:
+            anti_l_id_8nn = np.argwhere(np.isclose(a=self._nn_bond_vecs[50:]@self._basis[7][0], b=-1., atol=1e-10))[-1][-1]
+            l_id_8nn = np.argwhere(np.isclose(a=self._nn_bond_vecs[50:]@self._basis[7][0], b=1., atol=1e-10))[-1][-1]
+            t1_id_8nn = np.argwhere(np.all(np.isclose(a=self._nn_bond_vecs[50:], b=self._basis[7][1], atol=1e-10), axis=-1))[-1][-1]
+            self._plane_nn.append([self._nn_atom_ids[i+50] for i in [anti_l_id_8nn, l_id_8nn, t1_id_8nn]])
         
         if output:
             return self._plane_nn
@@ -789,14 +935,25 @@ class BccLAPotential(GenerateLAPotential):
         if self._stat_ba is None:
             self.run_static_analysis()
         if self._pos is None:
-            self._pos = [self.generate_atom_positions(direction=self.disp_dir[i]) for i in range(3)]
-            
+            self._pos = [self.generate_atom_positions(direction=self.disp_dir[i], spacing=self.uneven) for i in range(2)]
+            self._pos.append(self.generate_atom_positions(direction=self.disp_dir[2], low_disp=-self.disp, spacing=None))
+            # self._pos.append(self.generate_atom_positions(direction=self.disp_dir[2], spacing=self.uneven))
+
             if self.shells >= 2:
-                self._pos.append(self.generate_atom_positions(direction=self.disp_dir[3]))
+                self._pos.append(self.generate_atom_positions(direction=self.disp_dir[3], spacing=self.uneven))
                 
             if self.shells >= 4:
-                pos = [self.generate_atom_positions(direction=self.disp_dir[i]) for i in range(4, 6)]
-                self._pos.extend(pos)
+                self._pos.append(self.generate_atom_positions(direction=self.disp_dir[4], spacing=self.uneven))
+                self._pos.append(self.generate_atom_positions(direction=self.disp_dir[5], low_disp=-self.disp, spacing=None))
+                # self._pos.append(self.generate_atom_positions(direction=self.disp_dir[5], spacing=self.uneven))
+
+            if self.shells >= 7:
+                self._pos.append(self.generate_atom_positions(direction=self.disp_dir[6], spacing=self.uneven))
+                self._pos.append(self.generate_atom_positions(direction=self.disp_dir[7], low_disp=-self.disp, spacing=None))
+                # self._pos.append(self.generate_atom_positions(direction=self.disp_dir[7], spacing=self.uneven))
+
+            if self.shells == 8:
+                self._pos.append(self.generate_atom_positions(direction=self.disp_dir[8], spacing=self.uneven))
         
         # set the tags to correspond to the directions along which static calcuations are actually performed
         self._tags = np.arange(len(self._pos)).astype(str).tolist()
@@ -815,25 +972,47 @@ class BccLAPotential(GenerateLAPotential):
         force_on_j_list.append(self._force_on_j(self._plane_nn[0][1], tag='2'))
         
         if self.shells >= 2:
-            for i in self._plane_nn[1]:
+            s = 1
+            for i in self._plane_nn[s]:
                 force_on_j_list.append(self._force_on_j(i, tag='3'))
                 
         if self.shells >= 3:
-            for i in self._plane_nn[2]:
+            s = 2
+            for i in self._plane_nn[s]:
                 force_on_j_list.append(self._force_on_j(i, tag='1'))
-            force_on_j_list.append(self._force_on_j(self._plane_nn[2][1], tag='3'))
+            force_on_j_list.append(self._force_on_j(self._plane_nn[s][1], tag='3'))
 
         if self.shells >= 4:
-            for i in self._plane_nn[3]:
+            s = 3
+            for i in self._plane_nn[s]:
                 force_on_j_list.append(self._force_on_j(i, tag='4'))
-            force_on_j_list.append(self._force_on_j(self._plane_nn[3][1], tag='1'))
-            force_on_j_list.append(self._force_on_j(self._plane_nn[3][1], tag='5'))
+            force_on_j_list.append(self._force_on_j(self._plane_nn[s][1], tag='1'))
+            force_on_j_list.append(self._force_on_j(self._plane_nn[s][1], tag='5'))
 
-        if self.shells == 5:
-            for i in self._plane_nn[4]:
+        if self.shells >= 5:
+            s = 4
+            for i in self._plane_nn[s]:
                 force_on_j_list.append(self._force_on_j(i, tag='0'))
-            force_on_j_list.append(self._force_on_j(self._plane_nn[4][1], tag='1'))
-            force_on_j_list.append(self._force_on_j(self._plane_nn[4][1], tag='2'))
+            force_on_j_list.append(self._force_on_j(self._plane_nn[s][1], tag='1'))
+            force_on_j_list.append(self._force_on_j(self._plane_nn[s][1], tag='2'))
+
+        if self.shells >= 6:
+            s = 5
+            for i in self._plane_nn[s]:
+                force_on_j_list.append(self._force_on_j(i, tag='3'))
+
+        if self.shells >= 7:
+            s = 6
+            for i in self._plane_nn[s]:
+                force_on_j_list.append(self._force_on_j(i, tag='6'))
+            force_on_j_list.append(self._force_on_j(self._plane_nn[s][1], tag='1'))
+            force_on_j_list.append(self._force_on_j(self._plane_nn[s][1], tag='7'))
+
+        if self.shells == 8:
+            s = 7
+            for i in self._plane_nn[s]:
+                force_on_j_list.append(self._force_on_j(i, tag='8'))
+            force_on_j_list.append(self._force_on_j(self._plane_nn[s][1], tag='3'))
         
         self._force_on_j_list = np.array(force_on_j_list)
         if output:
@@ -861,39 +1040,40 @@ class BccLAPotential(GenerateLAPotential):
         Returns:
         - tuple: A tuple containing the displacements u and bond forces F_t_prime along the 'tag' direction.
         """
+        l_hat, t1_hat, t2_hat = self._basis[int(nn)-1]
         if nn == '1':
-            l_hat, t1_hat, t2_hat = self._basis[0]
             pos_t1, pos_t2 = self._pos[1], self._pos[2]
         elif nn == '2':
-            l_hat, t1_hat, t2_hat = self._basis[1]
             pos_t1, pos_t2 = self._pos[3], self._pos[3]
         elif nn == '3':
-            l_hat, t1_hat, t2_hat = self._basis[2]
             pos_t1, pos_t2 = self._pos[1], self._pos[3]
         elif nn == '4':
-            l_hat, t1_hat, t2_hat = self._basis[3]
             pos_t1, pos_t2 = self._pos[1], self._pos[5]
         elif nn == '5':
-            l_hat, t1_hat, t2_hat = self._basis[4]
             pos_t1, pos_t2 = self._pos[1], self._pos[2]
+        elif nn == '6':
+            pos_t1, pos_t2 = self._pos[3], self._pos[3]
+        elif nn == '7':
+            pos_t1, pos_t2 = self._pos[1], self._pos[7]
+        elif nn == '8':
+            pos_t1, pos_t2 = self._pos[8], self._pos[3]
         else:
             raise ValueError
         
         if tag == '1':
-            if nn in ['2', '3']:
-                r, F_ij, ij_direcs = self.get_ij_bond_force(jth_atom_id, jth_atom_forces, pos_t1)
+            r, F_ij, ij_direcs = self.get_ij_bond_force(jth_atom_id, jth_atom_forces, pos_t1)
+            if nn in ['2', '3', '6', '8']:
                 u = ij_direcs*r[:, np.newaxis]@l_hat
                 basis = np.array([t1_hat, l_hat, t2_hat])
-            elif nn in ['1', '4', '5']:
-                r, F_ij, ij_direcs = self.get_ij_bond_force(jth_atom_id, jth_atom_forces, pos_t1)
+            elif nn in ['1', '4', '5', '7']:
                 u = ij_direcs*r[:, np.newaxis]@t1_hat
                 basis = np.array([l_hat, t1_hat, t2_hat])
         elif tag == '2':
             r, F_ij, ij_direcs = self.get_ij_bond_force(jth_atom_id, jth_atom_forces, pos_t2)
-            if nn in ['1', '3', '4', '5']:
+            if nn in ['1', '3', '4', '5', '7', '8']:
                 u = ij_direcs*r[:, np.newaxis]@t2_hat
                 basis = np.array([l_hat, t2_hat, t1_hat])
-            elif nn == '2':
+            elif nn in ['2', '6']:
                 u = ij_direcs*r[:, np.newaxis]@l_hat
                 basis = np.array([t2_hat, l_hat, t1_hat])
             else:
@@ -923,7 +1103,8 @@ class BccLAPotential(GenerateLAPotential):
             bonds, force = self._concatenate_t(out=out) 
         elif tag == 't2_1nn':
             out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[3], jth_atom_id=self._plane_nn[0][1], tag='2', nn='1') 
-            bonds, force = self._concatenate_t(out=out) 
+            bonds, force = self._concatenate_t_special(out=out)
+            # bonds, force = self._concatenate_t(out=out) 
         elif tag == 'l_2nn':
             out = [self.get_ij_bond_force(jth_atom_forces=forces, jth_atom_id=atom_id, ith_atom_positions=self._pos[3]) 
                    for forces, atom_id in zip(self._force_on_j_list[4:6], self._plane_nn[1][:2])]
@@ -953,7 +1134,8 @@ class BccLAPotential(GenerateLAPotential):
             bonds, force = self._concatenate_t(out=out) 
         elif tag == 't2_4nn':
             out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[15], jth_atom_id=self._plane_nn[3][1], tag='2', nn='4')
-            bonds, force = self._concatenate_t(out=out) 
+            bonds, force = self._concatenate_t_special(out=out)
+            # bonds, force = self._concatenate_t(out=out) 
         elif tag == 'l_5nn':
             out = [self.get_ij_bond_force(jth_atom_forces=forces, jth_atom_id=atom_id, ith_atom_positions=self._pos[0]) 
                    for forces, atom_id in zip(self._force_on_j_list[16:18], self._plane_nn[4][:2])]
@@ -963,7 +1145,39 @@ class BccLAPotential(GenerateLAPotential):
             bonds, force = self._concatenate_t(out=out) 
         elif tag == 't2_5nn':
             out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[19], jth_atom_id=self._plane_nn[4][1], tag='2', nn='5')
+            bonds, force = self._concatenate_t_special(out=out) 
+            # bonds, force = self._concatenate_t(out=out)
+        elif tag == 'l_6nn':
+            out = [self.get_ij_bond_force(jth_atom_forces=forces, jth_atom_id=atom_id, ith_atom_positions=self._pos[3]) 
+                   for forces, atom_id in zip(self._force_on_j_list[20:22], self._plane_nn[5][:2])]
+            bonds, force = self._concatenate_l(out=out) 
+        elif tag == 't1_6nn':
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[22], jth_atom_id=self._plane_nn[5][2], tag='1', nn='6')
             bonds, force = self._concatenate_t(out=out) 
+        elif tag == 't2_6nn':
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[23], jth_atom_id=self._plane_nn[5][3], tag='2', nn='6') 
+            bonds, force = self._concatenate_t(out=out)
+        elif tag == 'l_7nn':
+            out = [self.get_ij_bond_force(jth_atom_forces=forces, jth_atom_id=atom_id, ith_atom_positions=self._pos[6]) 
+                   for forces, atom_id in zip(self._force_on_j_list[24:26], self._plane_nn[6][:2])]
+            bonds, force = self._concatenate_l(out=out) 
+        elif tag == 't1_7nn':
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[26], jth_atom_id=self._plane_nn[6][1], tag='1', nn='7')
+            bonds, force = self._concatenate_t(out=out) 
+        elif tag == 't2_7nn':
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[27], jth_atom_id=self._plane_nn[6][1], tag='2', nn='7') 
+            bonds, force = self._concatenate_t_special(out=out) 
+            # bonds, force = self._concatenate_t(out=out)
+        elif tag == 'l_8nn':
+            out = [self.get_ij_bond_force(jth_atom_forces=forces, jth_atom_id=atom_id, ith_atom_positions=self._pos[8]) 
+                   for forces, atom_id in zip(self._force_on_j_list[28:30], self._plane_nn[7][:2])]
+            bonds, force = self._concatenate_l(out=out) 
+        elif tag == 't1_8nn':
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[30], jth_atom_id=self._plane_nn[7][2], tag='1', nn='8')
+            bonds, force = self._concatenate_t(out=out) 
+        elif tag == 't2_8nn':
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[31], jth_atom_id=self._plane_nn[7][1], tag='2', nn='8') 
+            bonds, force = self._concatenate_t(out=out)
         else:
             raise ValueError
         return bonds, force

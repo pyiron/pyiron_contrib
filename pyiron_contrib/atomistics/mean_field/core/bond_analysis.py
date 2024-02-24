@@ -228,21 +228,21 @@ class StaticBondAnalysis(_BondAnalysisParent):
         # and sort them doing the following:
         per_shell_0K_rotations = []
         all_nn_bond_vectors_list = []
-        for b in enumerate(per_shell_irreducible_bond_vectors):
+        for b in per_shell_irreducible_bond_vectors:
             # get 'unique bonds' from the spglib data
-            unique_bonds = np.unique(np.dot(b[1], all_rotations), axis=0)
+            unique_bonds = np.unique(np.dot(b, all_rotations), axis=0)
             args_list = []
             for bond in unique_bonds:
                 # collect the arguments of the rotations that that give the unique bonds
                 args = []
-                for i, bd in enumerate(np.dot(b[1], all_rotations)):
-                    if np.array_equal(np.round(bd, decimals=3), np.round(bond, decimals=3)):
+                for i, bd in enumerate(np.dot(b, all_rotations)):
+                    if np.array_equal(np.round(bd, decimals=5), np.round(bond, decimals=5)):
                         args.append(i)
                 args_list.append(args[0])
             # sort the arguments and append the rotations to a list...
             per_shell_0K_rotations.append(all_rotations[np.sort(args_list)])
             # and the unique bonds also, to another list...
-            all_nn_bond_vectors_list.append(np.dot(b[1], per_shell_0K_rotations[-1]))
+            all_nn_bond_vectors_list.append(np.dot(b, per_shell_0K_rotations[-1]))
         # and clump the unique bonds into a single array
         all_nn_bond_vectors_list = np.array([bonds for per_shell_bonds in all_nn_bond_vectors_list
                                              for bonds in per_shell_bonds])
@@ -274,9 +274,8 @@ class StaticBondAnalysis(_BondAnalysisParent):
                 try:
                     b2 = bonds[np.argwhere(np.round(bonds@b1, decimals=5) == 0.).flatten()[0]]
                 except IndexError:
-                    # if in case a normal bond is not found for the shell, traverse through the previous shells as well
+                    # if in case a normal bond is not found for the shell, traverse through the other input shells as well
                     b2 = all_bonds[np.argwhere(np.round(all_bonds@b1, decimals=5) == 0.).flatten()[0]]
-                # third bond is then  normal to both the first and second bonds (transverse2)
                 b3 = np.cross(b1, b2)
                 if b1.dot(np.cross(b2, b3)) < 0.:  # if this condition is not met
                     b2, b3 = b3, b2  # reverse b2 and b3

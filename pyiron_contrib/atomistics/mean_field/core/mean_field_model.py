@@ -92,7 +92,7 @@ class MeanFieldModel():
     Args:
         ref_shell (int): Reference shell with respect to which the mean-field model is defined.
         shells (int): Number of shells up to which the input b_0s, potentials, rotations, alphas are specified.
-        shell_order (int): Number of shells up to which to compute bond densities for. Defaults to None, the number of shells.
+        l_order (int): Number of shells to consider as neighbors to build the mean-field model. Defaults to 1, the 1st nearest neighbor shell.
         bond_grid (np.ndarray): (len(lo_disps), len(t1_disps), len(t2_disps), 3) array of bond vectors in Cartesian xyz coordinates. Must be defined with respect to the reference shell.
         b_0s (list/np.array): The equilibrium bond length of each shell. Must be of length shells.
         basis (list/np.ndarray): (shells x 3 x 3) array of unit vectors for each shell. Must be of length shells.
@@ -104,7 +104,7 @@ class MeanFieldModel():
         t2_potentials (list of functions, optional): Function for the t2 potential, if any. Defaults to None.  Must be of length shells.
     """
 
-    def __init__(self, bond_grid, b_0s, basis, rotations, alphas, r_potentials, t1_potentials=None, t2_potentials=None, ref_shell=0, shells=1, shell_order=1, crystal='fcc'):
+    def __init__(self, bond_grid, b_0s, basis, rotations, alphas, r_potentials, t1_potentials=None, t2_potentials=None, ref_shell=0, shells=1, l_order=1):
         self.bond_grid = bond_grid
         self.b_0s = b_0s
         self.basis = basis
@@ -115,8 +115,7 @@ class MeanFieldModel():
         self.t2_potentials = t2_potentials
         self.shells = shells
         self.ref_shell = ref_shell
-        self.shell_order = shell_order
-        self.crystal = crystal
+        self.l_order = l_order
 
         self.meshes = get_meshes(self.bond_grid, self.basis[ref_shell])
         self.check_inputs()
@@ -127,17 +126,18 @@ class MeanFieldModel():
         """
         assert isinstance(self.shells, int), 'shells must be an integer.'
         assert self.shells > 0, 'shells must be greater than 0.'
-        assert isinstance(self.shell_order, int), 'shell_order must be an integer.'
-        assert self.shell_order <= self.shells, 'shell_order must be lesser than shells.'
+        assert isinstance(self.l_order, int), 'l_order must be an integer.'
+        assert self.l_order <= self.shells, 'l_order must be lesser than shells.'
         assert isinstance(self.ref_shell, int), 'ref_shell must be an integer.'
         assert self.ref_shell <= self.shells, 'ref_shell must be less than shells.'
               
         # enusre that these inputs have the same lengths
-        inputs = [self.b_0s, self.basis, self.rotations, self.alphas, self.r_potentials, self.t1_potentials, self.t2_potentials]
-        inputs_str = ['b_0s, basis', 'rotations', 'alphas', 'r_potentials', 't1_potentials', 't2_potentials']
+        inputs = [self.b_0s, self.basis, self.rotations, self.r_potentials, self.t1_potentials, self.t2_potentials]
+        inputs_str = ['b_0s, basis', 'rotations', 'r_potentials', 't1_potentials', 't2_potentials']
         for inp, inp_str in zip(inputs, inputs_str):
             if len(inp) != self.shells:
                 raise TypeError(f'length of {inp_str} is not equal to shells.')
+        assert len(self.alphas) == self.l_order, 'length of alphas is not equal to l_order.'
 
     def V1(self, bond_grid=None, shell=None, rotation=np.eye(3)):
         """
@@ -203,11 +203,11 @@ class MeanFieldModel():
             vmfc (np.ndarray): The correlated mean-field effective potential.
         """
         vmfc = 0
-        for shell in range(self.shells):
-            # each shell with a ref bond b_{0r} has its own alphas, which have the shape (no. of shifts, total neighbors, 3, 3)
+        for shell in range(self.l_order):
+            # each shell (r) with a ref bond b_{0r} has its own alphas, which have the shape (no. of shifts, total neighbors, 3, 3)
             # total neighbors can include 1NN, 2NN, 3NN, etc.
             # for convenience, we sort the alphas by the shell 
-            # i.e. alphas[shell_0].shape = (no. of shifts, 12, 3, 3), alphas[shell_1].shape = (no. of shifts, 6, 3, 3), etc.
+            # i.e. alphas[r_0].shape = (no. of shifts, 12, 3, 3), alphas[r_1].shape = (no. of shifts, 6, 3, 3), etc. for fcc.
             # this is done so we can choose the correct symmetry operation (rotation) for each shell
 
             # reference db for the shell
@@ -243,12 +243,12 @@ class VirialQuantities():
 
         if self.crystal == 'fcc':
             # set the number of bonds per shell.
-            self._n_bonds_per_shell = np.array([12, 6, 24, 12, 24])
+            self._n_bonds_per_shell = np.array([12, 6, 24, 12, 24, 8])
             # factors to obtain the correct volume from the bond length of each shell
-            self._factors = np.array([np.sqrt(2), 1., np.sqrt(2/3), np.sqrt(1/2), np.sqrt(2/5)])
+            self._factors = np.array([np.sqrt(2), 1., np.sqrt(2/3), np.sqrt(1/2), np.sqrt(2/5), np.sqrt(1/3)])
         elif self.crystal == 'bcc':
-            self._n_bonds_per_shell = np.array([8, 6, 12, 24, 8])
-            self._factors = np.array([2/np.sqrt(3), 1., 1/np.sqrt(2), 2/np.sqrt(11), 1/np.sqrt(3)])
+            self._n_bonds_per_shell = np.array([8, 6, 12, 24, 8, 6, 24, 24])
+            self._factors = np.array([2/np.sqrt(3), 1., 1/np.sqrt(2), 2/np.sqrt(11), 1/np.sqrt(3), 1/2, 2/np.sqrt(19), 1/np.sqrt(5)])
         else:
             raise TypeError('crystal must be fcc or bcc.')
 
@@ -304,8 +304,10 @@ class VirialQuantities():
             N_by_V = 4/(b_eps*self._factors[shell])**3
         elif self.crystal == 'bcc':
             N_by_V = 2/(b_eps*self._factors[shell])**3
+        else:
+            raise TypeError('crystal must be fcc or bcc.')
         a_dV1 = b_eps*dV1[0]
-        P_vir = -self._n_bonds_per_shell[shell]/6*N_by_V*(a_dV1*rho_1).sum()
+        P_vir = -N_by_V*(a_dV1*rho_1).sum()*self._n_bonds_per_shell[shell]/6
 
         if not return_rho_1:
             rho_1 = np.array([None])  
@@ -322,13 +324,13 @@ class Optimizer():
         energy_list (list/np.array): Energies of the energy-volume curve. Defaults to None, where no correction terms are added.
         strain_list (list/np.array): Strains corresponding to the volumes of the energy-volume curve. Defaults to None, where no correction terms are added.
     """
-    def __init__(self, b_0s, mfm_instances, vq_instances, energy_list=None, strain_list=None, shell_order=1):
+    def __init__(self, b_0s, mfm_instances, vq_instances, energy_list=None, strain_list=None, r_order=1):
         self.b_0s = b_0s
         self.mfm_instances = mfm_instances
         self.vq_instances = vq_instances
         self.energy_list = energy_list
         self.strain_list = strain_list
-        self.shell_order = shell_order
+        self.r_order = r_order
 
         self.check_inputs()
 
@@ -338,7 +340,7 @@ class Optimizer():
         """
         
         for inp, inp_str in zip([self.mfm_instances, self.vq_instances], ['mfm_instances', 'vq_instances']):
-            if len(inp) != self.shell_order:
+            if len(inp) != self.r_order:
                 raise TypeError(f"Length of {inp_str} is not equal to shell_order.")
             
         if (self.energy_list is not None) and (self.strain_list is not None):
@@ -377,20 +379,19 @@ class Optimizer():
             u_md_fit_eqn = np.poly1d(np.polyfit(strains, self.energy_list, deg=4))
             du_md_fit_eqn = u_md_fit_eqn.deriv(m=1)
 
-            u_mf = 0.
-            for shell in range(self.shell_order):
-                u_mf += self._n_bonds_per_shell[shell]/2.*self.mfm_instances[shell].r_potentials[shell](strains*self.b_0s[shell])
+            u_mf = np.zeros(len(strains))
+            for shell in range(self.r_order):
+                u_mf += self._n_bonds_per_shell[shell]*self.mfm_instances[shell].r_potentials[shell](strains*self.b_0s[shell])/2
             u_mf_fit_eqn = np.poly1d(np.polyfit(strains, u_mf, deg=4))
             du_mf_fit_eqn = u_mf_fit_eqn.deriv(m=1)
             E_offset = u_md_fit_eqn(eps)-u_mf_fit_eqn(eps)
             if self._crystal == 'fcc':
-                V_0 = (self.b_0s[0]*np.sqrt(2))**3
+                N_by_V_0 = 4/(self.b_0s[0]*self._factors[0])**3
             elif self._crystal == 'bcc':
-                V_0 = (self.b_0s[0]*2/np.sqrt(3))**3
+                N_by_V_0 = 2/(self.b_0s[0]*self._factors[0])**3
             else:
                 raise TypeError('crystal must be fcc or bcc.')
-            # First 3 is from d=3, second is from the differentiation dV = 3*V_0*(eps)**2 d(eps)
-            P_offset = -4/(3*eps**2*V_0)*(du_md_fit_eqn(eps)-du_mf_fit_eqn(eps))
+            P_offset = -N_by_V_0/(3*eps**2)*(du_md_fit_eqn(eps)-du_mf_fit_eqn(eps))
             return P_offset, E_offset
 
     def collect_properties(self, temperature, lms, eps, Veffs=None, dV1s=None, return_rho_1=False):
@@ -419,7 +420,7 @@ class Optimizer():
         P_vir = []
         b_eps = []
         rho_1s = []
-        for shell in range(self.shell_order):
+        for shell in range(self.r_order):
             Veff = self.mfm_instances[shell].Veff(eps=eps) if Veffs is None else Veffs[shell]
             dV1 = self.mfm_instances[shell].V1_gradient() if dV1s is None else dV1s[shell]    
             t, p, b, r = self.vq_instances[shell].get_virial_quantities(Veff=Veff, dV1=dV1, temperature=temperature, eps=eps, lm=lms[shell], shell=shell, return_rho_1=return_rho_1)
@@ -431,7 +432,7 @@ class Optimizer():
         print('T: {}\nT_vir: {}\nP_vir: {}\nP_offset: {}\nE_offset: {}\neps: {}\nlm: {}\n'.format(temperature, np.array(T_vir), np.array(P_vir), P_offset, E_offset, eps, lms))
         return np.array(T_vir), np.array(P_vir), P_offset, E_offset, np.array(b_eps), eps, lms, np.array(rho_1s)
 
-    def run_nvt(self, temperature=100., eps=1., return_rho_1=False):
+    def run_nvt(self, temperature=100., eps=1., return_rho_1=False, minimize_T=False):
         """
         Runs the mean-field NVT minimization for a given input temperature and strain.
         
@@ -450,26 +451,49 @@ class Optimizer():
             rho_1 (np.ndarray): Bond density, if return_rho_1 is True.
         """
         # For each shell, find a lagrange multiplier that enforces bond length.
+        # For each shell, find a lagrange multiplier that enforces bond length.
         lms = []
         Veffs = []
         dV1s = []
         print('T: {}\neps: {}\n'.format(temperature, eps))
-        for shell in range(self.shell_order):
-            print('Optimizing shell {}...'.format(shell))
-            Veff = self.mfm_instances[shell].Veff(eps=eps)
-            dV1 = self.mfm_instances[shell].V1_gradient()
+        if not minimize_T:
+            for shell in range(self.r_order):
+                print('Optimizing shell {}...'.format(shell))
+                Veff = self.mfm_instances[shell].Veff(eps=eps)
+                dV1 = self.mfm_instances[shell].V1_gradient()
+                def objective_function(args):
+                    _, _, b_eps, _ = self.vq_instances[shell].get_virial_quantities(Veff=Veff, dV1=dV1, temperature=temperature, eps=eps, lm=args, shell=shell)
+                    return np.abs(self.b_0s[shell]*eps-b_eps)
+                solver = root_scalar(objective_function, x0=0., x1=0.001, rtol=1e-10)
+                print('Optimization complete.')
+                lms.append(solver.root)
+                Veffs.append(Veff)
+                dV1s.append(dV1)
+            lms = np.array(lms)
+        else:
+            print('minimizing temperature...')
+            Veffs = np.array([self.mfm_instances[shell].Veff(eps=eps) for shell in range(self.r_order)]) 
+            dV1s = np.array([self.mfm_instances[shell].V1_gradient() for shell in range(self.r_order)])
             def objective_function(args):
-                _, _, b_eps, _ = self.vq_instances[shell].get_virial_quantities(Veff=Veff, dV1=dV1, temperature=temperature, eps=eps, lm=args, shell=shell)
-                return np.abs(self.b_0s[shell]*eps-b_eps)
-            solver = root_scalar(objective_function, x0=0., x1=0.001, rtol=1e-8)
+                T_virs = []
+                b_eps_diff = []
+                for shell in range(self.r_order):
+                    t_vir, _, b_eps, _ = self.vq_instances[shell].get_virial_quantities(Veff=Veffs[shell], dV1=dV1s[shell], temperature=args[-1], eps=eps, lm=args[shell], shell=shell)
+                    T_virs.append(t_vir)
+                    b_eps_diff.append(self.b_0s[shell]-b_eps)
+                T_diff = np.abs(np.sum(T_virs)-temperature)
+                print(args)
+                return np.concatenate((np.array(b_eps_diff), np.array([T_diff])))
+            x0 = np.concatenate((np.zeros(self.r_order), np.array([temperature])))
+            solver = root(objective_function, x0=x0, tol=1e-10)
             print('Optimization complete.')
-            lms.append(solver.root)
-            Veffs.append(Veff)
-            dV1s.append(dV1)
-        lms = np.array(lms)
+            lms = solver.x[:self.r_order+1]
+            if minimize_T:
+                temperature = solver.x[-1]
+                print('Effective/renormlaized temperature: {}'.format(solver.x[-1]))
         return self.collect_properties(temperature=temperature, lms=lms, eps=eps, Veffs=Veffs, dV1s=dV1s, return_rho_1=return_rho_1)
     
-    def run_npt(self, temperature=100., pressure=1e-4, return_rho_1=False, minimize_T=False):
+    def run_npt(self, temperature=100., pressure=1e-4, return_rho_1=False):
         """
         Runs the mean-field NPT minimization for a given input temperature and pressure.
         
@@ -492,47 +516,24 @@ class Optimizer():
         # Further, as the total pressure of the system is the sum of the pressures due to each shell, all shells are considered simultaneously in the objective function.
         print('T: {}\nP: {}\n'.format(temperature, pressure))
         print('Optimizing all shells at once. This might take a while...')
-        dV1s = np.array([self.mfm_instances[shell].V1_gradient() for shell in range(self.shell_order)])
-        if not minimize_T:
-            print('...not minimizing temperature...')
-            def objective_function(args):
-                P_virs = []
-                b_eps_diff = []
-                for shell in range(self.shell_order):
-                    Veff = self.mfm_instances[shell].Veff(eps=args[-1])
-                    _, p_vir, b_eps, _ = self.vq_instances[shell].get_virial_quantities(Veff=Veff, dV1=dV1s[shell], temperature=temperature, eps=args[-1], lm=args[shell], shell=shell)
-                    P_virs.append(p_vir)
-                    b_eps_diff.append(self.b_0s[shell]*args[-1]-b_eps)
-                P_offset, _ = self.get_epsilon_pressure(eps=args[-1])
-                P_diff = np.abs(np.sum(P_virs)+P_offset-pressure)
-                print(args)
-                return np.concatenate((np.array(b_eps_diff), np.array([P_diff])))
-            x0 = np.concatenate((np.zeros(self.shell_order), np.array([1.])))
-            solver = root(objective_function, x0=x0, tol=1e-8)
-        else:
-            print('...also minimizing temperature...')
-            def objective_function(args):
-                P_virs = []
-                T_virs = []
-                b_eps_diff = []
-                for shell in range(self.shell_order):
-                    Veff = self.mfm_instances[shell].Veff(eps=args[-1])
-                    t_vir, p_vir, b_eps, _ = self.vq_instances[shell].get_virial_quantities(Veff=Veff, dV1=dV1s[shell], temperature=args[-2], eps=args[-1], lm=args[shell], shell=shell)
-                    P_virs.append(p_vir)
-                    T_virs.append(t_vir)
-                    b_eps_diff.append(self.b_0s[shell]*args[-1]-b_eps)
-                P_offset, _ = self.get_epsilon_pressure(eps=args[-1])
-                P_diff = np.abs(np.sum(P_virs)+P_offset-pressure)
-                T_diff = np.abs(np.sum(T_virs)-temperature)
-                print(args)
-                return np.concatenate((np.array(b_eps_diff), np.array([T_diff]), np.array([P_diff])))
-            x0 = np.concatenate((np.zeros(self.shell_order), np.array([temperature]), np.array([1.])))
-            solver = root(objective_function, x0=x0, tol=1e-8)
+        dV1s = np.array([self.mfm_instances[shell].V1_gradient() for shell in range(self.r_order)]) 
+
+        def objective_function(args):
+            P_virs = []
+            b_eps_diff = []
+            for shell in range(self.r_order):
+                Veff = self.mfm_instances[shell].Veff(eps=args[-1])
+                _, p_vir, b_eps, _ = self.vq_instances[shell].get_virial_quantities(Veff=Veff, dV1=dV1s[shell], temperature=temperature, eps=args[-1], lm=args[shell], shell=shell)
+                P_virs.append(p_vir)
+                b_eps_diff.append(self.b_0s[shell]*args[-1]-b_eps)
+            P_offset, _ = self.get_epsilon_pressure(eps=args[-1])
+            P_diff = np.abs(np.sum(P_virs)+P_offset-pressure)
+            print(args)
+            return np.concatenate((np.array(b_eps_diff), np.array([P_diff])))
+        x0 = np.concatenate((np.zeros(self.r_order), np.array([1.])))
+        solver = root(objective_function, x0=x0, tol=1e-10)
         print('Optimization complete.')
-        lms = solver.x[:self.shell_order+1]
-        if minimize_T:
-            temperature = solver.x[-2]
-            print('Effective/renormlaized temperature: {}'.format(solver.x[-2]))
+        lms = solver.x[:self.r_order+1]
         eps = solver.x[-1]
         return self.collect_properties(temperature=temperature, lms=lms, eps=eps, dV1s=dV1s, return_rho_1=return_rho_1)
     
@@ -542,9 +543,9 @@ class MeanFieldJob():
         
     Args:
         shells (int): Number of nearest neighbor shells to consider for the model. Defaults to 1 shell, the 1st nearest neighbor shell.
-        shell_order (int): Number of shells up to which to compute bond densities for. Defaults to 1, the 1st nearest neighbor shell.
-        shift_order (int): Number of shifts to consider for each shell. Defaults to 1, shifts up to each shell. 
-                           (1 = up to the shell, including all inner shells, 2 = all inner shells, 1 outer shell, 3 = all inner shells, 2 outer shells, etc.)
+        r_order (int): Number of shells up to which to compute bond densities for. Defaults to 1, the 1st nearest neighbor shell.
+        s_order (int): Number of shifts to consider for each shell. Defaults to 0, shifts up to r_order. 
+                       (1 = up to the shell, including all inner shells, 2 = all inner shells, 1 outer shell, 3 = all inner shells, 2 outer shells, etc.)
         bond_grids (list/np.ndarray): (shells, len(lo_disps), len(t1_disps), len(t2_disps), 3) array of bond vectors in Cartesian xyz coordinates for each shell. Must be of length shells..
         b_0s (list/np.array): The equilibrium bond length of each shell. Must be of length shells.
         basis (list/np.ndarray): (shells x 3 x 3) array of unit vectors for each shell. Must be of length shells.
@@ -558,8 +559,8 @@ class MeanFieldJob():
         strain_list (list/np.array): Strains corresponding to the volumes of the energy-volume curve. Defaults to None, where no correction terms are added.
     """
 
-    def __init__(self, bond_grids, b_0s, basis, rotations, r_potentials, t1_potentials=None, t2_potentials=None, shells=1, kpoints=10, shell_order=1, shift_order=None,
-                 crystal='fcc', energy_list=None, strain_list=None):
+    def __init__(self, bond_grids, b_0s, basis, rotations, r_potentials, t1_potentials=None, t2_potentials=None, shells=1, kpoints=10, r_order=1, s_order=1,
+                 crystal='fcc', energy_list=None, strain_list=None, bloch_hessian=None, kpoint_vectors=None):
         self.b_0s = b_0s
         self.basis = basis
         self.rotations = rotations
@@ -569,17 +570,20 @@ class MeanFieldJob():
         self.t1_potentials = t1_potentials
         self.t2_potentials = t2_potentials
         self.shells = shells
-        self.shell_order = shell_order
-        self.shift_order = shift_order
+        self.r_order = r_order
+        self.s_order = s_order
         self.crystal = crystal
         self.energy_list = energy_list
         self.strain_list = strain_list
+        self.bloch_hessian = bloch_hessian
+        self.kpoint_vectors = kpoint_vectors
 
         self.output = None
         self.rho_1s = None
+        self._npt = False
 
         self.check_inputs()
-        self.meshes = np.array([get_meshes(self.bond_grids[s], self.basis[s]) for s in range(self.shell_order)])
+        self.meshes = np.array([get_meshes(self.bond_grids[s], self.basis[s]) for s in range(self.r_order)])
 
     def check_inputs(self):
         """
@@ -588,10 +592,10 @@ class MeanFieldJob():
         assert isinstance(self.shells, int), 'shells must be an integer.'
         assert self.shells > 0, 'shells must be greater than 0.'
         assert len(self.bond_grids) == self.shells, 'length of bond_grids must be equal to shells.'
-        assert isinstance(self.shell_order, int), 'shell_order must be an integer.'
-        assert self.shell_order <= self.shells, 'shell_order must be lesser than shells.'
-        assert isinstance(self.shift_order, int), 'shift_order must be an integer.'
-        assert self.shift_order <= self.shells, 'shift_order must be lesser than shells.'
+        assert isinstance(self.r_order, int), 'r_order must be an integer.'
+        assert self.r_order <= self.shells, 'r_order must be lesser than or equal to shells.'
+        assert isinstance(self.s_order, int), 's_order must be an integer.'
+        assert self.s_order+self.r_order <= self.shells, 's_order+r_order must be lesser than or equal to shells.'
 
         if (self.energy_list is not None) and (self.strain_list is not None):
             assert len(self.energy_list) == len(self.strain_list), 'length of energy_list and strain_list must be equal.'
@@ -601,11 +605,11 @@ class MeanFieldJob():
         # factors to get primitive cells from the basis
         if self.crystal == 'fcc':
             # set the number of bonds per shell.
-            self._n_bonds_per_shell = np.array([12, 6, 24, 12, 24])
-            self._primitive_factors = np.array([np.sqrt(2)*0.5, 1., np.sqrt(3/2), np.sqrt(2), np.sqrt(5/2)])
+            self._n_bonds_per_shell = np.array([12, 6, 24, 12, 24, 8])
+            self._primitive_factors = np.array([np.sqrt(2)*0.5, 1., np.sqrt(3/2), np.sqrt(2), np.sqrt(5/2), np.sqrt(3)])
         elif self.crystal == 'bcc':
-            self._n_bonds_per_shell = np.array([8, 6, 12, 24, 8])
-            self._primitive_factors = np.array([np.sqrt(3)*0.5, 1., np.sqrt(2), np.sqrt(11)/2, np.sqrt(3)])
+            self._n_bonds_per_shell = np.array([8, 6, 12, 24, 8, 6, 24, 24])
+            self._primitive_factors = np.array([np.sqrt(3)*0.5, 1., np.sqrt(2), np.sqrt(11)/2, np.sqrt(3), 2., np.sqrt(19)/2, np.sqrt(5)])
         else:
             raise ValueError('crystal must be fcc or bcc')
 
@@ -619,11 +623,11 @@ class MeanFieldJob():
         print('Initializing instances...')
         self._mfms = []
         self._vqs = []
-        for s in range(self.shell_order):
-            self._mfms.append(MeanFieldModel(bond_grid=self.bond_grids[s], b_0s=self.b_0s, basis=self.basis, rotations=self.rotations, alphas=self.alphas[s], ref_shell=s, 
-                                             shells=self.shells, r_potentials=self.r_potentials, t1_potentials=self.t1_potentials, t2_potentials=self.t2_potentials, 
-                                             shell_order=self.shell_order))
-            self._vqs.append(VirialQuantities(bond_grid=self.bond_grids[s], b_0=self.b_0s[s], basis=self.basis[s], crystal=self.crystal))
+        for r in range(self.r_order):
+            l_order = r+self.s_order+1
+            self._mfms.append(MeanFieldModel(bond_grid=self.bond_grids[r], b_0s=self.b_0s, basis=self.basis, rotations=self.rotations, alphas=self.alphas[r], ref_shell=r, 
+                                             shells=self.shells, r_potentials=self.r_potentials, t1_potentials=self.t1_potentials, t2_potentials=self.t2_potentials, l_order=l_order))
+            self._vqs.append(VirialQuantities(bond_grid=self.bond_grids[r], b_0=self.b_0s[r], basis=self.basis[r], crystal=self.crystal))
         print('Instances initialized.')
 
     def generate_alphas(self):
@@ -632,35 +636,35 @@ class MeanFieldJob():
         """
         print('Generating alphas...')
 
-        nn_bonds = []
-        for shell in range(self.shells):
-            nn_bonds.append(self.basis[shell][0]@self.rotations[shell]*self._primitive_factors[shell])
+        self._nn_pos = []
+        for s in range(self.shells):
+            self._nn_pos.append(self.basis[s][0]@self.rotations[s]*self._primitive_factors[s])
 
         model = DebyeModel(lattice=self.crystal, kappa_t=0.0, kpoints=self.kpoints)
+        model.nearest_neighbors = self._nn_pos[0]
+        model.make_model(bloch_hessian=self.bloch_hessian, kpoint_vectors=self.kpoint_vectors)
 
-        alphas = []
-        for shell in range(self.shell_order):
-            ref_bond = nn_bonds[shell][0]
+        self.alphas = []
+        for shell in range(self.r_order):
+            ref_bond = self._nn_pos[shell][0]
             bond_0_corr = model.correlation(ref_bond, ref_bond, shift=np.array([0.0, 0.0, 0.0]))
             inv_bond_0_corr = np.linalg.inv(bond_0_corr)
 
-            # curtail shifts to all inner shells and one outer shell
-            shells = list(range(min(self.shells, shell+self.shift_order)))
-            upto_shell = shells[-1]+1
-            shifts = np.vstack((np.zeros((1, 3)), *nn_bonds[:upto_shell]))
+            upto_shell = shell+self.s_order+1
+            shifts = np.vstack((np.zeros((1, 3)), *self._nn_pos[:upto_shell]))
 
             # iterate over all 1NN, 2NN etc. bonds
-            alphas_nn = [[] for _ in range(self.shells)]
+            alphas_nn = [[] for _ in range(upto_shell)]
             for shift in shifts:
-                for shl, nn in enumerate(nn_bonds):
+                for shl, nn in enumerate(self._nn_pos[:upto_shell]):
                     for bond_1 in nn:
                         bond_1_corr = model.correlation(bond_1=bond_1, bond_0=ref_bond, shift=shift)
-                        alphas_nn[shl].append(bond_1_corr@inv_bond_0_corr)
+                        alphas_nn[shl].append(np.real(bond_1_corr@inv_bond_0_corr))
             
-            for shl in range(self.shells):  # reshape the alphas to be (no. of shifts, neighbors in a shell, 3, 3)
+            for shl in range(upto_shell):  # reshape the alphas to be (no. of shifts, neighbors in a shell, 3, 3)
                 alphas_nn[shl] = np.array(alphas_nn[shl]).reshape(len(shifts), self._n_bonds_per_shell[shl], 3, 3)
-            alphas.append(alphas_nn)
-        self.alphas = alphas
+            self.alphas.append(alphas_nn)
+        
         print('Alphas generated.')
 
     def run_ensemble(self, temperature=100., pressure=None, eps=None, return_output=False, re_run=False, minimize_T=False):
@@ -688,16 +692,18 @@ class MeanFieldJob():
                 self.rho_1s = None
         
         self._temperature = temperature
-        opt = Optimizer(b_0s=self.b_0s, mfm_instances=self._mfms, vq_instances=self._vqs, energy_list=self.energy_list, strain_list=self.strain_list, shell_order=self.shell_order)
+        opt = Optimizer(b_0s=self.b_0s, mfm_instances=self._mfms, vq_instances=self._vqs, energy_list=self.energy_list, strain_list=self.strain_list, r_order=self.r_order)
         
         if pressure is None:
             assert eps is not None, 'eps must be specified if pressure is None.'
             assert isinstance(eps, (int, float)), 'eps must be an integer an integer or float.'
-            out = opt.run_nvt(temperature=temperature, eps=eps, return_rho_1=True)
+            out = opt.run_nvt(temperature=temperature, eps=eps, return_rho_1=True, minimize_T=minimize_T)
         elif pressure is not None:
-            assert eps is None, 'eps must be None if pressure specified.'
+            self._npt = True
+            if eps is not None:
+                print('Pressure specified, setting intial eps = 1.0')
             assert isinstance(pressure, (int, float)), 'pressure must be an integer or float.'
-            out = opt.run_npt(temperature=temperature, pressure=pressure, return_rho_1=True, minimize_T=minimize_T)
+            out = opt.run_npt(temperature=temperature, pressure=pressure, return_rho_1=True)
         else:
             raise ValueError('either pressure or eps must be specified.')
         
@@ -733,10 +739,13 @@ class MeanFieldJob():
         """
         assert self.output is not None, 'run_ensemble() must be run first.'
         
-        per_bond_energy = np.array([(self._mfms[s].V1(bond_grid=self.bond_grids[s], shell=s)*self.rho_1s[s]).sum() for s in range(self.shell_order)])
-        per_atom_energy = (self._n_bonds_per_shell[:self.shell_order]/2*per_bond_energy)
+        per_bond_energy = np.array([(self._mfms[s].V1(bond_grid=self.bond_grids[s], shell=s)*self.rho_1s[s]).sum() for s in range(self.r_order)])
+        per_atom_energy = (self._n_bonds_per_shell[:self.r_order]/2*per_bond_energy)
         per_shell_ah_U = per_atom_energy-1.5*KB*self.output['T_vir']
-        ah_U = per_shell_ah_U.sum()+self.output['E_offset']
+        print('per_shell_ah_U: {}\n'.format(per_shell_ah_U))
+        ah_U = per_shell_ah_U.sum() #-1.5*KB*self.output['T']
+        if self._npt:
+            ah_U += self.output['E_offset']
         if return_components:
             return ah_U, per_shell_ah_U
         return ah_U

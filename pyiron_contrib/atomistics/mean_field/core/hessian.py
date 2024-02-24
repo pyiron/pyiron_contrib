@@ -72,11 +72,11 @@ class GenerateHessian():
         ix = np.array([n//self.kpoints**2, (n//self.kpoints)%self.kpoints, n%self.kpoints]).T.astype(float)
         kpoint_vectors = (2.0*np.pi/float(self.kpoints))*(ix+0.5)@brilluoin_zone
         kpoint_vectors -= kpoint_vectors.mean(0)
-        return kpoint_vectors
+        return kpoint_vectors, box
     
     def get_hessian_k(self):
         hessian_real = self.get_hessian_real()
-        kpoint_vectors = self.get_kpoint_vectors()
+        kpoint_vectors, box = self.get_kpoint_vectors()
         structure = self.ref_job.structure.copy()
         n_atoms = structure.get_number_of_atoms()
 
@@ -85,6 +85,7 @@ class GenerateHessian():
 
         X = structure.positions
         dX = structure.find_mic(X-X[self.ref_atom])
+        dX /= box[0][0]  # rescale to the primitive cell
         hessian_k = []
         for k in kpoint_vectors:
             H_k = np.zeros((3,3),complex)

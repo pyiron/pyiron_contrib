@@ -642,7 +642,7 @@ class TinyDB(GenericDatabase):
                 return (
                     session.query(Job.id)
                     .where(
-                        Job.job == job_name,
+                        Job.job_name == job_name,
                         Job.project_id == project_id,
                     )
                     .one()

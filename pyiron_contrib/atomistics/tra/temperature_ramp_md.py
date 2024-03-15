@@ -47,7 +47,11 @@ variable         t_traj equal {{ n_traj }} # dump trajectory frequency
 
 # Integrator and thermostat.
 timestep         ${ts}
+{% if pressure is not none %}
+fix              f1 all nph iso {{ pressure }} {{ pressure }} 1.0
+{% else %}
 fix              f1 all nve
+{% endif %}
 fix              f2 all langevin {{ T_start }} {{ T_start }} 0.1 ${rnd} zero yes
 
 # Initial temperature to accelerate equilibration.

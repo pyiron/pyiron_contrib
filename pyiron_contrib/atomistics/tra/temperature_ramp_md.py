@@ -88,7 +88,7 @@ run              ${t}
 
 class TemperatureRampMD():
     def __init__(self, ref_job, temperatures, pressure, n_samples=5, n_ramp_steps=1000, 
-                 n_equib_steps=100, n_print=1, n_traj_print=1, time_step=1.):
+                 n_equib_steps=100, n_print=1, n_traj_print=1, time_step=1., recompress=False):
         self.ref_job = ref_job
         self.temperatures = temperatures
         self.pressure = pressure
@@ -98,6 +98,7 @@ class TemperatureRampMD():
         self.n_print = n_print
         self.n_traj_print = n_traj_print
         self.time_step = time_step
+        self.recompress = recompress
         
         self._project = self.ref_job.project
         self._job_names = ['sample_' + str(i) for i in range(self.n_samples)]
@@ -144,6 +145,8 @@ class TemperatureRampMD():
         forward = np.loadtxt(os.path.join(job.working_directory, "forward.dat"), unpack=True)
         data_dict['forward'].update(zip(data_dict['forward'], forward))
         data_dict['forward']['U'] = data_dict['forward']['en_pot']+data_dict['forward']['en_kin']
+        if self.recompress:
+            job.compress()
         return data_dict
     
     @staticmethod
@@ -183,7 +186,7 @@ class TemperatureRampMD():
     def _get_mapped_quantity(self, quantity, remapped_temperatures, poly_order=5, spline=False):
         w = self._weight_function(self._raw_temperatures)
         if not spline:
-            poly = np.polyfit(x=self._raw_temperatures, y=quantity, deg=poly_order, w=w)
+            poly = np.polyfit(x=self._raw_temperatures, y=quantity, w=w, deg=poly_order)
             return np.poly1d(poly)(remapped_temperatures)
         else:
             spl = splrep(x=self._raw_temperatures, y=quantity, w=w, k=5)
@@ -202,11 +205,13 @@ class TemperatureRampMD():
         V = self._get_mapped_quantity(mean_dict['V_mean'], self.temperatures, poly_order=poly_order, spline=spline)
         P = self._get_mapped_quantity(mean_dict['P_mean'], self.temperatures, poly_order=poly_order, spline=spline)
         Cp, S, G = self._get_properties(H)
+        _, _, F = self._get_properties(U)
         return {'T': self.temperatures.tolist(),
                 'U': U.tolist(),
                 'H': H.tolist(),
                 'Cp': Cp.tolist(),
                 'S': S.tolist(),
+                'F': F.tolist(),
                 'G': G.tolist(),
                 'V': V.tolist(),
                 'P': P.tolist()}
@@ -219,12 +224,13 @@ class TemperatureRampMD():
         P = self._get_mapped_quantity(mean_dict['P_mean'], remapped_temperatures, poly_order=poly_order, spline=spline)
         H_unmapped = self._get_mapped_quantity(mean_dict['H_mean'], self.temperatures, poly_order=poly_order, spline=spline)
         Cp, S, G = self._get_properties(H)
+        _, _, F = self._get_properties(U)
         return {'T': self.temperatures.tolist(),
                 'remapped_U': U.tolist(),
                 'remapped_H': H.tolist(),
                 'remapped_Cp': Cp.tolist(),
                 'remapped_S': S.tolist(),
+                'remapped_F': F.tolist(),
                 'remapped_G': G.tolist(),
                 'remapped_V': V.tolist(),
-                'remapped_P': P.tolist(),
-                'unmapped_H': H_unmapped.tolist()}
+                'remapped_P': P.tolist()}

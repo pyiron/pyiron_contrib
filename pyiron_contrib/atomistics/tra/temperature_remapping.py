@@ -55,7 +55,6 @@ class TemperatureRemapping(GenericJob):
         self.output = DataContainer(table_name="job_output")
         self.harm_job = None
         self.output.remapped_temperatures = None
-        self.output.frequencies_at_gamma = None
         
     @property
     def structure(self):
@@ -70,6 +69,19 @@ class TemperatureRemapping(GenericJob):
             self.harm_job.input['interaction_range'] = self.input.interaction_range
             self.harm_job.run()
         return self.harm_job
+    
+    def get_nu_data(self):
+        self.output.dos_nu = self.harm_job['output/dos_energies']
+        self.output.dos_total = self.harm_job['output/dos_total']
+        
+        sel = self.output.dos_nu > 0.
+        nu_real = self.output.dos_nu[sel]
+        dos_real = self.output.dos_nu[sel]/self.output.dos_nu[sel].sum()
+        self.output.effective_nu = (nu_real*dos_real).sum()
+        
+        hessian = self.get_hessian()
+        nu_v = self.get_vibrational_frequencies(hessian, return_eigenvectors=False)
+        self.output.frequencies_at_gamma = nu_v
         
     @staticmethod
     def reshape_hessian(hessian):
@@ -108,17 +120,15 @@ class TemperatureRemapping(GenericJob):
     
     def get_remapped_temperatures(self):
         if self.output.remapped_temperatures is None:
-            hessian = self.get_hessian()
-            nu_v = self.get_vibrational_frequencies(hessian, return_eigenvectors=False)
-            self.output.frequencies_at_gamma = nu_v
-            nu = nu_v[3:][nu_v[3:]>0.]
-            self.output.remapped_temperatures = np.array([np.sum(H*nu*1e12*(0.5+(1/(np.exp(H*nu*1e12/(KB*temp))-1))))/KB/len(nu)
-                                                         for temp in self.input.temperatures])
+            nu = self.output.effective_nu
+            self.output.remapped_temperatures = np.array([H*nu*1e12*(0.5+(1/(np.exp(H*nu*1e12/(KB*temp))-1)))/KB
+                                                          for temp in self.input.temperatures])
     
     def run_static(self):
         self.status.running = True
         self.run_ha()
         self.status.finished = True
+        self.get_nu_data()
         self.get_remapped_temperatures()
         self.to_hdf()
     
@@ -131,5 +141,4 @@ class TemperatureRemapping(GenericJob):
         super(TemperatureRemapping, self).from_hdf()
         self.input.from_hdf(self.project_hdf5)
         self.output.from_hdf(self.project_hdf5)
-        #self.harm_job = self.project.load('ha_job')
-        
+        # self.harm_job = self.project.load('ha_job')

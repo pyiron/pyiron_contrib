@@ -205,13 +205,11 @@ class TemperatureRampMD():
         V = self._get_mapped_quantity(mean_dict['V_mean'], self.temperatures, poly_order=poly_order, spline=spline)
         P = self._get_mapped_quantity(mean_dict['P_mean'], self.temperatures, poly_order=poly_order, spline=spline)
         Cp, S, G = self._get_properties(H)
-        _, _, F = self._get_properties(U)
         return {'T': self.temperatures.tolist(),
                 'U': U.tolist(),
                 'H': H.tolist(),
                 'Cp': Cp.tolist(),
                 'S': S.tolist(),
-                'F': F.tolist(),
                 'G': G.tolist(),
                 'V': V.tolist(),
                 'P': P.tolist()}
@@ -222,15 +220,12 @@ class TemperatureRampMD():
         H = self._get_mapped_quantity(mean_dict['H_mean'], remapped_temperatures, poly_order=poly_order, spline=spline)
         V = self._get_mapped_quantity(mean_dict['V_mean'], remapped_temperatures, poly_order=poly_order, spline=spline)
         P = self._get_mapped_quantity(mean_dict['P_mean'], remapped_temperatures, poly_order=poly_order, spline=spline)
-        H_unmapped = self._get_mapped_quantity(mean_dict['H_mean'], self.temperatures, poly_order=poly_order, spline=spline)
         Cp, S, G = self._get_properties(H)
-        _, _, F = self._get_properties(U)
         return {'T': self.temperatures.tolist(),
                 'remapped_U': U.tolist(),
                 'remapped_H': H.tolist(),
                 'remapped_Cp': Cp.tolist(),
                 'remapped_S': S.tolist(),
-                'remapped_F': F.tolist(),
                 'remapped_G': G.tolist(),
                 'remapped_V': V.tolist(),
                 'remapped_P': P.tolist()}

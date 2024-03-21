@@ -2,13 +2,14 @@ import unittest
 import os
 
 from shutil import rmtree
-from moto import mock_s3
+from moto import mock_aws
 import boto3
-from pyiron_contrib import Project
+from pyiron_base import Project
+import pyiron_contrib
 from pyiron_contrib.RDM.storagejob import StorageJob
 from pyiron_contrib.generic.s3io import FileS3IO
 from pyiron_base._tests import TestWithCleanProject
-from pyiron_base import FileDataTemplate
+from pyiron_base.storage.filedata import FileDataTemplate
 
 full_bucket = "full_bucket"
 io_bucket = "io_bucket"
@@ -29,7 +30,7 @@ class TestStorageJob(TestWithCleanProject):
         with open(cls.file2, 'w') as f:
             f.write('Some other text')
 
-        cls.moto = mock_s3()
+        cls.moto = mock_aws()
         cls.moto.start()
         cls.res = boto3.resource('s3', **aws_credentials)
         cls.bucket = cls.res.create_bucket(Bucket=full_bucket)

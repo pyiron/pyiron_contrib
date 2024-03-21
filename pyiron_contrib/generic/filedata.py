@@ -13,7 +13,7 @@ from pathlib import Path
 import pandas as pd
 
 from pyiron_base import GenericJob, state
-from pyiron_base import (
+from pyiron_base.storage.filedata import (
     FileDataTemplate as BaseFileDataTemplate,
     load_file,
     FileData as FileDataBase,

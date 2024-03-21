@@ -1,16 +1,18 @@
 import abc
+import codecs
 import importlib
+import pickle
 from typing import Any, Union, Optional
 
 from pyiron_base import DataContainer
+from pyiron_base.interfaces.has_groups import HasGroups
 from pyiron_base.storage.hdfio import ProjectHDFio
 from pyiron_contrib.tinybase import __version__ as base__version__
 
-import pickle
-import codecs
+from h5io_browser import Pointer as Hdf5Pointer
 
 
-class GenericStorage(abc.ABC):
+class GenericStorage(HasGroups, abc.ABC):
     """
     Generic interface to store things.
 
@@ -110,6 +112,8 @@ class GenericStorage(abc.ABC):
             item (str): name of the value
             value (object): value to store
         """
+        if item in self.list_groups():
+            del self[item]
         if isinstance(value, Storable):
             value.store(self, group_name=item)
         else:
@@ -120,6 +124,16 @@ class GenericStorage(abc.ABC):
                     self[item] = ListStorable(value)
                 else:
                     self[item] = PickleStorable(value)
+
+    @abc.abstractmethod
+    def __delitem__(self, item: str):
+        """
+        Remove a group or node.
+
+        Args:
+            item (str): name of the item to delete
+        """
+        pass
 
     @abc.abstractmethod
     def create_group(self, name):
@@ -167,20 +181,6 @@ class GenericStorage(abc.ABC):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
-
-    @abc.abstractmethod
-    def list_nodes(self) -> list[str]:
-        """
-        List names of values inside group.
-        """
-        pass
-
-    @abc.abstractmethod
-    def list_groups(self) -> list[str]:
-        """
-        List name of sub groups.
-        """
-        pass
 
     # DESIGN: this mostly exists to help to_object()ing GenericTinyJob, but it introduces a circular-ish connection.
     # Maybe there's another way to do it?
@@ -243,28 +243,28 @@ class ProjectHDFioStorageAdapter(GenericStorage):
             return value
 
     def _set(self, item, value):
-        if isinstance(value, Storable):
-            value.store(self, item)
-        else:
-            try:
-                self._hdf[item] = value
-            except TypeError:  # HDF layer doesn't know how to write value
-                # h5io bug, when triggering an error in the middle of a write
-                # some residual data maybe left in the file
-                del self._hdf[item]
-                raise
+        try:
+            self._hdf[item] = value
+        except TypeError:  # HDF layer doesn't know how to write value
+            # h5io bug, when triggering an error in the middle of a write
+            # some residual data maybe left in the file
+            del self._hdf[item]
+            raise
+
+    def __delitem__(self, item):
+        del self._hdf[item]
 
     def create_group(self, name):
         return ProjectHDFioStorageAdapter(self._project, self._hdf.create_group(name))
 
-    def list_nodes(self):
+    def _list_nodes(self):
         return self._hdf.list_nodes()
 
-    def list_groups(self):
+    def _list_groups(self):
         return self._hdf.list_groups()
 
     # compat with small bug in base ProjectHDFio
-    list_dirs = list_groups
+    list_dirs = _list_groups
 
     @property
     def project(self):
@@ -303,6 +303,9 @@ class DataContainerAdapter(GenericStorage):
     def _set(self, item: str, value: Any):
         self._cont[item] = value
 
+    def __delitem__(self, item):
+        del self._cont[item]
+
     def create_group(self, name):
         if name not in self._cont:
             d = self._cont.create_group(name)
@@ -310,10 +313,10 @@ class DataContainerAdapter(GenericStorage):
             d = self._cont[name]
         return self.__class__(self._project, d, name)
 
-    def list_nodes(self):
+    def _list_nodes(self):
         return self._cont.list_nodes()
 
-    def list_groups(self):
+    def _list_groups(self):
         return self._cont.list_groups()
 
     @property
@@ -323,6 +326,70 @@ class DataContainerAdapter(GenericStorage):
     @property
     def name(self):
         return self._name
+
+
+class H5ioStorage(GenericStorage):
+    """
+    Store objects in HDF5 files.
+
+    Maybe created with a non existing file path or HDF5 group.  Those will be created on first write access.
+    """
+
+    def __init__(self, pointer: Hdf5Pointer, project):
+        """
+        Args:
+            pointer (:class:`h5io_browser.Pointer`): open pointer object to HDF5 storage
+            project (:class:`.tinybase.ProjectInterface`): project this storage belongs to
+        """
+        if not isinstance(pointer, Hdf5Pointer):
+            raise TypeError("pointer must be a h5io_browser.Pointer!")
+        self._project = project
+        self._pointer = pointer
+
+    @classmethod
+    def from_file(cls, project, file: str, path: str = None):
+        """
+        Open a storage from the given file and HDF group within.
+
+        Args:
+            project (:class:`.tinybase.ProjectInterface`): project this storage belongs to
+            file (str): file path to the HDF5 file
+            path (str): group path within the HDF5 file
+        """
+        pointer = Hdf5Pointer(file)
+        if path is not None:
+            pointer = pointer[path]
+        return cls(pointer, project=project)
+
+    def __getitem__(self, item):
+        value = self._pointer[item]
+        if isinstance(value, Hdf5Pointer):
+            return type(self)(value, project=self._project)
+        else:
+            return value
+
+    def _set(self, item, value):
+        self._pointer[item] = value
+
+    def __delitem__(self, item):
+        del self._pointer[item]
+
+    def create_group(self, name):
+        return type(self)(self._pointer[name], project=self._project)
+
+    def _list_nodes(self):
+        return self._pointer.list_h5_path()["nodes"]
+
+    def _list_groups(self):
+        return self._pointer.list_h5_path()["groups"]
+
+    @property
+    def project(self):
+        return self._project
+
+    @property
+    def name(self):
+        return self._pointer.h5_path.rsplit("/", maxsplit=1)[1]
 
 
 # DESIGN: equivalent of HasHDF but with generalized language

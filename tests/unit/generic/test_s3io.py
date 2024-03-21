@@ -2,7 +2,7 @@ import unittest
 import os
 import json
 
-from moto import mock_s3
+from moto import mock_aws
 import boto3
 from pyiron_contrib.generic.s3io import FileS3IO
 
@@ -32,7 +32,7 @@ class TestS3IO(unittest.TestCase):
             json.dump(credentials_w_bucket, f)
         with open(cls.current_dir + '/config_noBucket.json', 'w') as f:
             json.dump(credentials, f)
-        cls.moto = mock_s3()
+        cls.moto = mock_aws()
         cls.moto.start()
         cls.res = boto3.resource('s3', **aws_credentials)
         cls.bucket = cls.res.create_bucket(Bucket=MY_BUCKET)
@@ -51,7 +51,7 @@ class TestS3IO(unittest.TestCase):
         os.remove(cls.current_dir + '/some_file.txt')
         os.remove(cls.current_dir + '/config.json')
         os.remove(cls.current_dir + '/config_noBucket.json')
-        cls.moto = mock_s3()
+        cls.moto = mock_aws()
         cls.res = boto3.resource('s3', **aws_credentials)
         bucket = cls.res.Bucket(MY_BUCKET)
         bucket.objects.all().delete()

@@ -4,3 +4,4 @@ dependencies:
   - python >= 3.10
   - lammps
   - nglview >=3.0.8
+  - pyiron-data >=0.0.25

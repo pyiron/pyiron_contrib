@@ -3,16 +3,18 @@ __all__ = []
 
 import warnings
 
-try:
-    from pyiron import Project
-except:
-    warnings.warn("pyiron module not found, importing Project from pyiron_base")
-    from pyiron_base import Project
+from pyiron_base import Project as BaseProject, JOB_CLASS_DICT
+from pyiron_base.project.maintenance import add_module_conversion
 
-from pyiron_base import JOB_CLASS_DICT
-from pyiron_contrib.generic.storage_interface_toolkit import StorageInterfaceFactory
 
-Project.register_tools("storage_interface", StorageInterfaceFactory)
+class Project(BaseProject):
+    def __init__(self, *args, **kwargs):
+        warnings.warn(
+            "Importing Project from pyiron_contrib is deprecated. "
+            "Import from appropriate pyiron module (e.g. pyiron) instead."
+        )
+        super().__init__(*args, **kwargs)
+
 
 # Make classes available for new pyiron version
 JOB_CLASS_DICT.update(
@@ -38,30 +40,58 @@ JOB_CLASS_DICT.update(
         "RandSpg": "pyiron_contrib.atomistics.randspg.randspg",
         "Fenics": "pyiron_contrib.continuum.fenics.job.generic",
         "FenicsLinearElastic": "pyiron_contrib.continuum.fenics.job.elastic",
-        "TrainingContainer": "pyiron_contrib.atomistics.atomistics.job.trainingcontainer",
         "RandomDisMaster": "pyiron_contrib.atomistics.mlip.masters",
         "RandomMDMaster": "pyiron_contrib.atomistics.mlip.masters",
-        "RunnerFit": "pyiron_contrib.atomistics.runner.job",
-        "MlipSelect": "pyiron_contrib.atomistics.mlip.mlipselect",
-        "Mlip": "pyiron_contrib.atomistics.mlip.mlip",
-        "LammpsMlip": "pyiron_contrib.atomistics.mlip.lammps",
-        "MlipJob": "pyiron_contrib.atomistics.mlip.mlipjob",
-        "Atomicrex": "pyiron_contrib.atomistics.atomicrex.atomicrex_job",
         "StructureMasterInt": "pyiron_contrib.atomistics.atomistics.job.structurelistmasterinteractive",
         "StorageJob": "pyiron_contrib.RDM.storagejob",
-        "MlipDescriptors": "pyiron_contrib.atomistics.mlip.mlipdescriptors",
-        "PacemakerJob": "pyiron_contrib.atomistics.pacemaker.job",
-        "MeamFit": "pyiron_contrib.atomistics.meamfit.meamfit",
         "Cp2kJob": "pyiron_contrib.atomistics.cp2k.job",
         "PiMD": "pyiron_contrib.atomistics.ipi.ipi_jobs",
         "GleMD": "pyiron_contrib.atomistics.ipi.ipi_jobs",
         "PigletMD": "pyiron_contrib.atomistics.ipi.ipi_jobs",
-        "FitsnapJob": "pyiron_contrib.atomistics.fitsnap.job",
         "QuasiHarmonicApproximation": "pyiron_contrib.atomistics.atomistics.master.qha",
         "TemperatureRemapping": "pyiron_contrib.atomistics.tra.temperature_remapping",
     }
 )
 
+old_prefix = "pyiron_contrib.atomistics."
+new_prefix = "pyiron_potentialfit."
+moved_potential_modules = [
+    "atomicrex",
+    "atomicrex.atomicrex_job",
+    "atomicrex.base",
+    "atomicrex.fit_properties",
+    "atomicrex.function_factory",
+    "atomicrex.general_input",
+    "atomicrex.interactive",
+    "atomicrex.output",
+    "atomicrex.parameter_constraints",
+    "atomicrex.potential_factory",
+    "atomicrex.structure_list",
+    "atomicrex.utility_functions",
+    "atomistics.job.trainingcontainer",
+    # "fitsnap",
+    # "fitsnap.common",
+    # "fitsnap.job",
+    "meamfit.meamfit",
+    "ml",
+    "ml.potentialfit",
+    "mlip",
+    "mlip.cfgs",
+    "mlip.lammps",
+    "mlip.masters",
+    "mlip.mlip",
+    "mlip.mlipdescriptors",
+    "mlip.parser",
+    "mlip.potential",
+    "pacemaker",
+    "pacemaker.job",
+    "runner",
+    "runner.job",
+    "runner.storageclasses",
+    "runner.utils",
+]
+for module in moved_potential_modules:
+    add_module_conversion(old_prefix + module, new_prefix + module)
 
 from ._version import get_versions
 

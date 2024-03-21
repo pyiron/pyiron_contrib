@@ -3,7 +3,7 @@ import posixpath
 import shutil
 
 from pyiron_base import GenericJob, DataContainer
-from pyiron_base import FileData
+from pyiron_base.storage.filedata import FileData
 from pyiron_contrib.generic.s3io import FileS3IO
 
 

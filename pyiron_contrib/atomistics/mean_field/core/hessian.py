@@ -6,10 +6,27 @@ import numpy as np
 
 ### TODO: Update documentation!
 
+def monkhorst_pack(size):
+    """Construct a uniform sampling of k-space of given size. From ase.dft.kpoints"""
+    if np.less_equal(size, 0).any():
+        raise ValueError(f'Illegal size: {list(size)}')
+    kpts = np.indices(size).transpose((1, 2, 3, 0)).reshape((-1, 3))
+    return (kpts+0.5)/size - 0.5
+
+def hessian_from_eigen(eigenvalues, eigenvectors):
+    eigenvalues = np.array(eigenvalues)
+    eigenvectors = np.array(eigenvectors)
+    num_points = eigenvalues.shape[0]
+    hessian = np.zeros((num_points, 3, 3))
+    for i in range(num_points):
+        hessian[i] = np.sum(eigenvalues[i, :, np.newaxis, np.newaxis] * 
+                            np.einsum('ij,ik->ijk', eigenvectors[i].T, eigenvectors[i].T), axis=0)
+    return hessian
+
 class GenerateHessian():
     """
     """
-    def __init__(self, project, ref_job, potential=None, ref_atom=0, delta_x=0.01, kpoints=10, threshold=0.02):
+    def __init__(self, project, ref_job, potential=None, ref_atom=0, delta_x=0.01, kpoints=10, threshold=0.01, fix_transverse=False):
         self.project = project
         self.ref_job = ref_job
         self.potential = potential
@@ -17,6 +34,7 @@ class GenerateHessian():
         self.delta_x = delta_x
         self.kpoints = kpoints
         self.threshold = threshold
+        self.fix_transverse = fix_transverse
 
         self._jobs = None
 
@@ -65,31 +83,37 @@ class GenerateHessian():
     def get_kpoint_vectors(self):
         structure = self.ref_job.structure.copy()
         box = structure.get_symmetry().info['std_lattice']
-        primitive_cell = structure.get_symmetry().get_primitive_cell(standardize=False).cell.array
-        primitive_cell /= box[0][0]
-        brilluoin_zone = np.linalg.inv(primitive_cell)
-        n = np.arange(self.kpoints**3)
-        ix = np.array([n//self.kpoints**2, (n//self.kpoints)%self.kpoints, n%self.kpoints]).T.astype(float)
-        kpoint_vectors = (2.0*np.pi/float(self.kpoints))*(ix+0.5)@brilluoin_zone
-        kpoint_vectors -= kpoint_vectors.mean(0)
+        primitive_cell = structure.get_symmetry().get_primitive_cell(standardize=False).cell.array/box[0][0]
+        reciprocal_latt_vecs = 2*np.pi*np.linalg.inv(primitive_cell)
+        #n = np.arange(self.kpoints**3)
+        #ix = np.array([n//self.kpoints**2, (n//self.kpoints)%self.kpoints, n%self.kpoints]).T.astype(float)
+        #kpoint_vectors = (2.0*np.pi/float(self.kpoints))*(ix+0.5)@brilluoin_zone
+        #kpoint_vectors -= kpoint_vectors.mean(0)
+        kpoint_vectors = monkhorst_pack([self.kpoints, self.kpoints, self.kpoints])@reciprocal_latt_vecs
         return kpoint_vectors, box
     
-    def get_hessian_k(self):
-        hessian_real = self.get_hessian_real()
-        kpoint_vectors, box = self.get_kpoint_vectors()
-        structure = self.ref_job.structure.copy()
-        n_atoms = structure.get_number_of_atoms()
+    def get_hessian_k(self, rewrite=False):
+        if ('hessian_k.npy' and 'kpoint_vectors.npy' in self.project.list_all()['files']) and (not rewrite):
+            return np.load(self.project.path+'/hessian_k.npy'), np.load(self.project.path+'/kpoint_vectors.npy')
+        else:
+            hessian_real = self.get_hessian_real()
+            if self.fix_transverse:
+                eval, evec = np.linalg.eigh(hessian_real)
+                eval[1:, 1] = 0.
+                eval[1:, 2] = 0.
+                hessian_real = hessian_from_eigen(eval, evec)
+            kpoint_vectors, box = self.get_kpoint_vectors()
+            structure = self.ref_job.structure.copy()
 
-        sq_trace = np.einsum('ijk,ikj->i',hessian_real,hessian_real)
-        select = sq_trace > self.threshold * sq_trace.max()
+            sq_trace = np.einsum('ijk,ikj->i', hessian_real, hessian_real)
+            select = sq_trace > self.threshold
 
-        X = structure.positions
-        dX = structure.find_mic(X-X[self.ref_atom])
-        dX /= box[0][0]  # rescale to the primitive cell
-        hessian_k = []
-        for k in kpoint_vectors:
-            H_k = np.zeros((3,3),complex)
-            for i in np.arange(n_atoms)[select]:
-                H_k += hessian_real[i]*np.exp(complex(0,1)*k@dX[i])
-            hessian_k.append(H_k)
-        return np.array(hessian_k), np.array(kpoint_vectors)
+            X = structure.positions.copy()
+            dX = structure.find_mic(X-X[self.ref_atom])
+            dX /= box[0][0]  # rescale to the primitive cell
+            k_dX = kpoint_vectors@dX[select].T
+            hessian_k = np.einsum('il,ijk->ljk', np.exp(-1j*k_dX.T), hessian_real[select])
+            
+            np.save(self.project.path+'/hessian_k.npy', np.array(hessian_k))
+            np.save(self.project.path+'/kpoint_vectors.npy', kpoint_vectors)
+            return np.array(hessian_k), kpoint_vectors

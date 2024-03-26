@@ -204,7 +204,7 @@ class MeanFieldModel():
         Returns:
             vmfc (np.ndarray): The correlated mean-field effective potential.
         """
-        vmfc = 0
+        vmfc = 0.
         for shell in range(self.l_order):
             # here, alpha scales the displacement from equilibrium, i.e. db = (b_l-a_l). 
             for alphas, alphas_rot_ids in zip(self.alphas[shell], self.alphas_rot_ids[shell]):

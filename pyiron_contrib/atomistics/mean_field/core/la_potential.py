@@ -124,7 +124,7 @@ class GenerateLAPotential():
         """
         if spacing:
             if asymmetric:
-                right = self.uneven_linspace(low_disp, self.disp, self.n_disps, spacing=spacing)
+                right = self.uneven_linspace(low_disp, self.disp, int(self.n_disps/2)+1, spacing=spacing)
                 samples = np.concatenate((np.flip(-right), right[1:]))
             else:
                 samples = self.uneven_linspace(low_disp, self.disp, self.n_disps, spacing=spacing)

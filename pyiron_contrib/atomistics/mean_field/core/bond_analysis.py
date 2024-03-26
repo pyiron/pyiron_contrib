@@ -247,23 +247,21 @@ class StaticBondAnalysis(_BondAnalysisParent):
         # and sort them doing the following:
         per_shell_0K_rotations = []
         all_nn_bond_vectors_list = []
-        for b in enumerate(per_shell_irreducible_bond_vectors):
+        for b in per_shell_irreducible_bond_vectors:
             # get 'unique bonds' from the spglib data
-            unique_bonds = np.unique(np.dot(b[1], all_rotations), axis=0)
+            unique_bonds = np.unique(np.dot(b, all_rotations), axis=0)
             args_list = []
             for bond in unique_bonds:
                 # collect the arguments of the rotations that that give the unique bonds
                 args = []
-                for i, bd in enumerate(np.dot(b[1], all_rotations)):
-                    if np.array_equal(
-                        np.round(bd, decimals=3), np.round(bond, decimals=3)
-                    ):
+                for i, bd in enumerate(np.dot(b, all_rotations)):
+                    if np.array_equal(np.round(bd, decimals=5), np.round(bond, decimals=5)):
                         args.append(i)
                 args_list.append(args[0])
             # sort the arguments and append the rotations to a list...
             per_shell_0K_rotations.append(all_rotations[np.sort(args_list)])
             # and the unique bonds also, to another list...
-            all_nn_bond_vectors_list.append(np.dot(b[1], per_shell_0K_rotations[-1]))
+            all_nn_bond_vectors_list.append(np.dot(b, per_shell_0K_rotations[-1]))
         # and clump the unique bonds into a single array
         all_nn_bond_vectors_list = np.array(
             [
@@ -311,13 +309,8 @@ class StaticBondAnalysis(_BondAnalysisParent):
                         ]
                     ]
                 except IndexError:
-                    # if in case a normal bond is not found for the shell, traverse through the previous shells as well
-                    b2 = all_bonds[
-                        np.argwhere(
-                            np.round(all_bonds @ b1, decimals=5) == 0.0
-                        ).flatten()[0]
-                    ]
-                # third bond is then  normal to both the first and second bonds (transverse2)
+                    # if in case a normal bond is not found for the shell, traverse through the other input shells as well
+                    b2 = all_bonds[np.argwhere(np.round(all_bonds@b1, decimals=5) == 0.).flatten()[0]]
                 b3 = np.cross(b1, b2)
                 if b1.dot(np.cross(b2, b3)) < 0.0:  # if this condition is not met
                     b2, b3 = b3, b2  # reverse b2 and b3
@@ -742,47 +735,30 @@ class MDBondAnalysis(_BondAnalysisParent):
         else:
             raise ValueError("choose between long, t1, and t2")
 
-    def _get_correlations(self, shell, bond_x, bond_y, axis_x, axis_y, n_bins):
-        per_shell_r_t1_t2_bond_vectors = self.get_r_t1_t2_bond_vectors()
-        all_bonds = per_shell_r_t1_t2_bond_vectors[shell]
-        n_bonds = len(all_bonds)
-        if (bond_x >= n_bonds) or (bond_y >= n_bonds):
-            raise ValueError(
-                "there are only {} bonds in shell {}".format(n_bonds, shell)
-            )
+    def _get_correlations(self, shell_x, shell_y, bond_x, bond_y, axis_x, axis_y, n_bins):
+        per_shell_l_t1_t2_bond_vectors = self.get_l_t1_t2_bond_vectors()
+        all_bonds_x = per_shell_l_t1_t2_bond_vectors[shell_x]
+        all_bonds_y = per_shell_l_t1_t2_bond_vectors[shell_y]
+        if (bond_x >= len(all_bonds_x)):
+            raise ValueError("there are only {} bonds in shell {}".format(len(all_bonds_x), shell_x))
+        elif (bond_y >= len(all_bonds_y)):
+            raise ValueError("there are only {} bonds in shell {}".format(len(all_bonds_y), shell_y))
         axis_0 = self._get_corr_column_value(axis_x)
         axis_1 = self._get_corr_column_value(axis_y)
-        return self._get_rho_corr_and_uncorr(
-            x_data=all_bonds[bond_y, :, axis_0],
-            y_data=all_bonds[bond_x, :, axis_1],
-            n_bins=n_bins,
-        )
+        return self._get_rho_corr_and_uncorr(x_data=all_bonds_x[bond_x, :, axis_0], y_data=all_bonds_y[bond_y, :, axis_1],
+                                             n_bins=n_bins)
 
-    def get_mutual_information(
-        self, shell=0, bond_x=0, bond_y=0, axis_x="long", axis_y="long", n_bins=101
-    ):
-        rho_corr, rho_uncorr, _, _ = self._get_correlations(
-            shell=shell,
-            bond_x=bond_x,
-            bond_y=bond_y,
-            axis_x=axis_x,
-            axis_y=axis_y,
-            n_bins=n_bins,
-        )
-        sel = (rho_uncorr > 0.0) * (rho_corr > 0.0)
-        return np.sum(rho_corr[sel] * np.log(rho_corr[sel] / rho_uncorr[sel]))
+    def get_mutual_information(self, shell_x=0, shell_y=0, bond_x=0, bond_y=0, axis_x='long', axis_y='long', n_bins=101):
+        rho_corr, rho_uncorr, _, _ = self._get_correlations(shell_x=shell_x, shell_y=shell_y, bond_x=bond_x, bond_y=bond_y, axis_x=axis_x,
+                                                            axis_y=axis_y, n_bins=n_bins)
+        sel = (rho_uncorr>0.0)*(rho_corr>0.0)
+        return np.sum(rho_corr[sel]*np.log(rho_corr[sel]/rho_uncorr[sel]))
 
-    def plot_correlations(
-        self, shell=0, bond_x=0, bond_y=0, axis_x="long", axis_y="long", n_bins=101
-    ):
-        rho_corr, rho_uncorr, x_edges, y_edges = self._get_correlations(
-            shell=shell,
-            bond_x=bond_x,
-            bond_y=bond_y,
-            axis_x=axis_x,
-            axis_y=axis_y,
-            n_bins=n_bins,
-        )
+    def plot_correlations(self, shell_x=0, shell_y=0, bond_x=0, bond_y=0, axis_x='long', axis_y='long', n_bins=101):
+        rho_corr, rho_uncorr, x_edges, y_edges = self._get_correlations(shell_x=shell_x, shell_y=shell_y,
+                                                                        bond_x=bond_x, bond_y=bond_y, 
+                                                                        axis_x=axis_x, axis_y=axis_y, n_bins=n_bins)
+
         rho_diff = rho_corr - rho_uncorr
         cm = LinearSegmentedColormap.from_list(
             "my_spec", [myc["b"], (1, 1, 1), myc["o"]], N=n_bins
@@ -796,8 +772,8 @@ class MDBondAnalysis(_BondAnalysisParent):
         plt.imshow(rho_diff[::-1, :], cmap=cm, extent=plims)
         plt.xticks(np.around(np.linspace(plims[0], plims[1], 5), decimals=2))
         plt.yticks(np.around(np.linspace(plims[2], plims[3], 5), decimals=2))
-        plt.xlabel(axis_x + "_" + str(bond_x))
-        plt.ylabel(axis_y + "_" + str(bond_y))
+        plt.xlabel('shell_' + str(shell_x) + '_' + axis_x + '_' + str(bond_x))
+        plt.ylabel('shell_' + str(shell_y) + '_' + axis_y + '_' + str(bond_y))
         plt.show()
 
 

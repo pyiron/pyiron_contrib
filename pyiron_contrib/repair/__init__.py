@@ -451,8 +451,8 @@ class VaspZpotrfZtrtri(VaspTool):
 
     def match(self, job):
         return super().match(job) and match_in_error_log(PartialLine(
-            "LAPACK: Routine ZPOTRF ZTRTRI failed!", job
-        ))
+            "LAPACK: Routine ZPOTRF ZTRTRI failed!"
+        ), job)
 
     def fix(self, old_job, new_job):
         super().fix(old_job, new_job)

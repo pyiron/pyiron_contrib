@@ -65,13 +65,13 @@ thermo           0
 # Run equilibraiton at T_start.
 run              ${t_eq}
 
-# Dump trajectory.
-dump             1 all custom ${t_traj} dump.out id type xsu ysu zsu fx fy fz vx vy vz
-dump_modify      1 sort id format line "%d %d %20.15g %20.15g %20.15g %20.15g %20.15g %20.15g %20.15g %20.15g %20.15g"
-
 # Dump properties just once, so that pyiron does not complain.
 thermo_style     custom step temp pe etotal pxx pxy pxz pyy pyz pzz vol
 thermo           0
+
+# Dump trajectory.
+dump             1 all custom ${t_traj} dump.out id type xsu ysu zsu fx fy fz vx vy vz
+dump_modify      1 sort id format line "%d %d %20.15g %20.15g %20.15g %20.15g %20.15g %20.15g %20.15g %20.15g %20.15g"
 
 # Refix and run forward ramping.
 unfix            f1
@@ -133,7 +133,7 @@ class TemperatureRampMD():
         for i, job_name in enumerate(self._job_names): 
             if job_name not in job_list:
                 self._run_job(project=self._project, job_name=job_name)
-            elif job_status[i] != 'finished' or delete_existing_jobs:
+            elif job_status[i] not in ['finished', 'running', 'collect'] or delete_existing_jobs:
                 self._project.remove_job(job_name)
                 self._run_job(project=self._project, job_name=job_name)
                 

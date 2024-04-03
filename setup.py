@@ -32,7 +32,7 @@ setup(
     install_requires=[        
         'matplotlib==3.8.3',
         'numpy==1.26.4',
-        'pyiron_base==0.7.9',
+        'pyiron_base==0.8',
         'scipy==1.12.0',
         'seaborn==0.13.2',
         'pyparsing==3.1.2',
@@ -40,7 +40,7 @@ setup(
     extras_require={
         'atomistic': [
             'ase==3.22.1',
-            'pyiron_atomistics==0.4.17',
+            'pyiron_atomistics==0.5.0',
             'pycp2k==0.2.2',
         ],
         'fenics': [
@@ -55,7 +55,7 @@ setup(
         'tinybase': [
             'distributed==2024.3.1',
             'pympipool==0.7.13',
-            'h5io_browser==0.0.9',
+            'h5io_browser==0.0.10',
         ]
     },
     cmdclass=versioneer.get_cmdclass(),

@@ -49,6 +49,7 @@ JOB_CLASS_DICT.update(
         "GleMD": "pyiron_contrib.atomistics.ipi.ipi_jobs",
         "PigletMD": "pyiron_contrib.atomistics.ipi.ipi_jobs",
         "QuasiHarmonicApproximation": "pyiron_contrib.atomistics.atomistics.master.qha",
+        "TemperatureRemapping": "pyiron_contrib.atomistics.tra.temperature_remapping",
     }
 )
 

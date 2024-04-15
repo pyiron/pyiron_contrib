@@ -55,7 +55,7 @@ setup(
         'tinybase': [
             'distributed==2024.4.1',
             'pympipool==0.7.17',
-            'h5io_browser==0.0.10',
+            'h5io_browser==0.0.11',
         ]
     },
     cmdclass=versioneer.get_cmdclass(),

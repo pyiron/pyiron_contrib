@@ -48,11 +48,22 @@ variable         t_traj equal {{ n_traj }} # dump trajectory frequency
 # Integrator and thermostat.
 timestep         ${ts}
 {% if pressure is not none %}
-fix              f1 all nph iso {{ pressure }} {{ pressure }} 1.0
+    {% if langevin == True %}
+        fix f1 all nph iso {{ pressure }} {{ pressure }} 1.0
+    {% else %}
+        fix f1 all npt temp {{ temperature }} {{ temperature }} 0.1 iso {{ pressure }} {{ pressure }} 1.0
+    {% endif %}
 {% else %}
-fix              f1 all nve
+    {% if langevin == True %}
+        fix f1 all nve
+    {% else %}
+        fix f1 all nvt temp {{ temperature }} {{ temperature }} 0.1
+    {% endif %}
 {% endif %}
-fix              f2 all langevin {{ T_start }} {{ T_start }} 0.1 ${rnd} zero yes
+
+{% if langevin == True %}
+    fix f2 all langevin {{ temperature }} {{ temperature }} 0.1 ${rnd} zero yes
+{% endif %}
 
 # Initial temperature to accelerate equilibration.
 variable         T_0 equal 2.0*{{ T_start }}
@@ -75,20 +86,37 @@ dump_modify      1 sort id format line "%d %d %20.15g %20.15g %20.15g %20.15g %2
 
 # Refix and run forward ramping.
 unfix            f1
-unfix            f2
-{% if pressure is not none %}
-fix              f1 all nph iso {{ pressure }} {{ pressure }} 1.0
-{% else %}
-fix              f1 all nve
+{% if langevin == True %}
+    unfix        f2
 {% endif %}
-fix              f2 all langevin {{ T_start }} {{ T_stop }} 0.1 ${rnd} zero yes
+
+# Integrator and thermostat.
+{% if pressure is not none %}
+    {% if langevin == True %}
+        fix f1 all nph iso {{ pressure }} {{ pressure }} 1.0
+    {% else %}
+        fix f1 all npt temp {{ temperature }} {{ temperature }} 0.1 iso {{ pressure }} {{ pressure }} 1.0
+    {% endif %}
+{% else %}
+    {% if langevin == True %}
+        fix f1 all nve
+    {% else %}
+        fix f1 all nvt temp {{ temperature }} {{ temperature }} 0.1
+    {% endif %}
+{% endif %}
+
+{% if langevin == True %}
+    fix f2 all langevin {{ temperature }} {{ temperature }} 0.1 ${rnd} zero yes
+{% endif %}
+
+# Print required output.
 fix              f3 all print ${t_print} "$(step) $(temp) $(pe) $(ke) $(enthalpy) $(vol) $(press)" title "# Step Temp[K] PE[eV] KE[eV] H[eV] Vol[Ang^3] P[eV/Ang^2]" screen no file forward.dat
 run              ${t}
 """
 
 class TemperatureRampMD():
     def __init__(self, ref_job, temperatures, pressure, n_samples=5, n_ramp_steps=1000, 
-                 n_equib_steps=100, n_print=1, n_traj_print=1, time_step=1., recompress=False):
+                 n_equib_steps=100, n_print=1, n_traj_print=1, time_step=1., langevin=True, recompress=False):
         self.ref_job = ref_job
         self.temperatures = temperatures
         self.pressure = pressure
@@ -98,6 +126,7 @@ class TemperatureRampMD():
         self.n_print = n_print
         self.n_traj_print = n_traj_print
         self.time_step = time_step
+        self.langevin = langevin
         self.recompress = recompress
         
         self._project = self.ref_job.project
@@ -118,7 +147,8 @@ class TemperatureRampMD():
             n_print=self.n_print,
             n_traj=self.n_traj_print,
             time_step=self.time_step,
-            pressure=self.pressure
+            pressure=self.pressure,
+            langevin=self.langevin
         )
         return input_script
         
@@ -130,10 +160,10 @@ class TemperatureRampMD():
     def run_ramp_md(self, delete_existing_jobs=False):
         job_list = self._project.job_table().job.to_list()
         job_status = self._project.job_table().status.to_list()
-        for i, job_name in enumerate(self._job_names): 
+        for job_name in self._job_names:
             if job_name not in job_list:
                 self._run_job(project=self._project, job_name=job_name)
-            elif job_status[i] not in ['finished', 'running', 'collect'] or delete_existing_jobs:
+            elif job_status[job_list.index(job_name)] not in ['finished', 'running', 'collect'] or delete_existing_jobs:
                 self._project.remove_job(job_name)
                 self._run_job(project=self._project, job_name=job_name)
                 
@@ -183,8 +213,17 @@ class TemperatureRampMD():
     def _weight_function(x, a=0.2, b=1., c=5e-3):
         return a - (a - b) * np.exp(-c * x)
 
-    def _get_mapped_quantity(self, quantity, remapped_temperatures, poly_order=5, spline=False):
-        w = self._weight_function(self._raw_temperatures)
+    @staticmethod
+    def _weight_function_linear(x, m=-1):
+        return m*x/x.max()+1
+
+    def _get_mapped_quantity(self, quantity, remapped_temperatures, poly_order=5, spline=False, weighting='custom'):
+        if weighting == 'linear':
+            w = self._weight_function_linear(self._raw_temperatures)
+        elif weighting == 'custom':
+            w = self._weight_function(self._raw_temperatures)
+        else:
+            raise ValueError('weighting must be linear or custom')
         if not spline:
             poly = np.polyfit(x=self._raw_temperatures, y=quantity, w=w, deg=poly_order)
             return np.poly1d(poly)(remapped_temperatures)
@@ -198,34 +237,34 @@ class TemperatureRampMD():
         G = U-self.temperatures*S
         return Cp, S, G
     
-    def get_unmapped_properties(self, poly_order=5, spline=True):
+    def get_unmapped_properties(self, poly_order=5, spline=False, weighting='custom'):
         mean_dict = self._get_mean_properties()
-        U = self._get_mapped_quantity(mean_dict['U_mean'], self.temperatures, poly_order=poly_order, spline=spline)
-        H = self._get_mapped_quantity(mean_dict['H_mean'], self.temperatures, poly_order=poly_order, spline=spline)
-        V = self._get_mapped_quantity(mean_dict['V_mean'], self.temperatures, poly_order=poly_order, spline=spline)
-        P = self._get_mapped_quantity(mean_dict['P_mean'], self.temperatures, poly_order=poly_order, spline=spline)
-        Cp, S, G = self._get_properties(H)
+        U = self._get_mapped_quantity(mean_dict['U_mean'], self.temperatures, poly_order=poly_order, spline=spline, weighting=weighting)
+        H = self._get_mapped_quantity(mean_dict['H_mean'], self.temperatures, poly_order=poly_order, spline=spline, weighting=weighting)
+        V = self._get_mapped_quantity(mean_dict['V_mean'], self.temperatures, poly_order=poly_order, spline=spline, weighting=weighting)
+        P = self._get_mapped_quantity(mean_dict['P_mean'], self.temperatures, poly_order=poly_order, spline=spline, weighting=weighting)
+        Cv, S, F = self._get_properties(U)
         return {'T': self.temperatures.tolist(),
                 'U': U.tolist(),
                 'H': H.tolist(),
-                'Cp': Cp.tolist(),
+                'Cv': Cv.tolist(),
                 'S': S.tolist(),
-                'G': G.tolist(),
+                'F': F.tolist(),
                 'V': V.tolist(),
                 'P': P.tolist()}
         
-    def get_remapped_properties(self, remapped_temperatures, poly_order=5, spline=True):
+    def get_remapped_properties(self, remapped_temperatures, poly_order=5, spline=False, weighting='custom'):
         mean_dict = self._get_mean_properties()
-        U = self._get_mapped_quantity(mean_dict['U_mean'], remapped_temperatures, poly_order=poly_order, spline=spline)
-        H = self._get_mapped_quantity(mean_dict['H_mean'], remapped_temperatures, poly_order=poly_order, spline=spline)
-        V = self._get_mapped_quantity(mean_dict['V_mean'], remapped_temperatures, poly_order=poly_order, spline=spline)
-        P = self._get_mapped_quantity(mean_dict['P_mean'], remapped_temperatures, poly_order=poly_order, spline=spline)
-        Cp, S, G = self._get_properties(H)
+        U = self._get_mapped_quantity(mean_dict['U_mean'], remapped_temperatures, poly_order=poly_order, spline=spline, weighting=weighting)
+        H = self._get_mapped_quantity(mean_dict['H_mean'], remapped_temperatures, poly_order=poly_order, spline=spline, weighting=weighting)
+        V = self._get_mapped_quantity(mean_dict['V_mean'], remapped_temperatures, poly_order=poly_order, spline=spline, weighting=weighting)
+        P = self._get_mapped_quantity(mean_dict['P_mean'], remapped_temperatures, poly_order=poly_order, spline=spline, weighting=weighting)
+        Cv, S, F = self._get_properties(U)
         return {'T': self.temperatures.tolist(),
-                'remapped_U': U.tolist(),
-                'remapped_H': H.tolist(),
-                'remapped_Cp': Cp.tolist(),
-                'remapped_S': S.tolist(),
-                'remapped_G': G.tolist(),
-                'remapped_V': V.tolist(),
-                'remapped_P': P.tolist()}
+                'U': U.tolist(),
+                'H': H.tolist(),
+                'Cv': Cv.tolist(),
+                'S': S.tolist(),
+                'F': F.tolist(),
+                'V': V.tolist(),
+                'P': P.tolist()}

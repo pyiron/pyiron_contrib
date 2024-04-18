@@ -10,6 +10,7 @@ from pyiron_base import Project
 from pyiron_base.jobs.job.generic import GenericJob
 from pyiron_base.storage.datacontainer import DataContainer
 
+from scipy.integrate import simpson
 import scipy.constants
 KB = scipy.constants.physical_constants['Boltzmann constant in eV/K'][0]
 HBAR = scipy.constants.physical_constants['reduced Planck constant in eV s'][0]
@@ -54,7 +55,6 @@ class TemperatureRemapping(GenericJob):
         self.input = _TRInput(table_name="job_input")
         self.output = DataContainer(table_name="job_output")
         self.harm_job = None
-        self.output.remapped_temperatures = None
         
     @property
     def structure(self):
@@ -66,7 +66,6 @@ class TemperatureRemapping(GenericJob):
             sub_pr = Project(self.working_directory)
             self.harm_job = sub_pr.create.job.PhonopyJob('ha_job', delete_existing_job=True)
             self.harm_job.ref_job = self.input.ref_job
-            self.harm_job.input['interaction_range'] = self.input.interaction_range
             self.harm_job.run()
         return self.harm_job
     
@@ -75,9 +74,10 @@ class TemperatureRemapping(GenericJob):
         self.output.dos_total = self.harm_job['output/dos_total']
         
         sel = self.output.dos_nu > 0.
-        nu_real = self.output.dos_nu[sel]
-        dos_real = self.output.dos_nu[sel]/self.output.dos_nu[sel].sum()
-        self.output.effective_nu = (nu_real*dos_real).sum()
+        nu  = self.output.dos_nu[sel]
+        dos = self.output.dos_total[sel]
+        dos /= simpson(y=dos, x=nu)
+        self.output.effective_nu = simpson(y=dos*nu, x=nu)  # in Thz
         
         hessian = self.get_hessian()
         nu_v = self.get_vibrational_frequencies(hessian, return_eigenvectors=False)
@@ -119,11 +119,13 @@ class TemperatureRemapping(GenericJob):
         return np.sum((eigvectors**2) * delta_function(nu, nu_v), axis=-1)
     
     def get_remapped_temperatures(self):
-        if self.output.remapped_temperatures is None:
-            nu = self.output.effective_nu
-            self.output.remapped_temperatures = np.array([H*nu*1e12*(0.5+(1/(np.exp(H*nu*1e12/(KB*temp))-1)))/KB
-                                                          for temp in self.input.temperatures])
-    
+        sel = self.output.dos_nu > 0.
+        nu  = self.output.dos_nu[sel]*1e12  # from THz to Hz
+        dos = self.output.dos_total[sel]
+        dos /= simpson(y=dos, x=nu)
+        self.output.remapped_temperatures = np.array([simpson(y=H*dos*nu*(0.5+(1/(np.exp(H*nu/(KB*temp))-1))), x=nu)/KB
+                                                      for temp in self.input.temperatures])
+
     def run_static(self):
         self.status.running = True
         self.run_ha()
@@ -141,4 +143,4 @@ class TemperatureRemapping(GenericJob):
         super(TemperatureRemapping, self).from_hdf()
         self.input.from_hdf(self.project_hdf5)
         self.output.from_hdf(self.project_hdf5)
-        # self.harm_job = self.project.load('ha_job')
+        self.harm_job = self.project.inspect('ha_job')

@@ -506,7 +506,7 @@ class CoscineConnect:
             coscine.Project,
             coscine.FileObject,
             coscine.Resource,
-            coscine.Client,
+            coscine.client.ApiClient,
             str,
             None,
         ],
@@ -533,13 +533,13 @@ class CoscineConnect:
         else:
             self._client = token
 
-        maintenance = self._client.get_maintenance()
-        if maintenance["displayName"] is not None:
+        maintenance = self._client.maintenances()
+        if len(maintenance) > 0 :
             state.logger.warn(f"Coscine is a maintenance mode: {maintenance}")
 
     @staticmethod
     def _connect_client(token: str):
-        client = coscine.Client(token)
+        client = coscine.client.ApiClient(token, verbose=False)
         try:
             client.projects()
         except (PermissionError, RuntimeError, ConnectionError) as e:
@@ -555,7 +555,7 @@ class CoscineConnect:
 class CoscineProject(HasGroups):
     def __init__(
         self,
-        project: Union[coscine.Project, coscine.Client, str, None] = None,
+        project: Union[coscine.Project, coscine.client.ApiClient, str, None] = None,
         parent_path=None,
     ):
         """

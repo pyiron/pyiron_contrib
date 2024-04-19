@@ -3,17 +3,20 @@
 # Distributed under the terms of "New BSD License", see the LICENSE file.
 
 import numpy as np
-from scipy.interpolate import splrep, splev
-from scipy.integrate import cumtrapz
-from scipy.constants import physical_constants
-KB = physical_constants['Boltzmann constant in eV/K'][0]
+import pandas as pd
+from pandas.errors import EmptyDataError
+
+from scipy.integrate import simpson
+import scipy.constants as sc
+KB = sc.value('Boltzmann constant in eV/K')
+EV = sc.value('electron volt')
+H = sc.value('Planck constant in eV/Hz')
+AMU = sc.value('atomic mass constant')
 bar_to_GPa = 1e-4
 
 from jinja2 import Template
 from io import StringIO
 import os
-
-from pandas.errors import EmptyDataError
 
 lammps_input = """\
 # This script runs alchemical TILD.
@@ -23,18 +26,21 @@ units            metal
 dimension        3
 boundary         p p p
 atom_style       atomic
+atom_modify      map yes
 
 # Create atoms.
 read_data        structure.inp
 
 # Initalizes the random number generator.
 variable         rnd equal round(random(0,99999,{{ seed }}))
+variable         KB equal 8.617333262E-05
 
 # Simulation control parameters.
 variable         t_eq equal round({{ n_equib }}) # Equilibration steps.
 variable         t equal round({{ n_steps }}) # Switching steps.
-variable         ts equal {{ time_step }}/1000 # Timestep
-variable         t_print equal {{ n_print}} # dump frequency
+variable         ts equal {{ time_step }}/1000 # Timestep.
+variable         t_print equal {{ n_print}} # Dump frequency of properties.
+variable         atom_id equal round({{ atom_id }}+1) # Id of the atom to be removed
 
 # Define interatomic potential.
 pair_style       hybrid {{ pair_style }} zero 0.0 nocoeff
@@ -70,8 +76,27 @@ velocity         all create ${T_0} ${rnd} dist gaussian
 # Replace harmonic osciallators with interacting atoms if pure.
 set              type 2 type 1
 
+# Compute and record the average msd to determine the spring constant k.
+compute          msd all msd average yes com yes
+variable         n_every equal round(${t_eq}/100)
+variable         n_repeat equal 50
+fix              ave_msd all ave/time ${n_every} ${n_repeat} ${t_eq} c_msd[4]
+
+# Also record the average positions.
+group            pos id ${atom_id}
+compute          upos pos property/atom xu yu zu
+fix              ave_pos pos ave/atom ${n_every} ${n_repeat} ${t_eq} c_upos[1] c_upos[2] c_upos[3]
+
 # Run equilibraiton at T_start.
 run              ${t_eq}
+
+# Determine k.
+variable         ave_msd equal f_ave_msd
+variable         ave_x equal f_ave_pos[${atom_id}][1]
+variable         ave_y equal f_ave_pos[${atom_id}][2]
+variable         ave_z equal f_ave_pos[${atom_id}][3]
+variable         k equal 3*${KB}*{{ temperature }}/${ave_msd}
+print            "$k ${ave_x} ${ave_y} ${ave_z}" file spring.dat
 
 # Define partitions.
 variable         name world pure alloy
@@ -82,7 +107,7 @@ if "${name} == alloy" then "set atom 1 type 2"
 # Define the harmonic oscillator by tethering the 0th atom to the origin.
 if "${name} == alloy" then &
     "group ho id 1" & 
-    "fix f_ho ho spring tether {{ k }} 0.0 0.0 0.0 0.0" &
+    "fix f_ho ho spring tether $k ${ave_x} ${ave_y} ${ave_z} 0.0" &
     "fix_modify f_ho energy yes"
 
 # Define ramp variable to combine the two different partitions.
@@ -108,14 +133,14 @@ run              ${t}
 """
 
 class VacancyFormationTI():
-    def __init__(self, ref_job, temperature, pressure, k=2.5, n_samples=5, n_steps=1000, n_equib_steps=100, n_print=1, time_step=1.,
+    def __init__(self, ref_job, temperature, pressure, atom_id=0, n_samples=1, n_steps=1000, n_equib_steps=100, n_print=1, time_step=1.,
                  pair_style=None, pair_coeff=None, langevin=True, recompress=False):
         self.ref_job = ref_job
         self.pair_style = pair_style
         self.pair_coeff = pair_coeff
         self.temperature = temperature
         self.pressure = pressure
-        self.k = k
+        self.atom_id = atom_id
         self.n_samples = n_samples
         self.n_steps = n_steps
         self.n_equib_steps = n_equib_steps
@@ -143,7 +168,7 @@ class VacancyFormationTI():
             n_print=self.n_print,
             time_step=self.time_step,
             pressure=self.pressure,
-            k=self.k,
+            atom_id=self.atom_id,
             langevin=self.langevin
         )
         return input_script
@@ -155,6 +180,7 @@ class VacancyFormationTI():
             job.run()
         except EmptyDataError:
             job.status.finished = True
+            job.compress()
         
     def run_md(self, delete_existing_jobs=False):
         job_list = self._project.job_table().job.to_list()
@@ -165,6 +191,10 @@ class VacancyFormationTI():
             elif job_status[job_list.index(job_name)] not in ['finished', 'running', 'collect'] or delete_existing_jobs:
                 self._project.remove_job(job_name)
                 self._run_job(project=self._project, job_name=job_name)
+
+    def _collect_spring_data(self, working_directory):
+        k, x, y, z = np.loadtxt(working_directory+'/spring.dat')
+        return k, np.array([x, y, z])
                 
     def _collect_output(self, job_name):
         job = self._project.inspect(job_name)
@@ -192,30 +222,38 @@ class VacancyFormationTI():
         df_arrays = df_pandas.to_numpy().T
         if self.recompress:
             job.compress()
-        return df_arrays
+        return df_arrays, *self._collect_spring_data(working_directory=job.working_directory)
 
     def get_output(self):
-        output_arrays = np.array([self._collect_output(job_name) for job_name in self._job_names])
+        output_arrays, k_s, tether_pos = zip(*[self._collect_output(job_name) for job_name in self._job_names])
+        output_arrays = np.array(output_arrays)
         data_dict = {
-            'Step': output_arrays[:, 0].mean(axis=0),
-            'Temperature': output_arrays[:, 1].mean(axis=0),
-            'Pressure': output_arrays[:, 2].mean(axis=0),
-            'energy_kin': output_arrays[:, 3].mean(axis=0),
-            'lambda': np.flip(output_arrays[:, 4].mean(axis=0)),
-            'bulk_energy_pot': output_arrays[:, 5].mean(axis=0),
-            'alloy_energy_pot': output_arrays[:, 6].mean(axis=0),
-            'energy_pot_mix': output_arrays[:, 7].mean(axis=0)
+            'Step': output_arrays[:, 0],
+            'Temperature': output_arrays[:, 1],
+            'Pressure': output_arrays[:, 2],
+            'energy_kin': output_arrays[:, 3],
+            'lambda': np.flip(output_arrays[:, 4]),
+            'bulk_energy_pot': output_arrays[:, 5],
+            'alloy_energy_pot': output_arrays[:, 6],
+            'energy_pot_mix': output_arrays[:, 7],
+            'spring_constant': np.array(k_s),
+            'tether_positions': np.array(tether_pos)
         }
         return data_dict
 
     def get_formation_energy(self, per_atom_bulk_free_energy):
         data_dict = self.get_output()
-        lambdas = data_dict['lambda']
-        U_bulk = data_dict['bulk_energy_pot']
-        U_vac = data_dict['alloy_energy_pot']
-        
-        mass = self._structure.get_masses()[0]
-        omega = np.sqrt(self.k*EV/(mass*AMU))*1.0e+10
-        nu = omega/(2*np.pi)
-        F_harm = 3*KB*temperature*np.log(H*nu/(KB*self.temperature))
-        return per_atom_bulk_free_energy+simpson(y=U_vac-U_bulk, x=lambdas)-F_harm
+        G_form = []
+        for n in range(self.n_samples):
+            lambdas = data_dict['lambda'][n]
+            U_bulk = data_dict['bulk_energy_pot'][n]
+            U_vac = data_dict['alloy_energy_pot'][n]
+            k = data_dict['spring_constant'][n]
+            
+            mass = self._structure.get_masses()[0]
+            omega = np.sqrt(k*EV/(mass*AMU))*1.0e+10
+            nu = omega/(2*np.pi)
+            F_harm = 3*KB*self.temperature*np.log(H*nu/(KB*self.temperature))
+            G_form.append(per_atom_bulk_free_energy+simpson(y=U_vac-U_bulk, x=lambdas)-F_harm)
+        G_form = np.array(G_form)
+        return G_form

@@ -51,22 +51,22 @@ timestep         ${ts}
     {% if langevin == True %}
         fix f1 all nph iso {{ pressure }} {{ pressure }} 1.0
     {% else %}
-        fix f1 all npt temp {{ temperature }} {{ temperature }} 0.1 iso {{ pressure }} {{ pressure }} 1.0
+        fix f1 all npt temp {{ temperature_start }} {{ temperature_start }} 0.1 iso {{ pressure }} {{ pressure }} 1.0
     {% endif %}
 {% else %}
     {% if langevin == True %}
         fix f1 all nve
     {% else %}
-        fix f1 all nvt temp {{ temperature }} {{ temperature }} 0.1
+        fix f1 all nvt temp {{ temperature_start }} {{ temperature_start }} 0.1
     {% endif %}
 {% endif %}
 
 {% if langevin == True %}
-    fix f2 all langevin {{ temperature }} {{ temperature }} 0.1 ${rnd} zero yes
+    fix f2 all langevin {{ temperature_start }} {{ temperature_start }} 0.1 ${rnd} zero yes
 {% endif %}
 
 # Initial temperature to accelerate equilibration.
-variable         T_0 equal 2.0*{{ T_start }}
+variable         T_0 equal 2.0*{{ temperature_start }}
 velocity         all create ${T_0} ${rnd} dist gaussian
 
 # Dummy thermo out, so pyiron does not complain.
@@ -95,18 +95,18 @@ unfix            f1
     {% if langevin == True %}
         fix f1 all nph iso {{ pressure }} {{ pressure }} 1.0
     {% else %}
-        fix f1 all npt temp {{ temperature }} {{ temperature }} 0.1 iso {{ pressure }} {{ pressure }} 1.0
+        fix f1 all npt temp {{ temperature_start }} {{ temperature_stop }} 0.1 iso {{ pressure }} {{ pressure }} 1.0
     {% endif %}
 {% else %}
     {% if langevin == True %}
         fix f1 all nve
     {% else %}
-        fix f1 all nvt temp {{ temperature }} {{ temperature }} 0.1
+        fix f1 all nvt temp {{ temperature_start }} {{ temperature_stop }} 0.1
     {% endif %}
 {% endif %}
 
 {% if langevin == True %}
-    fix f2 all langevin {{ temperature }} {{ temperature }} 0.1 ${rnd} zero yes
+    fix f2 all langevin {{ temperature_start }} {{ temperature_stop }} 0.1 ${rnd} zero yes
 {% endif %}
 
 # Print required output.
@@ -140,8 +140,8 @@ class TemperatureRampMD():
         template = Template(lammps_input)
         input_script = template.render(
             seed=np.random.randint(99999), 
-            T_start=self.temperatures[0], 
-            T_stop=self.temperatures[-1],
+            temperature_start=self.temperatures[0], 
+            temperature_stop=self.temperatures[-1],
             n_equib=self.n_equib_steps,
             n_steps=self.n_ramp_steps,
             n_print=self.n_print,

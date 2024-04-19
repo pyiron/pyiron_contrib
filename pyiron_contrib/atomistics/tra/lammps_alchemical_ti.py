@@ -134,10 +134,8 @@ run              ${t}
 
 class VacancyFormationTI():
     def __init__(self, ref_job, temperature, pressure, atom_id=0, n_samples=1, n_steps=1000, n_equib_steps=100, n_print=1, time_step=1.,
-                 pair_style=None, pair_coeff=None, langevin=True, recompress=False):
+                 langevin=True, recompress=False):
         self.ref_job = ref_job
-        self.pair_style = pair_style
-        self.pair_coeff = pair_coeff
         self.temperature = temperature
         self.pressure = pressure
         self.atom_id = atom_id
@@ -155,13 +153,15 @@ class VacancyFormationTI():
         self._n_atoms = self._structure.get_number_of_atoms()
         if self.pressure is not None:
             self.pressure *= 1/bar_to_GPa
+        self._split_potential_strings()
+        self._create_ho_structure()
     
     def _generate_input_script(self):
         template = Template(lammps_input)
         input_script = template.render(
             seed=np.random.randint(99999),
-            pair_style = self.pair_style,
-            pair_coeff = self.pair_coeff,
+            pair_style = self._pair_style,
+            pair_coeff = self._pair_coeff,
             temperature=self.temperature,
             n_equib=self.n_equib_steps,
             n_steps=self.n_steps,
@@ -172,9 +172,24 @@ class VacancyFormationTI():
             langevin=self.langevin
         )
         return input_script
+
+    def _split_potential_strings(self):
+        potential = self.ref_job.potential
+        self._pair_style = potential['Config'][0][0].split()[1]
+        pair_coeff = potential['Config'][0][1].split()
+        self._pair_coeff = ' '.join(pair_coeff[1:])
+
+    def _create_ho_structure(self):
+        self._structure = self.ref_job.structure.copy()
+        self._structure[self.atom_id] = 'H'
+
+    def _create_ho_potential(self):
+        
         
     def _run_job(self, project, job_name):
         job = self.ref_job.copy_template(project=project, new_job_name=job_name)
+        job.structure = self._structure.copy()
+        job.potential = self._potential
         job.input.control.load_string(self._generate_input_script())
         try:
             job.run()
@@ -241,7 +256,7 @@ class VacancyFormationTI():
         }
         return data_dict
 
-    def get_formation_energy(self, per_atom_bulk_free_energy):
+    def get_formation_energy(self, per_atom_bulk_free_energy, averaged=True):
         data_dict = self.get_output()
         G_form = []
         for n in range(self.n_samples):
@@ -256,4 +271,7 @@ class VacancyFormationTI():
             F_harm = 3*KB*self.temperature*np.log(H*nu/(KB*self.temperature))
             G_form.append(per_atom_bulk_free_energy+simpson(y=U_vac-U_bulk, x=lambdas)-F_harm)
         G_form = np.array(G_form)
-        return G_form
+        if not averaged:
+            return G_form
+        else:
+            return G_form.mean(), G_form.std()/np.sqrt(self.n_samples)

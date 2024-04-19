@@ -51,7 +51,7 @@ class _TRInput(DataContainer):
 class TemperatureRemapping(GenericJob):
     def __init__(self, project, job_name):
         super(TemperatureRemapping, self).__init__(project, job_name)
-        self._python_only_job = True
+        self._python_only_job = False
         self.input = _TRInput(table_name="job_input")
         self.output = DataContainer(table_name="job_output")
         self.harm_job = None

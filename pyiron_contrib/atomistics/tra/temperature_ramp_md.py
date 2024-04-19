@@ -243,13 +243,17 @@ class TemperatureRampMD():
         H = self._get_mapped_quantity(mean_dict['H_mean'], self.temperatures, poly_order=poly_order, spline=spline, weighting=weighting)
         V = self._get_mapped_quantity(mean_dict['V_mean'], self.temperatures, poly_order=poly_order, spline=spline, weighting=weighting)
         P = self._get_mapped_quantity(mean_dict['P_mean'], self.temperatures, poly_order=poly_order, spline=spline, weighting=weighting)
-        Cv, S, F = self._get_properties(U)
+        Cv, Sv, F = self._get_properties(U)
+        Cp, Sp, G = self._get_properties(H)
         return {'T': self.temperatures.tolist(),
                 'U': U.tolist(),
                 'H': H.tolist(),
                 'Cv': Cv.tolist(),
-                'S': S.tolist(),
+                'Sv': Sv.tolist(),
                 'F': F.tolist(),
+                'Cp': Cp.tolist(),
+                'Sp': Sp.tolist(),
+                'G': G.tolist(),
                 'V': V.tolist(),
                 'P': P.tolist()}
         
@@ -259,12 +263,16 @@ class TemperatureRampMD():
         H = self._get_mapped_quantity(mean_dict['H_mean'], remapped_temperatures, poly_order=poly_order, spline=spline, weighting=weighting)
         V = self._get_mapped_quantity(mean_dict['V_mean'], remapped_temperatures, poly_order=poly_order, spline=spline, weighting=weighting)
         P = self._get_mapped_quantity(mean_dict['P_mean'], remapped_temperatures, poly_order=poly_order, spline=spline, weighting=weighting)
-        Cv, S, F = self._get_properties(U)
+        Cv, Sv, F = self._get_properties(U)
+        Cp, Sp, G = self._get_properties(H)
         return {'T': self.temperatures.tolist(),
                 'U': U.tolist(),
                 'H': H.tolist(),
                 'Cv': Cv.tolist(),
-                'S': S.tolist(),
+                'Sv': Sv.tolist(),
                 'F': F.tolist(),
+                'Cp': Cp.tolist(),
+                'Sp': Sp.tolist(),
+                'G': G.tolist(),
                 'V': V.tolist(),
                 'P': P.tolist()}

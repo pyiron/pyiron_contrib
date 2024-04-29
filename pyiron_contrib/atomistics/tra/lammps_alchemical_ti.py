@@ -40,7 +40,8 @@ variable         t_eq equal round({{ n_equib }}) # Equilibration steps.
 variable         t equal round({{ n_steps }}) # Switching steps.
 variable         ts equal {{ time_step }}/1000 # Timestep.
 variable         t_print equal {{ n_print}} # Dump frequency of properties.
-variable         atom_id equal round({{ atom_id }}+1) # Id of the atom to be removed
+variable         atom_id equal round({{ atom_id }}+1) # Id of the atom to be removed.
+variable         masses atomfile masses.dat # Read the original masses.
 
 # Define interatomic potential.
 pair_style       hybrid {{ pair_style }} zero 0.0 nocoeff
@@ -53,27 +54,27 @@ pair_coeff       2 2 zero
 timestep         ${ts}
 {% if pressure is not none %}
     {% if langevin == True %}
-        fix f1 all nph iso {{ pressure }} {{ pressure }} 1.0
+        fix      f1 all nph iso {{ pressure }} {{ pressure }} 1.0
     {% else %}
-        fix f1 all npt temp {{ temperature }} {{ temperature }} 0.1 iso {{ pressure }} {{ pressure }} 1.0
+        fix      f1 all npt temp {{ temperature }} {{ temperature }} 0.1 iso {{ pressure }} {{ pressure }} 1.0
     {% endif %}
 {% else %}
     {% if langevin == True %}
-        fix f1 all nve
+        fix      f1 all nve
     {% else %}
-        fix f1 all nvt temp {{ temperature }} {{ temperature }} 0.1
+        fix      f1 all nvt temp {{ temperature }} {{ temperature }} 0.1
     {% endif %}
 {% endif %}
 
 {% if langevin == True %}
-    fix f2 all langevin {{ temperature }} {{ temperature }} 0.1 ${rnd} zero yes
+    fix          f2 all langevin {{ temperature }} {{ temperature }} 0.1 ${rnd} zero yes
 {% endif %}
 
 # Initial temperature to accelerate equilibration.
 variable         T_0 equal 2.0*{{ temperature }}
 velocity         all create ${T_0} ${rnd} dist gaussian
 
-# Replace harmonic osciallators with interacting atoms if pure.
+# Replace harmonic osciallator with interacting atoms for equilibration.
 set              type 2 type 1
 
 # Compute and record the average msd to determine the spring constant k.
@@ -101,30 +102,39 @@ print            "$k ${ave_x} ${ave_y} ${ave_z}" file spring.dat
 # Define partitions.
 variable         name world pure alloy
 
-# Replace harmonic osciallators with interacting atoms if pure.
-if "${name} == alloy" then "set atom 1 type 2"
-
-# Define the harmonic oscillator by tethering the 0th atom to the origin.
-if "${name} == alloy" then &
-    "group ho id 1" & 
-    "fix f_ho ho spring tether $k ${ave_x} ${ave_y} ${ave_z} 0.0" &
-    "fix_modify f_ho energy yes"
-
 # Define ramp variable to combine the two different partitions.
 if "${name} == alloy" then &
-    "variable ramp equal ramp(0.0,1.0)" &
+    "variable    ramp equal ramp(0.0,1.0)" &
 else &
-    "variable ramp equal ramp(1.0,0.0)"
+    "variable    ramp equal ramp(1.0,0.0)"
 
-# Call the fix.
+# Bring back the harmonic oscillator and give it the same mass as the interacting atom.
+if "${name} == alloy" then &
+    "set         atom ${atom_id} type 2" &
+    "fix         f_m all property/atom rmass ghost yes" &
+    "set         atom * mass v_masses"
+
+# Tether the harmonic oscillator to its average position during equilibrium.
+if "${name} == alloy" then &
+    "group       ho id ${atom_id}" &
+    "fix         f_ho ho spring tether $k ${ave_x} ${ave_y} ${ave_z} 0.0" &
+    "fix_modify  f_ho energy yes"
+
+# Call the main fix.
 fix              al all alchemy v_ramp
 
 # Pressure of both the systems is the same and calculated with pressure/alchemy.
 compute          pressure all pressure/alchemy al
+fix_modify       f1 press pressure
+
+# Compute to record displacments from the original positions.
+compute          dsp all displace/atom
+compute          maxdsp all reduce max c_dsp[4]
+variable         dsp equal c_maxdsp
 
 # Thermo outputs.
-thermo_style     custom step temp press ke f_al f_al[1] f_al[2] f_al[3]
-thermo_modify    colname f_al lambda colname f_al[1] BulkEPot colname f_al[2] AlloyEPot colname f_al[3] EPot_mixed
+thermo_style     custom step temp press vol ke f_al f_al[1] f_al[2] f_al[3] v_dsp
+thermo_modify    colname f_al lambda colname f_al[1] BulkEPot colname f_al[2] AlloyEPot colname f_al[3] EPot_mixed colname v_dsp MaxDisp
 thermo_modify    press pressure
 thermo           ${t_print}
 
@@ -134,7 +144,7 @@ run              ${t}
 
 class VacancyFormationTI():
     def __init__(self, ref_job, temperature, pressure, atom_id=0, n_samples=1, n_steps=1000, n_equib_steps=100, n_print=1, time_step=1.,
-                 langevin=True, recompress=False):
+                 langevin=True, masses=None, cutoff=None, recompress=False):
         self.ref_job = ref_job
         self.temperature = temperature
         self.pressure = pressure
@@ -145,18 +155,23 @@ class VacancyFormationTI():
         self.n_print = n_print
         self.time_step = time_step
         self.langevin = langevin
+        self.cutoff = cutoff
+        self.masses = masses
         self.recompress = recompress
         
         self._project = self.ref_job.project
         self._job_names = ['sample_' + str(i) for i in range(self.n_samples)]
         self._structure = self.ref_job.structure.copy()
         self._n_atoms = self._structure.get_number_of_atoms()
-        if self.pressure is not None:
-            self.pressure *= 1/bar_to_GPa
+        self._set_cutoff()
+        self._check_masses()
         self._split_potential_strings()
         self._create_ho_structure()
+        self._create_ho_potential()
     
     def _generate_input_script(self):
+        if self.pressure is not None:
+            self.pressure *= 1/bar_to_GPa
         template = Template(lammps_input)
         input_script = template.render(
             seed=np.random.randint(99999),
@@ -174,9 +189,10 @@ class VacancyFormationTI():
         return input_script
 
     def _split_potential_strings(self):
-        potential = self.ref_job.potential
-        self._pair_style = potential['Config'][0][0].split()[1]
-        pair_coeff = potential['Config'][0][1].split()
+        potential = self.ref_job.potential.copy(deep=True)
+        self._pair_style = potential['Config'].tolist()[0][0].split()[1]
+        pair_coeff = potential['Config'].tolist()[0][1].split()
+        pair_coeff[3] = pair_coeff[3].replace(pair_coeff[3], '{} {}'.format(self._pair_style, pair_coeff[3]))
         self._pair_coeff = ' '.join(pair_coeff[1:])
 
     def _create_ho_structure(self):
@@ -184,13 +200,42 @@ class VacancyFormationTI():
         self._structure[self.atom_id] = 'H'
 
     def _create_ho_potential(self):
+        self._potential = self.ref_job.potential.copy()
+        potential_str = self._potential['Config'].tolist()[0]
+        new_str = potential_str[1].strip() + ' H\n'
+        potential_str[1] = new_str
+        self._potential['Config'] = [potential_str]
+        self._potential['Species'] = [self._potential['Species'].tolist()[0].append('H')]
+
+    def _check_masses(self):
+        if self.masses is None:
+            self.masses = self.ref_job.structure.get_masses().copy()
+        else:
+            assert len(self.masses) == len(self.ref_job.structure.get_masses().copy()), "Input len(masses) != len(structure.masses)"
+
+    def _write_masses(self, job):
+        n = len(self.masses)
+        data = [f"{n}\n"]
+        for i in range(n):
+            data.append(f"{i+1} {self.masses[i]}\n")
         
+        directory = job.working_directory
+        file_path = os.path.join(directory, 'masses.dat')
+        with open(file_path, 'w') as file:
+            for line in data:
+                file.write(line)
+    
+    def _set_cutoff(self):
+        if self.cutoff is None:
+            self.cutoff = self._structure.get_neighbors().distances[0][0]
         
     def _run_job(self, project, job_name):
+        # BUG: at the moment, the re-written pandas df for the potential returns None for species for some reason?
         job = self.ref_job.copy_template(project=project, new_job_name=job_name)
-        job.structure = self._structure.copy()
-        job.potential = self._potential
+        # job.structure = self._structure.copy()
+        # job.potential = self._potential.copy()
         job.input.control.load_string(self._generate_input_script())
+        self._write_masses(job=job)
         try:
             job.run()
         except EmptyDataError:
@@ -246,32 +291,43 @@ class VacancyFormationTI():
             'Step': output_arrays[:, 0],
             'Temperature': output_arrays[:, 1],
             'Pressure': output_arrays[:, 2],
-            'energy_kin': output_arrays[:, 3],
-            'lambda': np.flip(output_arrays[:, 4]),
-            'bulk_energy_pot': output_arrays[:, 5],
-            'alloy_energy_pot': output_arrays[:, 6],
-            'energy_pot_mix': output_arrays[:, 7],
+            'Volume': output_arrays[:, 3],
+            'energy_kin': output_arrays[:, 4],
+            'lambda': np.flip(output_arrays[:, 5]),
+            'bulk_energy_pot': output_arrays[:, 6],
+            'alloy_energy_pot': output_arrays[:, 7],
+            'energy_pot_mix': output_arrays[:, 8],
+            'max_displacement': output_arrays[:, 9],
             'spring_constant': np.array(k_s),
             'tether_positions': np.array(tether_pos)
         }
         return data_dict
 
+    def skip_diffused(self, data_dict):
+        no_diffusion = []
+        for n in range(self.n_samples):
+            if not (np.max(data_dict['max_displacement'][n]) >= self.cutoff):
+                no_diffusion.append(n)
+        return np.array(no_diffusion)
+
     def get_formation_energy(self, per_atom_bulk_free_energy, averaged=True):
         data_dict = self.get_output()
+        no_diffusion = self.skip_diffused(data_dict)
         G_form = []
-        for n in range(self.n_samples):
+        for n in no_diffusion:
             lambdas = data_dict['lambda'][n]
             U_bulk = data_dict['bulk_energy_pot'][n]
             U_vac = data_dict['alloy_energy_pot'][n]
             k = data_dict['spring_constant'][n]
             
-            mass = self._structure.get_masses()[0]
-            omega = np.sqrt(k*EV/(mass*AMU))*1.0e+10
+            mass = self.masses[self.atom_id]
+            omega = np.sqrt(k*EV/(mass*AMU))*1e+10
             nu = omega/(2*np.pi)
             F_harm = 3*KB*self.temperature*np.log(H*nu/(KB*self.temperature))
             G_form.append(per_atom_bulk_free_energy+simpson(y=U_vac-U_bulk, x=lambdas)-F_harm)
         G_form = np.array(G_form)
+        n_samples = len(no_diffusion)
         if not averaged:
             return G_form
         else:
-            return G_form.mean(), G_form.std()/np.sqrt(self.n_samples)
+            return G_form.mean(), G_form.std(), n_samples

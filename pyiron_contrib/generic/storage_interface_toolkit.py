@@ -1,7 +1,7 @@
 import warnings
 
 from pyiron_base import Toolkit
-from pyiron_base import ImportAlarm
+from pyiron_snippets.import_alarm import ImportAlarm
 
 try:
     from pyiron_contrib.generic.coscineIo import CoscineProject, CoscineResource

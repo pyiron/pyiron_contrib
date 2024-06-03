@@ -55,6 +55,7 @@ setup(
         ],
         'tinybase': [
             'distributed==2024.5.1',
+            'pymatgen==2024.5.1',
             'pympipool==0.7.17',
             'h5io_browser==0.0.10',
         ]

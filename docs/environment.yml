@@ -25,5 +25,5 @@ dependencies:
 - pycp2k =0.2.2
 - aws-sam-translator =1.77.0
 - distributed =2024.5.1
-- pympipool =0.8.2
+- pympipool =0.8.1
 - h5io_browser =0.0.10

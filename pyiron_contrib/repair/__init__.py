@@ -12,7 +12,7 @@ from pyiron_atomistics import ase_to_pyiron
 from ase.io import read as ase_read
 from pyiron_atomistics.atomistics.job.atomistic import AtomisticGenericJob
 from pyiron_base import GenericJob, GenericMaster
-from pyiron_base.state.logger import logger
+from pyiron_snippets.logger import logger
 
 from tqdm.auto import tqdm
 

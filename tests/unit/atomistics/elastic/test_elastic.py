@@ -4,9 +4,8 @@
 
 import os
 import unittest
-from pyiron_atomistics.atomistics.structure.atoms import CrystalStructure
-from pyiron_base import Project
-from pyiron_atomistics.atomistics.master.elastic import (
+from pyiron_atomistics import Project
+from pyiron_contrib.atomistics.elastic.elastic import (
     calc_elastic_tensor,
     _get_higher_order_strains,
     calc_elastic_constants,
@@ -21,9 +20,7 @@ class TestElasticTensor(unittest.TestCase):
     def setUpClass(cls):
         cls.file_location = os.path.dirname(os.path.abspath(__file__))
         cls.project = Project(os.path.join(cls.file_location, "test_elast"))
-        cls.basis = CrystalStructure(
-            element="Fe", bravais_basis="bcc", lattice_constant=2.83
-        )
+        cls.basis = cls.project.create.structure.bulk("Fe", a=2.83)
         cls.project.remove_jobs(recursive=True, silently=True)
 
     @classmethod

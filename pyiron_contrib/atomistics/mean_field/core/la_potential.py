@@ -129,7 +129,11 @@ class GenerateLAPotential():
             else:
                 samples = self.uneven_linspace(low_disp, self.disp, self.n_disps, spacing=spacing)
         else:
-            samples = np.linspace(low_disp, self.disp, self.n_disps)
+            if asymmetric:
+                right = np.linspace(low_disp, self.disp, int(self.n_disps/2)+1)
+                samples = np.concatenate((np.flip(-right), right[1:]))
+            else:
+                samples = np.linspace(low_disp, self.disp, self.n_disps)
             
         # make sure there is always a 0 displacement
         if not np.any(np.isclose(samples, 0., atol=1e-10)):
@@ -315,8 +319,8 @@ class GenerateLAPotential():
         Returns:
         - tuple: A tuple containing the cubic spline functions for bond force and potential.
         """
-        force = CubicSpline(data[0], data[1], bc_type='natural')
-        potential = CubicSpline(data[0], data[2], bc_type='natural')
+        force = CubicSpline(data[0], data[1])
+        potential = CubicSpline(data[0], data[2])
         return force, potential
     
     def get_poly_fit(self, data, deg=4):
@@ -530,9 +534,9 @@ class FccLAPotential(GenerateLAPotential):
                 self._pos.append(self.generate_atom_positions(direction=self.disp_dir[1], spacing=self.uneven))
                 
             if self.shells >= 3:
-                self._pos.append(self.generate_atom_positions(direction=self.disp_dir[2], spacing=self.uneven))
-                self._pos.append(self.generate_atom_positions(direction=self.disp_dir[3], spacing=self.uneven, asymmetric=True))
-                # self._pos.extend([self.generate_atom_positions(direction=self.disp_dir[i], spacing=self.uneven) for i in range(2, 4)])
+                # self._pos.append(self.generate_atom_positions(direction=self.disp_dir[2], spacing=self.uneven))
+                # self._pos.append(self.generate_atom_positions(direction=self.disp_dir[3], spacing=self.uneven, asymmetric=True))
+                self._pos.extend([self.generate_atom_positions(direction=self.disp_dir[i], spacing=self.uneven) for i in range(2, 4)])
 
             if self.shells >= 5:
                 self._pos.append(self.generate_atom_positions(direction=self.disp_dir[4], spacing=self.uneven))
@@ -581,7 +585,7 @@ class FccLAPotential(GenerateLAPotential):
         if output:
             return self._force_on_j_list
     
-    def get_t_bond_force(self, jth_atom_id, jth_atom_forces, tag='1', nn='1', return_prime=False):
+    def get_t_bond_force(self, jth_atom_id, jth_atom_forces, tag='1', nn='1', l_force_func=None, return_prime=False):
         """
         Compute the bonding forces along a transversal direction.
         
@@ -639,6 +643,7 @@ class FccLAPotential(GenerateLAPotential):
                 raise ValueError
         else:
             raise ValueError
+        F_ij = l_force_func(r) if l_force_func is not None else F_ij
         F_t = jth_atom_forces-ij_direcs*F_ij[:, np.newaxis]
         F_t_prime = []
         prime = []
@@ -656,63 +661,69 @@ class FccLAPotential(GenerateLAPotential):
         if tag == 'l_1nn':
             out = [self.get_ij_bond_force(jth_atom_forces=forces, jth_atom_id=atom_id, ith_atom_positions=self._pos[0]) 
                    for forces, atom_id in zip(self._force_on_j_list[:2], self._plane_nn[0][:2])]
-            bonds, force = self._concatenate_l(out=out) 
+            bonds, force = self._concatenate_l(out=out)
+            self._l_force_func = CubicSpline(bonds, force)
         elif tag == 't1_1nn':
-            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[2], jth_atom_id=self._plane_nn[0][2], tag='1', nn='1')
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[2], jth_atom_id=self._plane_nn[0][2], tag='1', nn='1', l_force_func=self._l_force_func)
             bonds, force = self._concatenate_t(out=out) 
         elif tag == 't2_1nn':
-            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[3], jth_atom_id=self._plane_nn[0][1], tag='2', nn='1') 
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[3], jth_atom_id=self._plane_nn[0][1], tag='2', nn='1', l_force_func=self._l_force_func) 
             bonds, force = self._concatenate_t(out=out) 
         elif tag == 'l_2nn':
             out = [self.get_ij_bond_force(jth_atom_forces=forces, jth_atom_id=atom_id, ith_atom_positions=self._pos[1]) 
                    for forces, atom_id in zip(self._force_on_j_list[4:6], self._plane_nn[1][:2])]
-            bonds, force = self._concatenate_l(out=out) 
+            bonds, force = self._concatenate_l(out=out)
+            self._l_force_func = CubicSpline(bonds, force)
         elif tag == 't1_2nn':
-            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[6], jth_atom_id=self._plane_nn[1][2], tag='1', nn='2')
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[6], jth_atom_id=self._plane_nn[1][2], tag='1', nn='2', l_force_func=self._l_force_func)
             bonds, force = self._concatenate_t(out=out) 
         elif tag == 't2_2nn':
-            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[7], jth_atom_id=self._plane_nn[1][3], tag='2', nn='2') 
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[7], jth_atom_id=self._plane_nn[1][3], tag='2', nn='2', l_force_func=self._l_force_func) 
             bonds, force = self._concatenate_t(out=out) 
         elif tag == 'l_3nn':
             out = [self.get_ij_bond_force(jth_atom_forces=forces, jth_atom_id=atom_id, ith_atom_positions=self._pos[2]) 
                    for forces, atom_id in zip(self._force_on_j_list[8:10], self._plane_nn[2][:2])]
-            bonds, force = self._concatenate_l(out=out) 
+            bonds, force = self._concatenate_l(out=out)
+            self._l_force_func = CubicSpline(bonds, force)
         elif tag == 't1_3nn':
-            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[10], jth_atom_id=self._plane_nn[2][1], tag='1', nn='3')
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[10], jth_atom_id=self._plane_nn[2][1], tag='1', nn='3', l_force_func=self._l_force_func)
             bonds, force = self._concatenate_t(out=out) 
         elif tag == 't2_3nn':
-            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[11], jth_atom_id=self._plane_nn[2][1], tag='2', nn='3')
-            bonds, force = self._concatenate_t_special(out=out)
-            # bonds, force = self._concatenate_t(out=out) 
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[11], jth_atom_id=self._plane_nn[2][1], tag='2', nn='3', l_force_func=self._l_force_func)
+            # bonds, force = self._concatenate_t_special(out=out)
+            bonds, force = self._concatenate_t(out=out) 
         elif tag == 'l_4nn':
             out = [self.get_ij_bond_force(jth_atom_forces=forces, jth_atom_id=atom_id, ith_atom_positions=self._pos[0]) 
                    for forces, atom_id in zip(self._force_on_j_list[12:14], self._plane_nn[3][:2])]
-            bonds, force = self._concatenate_l(out=out) 
+            bonds, force = self._concatenate_l(out=out)
+            self._l_force_func = CubicSpline(bonds, force)
         elif tag == 't1_4nn':
-            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[14], jth_atom_id=self._plane_nn[3][2], tag='1', nn='4')
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[14], jth_atom_id=self._plane_nn[3][2], tag='1', nn='4', l_force_func=self._l_force_func)
             bonds, force = self._concatenate_t(out=out) 
         elif tag == 't2_4nn':
-            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[15], jth_atom_id=self._plane_nn[3][1], tag='2', nn='4')
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[15], jth_atom_id=self._plane_nn[3][1], tag='2', nn='4', l_force_func=self._l_force_func)
             bonds, force = self._concatenate_t(out=out) 
         elif tag == 'l_5nn':
             out = [self.get_ij_bond_force(jth_atom_forces=forces, jth_atom_id=atom_id, ith_atom_positions=self._pos[4]) 
                    for forces, atom_id in zip(self._force_on_j_list[16:18], self._plane_nn[4][:2])]
-            bonds, force = self._concatenate_l(out=out) 
+            bonds, force = self._concatenate_l(out=out)
+            self._l_force_func = CubicSpline(bonds, force)
         elif tag == 't1_5nn':
-            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[18], jth_atom_id=self._plane_nn[4][2], tag='1', nn='5')
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[18], jth_atom_id=self._plane_nn[4][2], tag='1', nn='5', l_force_func=self._l_force_func)
             bonds, force = self._concatenate_t(out=out) 
         elif tag == 't2_5nn':
-            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[19], jth_atom_id=self._plane_nn[4][1], tag='2', nn='5')
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[19], jth_atom_id=self._plane_nn[4][1], tag='2', nn='5', l_force_func=self._l_force_func)
             bonds, force = self._concatenate_t(out=out) 
         elif tag == 'l_6nn':
             out = [self.get_ij_bond_force(jth_atom_forces=forces, jth_atom_id=atom_id, ith_atom_positions=self._pos[3]) 
                    for forces, atom_id in zip(self._force_on_j_list[20:22], self._plane_nn[5][:2])]
-            bonds, force = self._concatenate_l(out=out) 
+            bonds, force = self._concatenate_l(out=out)
+            self._l_force_func = CubicSpline(bonds, force)
         elif tag == 't1_6nn':
-            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[22], jth_atom_id=self._plane_nn[5][1], tag='1', nn='6')
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[22], jth_atom_id=self._plane_nn[5][1], tag='1', nn='6', l_force_func=self._l_force_func)
             bonds, force = self._concatenate_t(out=out) 
         elif tag == 't2_6nn':
-            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[23], jth_atom_id=self._plane_nn[5][1], tag='2', nn='6')
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[23], jth_atom_id=self._plane_nn[5][1], tag='2', nn='6', l_force_func=self._l_force_func)
             bonds, force = self._concatenate_t(out=out) 
         else:
             raise ValueError
@@ -888,21 +899,21 @@ class BccLAPotential(GenerateLAPotential):
             self.run_static_analysis()
         if self._pos is None:
             self._pos = [self.generate_atom_positions(direction=self.disp_dir[i], spacing=self.uneven) for i in range(2)]
-            self._pos.append(self.generate_atom_positions(direction=self.disp_dir[2], spacing=self.uneven, asymmetric=True))
-            # self._pos.append(self.generate_atom_positions(direction=self.disp_dir[2], spacing=self.uneven))
+            # self._pos.append(self.generate_atom_positions(direction=self.disp_dir[2], spacing=self.uneven, asymmetric=True))
+            self._pos.append(self.generate_atom_positions(direction=self.disp_dir[2], spacing=self.uneven))
 
             if self.shells >= 2:
                 self._pos.append(self.generate_atom_positions(direction=self.disp_dir[3], spacing=self.uneven))
                 
             if self.shells >= 4:
                 self._pos.append(self.generate_atom_positions(direction=self.disp_dir[4], spacing=self.uneven))
-                self._pos.append(self.generate_atom_positions(direction=self.disp_dir[5], spacing=self.uneven, asymmetric=True))
-                # self._pos.append(self.generate_atom_positions(direction=self.disp_dir[5], spacing=self.uneven))
+                # self._pos.append(self.generate_atom_positions(direction=self.disp_dir[5], spacing=self.uneven, asymmetric=True))
+                self._pos.append(self.generate_atom_positions(direction=self.disp_dir[5], spacing=self.uneven))
 
             if self.shells >= 7:
                 self._pos.append(self.generate_atom_positions(direction=self.disp_dir[6], spacing=self.uneven))
-                self._pos.append(self.generate_atom_positions(direction=self.disp_dir[7], spacing=self.uneven, asymmetric=True))
-                # self._pos.append(self.generate_atom_positions(direction=self.disp_dir[7], spacing=self.uneven))
+                # self._pos.append(self.generate_atom_positions(direction=self.disp_dir[7], spacing=self.uneven, asymmetric=True))
+                self._pos.append(self.generate_atom_positions(direction=self.disp_dir[7], spacing=self.uneven))
 
             if self.shells == 8:
                 self._pos.append(self.generate_atom_positions(direction=self.disp_dir[8], spacing=self.uneven))
@@ -969,7 +980,7 @@ class BccLAPotential(GenerateLAPotential):
         if output:
             return self._force_on_j_list
     
-    def get_t_bond_force(self, jth_atom_id, jth_atom_forces, tag='1', nn='1', return_prime=False):
+    def get_t_bond_force(self, jth_atom_id, jth_atom_forces, tag='1', nn='1', l_force_func=None, return_prime=False):
         """
         Compute the bonding forces along a transversal direction.
         
@@ -1031,6 +1042,7 @@ class BccLAPotential(GenerateLAPotential):
                 raise ValueError
         else:
             raise ValueError
+        F_ij = l_force_func(r) if l_force_func is not None else F_ij
         F_t = jth_atom_forces-ij_direcs*F_ij[:, np.newaxis]
         F_t_prime = []
         prime = []
@@ -1048,86 +1060,94 @@ class BccLAPotential(GenerateLAPotential):
         if tag == 'l_1nn':
             out = [self.get_ij_bond_force(jth_atom_forces=forces, jth_atom_id=atom_id, ith_atom_positions=self._pos[0]) 
                    for forces, atom_id in zip(self._force_on_j_list[:2], self._plane_nn[0][:2])]
-            bonds, force = self._concatenate_l(out=out) 
+            bonds, force = self._concatenate_l(out=out)
+            self._l_force_func = CubicSpline(bonds, force)
         elif tag == 't1_1nn':
-            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[2], jth_atom_id=self._plane_nn[0][1], tag='1', nn='1')
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[2], jth_atom_id=self._plane_nn[0][1], tag='1', nn='1', l_force_func=self._l_force_func)
             bonds, force = self._concatenate_t(out=out) 
         elif tag == 't2_1nn':
-            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[3], jth_atom_id=self._plane_nn[0][1], tag='2', nn='1') 
-            bonds, force = self._concatenate_t_special(out=out)
-            # bonds, force = self._concatenate_t(out=out) 
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[3], jth_atom_id=self._plane_nn[0][1], tag='2', nn='1', l_force_func=self._l_force_func) 
+            # bonds, force = self._concatenate_t_special(out=out)
+            bonds, force = self._concatenate_t(out=out) 
         elif tag == 'l_2nn':
             out = [self.get_ij_bond_force(jth_atom_forces=forces, jth_atom_id=atom_id, ith_atom_positions=self._pos[3]) 
                    for forces, atom_id in zip(self._force_on_j_list[4:6], self._plane_nn[1][:2])]
-            bonds, force = self._concatenate_l(out=out) 
+            bonds, force = self._concatenate_l(out=out)
+            self._l_force_func = CubicSpline(bonds, force)
         elif tag == 't1_2nn':
-            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[6], jth_atom_id=self._plane_nn[1][2], tag='1', nn='2')
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[6], jth_atom_id=self._plane_nn[1][2], tag='1', nn='2', l_force_func=self._l_force_func)
             bonds, force = self._concatenate_t(out=out) 
         elif tag == 't2_2nn':
-            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[7], jth_atom_id=self._plane_nn[1][3], tag='2', nn='2') 
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[7], jth_atom_id=self._plane_nn[1][3], tag='2', nn='2', l_force_func=self._l_force_func) 
             bonds, force = self._concatenate_t(out=out) 
         elif tag == 'l_3nn':
             out = [self.get_ij_bond_force(jth_atom_forces=forces, jth_atom_id=atom_id, ith_atom_positions=self._pos[1]) 
                    for forces, atom_id in zip(self._force_on_j_list[8:10], self._plane_nn[2][:2])]
-            bonds, force = self._concatenate_l(out=out) 
+            bonds, force = self._concatenate_l(out=out)
+            self._l_force_func = CubicSpline(bonds, force)
         elif tag == 't1_3nn':
-            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[10], jth_atom_id=self._plane_nn[2][2], tag='1', nn='3')
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[10], jth_atom_id=self._plane_nn[2][2], tag='1', nn='3', l_force_func=self._l_force_func)
             bonds, force = self._concatenate_t(out=out) 
         elif tag == 't2_3nn':
-            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[11], jth_atom_id=self._plane_nn[2][1], tag='2', nn='3') 
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[11], jth_atom_id=self._plane_nn[2][1], tag='2', nn='3', l_force_func=self._l_force_func) 
             bonds, force = self._concatenate_t(out=out) 
         elif tag == 'l_4nn':
             out = [self.get_ij_bond_force(jth_atom_forces=forces, jth_atom_id=atom_id, ith_atom_positions=self._pos[4]) 
                    for forces, atom_id in zip(self._force_on_j_list[12:14], self._plane_nn[3][:2])]
-            bonds, force = self._concatenate_l(out=out) 
+            bonds, force = self._concatenate_l(out=out)
+            self._l_force_func = CubicSpline(bonds, force)
         elif tag == 't1_4nn':
-            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[14], jth_atom_id=self._plane_nn[3][1], tag='1', nn='4')
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[14], jth_atom_id=self._plane_nn[3][1], tag='1', nn='4', l_force_func=self._l_force_func)
             bonds, force = self._concatenate_t(out=out) 
         elif tag == 't2_4nn':
-            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[15], jth_atom_id=self._plane_nn[3][1], tag='2', nn='4')
-            bonds, force = self._concatenate_t_special(out=out)
-            # bonds, force = self._concatenate_t(out=out) 
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[15], jth_atom_id=self._plane_nn[3][1], tag='2', nn='4', l_force_func=self._l_force_func)
+            # bonds, force = self._concatenate_t_special(out=out)
+            bonds, force = self._concatenate_t(out=out) 
         elif tag == 'l_5nn':
             out = [self.get_ij_bond_force(jth_atom_forces=forces, jth_atom_id=atom_id, ith_atom_positions=self._pos[0]) 
                    for forces, atom_id in zip(self._force_on_j_list[16:18], self._plane_nn[4][:2])]
-            bonds, force = self._concatenate_l(out=out) 
+            bonds, force = self._concatenate_l(out=out)
+            self._l_force_func = CubicSpline(bonds, force)
         elif tag == 't1_5nn':
-            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[18], jth_atom_id=self._plane_nn[4][1], tag='1', nn='5')
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[18], jth_atom_id=self._plane_nn[4][1], tag='1', nn='5', l_force_func=self._l_force_func)
             bonds, force = self._concatenate_t(out=out) 
         elif tag == 't2_5nn':
-            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[19], jth_atom_id=self._plane_nn[4][1], tag='2', nn='5')
-            bonds, force = self._concatenate_t_special(out=out) 
-            # bonds, force = self._concatenate_t(out=out)
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[19], jth_atom_id=self._plane_nn[4][1], tag='2', nn='5', l_force_func=self._l_force_func)
+            # bonds, force = self._concatenate_t_special(out=out) 
+            bonds, force = self._concatenate_t(out=out)
         elif tag == 'l_6nn':
             out = [self.get_ij_bond_force(jth_atom_forces=forces, jth_atom_id=atom_id, ith_atom_positions=self._pos[3]) 
                    for forces, atom_id in zip(self._force_on_j_list[20:22], self._plane_nn[5][:2])]
-            bonds, force = self._concatenate_l(out=out) 
+            bonds, force = self._concatenate_l(out=out)
+            self._l_force_func = CubicSpline(bonds, force)
         elif tag == 't1_6nn':
-            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[22], jth_atom_id=self._plane_nn[5][2], tag='1', nn='6')
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[22], jth_atom_id=self._plane_nn[5][2], tag='1', nn='6', l_force_func=self._l_force_func)
             bonds, force = self._concatenate_t(out=out) 
         elif tag == 't2_6nn':
-            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[23], jth_atom_id=self._plane_nn[5][3], tag='2', nn='6') 
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[23], jth_atom_id=self._plane_nn[5][3], tag='2', nn='6', l_force_func=self._l_force_func) 
             bonds, force = self._concatenate_t(out=out)
         elif tag == 'l_7nn':
             out = [self.get_ij_bond_force(jth_atom_forces=forces, jth_atom_id=atom_id, ith_atom_positions=self._pos[6]) 
                    for forces, atom_id in zip(self._force_on_j_list[24:26], self._plane_nn[6][:2])]
-            bonds, force = self._concatenate_l(out=out) 
+            bonds, force = self._concatenate_l(out=out)
+            self._l_force_func = CubicSpline(bonds, force)
         elif tag == 't1_7nn':
-            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[26], jth_atom_id=self._plane_nn[6][1], tag='1', nn='7')
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[26], jth_atom_id=self._plane_nn[6][1], tag='1', nn='7', l_force_func=self._l_force_func)
             bonds, force = self._concatenate_t(out=out) 
         elif tag == 't2_7nn':
-            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[27], jth_atom_id=self._plane_nn[6][1], tag='2', nn='7') 
-            bonds, force = self._concatenate_t_special(out=out) 
-            # bonds, force = self._concatenate_t(out=out)
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[27], jth_atom_id=self._plane_nn[6][1], tag='2', nn='7', l_force_func=self._l_force_func) 
+            # bonds, force = self._concatenate_t_special(out=out) 
+            bonds, force = self._concatenate_t(out=out)
         elif tag == 'l_8nn':
             out = [self.get_ij_bond_force(jth_atom_forces=forces, jth_atom_id=atom_id, ith_atom_positions=self._pos[8]) 
                    for forces, atom_id in zip(self._force_on_j_list[28:30], self._plane_nn[7][:2])]
-            bonds, force = self._concatenate_l(out=out) 
+            bonds, force = self._concatenate_l(out=out)
+            self._l_force_func = CubicSpline(bonds, force)
         elif tag == 't1_8nn':
-            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[30], jth_atom_id=self._plane_nn[7][2], tag='1', nn='8')
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[30], jth_atom_id=self._plane_nn[7][2], tag='1', nn='8', l_force_func=self._l_force_func)
             bonds, force = self._concatenate_t(out=out) 
         elif tag == 't2_8nn':
-            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[31], jth_atom_id=self._plane_nn[7][1], tag='2', nn='8') 
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[31], jth_atom_id=self._plane_nn[7][1], tag='2', nn='8', l_force_func=self._l_force_func) 
             bonds, force = self._concatenate_t(out=out)
         else:
             raise ValueError

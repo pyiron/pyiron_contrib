@@ -223,6 +223,59 @@ class StaticBondAnalysis(_BondAnalysisParent):
         else:
             return np.eye(3)  # for identical directions
 
+    @staticmethod
+    def _rotation_matrix_from_vectors(v1, v2):
+        """
+        Compute the rotation matrix between two vectors.
+        """
+        v1 = np.array(v1)
+        v2 = np.array(v2)
+
+        # Normalize vectors
+        v1_norm = np.linalg.norm(v1)
+        v2_norm = np.linalg.norm(v2)
+
+        if v1_norm == 0 or v2_norm == 0:
+            raise ValueError("Input vectors cannot be zero vectors.")
+
+        v1 /= v1_norm
+        v2 /= v2_norm
+
+        # Check if vectors are parallel
+        if np.allclose(np.abs(np.dot(v1, v2)), 1.0):
+            # Check if vectors are parallel and in opposite directions
+            if np.allclose(np.dot(v1, v2), -1.0):
+                # Return -1 times the identity matrix
+                return -1 * np.eye(3)
+            else:
+                # Vectors are parallel and in the same direction, no rotation needed
+                return np.eye(3)
+        else:
+            # Compute rotation axis
+            axis = np.cross(v1, v2)
+            axis_norm = np.linalg.norm(axis)
+
+            if axis_norm == 0:
+                raise ValueError("Vectors are collinear but not parallel.")
+
+            axis /= axis_norm
+
+            # Compute rotation angle
+            angle = np.arccos(np.clip(np.dot(v1, v2), -1.0, 1.0))
+
+            # Rodrigues' rotation formula
+            c = np.cos(angle)
+            s = np.sin(angle)
+            t = 1 - c
+            x, y, z = axis
+            rotation_matrix = np.array([
+                [t*x*x + c,    t*x*y - z*s,  t*x*z + y*s],
+                [t*x*y + z*s,  t*y*y + c,    t*y*z - x*s],
+                [t*x*z - y*s,  t*y*z + x*s,  t*z*z + c]
+            ])
+
+            return rotation_matrix.T
+
     def _get_irreducible_bond_vector_per_shell(self, nn, n_bonds_per_shell):
         """
         Get one irreducible bond vector per nearest neighbor shell. If symmetries are known, this irreducible bond can
@@ -238,6 +291,16 @@ class StaticBondAnalysis(_BondAnalysisParent):
         per_shell_irreducible_bond_vectors = np.array(
             [b[0] for b in bond_vectors_per_shell]
         )
+
+        # without using symmetries
+        # per_shell_0K_rotations = []
+        # for i, b in enumerate(per_shell_irreducible_bond_vectors):
+        #     rots = []
+        #     for bond in bond_vectors_per_shell[i]:
+        #         rots.append(self._rotation_matrix_from_vectors(b, bond))
+        #     per_shell_0K_rotations.append(np.array(rots))
+        # all_nn_bond_vectors_list = np.array([bond for bvs in bond_vectors_per_shell for bond in bvs])
+
         # get all the rotations from spglib
         data = self.input.structure.get_symmetry()
         # account for only 0 translation rotations
@@ -304,7 +367,7 @@ class StaticBondAnalysis(_BondAnalysisParent):
                 # second bond is normal to the first (transverse1). If multiple normal bonds, select 1
                 try:
                     b2 = bonds[
-                        np.argwhere(np.round(bonds @ b1, decimals=5) == 0.0).flatten()[
+                        np.argwhere(np.round(bonds@b1, decimals=5) == 0.0).flatten()[
                             0
                         ]
                     ]

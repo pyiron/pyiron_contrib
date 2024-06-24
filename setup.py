@@ -48,7 +48,7 @@ setup(
             'fenics==2019.1.0',
             'mshr==2019.1.0',
         ],
-        'image': ['scikit-image==0.22.0'],
+        'image': ['scikit-image==0.24.0'],
         'generic': [
             'boto3==1.34.122', 
             'moto==5.0.9'

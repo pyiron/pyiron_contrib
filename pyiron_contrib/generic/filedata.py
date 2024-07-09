@@ -13,11 +13,11 @@ from pathlib import Path
 import pandas as pd
 
 from pyiron_base import GenericJob, state
-# from pyiron_base import (
-#     FileDataTemplate as BaseFileDataTemplate,
-#     load_file,
-#     FileData as FileDataBase,
-# )
+from pyiron_base import (
+    FileDataTemplate as BaseFileDataTemplate,
+    load_file,
+    FileData as FileDataBase,
+)
 from pyiron_base import HasGroups
 
 try:

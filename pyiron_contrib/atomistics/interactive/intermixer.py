@@ -60,13 +60,14 @@ class Intermixer(InteractiveWrapper):
             return None
 
     @ref_job.setter
-    def ref_job(self, ref_job):
-        self._ref_job_all.append(ref_job)
-        self._ref_job_all[-1].structure.positions = self._ref_job_all[
-            0
-        ].structure.positions
-        self._ref_job_all[-1].structure.cell = self._ref_job_all[0].structure.cell
-        self.append(ref_job)
+    def ref_job(self, ref_job: list):
+        if not isinstance(ref_job, list):
+            raise TypeError("ref_job must be a list of jobs")
+        self._ref_job_all.extend(ref_job)
+        for job in self._ref_job_all:
+            job.structure.positions = self._ref_job_all[0].structure.positions
+            job.structure.cell = self._ref_job_all[0].structure.cell
+            self.append(job)
 
     @property
     def ref_job_all(self):

@@ -4,12 +4,17 @@
 
 import numpy as np
 from pyiron_base import JobStatus, GenericJob, GenericParameters
-from pyiron_atomistics.atomistics.job.interactivewrapper import InteractiveWrapper, ReferenceJobOutput
+from pyiron_atomistics.atomistics.job.interactivewrapper import (
+    InteractiveWrapper,
+    ReferenceJobOutput,
+)
 from pyiron_mpie.interactive.pipe_forward import pipe_forwarding
 
 __author__ = "Osamu Waseda"
-__copyright__ = "Copyright 2020, Max-Planck-Institut für Eisenforschung GmbH " \
-                "- Computational Materials Design (CM) Department"
+__copyright__ = (
+    "Copyright 2020, Max-Planck-Institut für Eisenforschung GmbH "
+    "- Computational Materials Design (CM) Department"
+)
 __version__ = "1.0"
 __maintainer__ = "Osamu Waseda"
 __email__ = "waseda@mpie.de"
@@ -39,11 +44,11 @@ class Intermixer(InteractiveWrapper):
 
     @property
     def _n_jobs(self):
-        return len(self._ref_job_all)+len(self)
+        return len(self._ref_job_all) + len(self)
 
     @property
     def ref_job(self):
-        if len(self._ref_job_all)>0:
+        if len(self._ref_job_all) > 0:
             return self._ref_job_all[0]
         try:
             if isinstance(self[0], GenericJob):
@@ -57,7 +62,9 @@ class Intermixer(InteractiveWrapper):
     @ref_job.setter
     def ref_job(self, ref_job):
         self._ref_job_all.append(ref_job)
-        self._ref_job_all[-1].structure.positions = self._ref_job_all[0].structure.positions
+        self._ref_job_all[-1].structure.positions = self._ref_job_all[
+            0
+        ].structure.positions
         self._ref_job_all[-1].structure.cell = self._ref_job_all[0].structure.cell
         self.append(ref_job)
 
@@ -67,7 +74,7 @@ class Intermixer(InteractiveWrapper):
 
     @property
     def structure(self):
-        if self._n_jobs>0:
+        if self._n_jobs > 0:
             return self.ref_job.structure
         else:
             return None
@@ -100,7 +107,9 @@ class Intermixer(InteractiveWrapper):
         self._ref_job_all = []
         while len(self._job_name_lst) > 0:
             self._ref_job_all.append(self.pop(-1))
-            self._ref_job_all[-1].structure.positions = self._ref_job_all[0].structure.positions
+            self._ref_job_all[-1].structure.positions = self._ref_job_all[
+                0
+            ].structure.positions
             self._ref_job_all[-1].structure.cell = self._ref_job_all[0].structure.cell
             if self._job_id is not None and self._ref_job_all[-1]._master_id is None:
                 self._ref_job_all[-1]._job_id = self.job_id
@@ -110,7 +119,10 @@ class Intermixer(InteractiveWrapper):
             self.ref_job_initialize()
         self.status.running = True
         for i in range(self._n_jobs):
-            if self.ref_job_all[i].server.run_mode.interactive or self.ref_job_all[i].server.run_mode.interactive_non_modal:
+            if (
+                self.ref_job_all[i].server.run_mode.interactive
+                or self.ref_job_all[i].server.run_mode.interactive_non_modal
+            ):
                 self.ref_job_all[i].run()
             else:
                 self.ref_job_all[i].run(run_again=True)
@@ -125,7 +137,10 @@ class Intermixer(InteractiveWrapper):
     def interactive_close(self):
         self.status.collect = True
         for i in range(self._n_jobs):
-            if self.ref_job_all[i].server.run_mode.interactive or self.ref_job_all[i].server.run_mode.interactive_non_modal:
+            if (
+                self.ref_job_all[i].server.run_mode.interactive
+                or self.ref_job_all[i].server.run_mode.interactive_non_modal
+            ):
                 self.ref_job_all[i].interactive_close()
         self.project.db.item_update(self._runtime(), self.job_id)
         self.status.finished = True
@@ -152,14 +167,19 @@ class Input(GenericParameters):
     """
 
     def __init__(self, input_file_name=None, table_name="input"):
-        super(Input, self).__init__(input_file_name=input_file_name, table_name=table_name, comment_char="//",
-                                    separator_char="=", end_value_char=';')
+        super(Input, self).__init__(
+            input_file_name=input_file_name,
+            table_name=table_name,
+            comment_char="//",
+            separator_char="=",
+            end_value_char=";",
+        )
 
     def load_default(self):
         """
         Loads the default file content
         """
-        file_content = ('beta = 0\n')
+        file_content = "beta = 0\n"
         self.load_string(file_content)
 
 
@@ -173,41 +193,69 @@ class IntermixingOutput(ReferenceJobOutput):
 
     @property
     def energy_pot(self):
-        return np.average([self._job._ref_job_all[i].output.energy_pot
-                           for i in range(self.n_jobs)], axis=0, weights=self.boltzmann_weight*self.weights)
+        return np.average(
+            [self._job._ref_job_all[i].output.energy_pot for i in range(self.n_jobs)],
+            axis=0,
+            weights=self.boltzmann_weight * self.weights,
+        )
 
     @property
     def energy_tot(self):
-        return np.average([self._job._ref_job_all[i].output.energy_tot
-                           for i in range(self.n_jobs)], axis=0, weights=self.boltzmann_weight*self.weights)
+        return np.average(
+            [self._job._ref_job_all[i].output.energy_tot for i in range(self.n_jobs)],
+            axis=0,
+            weights=self.boltzmann_weight * self.weights,
+        )
 
     @property
     def forces(self):
-        return np.average([self._job._ref_job_all[i].output.forces
-                           for i in range(self.n_jobs)], axis=0, weights=self.boltzmann_weight*self.weights)
+        return np.average(
+            [self._job._ref_job_all[i].output.forces for i in range(self.n_jobs)],
+            axis=0,
+            weights=self.boltzmann_weight * self.weights,
+        )
 
     @property
     def pressures(self):
-        return np.average([self._job._ref_job_all[i].output.pressures
-                           for i in range(self.n_jobs)], axis=0, weights=self.boltzmann_weight*self.weights)
+        return np.average(
+            [self._job._ref_job_all[i].output.pressures for i in range(self.n_jobs)],
+            axis=0,
+            weights=self.boltzmann_weight * self.weights,
+        )
 
     @property
     def temperatures(self):
-        return np.average([self._job._ref_job_all[i].output.temperatures
-                           for i in range(self.n_jobs)], axis=0, weights=self.boltzmann_weight*self.weights)
+        return np.average(
+            [self._job._ref_job_all[i].output.temperatures for i in range(self.n_jobs)],
+            axis=0,
+            weights=self.boltzmann_weight * self.weights,
+        )
 
     @property
     def weights(self):
-        if self._job.weights is None or len(self._job.weights)!=self.n_jobs:
+        if self._job.weights is None or len(self._job.weights) != self.n_jobs:
             return np.ones(self.n_jobs)
         return np.array(self._job.weights)[::-1]
 
     @property
     def boltzmann_weight(self):
-        if self._job.input['beta']>0:
-            mean_E = np.mean([self._job._ref_job_all[i].output.energy_pot for i in range(self.n_jobs)], axis=0)
-            return np.exp(-np.array([self._job._ref_job_all[i].output.energy_pot-mean_E
-                                     for i in range(self.n_jobs)])/len(self._job.structure)*self._job.input['beta'])
+        if self._job.input["beta"] > 0:
+            mean_E = np.mean(
+                [
+                    self._job._ref_job_all[i].output.energy_pot
+                    for i in range(self.n_jobs)
+                ],
+                axis=0,
+            )
+            return np.exp(
+                -np.array(
+                    [
+                        self._job._ref_job_all[i].output.energy_pot - mean_E
+                        for i in range(self.n_jobs)
+                    ]
+                )
+                / len(self._job.structure)
+                * self._job.input["beta"]
+            )
         else:
             return np.ones(self.n_jobs)
-

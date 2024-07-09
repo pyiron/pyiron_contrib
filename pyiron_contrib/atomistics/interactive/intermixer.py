@@ -35,7 +35,6 @@ class Intermixer(InteractiveWrapper):
         self.output = IntermixingOutput(job=self)
         self.server.run_mode.interactive = True
         self.interactive_cache = {}
-        self._initialized = False
         self.weights = None
 
     @property
@@ -97,10 +96,6 @@ class Intermixer(InteractiveWrapper):
             self.interactive_cache[key] = []
         self.output = IntermixingOutput(job=self)
 
-    def _initialize(self):
-        pipe_forwarding(job_lst = [self.ref_job_all[i] for i in range(self._n_jobs)])
-        self._initialized = True
-
     def ref_job_initialize(self):
         self._ref_job_all = []
         while len(self._job_name_lst) > 0:
@@ -111,9 +106,8 @@ class Intermixer(InteractiveWrapper):
                 self._ref_job_all[-1]._job_id = self.job_id
 
     def run_if_interactive(self):
-        if not self._initialized:
+        if not self.status.initialized:
             self.ref_job_initialize()
-            self._initialize()
         self.status.running = True
         for i in range(self._n_jobs):
             if self.ref_job_all[i].server.run_mode.interactive or self.ref_job_all[i].server.run_mode.interactive_non_modal:

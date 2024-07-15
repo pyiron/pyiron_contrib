@@ -198,30 +198,30 @@ class StaticBondAnalysis(_BondAnalysisParent):
             sums += n
         return vectors_per_shell
 
-    @staticmethod
-    def _rotation_matrix_from_vectors(vec_1, vec_2):
-        """
-        Find the rotation matrix that aligns vec_1 to vec_2.
-        Args:
-            vec_1: A 3d "source" vector
-            vec_2: A 3d "destination" vector
+    # @staticmethod
+    # def _rotation_matrix_from_vectors(vec_1, vec_2):
+    #     """
+    #     Find the rotation matrix that aligns vec_1 to vec_2.
+    #     Args:
+    #         vec_1: A 3d "source" vector
+    #         vec_2: A 3d "destination" vector
 
-        Returns:
-            A transformation matrix (3x3) which when applied to vec1, aligns it with vec2.
-        """
-        a, b = (vec_1 / np.linalg.norm(vec_1)).reshape(3), (
-            vec_2 / np.linalg.norm(vec_2)
-        ).reshape(3)
-        v = np.cross(a, b)
-        c = np.dot(a, b)
-        if np.any(v):  # if not all zeros then
-            s = np.linalg.norm(v)
-            kmat = np.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
-            return np.eye(3) + kmat + kmat.dot(kmat) * ((1 - c) / (s**2))
-        elif not np.any(v) and c < 0.0:
-            return np.eye(3) * -1  # for opposite directions
-        else:
-            return np.eye(3)  # for identical directions
+    #     Returns:
+    #         A transformation matrix (3x3) which when applied to vec1, aligns it with vec2.
+    #     """
+    #     a, b = (vec_1 / np.linalg.norm(vec_1)).reshape(3), (
+    #         vec_2 / np.linalg.norm(vec_2)
+    #     ).reshape(3)
+    #     v = np.cross(a, b)
+    #     c = np.dot(a, b)
+    #     if np.any(v):  # if not all zeros then
+    #         s = np.linalg.norm(v)
+    #         kmat = np.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
+    #         return np.eye(3) + kmat + kmat.dot(kmat) * ((1 - c) / (s**2))
+    #     elif not np.any(v) and c < 0.0:
+    #         return np.eye(3) * -1  # for opposite directions
+    #     else:
+    #         return np.eye(3)  # for identical directions
 
     @staticmethod
     def _rotation_matrix_from_vectors(v1, v2):

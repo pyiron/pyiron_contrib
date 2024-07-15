@@ -4,7 +4,7 @@
 
 import numpy as np
 from scipy.interpolate import CubicSpline
-from scipy.integrate import cumtrapz
+from scipy.integrate import cumulative_trapezoid
 
 from pyiron_contrib.atomistics.mean_field.core.bond_analysis import StaticBondAnalysis
 
@@ -245,7 +245,7 @@ class GenerateLAPotential():
         - tuple: A tuple containing the magnitudes of displacements, bond forces, and displacement directions.
         """
         jth_atom_position = self.structure.positions[jth_atom_id]
-        ij = self.find_mic(self.structure, jth_atom_position-ith_atom_positions)
+        ij = self.find_mic(self.structure, jth_atom_position) - ith_atom_positions
         r = np.linalg.norm(ij, axis=-1)
         ij_direcs = ij/r[:, np.newaxis]
         F_ij = (jth_atom_forces*ij_direcs).sum(axis=-1)
@@ -281,8 +281,8 @@ class GenerateLAPotential():
         else:
             raise ValueError
             
-        up = cumtrapz(y=-force[arg_b_0:], x=bonds[arg_b_0:], initial=0.)
-        down = np.flip(cumtrapz(y=-np.flip(force[:arg_b_0+1]), x=np.flip(bonds[:arg_b_0+1])))
+        up = cumulative_trapezoid(y=-force[arg_b_0:], x=bonds[arg_b_0:], initial=0.)
+        down = np.flip(cumulative_trapezoid(y=-np.flip(force[:arg_b_0+1]), x=np.flip(bonds[:arg_b_0+1])))
         potential = np.concatenate((down, up))
         
         return bonds, force, potential
@@ -348,8 +348,9 @@ class GenerateLAPotential():
         Returns:
         - tuple: A tuple containing the longitudinal, t1, and t2 bonding forces and potential functions.
         """
-        self.get_force_on_j()
-        self.get_all_bond_force_pot()
+        if self._data is None:
+            self.get_force_on_j()
+            self.get_all_bond_force_pot()
 
         potential_func = [[], [], []]
         force_func = [[], [], []]

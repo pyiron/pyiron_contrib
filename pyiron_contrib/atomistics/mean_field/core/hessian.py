@@ -63,7 +63,7 @@ class GenerateHessian():
             else:
                 job = self.project.inspect(job_name)
                 if job.status in ['aborted'] or delete_existing_jobs:
-                    self.project_name.remove_job(job_name)
+                    self.project.remove_job(job_name)
                     self._run_job(job_name=job_name, i=i, j=int((i-(i%2))/2))
 
     def load_jobs(self):
@@ -120,7 +120,7 @@ class GenerateHessian():
         kpoint_vectors = (2.0*np.pi*grid)@reciprocal_cell
         return kpoint_vectors, weights
     
-    def get_hessian_reciprocal(self, rewrite=False):
+    def get_hessian_reciprocal(self, hessian_real=None, rewrite=False):
         """
         Get the Hessians in reciprocal space, along with the kpoint vectors and their weights, for use with the GenerateAlphas class.
 
@@ -141,13 +141,16 @@ class GenerateHessian():
                     np.load(os.path.join(self.project.path, 'resources', 'kpoint_weights.npy'))
                     )
         else:
-            hessian_real = self.get_hessian_crystal()
+            if hessian_real is None:
+                hessian_real = self.get_hessian_crystal()
             kpoint_vectors, weights = self.get_kpoint_vectors()
             structure = self.ref_job.structure.copy()
             X = structure.positions.copy()
             if self.cutoff_radius is not None:
-                select = structure.get_neighborhood(positions=X[self.ref_atom], cutoff_radius=self.cutoff_radius+1e-2, 
+                select = structure.get_neighborhood(positions=X[self.ref_atom], cutoff_radius=self.cutoff_radius, 
                                                     num_neighbors=None).indices
+                if len(select)>structure.get_number_of_atoms():
+                    select = np.ones(structure.get_number_of_atoms(), dtype=bool)
             else:
                 sq_trace = np.einsum('ijk,ikj->i', hessian_real, hessian_real)
                 select = sq_trace > 1e-3

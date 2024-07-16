@@ -120,7 +120,7 @@ class GenerateHessian():
         kpoint_vectors = (2.0*np.pi*grid)@reciprocal_cell
         return kpoint_vectors, weights
     
-    def get_hessian_reciprocal(self, hessian_real=None, rewrite=False):
+    def get_hessian_reciprocal(self, structure=None, hessian_real=None, rewrite=False):
         """
         Get the Hessians in reciprocal space, along with the kpoint vectors and their weights, for use with the GenerateAlphas class.
 
@@ -144,7 +144,8 @@ class GenerateHessian():
             if hessian_real is None:
                 hessian_real = self.get_hessian_crystal()
             kpoint_vectors, weights = self.get_kpoint_vectors()
-            structure = self.ref_job.structure.copy()
+            if structure is None:
+                structure = self.ref_job.structure.copy()
             X = structure.positions.copy()
             if self.cutoff_radius is not None:
                 select = structure.get_neighborhood(positions=X[self.ref_atom], cutoff_radius=self.cutoff_radius, 

@@ -25,7 +25,7 @@ def get_meshes(bond_grid, basis):
     t2_mesh = np.dot(bond_grid, basis[2])
     return lo_mesh, t1_mesh, t2_mesh
 
-def get_anharmonic_F(anharmonic_U, temperatures, n_fine_samples=10000, offset=False):
+def get_anharmonic_F(anharmonic_U, temperatures, n_fine_samples=10000, offset=True):
     """
     Interpolate and integrate the anharmonic internal energies (U) over inverse temperature to obtain the anharmonic free energy (F).
 
@@ -465,7 +465,7 @@ class Optimizer():
             filename = f'Veff_eta_{eta}_{shell+1}NN_eps_{eps}'.replace('.','_')+'.npy'
         else:
             filename = f'Veff_{shell+1}NN_eps_{eps}'.replace('.','_')+'.npy'
-        Veff = np.load(os.path.join(self.project_path, 'resources', filename), allow_pickle=True)
+        Veff = np.load(os.path.join(self.project_path, filename), allow_pickle=True)
         return Veff
 
     def run_nvt(self, temperature=100., eps=1., eta=None, return_rho_1=False, fix_T=False):
@@ -491,7 +491,7 @@ class Optimizer():
         Veffs = [self.load_Veff(shell=shell, eps=eps, eta=eta) for shell in range(self.r_order)]
         dV1s = [self.mfm_instances[shell].V1_gradient() for shell in range(self.r_order)]
         lms = []
-        # print('T: {}\neps: {}\n'.format(temperature, eps))
+        print(f'Running T: {temperature}; eps: {eps}; eta: {eta}\n')
         if not fix_T:
             for shell in range(self.r_order):
                 # print('Optimizing shell {}...'.format(shell))
@@ -544,7 +544,7 @@ class Optimizer():
         """
         # Here, the Veff is redefined inside the objective function for each new value of eps.
         # Further, as the total pressure of the system is the sum of the pressures due to each shell, all shells are considered simultaneously in the objective function.
-        # print('T: {}\nP: {}\n'.format(temperature, pressure))
+        print('Running T: {temperature}; P: {pressure}\n')
         # print('Optimizing all shells at once. This might take a while...')
         dV1s = np.array([self.mfm_instances[shell].V1_gradient() for shell in range(self.r_order)]) 
         if not fix_T:
@@ -650,11 +650,11 @@ class GenerateAlphas():
         """
         Whether or not to load existing alphas or calculate new ones.
         """
-        if not os.path.exists(os.path.join(self.project_path, 'resources')):
-            os.mkdir(os.path.join(self.project_path, 'resources'))
-        exists = [os.path.exists(os.path.join(self.project_path, 'resources', file)) for file in ['alphas.npy', 'alphas_rotation_ids.npy']]
-        self.alphas = np.load(os.path.join(self.project_path, 'resources', 'alphas.npy'), allow_pickle=True).tolist() if exists[0] else None
-        self.alphas_rotation_ids = np.load(os.path.join(self.project_path, 'resources', 'alphas_rotation_ids.npy'), allow_pickle=True).tolist() if exists[1] else None
+        if not os.path.exists(self.project_path):
+            os.mkdir(self.project_path)
+        exists = [os.path.exists(os.path.join(self.project_path, file)) for file in ['alphas.npy', 'alphas_rotation_ids.npy']]
+        self.alphas = np.load(os.path.join(self.project_path, 'alphas.npy'), allow_pickle=True).tolist() if exists[0] else None
+        self.alphas_rotation_ids = np.load(os.path.join(self.project_path, 'alphas_rotation_ids.npy'), allow_pickle=True).tolist() if exists[1] else None
         if (not np.all(exists)) or (self.rewrite_alphas):
             self.make_model()
             self.generate_alphas(write=True)
@@ -912,12 +912,12 @@ class MeanFieldJob():
                 filename = f'Veff_eta_{eta}_{shell+1}NN_eps_{eps}'.replace('.','_')+'.npy'
             else:
                 filename = f'Veff_{shell+1}NN_eps_{eps}'.replace('.','_')+'.npy'
-            exists = os.path.exists(self.project_path, filename)
+            exists = os.path.exists(os.path.join(self.project_path, filename))
             if not exists or rewrite_veff:
-                print('Building Veff for {}NNs at epsilon {}...'.format(shell+1, eps))
+                # print('Building Veff for {}NNs at epsilon {}...'.format(shell+1, eps))
                 Veff = self._mfms[shell].Veff(eps=eps)
-                np.save(os.path.join(self.project_path, 'resources', filename), np.array(Veff, dtype=object))
-                print('Veff for {}NNs at epsilon {} saved'.format(shell+1, eps))
+                np.save(os.path.join(self.project_path, filename), np.array(Veff, dtype=object))
+                # print('Veff for {}NNs at epsilon {} saved'.format(shell+1, eps))
 
     @staticmethod
     def check_temperatures(temperatures):

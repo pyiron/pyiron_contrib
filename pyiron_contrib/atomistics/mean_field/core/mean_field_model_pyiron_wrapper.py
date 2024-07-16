@@ -151,6 +151,7 @@ class MeanFieldPyironJob(PythonTemplateJob):
         self.input['r_harm_potentials'] = self.convert_to_data_container(self.input['r_harm_potentials'])
         self.input['t1_harm_potentials'] = self.convert_to_data_container(self.input['t1_harm_potentials'])
         self.input['t2_harm_potentials'] = self.convert_to_data_container(self.input['t2_harm_potentials'])
+        self.input['rotations'] = DataContainer(self.input['rotations'])
         super(MeanFieldPyironJob, self).to_hdf(hdf=hdf, group_name=group_name)
 
     def from_hdf(self, hdf=None, group_name=None):
@@ -161,3 +162,4 @@ class MeanFieldPyironJob(PythonTemplateJob):
         self.input['r_harm_potentials'] = self.convert_from_data_container(self.input['r_harm_potentials'])
         self.input['t1_harm_potentials'] = self.convert_from_data_container(self.input['t1_harm_potentials'])
         self.input['t2_harm_potentials'] = self.convert_from_data_container(self.input['t2_harm_potentials'])
+        self.input['rotations'] = self.input['rotations'].to_builtin()

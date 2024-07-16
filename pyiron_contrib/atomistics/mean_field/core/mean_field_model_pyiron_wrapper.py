@@ -113,9 +113,11 @@ class MeanFieldPyironJob(PythonTemplateJob):
         self.output.update(self.mf_job.output)
 
     def run_static(self):
+        self.status.initialized = True
         if self.mf_job is None:
             self.initialize_job()
         self.initialize_alphas()
+        self.status.running = True
         self.run_mf_job(temperatures=self.input['temperatures'], 
                         pressure=self.input['pressure'], 
                         eps=self.input['eps'], 
@@ -124,6 +126,9 @@ class MeanFieldPyironJob(PythonTemplateJob):
                         fix_T=self.input['fix_T'], 
                         return_rho_1s=self.input['return_rho_1s'], 
                         rewrite_veff=self.input['rewrite_veff'])
+        self.status.collect = True
+        self.to_hdf()
+        self.status.finished = True
         
     def convert_to_data_container(self, func_list):
         if func_list is None:

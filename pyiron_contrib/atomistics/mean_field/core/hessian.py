@@ -19,16 +19,19 @@ class GenerateHessian():
         kpoints (float): Kpoints along each direction (the mesh will be kpoints x kpoints x kpoints). Defaults to 10.
         cutoff_radius (float): The cutoff radius upto which the nearest neighbors are considered. Defaults to None, consider all atoms as neighbors.
     """
-    def __init__(self, project, ref_job, potential, ref_atom=0, delta_x=0.01, kpoints=10, cutoff_radius=None):
+    def __init__(self, project, ref_job, potential, structure=None, ref_atom=0, delta_x=0.01, kpoints=10, cutoff_radius=None):
         self.project = project
         self.ref_job = ref_job
         self.potential = potential
+        self.structure = structure
         self.ref_atom = ref_atom
         self.delta_x = delta_x
         self.kpoints = kpoints
         self.cutoff_radius = cutoff_radius
 
         self._jobs = None
+        if self.structure is None:
+            self.structure = self.ref_job.structure.copy()
 
     def _run_job(self, job_name, i, j):
         """
@@ -105,7 +108,7 @@ class GenerateHessian():
             kpoint_vectors (np.ndarray): Reduced kpoints**3 x 3 vectors.
             weights (np.array): Weights of the reduced kpoint vectors.
         """
-        structure = self.ref_job.structure.copy()
+        structure = self.structure.copy()
         # box = structure.get_symmetry().info['std_lattice']
         # primitive_cell = structure.get_symmetry().get_primitive_cell(standardize=False).cell.array/box[0][0]
         # reciprocal_cell = np.linalg.inv(primitive_cell)
@@ -144,8 +147,7 @@ class GenerateHessian():
             if hessian_real is None:
                 hessian_real = self.get_hessian_crystal()
             kpoint_vectors, weights = self.get_kpoint_vectors()
-            if structure is None:
-                structure = self.ref_job.structure.copy()
+            structure = self.structure.copy()
             X = structure.positions.copy()
             if self.cutoff_radius is not None:
                 select = structure.get_neighborhood(positions=X[self.ref_atom], cutoff_radius=self.cutoff_radius, 

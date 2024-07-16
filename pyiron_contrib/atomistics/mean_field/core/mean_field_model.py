@@ -759,8 +759,8 @@ class GenerateAlphas():
             self.alphas_rotation_ids.append(alphas_rotation_ids)
             print('{}NN alphas generated'.format(shell+1))
         if write:
-            np.save(os.path.join(self.project_path, 'resources', 'alphas.npy'), np.array(self.alphas, dtype=object))
-            np.save(os.path.join(self.project_path, 'resources', 'alphas_rotation_ids.npy'), np.array(self.alphas_rotation_ids, dtype=object))
+            np.save(os.path.join(self.project_path, 'alphas.npy'), np.array(self.alphas, dtype=object))
+            np.save(os.path.join(self.project_path, 'alphas_rotation_ids.npy'), np.array(self.alphas_rotation_ids, dtype=object))
             print('Alphas saved')
     
 class MeanFieldJob():

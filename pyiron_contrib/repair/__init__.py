@@ -217,7 +217,7 @@ class HandyMan:
                 logger.warn(f"Matching {tool} on job {job.id} failed with {e}!")
         raise NoMatchingTool("Cannot find stuitable tool!")
 
-    def fix_project(self, project, server_override={}, **kwargs):
+    def fix_project(self, project, server_override={}, refresh=True, **kwargs):
         """
         Fix broken jobs.
 
@@ -227,7 +227,8 @@ class HandyMan:
             **kwargs: pass through project.job_table when searching; use to
                       restrict what jobs are fixed
         """
-        project.refresh_job_status()
+        if refresh:
+            project.refresh_job_status()
 
         hopeless = []
         failed = {}

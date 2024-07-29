@@ -398,7 +398,7 @@ class VaspNbandsTool(VaspTool):
         )
 
         try:
-            new_job.restart_file_list.append(old_job.get_workdir_file("CHGCAR"))
+            new_job.restart_file_list.append(str(old_job.files.CHGCAR))
             new_job.input.incar["ICHARG"] = 1
         except FileNotFoundError:
             # run didn't include CHGCAR file

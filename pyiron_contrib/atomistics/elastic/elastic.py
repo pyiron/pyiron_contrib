@@ -579,8 +579,10 @@ class ElasticTensor(AtomisticParallelMaster):
     def get_elastic_tensor_by_orientation(self, orientation):
         """
         Get elastic tensor in given orientation.
+
         Args:
             orientation (numpy.ndarray): 3x3 orientation tensor (e.g. [[1,1,1],[-1,0,1],[1,-2,1]])
+
         Returns:
             elastic tensor in the given orientation
         """

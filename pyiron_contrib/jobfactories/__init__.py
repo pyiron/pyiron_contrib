@@ -355,7 +355,7 @@ class VaspFactory(DftFactory):
             try:
                 job.potential[k] = v
             except AttributeError:
-                pass # element k does not exist in the current structure
+                pass  # element k does not exist in the current structure
         if self.storage.nband_nelec_map is not None:
             # ensure we apply the hack only for structures where we know an NBAND estimate for all elements
             elems = set(self.storage.nband_nelec_map.keys())

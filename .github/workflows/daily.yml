@@ -8,5 +8,5 @@ on:
 
 jobs:
   codeql:
-    uses: pyiron/actions/.github/workflows/tests-and-coverage.yml@actions-1.1.0b
+    uses: pyiron/actions/.github/workflows/tests-and-coverage.yml@actions-3.2.0
     secrets: inherit

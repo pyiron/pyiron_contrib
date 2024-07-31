@@ -32,8 +32,8 @@ setup(
     install_requires=[        
         'matplotlib==3.8.3',
         'numpy==1.26.4',
-        'pyiron_snippets==0.1.1',
-        'pyiron_base==0.9.0',
+        'pyiron_snippets==0.1.3',
+        'pyiron_base==0.9.10',
         'scipy==1.12.0',
         'seaborn==0.13.2',
         'pyparsing==3.1.2',
@@ -41,14 +41,14 @@ setup(
     extras_require={
         'atomistic': [
             'ase==3.23.0',
-            'pyiron_atomistics==0.6.1',
+            'pyiron_atomistics==0.6.9',
             'pycp2k==0.2.2',
         ],
         'fenics': [
             'fenics==2019.1.0',
             'mshr==2019.1.0',
         ],
-        'image': ['scikit-image==0.22.0'],
+        'image': ['scikit-image==0.24.0'],
         'generic': [
             'boto3==1.34.122', 
             'moto==5.0.9'
@@ -57,7 +57,7 @@ setup(
             'distributed==2024.5.2',
             'pymatgen==2024.5.1',
             'pympipool==0.8.4',
-            'h5io_browser==0.0.12',
+            'h5io_browser==0.0.17',
         ]
     },
     cmdclass=versioneer.get_cmdclass(),

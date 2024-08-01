@@ -169,11 +169,9 @@ class HandyMan:
         except Exception as e:
             raise RestartFailed(e) from None
 
-        last_tool = job["user/handyman/last"]
         history = job["user/handyman/history"] or []
-        if last_tool is not None:
-            history.append(last_tool)
-        new_job["user/handyman/last"] = type(tool).__name__
+        history.append(type(tool).__name__)
+        new_job["user/handyman/last"] = history[-1]
         new_job["user/handyman/history"] = history
 
         try:

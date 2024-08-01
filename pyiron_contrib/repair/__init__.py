@@ -193,6 +193,11 @@ class HandyMan:
         if graveyard is None:
             job.remove()
         else:
+            try:
+                no = len(job.content["user/handyman/history"])
+            except KeyError:
+                no = 0
+            job.rename(f'{job.name}_fix_{no}')
             job.move_to(graveyard)
         new_job.rename(name)
 

@@ -160,10 +160,9 @@ class HandyMan:
 
     def restart(self, job):
         new = job.restart()
-        # avoids problems with restart files if original job is deleted
         return new
 
-    def fix_job(self, tool, job):
+    def fix_job(self, tool, job, graveyard=None):
         try:
             new_job = self.restart(job)
         except Exception as e:
@@ -191,7 +190,10 @@ class HandyMan:
         pid = job.parent_id
 
         name = job.name
-        job.remove()
+        if graveyard is None:
+            job.remove()
+        else:
+            job.move_to(graveyard)
         new_job.rename(name)
 
         new_job.master_id = mid
@@ -216,13 +218,14 @@ class HandyMan:
                 logger.warn(f"Matching {tool} on job {job.id} failed with {e}!")
         raise NoMatchingTool("Cannot find stuitable tool!")
 
-    def fix_project(self, project, server_override={}, refresh=True, **kwargs):
+    def fix_project(self, project, server_override={}, refresh=True, graveyard=None, **kwargs):
         """
         Fix broken jobs.
 
         Args:
             project (Project): search this project for broken jobs
             server_override (dict): override these values on the restarted jobs
+            graveyard (Project): move fixed projects here, instead of deleting
             **kwargs: pass through project.job_table when searching; use to
                       restrict what jobs are fixed
         """
@@ -260,7 +263,7 @@ class HandyMan:
                 tool = self.find_tool(job)
                 fixing[type(tool).__name__].append(job.id)
                 if not tool.fix_inplace(job, self):
-                    job = self.fix_job(tool, job)
+                    job = self.fix_job(tool, job, graveyard=graveyard)
                     for k, v in server_override.items():
                         setattr(job.server, k, v)
                     job.run()

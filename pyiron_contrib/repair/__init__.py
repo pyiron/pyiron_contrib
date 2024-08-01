@@ -485,9 +485,19 @@ class VaspZbrentTool(VaspTool):
         if ediff > 1e-6:
             new_job.input.incar["EDIFF"] = 1e-6
         else:
-            new_job.structure = ase_to_pyiron(
-                ase_read(old_job.get_workdir_file("CONTCAR"))
-            )
+            contcar = ase_to_pyiron(ase_read(str(old_job.files.CONTCAR)))
+            # VASP manual recommend to copy CONTCAR to POSCAR, but if we
+            # overwrite the structure in pyiron directly with the one read from
+            # CONTCAR we'll lose spins and charges
+            new_job.structure.positions[:] = contcar.positions
+            new_job.structure.cell[:] = contcar.cell
+            # Job is a relaxation run, including positions
+            if new_job.input.incar.get("ISIF", 2) not in [5,6,7]:
+                new_job.structure.rattle(1e-2)
+            # ZBRENT is caused by small and noisy forces; when starting on a
+            # high symmetry configuration, forces start out small, confusing
+            # the VASP minimizer; instead let's try to shake us away a bit from
+            # equilibrium to get higher forces
         nelmin = old_job.input.incar["NELMIN"]
         if nelmin is None or nelmin < 8:
             new_job.input.incar["NELMIN"] = 8
@@ -584,7 +594,6 @@ class VaspMinimizeStepsTool(VaspTool):
 
     def fix(self, old_job, new_job):
         super().fix(old_job, new_job)
-        new_job.structure = old_job.structure
         new_job.input.incar["NSW"] = int(
             old_job.input.incar.get("NSW", 100) * self._factor
         )

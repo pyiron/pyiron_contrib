@@ -184,6 +184,7 @@ class HandyMan:
             else:
                 raise
 
+        new_job.write_input()
         new_job.save()
         new_job._restart_file_list = []
         new_job._restart_file_dict = {}
@@ -435,8 +436,6 @@ class VaspDisableIsymTool(VaspTool):
     def fix(self, old_job, new_job):
         super().fix(old_job, new_job)
         new_job.input.incar["ISYM"] = 0
-        # ISYM parameter not registered in INCAR otherwise. :|
-        new_job.write_input()
 
     applicable_status = ("aborted",)
 
@@ -454,7 +453,6 @@ class VaspSubspaceTool(VaspTool):
     def fix(self, old_job, new_job):
         super().fix(old_job, new_job)
         new_job.input.incar["ALGO"] = "Normal"
-        new_job.write_input()
 
     applicable_status = ("aborted",)
 

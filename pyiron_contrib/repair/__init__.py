@@ -197,7 +197,7 @@ class HandyMan:
                 no = len(job.content["user/handyman/history"])
             except KeyError:
                 no = 0
-            job.rename(f'{job.name}_fix_{no}')
+            job.rename(f"{job.name}_fix_{no}")
             job.move_to(graveyard)
         new_job.rename(name)
 
@@ -223,7 +223,9 @@ class HandyMan:
                 logger.warn(f"Matching {tool} on job {job.id} failed with {e}!")
         raise NoMatchingTool("Cannot find stuitable tool!")
 
-    def fix_project(self, project, server_override={}, refresh=True, graveyard=None, **kwargs):
+    def fix_project(
+        self, project, server_override={}, refresh=True, graveyard=None, **kwargs
+    ):
         """
         Fix broken jobs.
 
@@ -432,7 +434,9 @@ class VaspDisableIsymTool(VaspTool):
                     " VERY BAD NEWS! internal error in subroutine PRICEL "
                     "(probably precision problem, try to change SYMPREC in INCAR ?):",
                     " VERY BAD NEWS! internal error in subroutine INVGRP:",
-                    PartialLine("Inconsistent Bravais lattice types found for crystalline and"),
+                    PartialLine(
+                        "Inconsistent Bravais lattice types found for crystalline and"
+                    ),
                     PartialLine("Found some non-integer element in rotation matrix"),
                 ],
                 job,
@@ -498,7 +502,7 @@ class VaspZbrentTool(VaspTool):
             new_job.structure.positions[:] = contcar.positions
             new_job.structure.cell[:] = contcar.cell
             # Job is a relaxation run, including positions
-            if new_job.input.incar.get("ISIF", 2) not in [5,6,7]:
+            if new_job.input.incar.get("ISIF", 2) not in [5, 6, 7]:
                 new_job.structure.rattle(1e-2)
             # ZBRENT is caused by small and noisy forces; when starting on a
             # high symmetry configuration, forces start out small, confusing

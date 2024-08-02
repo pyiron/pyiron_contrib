@@ -22,6 +22,6 @@ dependencies:
 - h5io_browser =0.0.17
 - pymatgen =2024.7.18
 - python >= 3.10
-- lammps
+- lammps =*=*openmpi*
 - nglview >=3.0.8
 - pyiron-data >=0.0.25

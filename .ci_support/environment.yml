@@ -21,5 +21,4 @@ dependencies:
 - aws-sam-translator =1.77.0
 - distributed =2024.5.2
 - h5io_browser =0.0.17
-- pymatgen =2024.5.1
-- pympipool =0.8.4
+- pymatgen =2024.7.18

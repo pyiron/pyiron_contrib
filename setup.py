@@ -58,6 +58,11 @@ setup(
             'pymatgen==2024.7.18',
             'pympipool==0.8.4',
             'h5io_browser==0.0.17',
+        ],
+        'workflow': [
+            'cloudpickle==3.0.0',
+            'pyiron_workflow==0.10.0',
+            'h5io==0.2.4'
         ]
     },
     cmdclass=versioneer.get_cmdclass(),

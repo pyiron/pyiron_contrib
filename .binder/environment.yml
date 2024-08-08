@@ -25,3 +25,6 @@ dependencies:
 - lammps
 - nglview >=3.0.8
 - pyiron-data >=0.0.25
+- cloudpickle =3.0.0
+- pyiron_workflow =0.10.0
+- h5io =0.2.4

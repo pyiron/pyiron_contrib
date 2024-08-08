@@ -7,7 +7,7 @@ import unittest
 from pyiron_base import Project
 from pyiron_workflow import Workflow
 from pyiron_workflow.channels import NOT_DATA
-import pyiron_workflow.job  # To get the job classes registered
+import pyiron_contrib.workflow.job  # To get the job classes registered
 from pyiron_workflow.node import Node
 
 

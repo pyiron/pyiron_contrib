@@ -2,7 +2,7 @@ import abc
 
 from typing import Union
 
-from pyiron_contrib.tinybase.storage import GenericStorage
+from pyiron_contrib.tinybase.storage import GenericStorage, Storable
 from pyiron_contrib.tinybase.database import GenericDatabase
 
 
@@ -10,7 +10,7 @@ class JobNotFoundError(Exception):
     pass
 
 
-class ProjectInterface(abc.ABC):
+class ProjectInterface(Storable, abc.ABC):
     @classmethod
     @abc.abstractmethod
     def open_location(cls, location) -> "ProjectInterface":
@@ -105,3 +105,11 @@ class ProjectInterface(abc.ABC):
 
     # TODO:
     # def copy_to/move_to across types of ProjectInterface
+
+    # Storable Impl'
+    def _store(self, storage):
+        storage["location"] = self.path
+
+    @classmethod
+    def _restore(cls, storage, version):
+        return cls.open_location(storage["location"])

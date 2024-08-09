@@ -38,7 +38,7 @@ class FilesystemProject(ProjectInterface):
     def create_storage(self, name):
         if not os.path.exists(self.path):
             os.makedirs(self.path, exist_ok=True)
-        return H5ioStorage.from_file(self, self._get_job_file(name), name)
+        return H5ioStorage.from_file(self._get_job_file(name), name)
 
     def exists_storage(self, name):
         return os.path.exists(self._get_job_file(name))
@@ -74,7 +74,7 @@ class SingleHdfProject(FilesystemProject):
     """
 
     def _get_hdf(self):
-        return H5ioStorage.from_file(self, os.path.join(self.path, "project.h5"))
+        return H5ioStorage.from_file(os.path.join(self.path, "project.h5"))
 
     def create_storage(self, name):
         if not os.path.exists(self.path):

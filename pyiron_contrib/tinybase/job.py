@@ -193,6 +193,7 @@ class TinyJob(Storable):
     # Storable Impl'
     def _store(self, storage):
         storage["task"] = self.task
+        storage["project"] = self.project
         if self._output is not None:
             storage["output"] = self._output
 
@@ -215,6 +216,7 @@ class TinyJob(Storable):
     @classmethod
     def _restore(cls, storage, version):
         task = storage["task"].to_object()
-        job = cls(task=task, project=storage.project, job_name=storage.name)
+        project = storage["project"].to_object()
+        job = cls(task=task, project=project, job_name=storage.name)
         job.load(storage=storage)
         return job

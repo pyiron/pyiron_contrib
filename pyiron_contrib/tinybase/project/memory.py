@@ -23,7 +23,7 @@ class InMemoryProject(ProjectInterface):
 
     def create_storage(self, name) -> GenericStorage:
         return DataContainerAdapter(
-            self, self._storage[self._location], "/"
+            self._storage[self._location], "/"
         ).create_group(name)
 
     def exists_storage(self, name) -> bool:

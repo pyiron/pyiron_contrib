@@ -31,8 +31,7 @@ class GenericStorage(HasGroups, abc.ABC):
     2. :meth:`._set` to write values,
     3. :meth:`.create_group` to create sub groups,
     4. :meth:`.list_nodes` and :meth:`.list_groups` to see the contained groups and nodes,
-    5. :attr:`.project` which is a back reference to the project that originally created this storage,
-    6. :attr:`.name` which is the name of the group that this object points to, e.g. `storage.create_group(name).name == name`.
+    5. :attr:`.name` which is the name of the group that this object points to, e.g. `storage.create_group(name).name == name`.
 
     For values that implement :class:`.Storable` there is an intentional asymmetry in item writing and reading.  Writing
     it calls :meth:`.Storable.store` automatically, but reading will return the :class:`.GenericStorage` group that was
@@ -182,16 +181,6 @@ class GenericStorage(HasGroups, abc.ABC):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
 
-    # DESIGN: this mostly exists to help to_object()ing GenericTinyJob, but it introduces a circular-ish connection.
-    # Maybe there's another way to do it?
-    @property
-    @abc.abstractmethod
-    def project(self):
-        """
-        The project that this storage belongs to.
-        """
-        pass
-
     @property
     @abc.abstractmethod
     def name(self):
@@ -288,15 +277,14 @@ class DataContainerAdapter(GenericStorage):
     Provides in memory location to store objects.
     """
 
-    def __init__(self, project, cont: DataContainer, name):
-        self._project = project
+    def __init__(self, cont: DataContainer, name):
         self._cont = cont
         self._name = name
 
     def __getitem__(self, item: str) -> Union["GenericStorage", Any]:
         v = self._cont[item]
         if isinstance(v, DataContainer):
-            return self.__class__(self._project, v, item)
+            return self.__class__(v, item)
         else:
             return v
 
@@ -311,17 +299,13 @@ class DataContainerAdapter(GenericStorage):
             d = self._cont.create_group(name)
         else:
             d = self._cont[name]
-        return self.__class__(self._project, d, name)
+        return self.__class__(d, name)
 
     def _list_nodes(self):
         return self._cont.list_nodes()
 
     def _list_groups(self):
         return self._cont.list_groups()
-
-    @property
-    def project(self):
-        return self._project
 
     @property
     def name(self):
@@ -335,36 +319,33 @@ class H5ioStorage(GenericStorage):
     Maybe created with a non existing file path or HDF5 group.  Those will be created on first write access.
     """
 
-    def __init__(self, pointer: Hdf5Pointer, project):
+    def __init__(self, pointer: Hdf5Pointer):
         """
         Args:
             pointer (:class:`h5io_browser.Pointer`): open pointer object to HDF5 storage
-            project (:class:`.tinybase.ProjectInterface`): project this storage belongs to
         """
         if not isinstance(pointer, Hdf5Pointer):
             raise TypeError("pointer must be a h5io_browser.Pointer!")
-        self._project = project
         self._pointer = pointer
 
     @classmethod
-    def from_file(cls, project, file: str, path: str = None):
+    def from_file(cls, file: str, path: str = None):
         """
         Open a storage from the given file and HDF group within.
 
         Args:
-            project (:class:`.tinybase.ProjectInterface`): project this storage belongs to
             file (str): file path to the HDF5 file
             path (str): group path within the HDF5 file
         """
         pointer = Hdf5Pointer(file)
         if path is not None:
             pointer = pointer[path]
-        return cls(pointer, project=project)
+        return cls(pointer)
 
     def __getitem__(self, item):
         value = self._pointer[item]
         if isinstance(value, Hdf5Pointer):
-            return type(self)(value, project=self._project)
+            return type(self)(value)
         else:
             return value
 
@@ -375,17 +356,13 @@ class H5ioStorage(GenericStorage):
         del self._pointer[item]
 
     def create_group(self, name):
-        return type(self)(self._pointer[name], project=self._project)
+        return type(self)(self._pointer[name])
 
     def _list_nodes(self):
         return self._pointer.list_h5_path()["nodes"]
 
     def _list_groups(self):
         return self._pointer.list_h5_path()["groups"]
-
-    @property
-    def project(self):
-        return self._project
 
     @property
     def name(self):

@@ -917,6 +917,45 @@ class VaspRhosygSymprecTool(VaspTool):
         new_job.input.incar["SYMPREC"] = 1e-4
 
 
+class VaspMetaGGAElectronicConvergenceTool(VaspTool):
+    """
+    Meta GGA functionals converge slower and not always as "deep" as plain LDA/GGA.
+    Vasp wiki recommends switching ALGO to ALL and lowering EDIFF in case of trouble.
+    (It also recommends to pre-run a charge density with PBE and start from there, but I'm trying to avoid it here.)
+    """
+
+    def __init__(self, *args, reset_ediff=None, **kwargs):
+        """
+        Args:
+            reset_ediff (float, optional): if given also set EDIFF to this value, unless job to be fixed specifies loser setting already
+        """
+        super().__init__(*args, **kwargs)
+        self.reset_ediff = reset_ediff
+
+    def match(self, job):
+        def electronically_converged(job):
+            ef = job.content["output/generic/dft/scf_energy_free"]
+            n  = job.input.incar.get("NELM", 60)
+            return all(len(l) < n for l in ef)
+        ediff = self.reset_ediff
+        if ediff is None:
+            ediff = 0
+        return (
+            super().match(job)
+            and 'METAGGA' in job.input.incar.keys()
+            and not electronically_converged(job)
+            and (job.input.incar.get("ALGO", "Fast") != "Fast" or job.input.incar.get("EDIFF", 1e-4) < ediff)
+        )
+
+    def fix(self, old_job, new_job):
+        super().fix(old_job, new_job)
+        new_job.input.incar["ALGO"] = "All"
+        if self.reset_ediff is not None:
+            new_job.input.incar["EDIFF"] = max(old_job.input.incar.get("EDIFF"), self.reset_ediff)
+
+    applicable_status = ("not_converged",)
+
+
 DEFAULT_SHED = [
     TimeoutTool(2),
     MurnaghanFinishedChildrenTool(),

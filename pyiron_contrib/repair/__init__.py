@@ -188,6 +188,7 @@ class HandyMan:
 
         mid = job.master_id
         pid = job.parent_id
+        queue = job.server.queue
 
         name = job.name
         if graveyard is None:
@@ -203,7 +204,8 @@ class HandyMan:
 
         new_job.master_id = mid
         new_job.parent_id = pid
-        new_job.server.queue = "cmti"
+        if queue is not None:
+            new_job.server.queue = queue
         return new_job
 
     def find_tool(self, job):

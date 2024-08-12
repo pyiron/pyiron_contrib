@@ -416,7 +416,7 @@ class VaspNbandsTool(VaspTool):
             # run didn't include CHGCAR file
             pass
 
-    applicable_status = ("not_converged",)
+    applicable_status = ("not_converged","aborted")
 
 
 class VaspDisableIsymTool(VaspTool):

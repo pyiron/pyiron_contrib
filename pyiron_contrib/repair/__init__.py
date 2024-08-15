@@ -434,7 +434,7 @@ class VaspDisableIsymTool(VaspTool):
     def match(self, job):
         return (
             super().match(job)
-            and job.input.incar["ISYM"] != 0
+            and job.input.incar.get("ISYM", 2) != -1
             and match_in_error_log(
                 [
                     " inverse of rotation matrix was not found (increase SYMPREC)       5",
@@ -443,9 +443,8 @@ class VaspDisableIsymTool(VaspTool):
                     " VERY BAD NEWS! internal error in subroutine PRICEL "
                     "(probably precision problem, try to change SYMPREC in INCAR ?):",
                     " VERY BAD NEWS! internal error in subroutine INVGRP:",
-                    PartialLine(
-                        "Inconsistent Bravais lattice types found for crystalline and"
-                    ),
+                    PartialLine("VERY BAD NEWS! internal error in subroutine POSMAP: symmetry"),
+                    PartialLine("Inconsistent Bravais lattice types found for crystalline and"),
                     PartialLine("Found some non-integer element in rotation matrix"),
                 ],
                 job,
@@ -454,7 +453,12 @@ class VaspDisableIsymTool(VaspTool):
 
     def fix(self, old_job, new_job):
         super().fix(old_job, new_job)
-        new_job.input.incar["ISYM"] = 0
+        # ISYM=-1 seems about twice as slow as ISYM=0, so let's try with 0
+        # first before we switch symmetry completely off
+        if old_job.input.incar.get("ISYM", 2) != 0:
+            new_job.input.incar["ISYM"] = 0
+        else:
+            new_job.input.incar["ISYM"] = -1
 
     applicable_status = ("aborted",)
 

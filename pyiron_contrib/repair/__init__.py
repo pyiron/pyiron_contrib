@@ -404,11 +404,11 @@ class VaspNbandsTool(VaspTool):
         self._state_factor = state_factor
 
     def match(self, job: GenericJob) -> bool:
-        return super().match(job) and not job.nbands_convergence_check()
+        return super().match(job) and "electronic_structure" in job.content.output.list_groups() and not job.nbands_convergence_check()
 
     def fix(self, old_job, new_job):
         super().fix(old_job, new_job)
-        old_states = old_job["output/generic/dft/bands/occ_matrix"].shape[-1]
+        old_states = old_job.content["output/generic/dft/bands/occ_matrix"].shape[0]
         n_elect = old_job.get_nelect()
         # double free states
         new_job.set_empty_states(
@@ -423,6 +423,7 @@ class VaspNbandsTool(VaspTool):
             pass
 
     applicable_status = ("not_converged","aborted")
+    priority = -1
 
 
 class VaspDisableIsymTool(VaspTool):

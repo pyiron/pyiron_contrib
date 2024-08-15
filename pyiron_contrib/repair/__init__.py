@@ -404,7 +404,11 @@ class VaspNbandsTool(VaspTool):
         self._state_factor = state_factor
 
     def match(self, job: GenericJob) -> bool:
-        return super().match(job) and "electronic_structure" in job.content.output.list_groups() and not job.nbands_convergence_check()
+        return (
+            super().match(job)
+            and "electronic_structure" in job.content.output.list_groups()
+            and not job.nbands_convergence_check()
+        )
 
     def fix(self, old_job, new_job):
         super().fix(old_job, new_job)
@@ -422,7 +426,7 @@ class VaspNbandsTool(VaspTool):
             # run didn't include CHGCAR file
             pass
 
-    applicable_status = ("not_converged","aborted")
+    applicable_status = ("not_converged", "aborted")
     priority = -1
 
 
@@ -443,8 +447,12 @@ class VaspDisableIsymTool(VaspTool):
                     " VERY BAD NEWS! internal error in subroutine PRICEL "
                     "(probably precision problem, try to change SYMPREC in INCAR ?):",
                     " VERY BAD NEWS! internal error in subroutine INVGRP:",
-                    PartialLine("VERY BAD NEWS! internal error in subroutine POSMAP: symmetry"),
-                    PartialLine("Inconsistent Bravais lattice types found for crystalline and"),
+                    PartialLine(
+                        "VERY BAD NEWS! internal error in subroutine POSMAP: symmetry"
+                    ),
+                    PartialLine(
+                        "Inconsistent Bravais lattice types found for crystalline and"
+                    ),
                     PartialLine("Found some non-integer element in rotation matrix"),
                 ],
                 job,
@@ -926,23 +934,27 @@ class VaspRhosygSymprecTool(VaspTool):
 
 class VaspElectronicConvergenceTool(VaspTool):
     def __init__(self, factor=2, max_steps=200, reset_ediff=None, **kwargs):
-        self.factor=factor
-        self.max_steps=max_steps
+        self.factor = factor
+        self.max_steps = max_steps
         self.reset_ediff = reset_ediff
 
     def match(self, job):
         ef = job.content["output/generic/dft/scf_energy_free"]
-        n  = job.input.incar.get("NELM", 60)
+        n = job.input.incar.get("NELM", 60)
         electronically_converged = all(len(l) < n for l in ef)
-        return super().match(job) and n < self.max_steps and not electronically_converged
+        return (
+            super().match(job) and n < self.max_steps and not electronically_converged
+        )
 
     def fix(self, old_job, new_job):
         super().fix(old_job, new_job)
-        new_job.input.incar['NELM'] = old_job.input.incar('NELM', 60) * self.max_factor
+        new_job.input.incar["NELM"] = old_job.input.incar("NELM", 60) * self.max_factor
         if self.reset_ediff is not None:
-            new_job.input.incar["EDIFF"] = max(old_job.input.incar.get("EDIFF"), self.reset_ediff)
+            new_job.input.incar["EDIFF"] = max(
+                old_job.input.incar.get("EDIFF"), self.reset_ediff
+            )
 
-    applicable_status = ("not_converged","aborted")
+    applicable_status = ("not_converged", "aborted")
 
 
 class VaspMetaGGAElectronicConvergenceTool(VaspTool):
@@ -963,23 +975,29 @@ class VaspMetaGGAElectronicConvergenceTool(VaspTool):
     def match(self, job):
         def electronically_converged(job):
             ef = job.content["output/generic/dft/scf_energy_free"]
-            n  = job.input.incar.get("NELM", 60)
+            n = job.input.incar.get("NELM", 60)
             return all(len(l) < n for l in ef)
+
         ediff = self.reset_ediff
         if ediff is None:
             ediff = 0
         return (
             super().match(job)
-            and 'METAGGA' in job.input.incar.keys()
+            and "METAGGA" in job.input.incar.keys()
             and not electronically_converged(job)
-            and (job.input.incar.get("ALGO", "Fast") != "Fast" or job.input.incar.get("EDIFF", 1e-4) < ediff)
+            and (
+                job.input.incar.get("ALGO", "Fast") != "Fast"
+                or job.input.incar.get("EDIFF", 1e-4) < ediff
+            )
         )
 
     def fix(self, old_job, new_job):
         super().fix(old_job, new_job)
         new_job.input.incar["ALGO"] = "All"
         if self.reset_ediff is not None:
-            new_job.input.incar["EDIFF"] = max(old_job.input.incar.get("EDIFF"), self.reset_ediff)
+            new_job.input.incar["EDIFF"] = max(
+                old_job.input.incar.get("EDIFF"), self.reset_ediff
+            )
 
     applicable_status = ("not_converged",)
     priority = 1

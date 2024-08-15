@@ -22,9 +22,9 @@ class InMemoryProject(ProjectInterface):
         return self.__class__(location, db=self.database, storage=self._storage)
 
     def create_storage(self, name) -> GenericStorage:
-        return DataContainerAdapter(
-            self._storage[self._location], "/"
-        ).create_group(name)
+        return DataContainerAdapter(self._storage[self._location], "/").create_group(
+            name
+        )
 
     def exists_storage(self, name) -> bool:
         return name in self._storage[self._location].list_groups()

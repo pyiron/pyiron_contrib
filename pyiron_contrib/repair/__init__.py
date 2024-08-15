@@ -13,6 +13,7 @@ from ase.io import read as ase_read
 from pyiron_atomistics.atomistics.job.atomistic import AtomisticGenericJob
 from pyiron_base import GenericJob, GenericMaster
 from pyiron_snippets.logger import logger
+from pyiron_snippets.deprecate import deprecate
 
 from tqdm.auto import tqdm
 
@@ -140,11 +141,13 @@ class ConstructionSite:
 
 class HandyMan:
 
+    @deprecate(suppress_fix_errors="Use suppress_errors instead")
     def __init__(
-        self, tools: Union[None, Iterable[RepairTool]] = None, suppress_fix_errors=True
+        self, tools: Union[None, Iterable[RepairTool]] = None,
+        suppress_errors=True, suppress_fix_errors=True
     ):
         self.shed = defaultdict(list)
-        self._suppress_fix_errors = suppress_fix_errors
+        self._suppress_errors = suppress_fix_errors and suppress_errors
 
         if tools is None:
             tools = DEFAULT_SHED
@@ -182,7 +185,7 @@ class HandyMan:
         try:
             tool.fix(job, new_job)
         except Exception as e:
-            if self._suppress_fix_errors:
+            if self._suppress_errors:
                 raise FixFailed(e) from None
             else:
                 raise
@@ -228,7 +231,10 @@ class HandyMan:
                 if tool.match(job):
                     return tool
             except Exception as e:
-                logger.warn(f"Matching {tool} on job {job.id} failed with {e}!")
+                if self._suppress_errors:
+                    logger.warn(f"Matching {tool} on job {job.id} failed with {e}!")
+                else:
+                    raise
         raise NoMatchingTool("Cannot find stuitable tool!")
 
     def fix_project(

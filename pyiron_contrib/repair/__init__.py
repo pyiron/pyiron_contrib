@@ -627,10 +627,6 @@ class VaspMinimizeStepsTool(VaspTool):
     applicable_status = ("not_converged",)
 
 
-class VaspElectronicConvergenceTool(VaspTool):
-    """ """
-
-
 class VaspTooManyKpointsIsym(VaspTool):
     """
     Occurs when too many k-points are requested.
@@ -928,6 +924,27 @@ class VaspRhosygSymprecTool(VaspTool):
         new_job.input.incar["SYMPREC"] = 1e-4
 
 
+class VaspElectronicConvergenceTool(VaspTool):
+    def __init__(self, factor=2, max_steps=200, reset_ediff=None, **kwargs):
+        self.factor=factor
+        self.max_steps=max_steps
+        self.reset_ediff = reset_ediff
+
+    def match(self, job):
+        ef = job.content["output/generic/dft/scf_energy_free"]
+        n  = job.input.incar.get("NELM", 60)
+        electronically_converged = all(len(l) < n for l in ef)
+        return super().match(job) and n < self.max_steps and not electronically_converged
+
+    def fix(self, old_job, new_job):
+        super().fix(old_job, new_job)
+        new_job.input.incar['NELM'] = old_job.input.incar('NELM', 60) * self.max_factor
+        if self.reset_ediff is not None:
+            new_job.input.incar["EDIFF"] = max(old_job.input.incar.get("EDIFF"), self.reset_ediff)
+
+    applicable_status = ("not_converged","aborted")
+
+
 class VaspMetaGGAElectronicConvergenceTool(VaspTool):
     """
     Meta GGA functionals converge slower and not always as "deep" as plain LDA/GGA.
@@ -965,6 +982,7 @@ class VaspMetaGGAElectronicConvergenceTool(VaspTool):
             new_job.input.incar["EDIFF"] = max(old_job.input.incar.get("EDIFF"), self.reset_ediff)
 
     applicable_status = ("not_converged",)
+    priority = 1
 
 
 DEFAULT_SHED = [

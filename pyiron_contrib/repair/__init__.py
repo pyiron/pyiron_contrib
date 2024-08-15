@@ -34,9 +34,15 @@ class FixFailed(RepairError):
 
 
 def get_job_error_log(job):
-    log = job["error.out"]
-    if log is None:
-        log = job["error.msg"]
+    log = []
+    try:
+        log += job.files["error.out"].list()
+    except FileNotFoundError:
+        pass
+    try:
+        log += job.files["error.msg"].list()
+    except FileNotFoundError:
+        pass
     return log
 
 

@@ -34,9 +34,15 @@ class FixFailed(RepairError):
 
 
 def get_job_error_log(job):
-    log = job["error.out"]
-    if log is None:
-        log = job["error.msg"]
+    log = []
+    try:
+        log += job.files["error.out"].list()
+    except FileNotFoundError:
+        pass
+    try:
+        log += job.files["error.msg"].list()
+    except FileNotFoundError:
+        pass
     return log
 
 
@@ -188,6 +194,7 @@ class HandyMan:
 
         mid = job.master_id
         pid = job.parent_id
+        queue = job.server.queue
 
         name = job.name
         if graveyard is None:
@@ -203,7 +210,8 @@ class HandyMan:
 
         new_job.master_id = mid
         new_job.parent_id = pid
-        new_job.server.queue = "cmti"
+        if queue is not None:
+            new_job.server.queue = queue
         return new_job
 
     def find_tool(self, job):
@@ -396,11 +404,15 @@ class VaspNbandsTool(VaspTool):
         self._state_factor = state_factor
 
     def match(self, job: GenericJob) -> bool:
-        return super().match(job) and not job.nbands_convergence_check()
+        return (
+            super().match(job)
+            and "electronic_structure" in job.content.output.list_groups()
+            and not job.nbands_convergence_check()
+        )
 
     def fix(self, old_job, new_job):
         super().fix(old_job, new_job)
-        old_states = old_job["output/generic/dft/bands/occ_matrix"].shape[-1]
+        old_states = old_job.content["output/generic/dft/bands/occ_matrix"].shape[0]
         n_elect = old_job.get_nelect()
         # double free states
         new_job.set_empty_states(
@@ -414,7 +426,8 @@ class VaspNbandsTool(VaspTool):
             # run didn't include CHGCAR file
             pass
 
-    applicable_status = ("not_converged",)
+    applicable_status = ("not_converged", "aborted")
+    priority = -1
 
 
 class VaspDisableIsymTool(VaspTool):
@@ -425,7 +438,7 @@ class VaspDisableIsymTool(VaspTool):
     def match(self, job):
         return (
             super().match(job)
-            and job.input.incar["ISYM"] != 0
+            and job.input.incar.get("ISYM", 2) != -1
             and match_in_error_log(
                 [
                     " inverse of rotation matrix was not found (increase SYMPREC)       5",
@@ -434,6 +447,9 @@ class VaspDisableIsymTool(VaspTool):
                     " VERY BAD NEWS! internal error in subroutine PRICEL "
                     "(probably precision problem, try to change SYMPREC in INCAR ?):",
                     " VERY BAD NEWS! internal error in subroutine INVGRP:",
+                    PartialLine(
+                        "VERY BAD NEWS! internal error in subroutine POSMAP: symmetry"
+                    ),
                     PartialLine(
                         "Inconsistent Bravais lattice types found for crystalline and"
                     ),
@@ -445,7 +461,12 @@ class VaspDisableIsymTool(VaspTool):
 
     def fix(self, old_job, new_job):
         super().fix(old_job, new_job)
-        new_job.input.incar["ISYM"] = 0
+        # ISYM=-1 seems about twice as slow as ISYM=0, so let's try with 0
+        # first before we switch symmetry completely off
+        if old_job.input.incar.get("ISYM", 2) != 0:
+            new_job.input.incar["ISYM"] = 0
+        else:
+            new_job.input.incar["ISYM"] = -1
 
     applicable_status = ("aborted",)
 
@@ -612,10 +633,6 @@ class VaspMinimizeStepsTool(VaspTool):
         new_job._restart_file_dict = {}
 
     applicable_status = ("not_converged",)
-
-
-class VaspElectronicConvergenceTool(VaspTool):
-    """ """
 
 
 class VaspTooManyKpointsIsym(VaspTool):
@@ -913,6 +930,77 @@ class VaspRhosygSymprecTool(VaspTool):
     def fix(self, old_job, new_job):
         super().fix(old_job, new_job)
         new_job.input.incar["SYMPREC"] = 1e-4
+
+
+class VaspElectronicConvergenceTool(VaspTool):
+    def __init__(self, factor=2, max_steps=200, reset_ediff=None, **kwargs):
+        self.factor = factor
+        self.max_steps = max_steps
+        self.reset_ediff = reset_ediff
+
+    def match(self, job):
+        ef = job.content["output/generic/dft/scf_energy_free"]
+        n = job.input.incar.get("NELM", 60)
+        electronically_converged = all(len(l) < n for l in ef)
+        return (
+            super().match(job) and n < self.max_steps and not electronically_converged
+        )
+
+    def fix(self, old_job, new_job):
+        super().fix(old_job, new_job)
+        new_job.input.incar["NELM"] = old_job.input.incar("NELM", 60) * self.max_factor
+        if self.reset_ediff is not None:
+            new_job.input.incar["EDIFF"] = max(
+                old_job.input.incar.get("EDIFF"), self.reset_ediff
+            )
+
+    applicable_status = ("not_converged", "aborted")
+
+
+class VaspMetaGGAElectronicConvergenceTool(VaspTool):
+    """
+    Meta GGA functionals converge slower and not always as "deep" as plain LDA/GGA.
+    Vasp wiki recommends switching ALGO to ALL and lowering EDIFF in case of trouble.
+    (It also recommends to pre-run a charge density with PBE and start from there, but I'm trying to avoid it here.)
+    """
+
+    def __init__(self, *args, reset_ediff=None, **kwargs):
+        """
+        Args:
+            reset_ediff (float, optional): if given also set EDIFF to this value, unless job to be fixed specifies loser setting already
+        """
+        super().__init__(*args, **kwargs)
+        self.reset_ediff = reset_ediff
+
+    def match(self, job):
+        def electronically_converged(job):
+            ef = job.content["output/generic/dft/scf_energy_free"]
+            n = job.input.incar.get("NELM", 60)
+            return all(len(l) < n for l in ef)
+
+        ediff = self.reset_ediff
+        if ediff is None:
+            ediff = 0
+        return (
+            super().match(job)
+            and "METAGGA" in job.input.incar.keys()
+            and not electronically_converged(job)
+            and (
+                job.input.incar.get("ALGO", "Fast") != "Fast"
+                or job.input.incar.get("EDIFF", 1e-4) < ediff
+            )
+        )
+
+    def fix(self, old_job, new_job):
+        super().fix(old_job, new_job)
+        new_job.input.incar["ALGO"] = "All"
+        if self.reset_ediff is not None:
+            new_job.input.incar["EDIFF"] = max(
+                old_job.input.incar.get("EDIFF"), self.reset_ediff
+            )
+
+    applicable_status = ("not_converged",)
+    priority = 1
 
 
 DEFAULT_SHED = [

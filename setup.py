@@ -57,7 +57,7 @@ setup(
             'distributed==2024.8.0',
             'pymatgen==2024.7.18',
             'pympipool==0.8.4',
-            'h5io_browser==0.0.17',
+            'h5io_browser==0.1.0',
         ]
     },
     cmdclass=versioneer.get_cmdclass(),

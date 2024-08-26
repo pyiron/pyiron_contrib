@@ -21,6 +21,9 @@ dependencies:
 - distributed =2024.8.0
 - h5io_browser =0.0.17
 - pymatgen =2024.7.18
+- cloudpickle =3.0.0
+- pyiron_workflow =0.10.0
+- h5io =0.2.4
 - python >= 3.10
 - lammps
 - nglview >=3.0.8

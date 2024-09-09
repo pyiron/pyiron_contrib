@@ -55,7 +55,7 @@ setup(
             'moto==5.0.14'
         ],
         'tinybase': [
-            'distributed==2024.8.0',
+            'distributed==2024.8.2',
             'pymatgen==2024.7.18',
             'pympipool==0.8.4',
             'h5io_browser==0.1.1',

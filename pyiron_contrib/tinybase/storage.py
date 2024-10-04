@@ -79,7 +79,7 @@ class GenericStorage(HasGroups, abc.ABC):
             KeyError: `item` is neither a node or a sub group of this group
         """
         try:
-            value = self[item]
+            return self[item]
         except (KeyError, ValueError):
             if default is not None:
                 return default
@@ -343,6 +343,10 @@ class H5ioStorage(GenericStorage):
         return cls(pointer)
 
     def __getitem__(self, item):
+        lall = self._pointer.list_all()
+        # h5io_browser always returned a pointer object on empty groups/nodes, so need to check on our own.
+        if item not in lall:
+            raise KeyError(item)
         value = self._pointer[item]
         if isinstance(value, Hdf5Pointer):
             return type(self)(value)
@@ -503,3 +507,54 @@ class ListStorable(Storable):
                 v = v.to_object()
             value.append(v)
         return value
+
+
+class ReduceStorable(Storable):
+    def __init__(self, value):
+        assert hasattr(value, '__reduce__'), f"type {type(value)} does not define reduce!"
+        self._value = value
+
+    def _store(self, storage):
+        func, args, *opts = self._value.__reduce__()
+        # assume this is a static function, that we can pickle
+        func_dump = pickle_dump(func)
+        if len(opts) > 3 and (setstate := opts[3]) is not None:
+            setstate_dump = pickle_dump(setstate)
+        else:
+            setstate_dump = None
+        try:
+            pickle_load(func_dump)
+            if setstate_dump is not None:
+                pickle_load(setstate_dump)
+        except Exception as e:
+            raise ValueError(
+                    f"Could not pickle/unpickle constructor or custom setstate of {self._value} of type {type(self._value)}! "
+                    "Refusing to store object when constructor cannot be stored!  If this type is using a "
+                    "custom __reduce__, double check that it returns a pickleable function as the first value!"
+            )
+        storage["func"] = func_dump
+        storage["func_args"] = args
+        if len(opts) > 0 and (state := opts[0]) is not None:
+            storage["state"] = dict(state)
+        if len(opts) > 1 and (listitems := opts[1]) is not None:
+            storage["listitems"] = list(listitems)
+        if len(opts) > 2 and (dictitems := opts[2]) is not None:
+            storage["dictitems"] = dict(dictitems)
+        if setstate_dump is not None:
+            storage["setstate"] = setstate_dump
+
+    @classmethod
+    def _restore(cls, storage, version):
+        func = pickle_load(storage["func"])
+        args = storage["func_args"]
+        obj = func(*args)
+        if "setstate" in storage.list_nodes():
+            setstate = pickle_load(storage["setstate"])
+        else:
+            setstate = getattr(obj, "__setstate__", obj.__dict__.update)
+        setstate(storage.get("state", {}))
+        for v in storage.get("listitems", []):
+            obj.append(v)
+        for k, v in storage.get("dictitems", {}).items():
+            obj[k] = v
+        return obj

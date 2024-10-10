@@ -13,6 +13,7 @@ from ase.io import read as ase_read
 from pyiron_atomistics.atomistics.job.atomistic import AtomisticGenericJob
 from pyiron_base import GenericJob, GenericMaster
 from pyiron_snippets.logger import logger
+from pyiron_snippets.deprecate import deprecate
 
 from tqdm.auto import tqdm
 
@@ -140,11 +141,15 @@ class ConstructionSite:
 
 class HandyMan:
 
+    @deprecate(suppress_fix_errors="Use suppress_errors instead")
     def __init__(
-        self, tools: Union[None, Iterable[RepairTool]] = None, suppress_fix_errors=True
+        self,
+        tools: Union[None, Iterable[RepairTool]] = None,
+        suppress_errors=True,
+        suppress_fix_errors=True,
     ):
         self.shed = defaultdict(list)
-        self._suppress_fix_errors = suppress_fix_errors
+        self._suppress_errors = suppress_fix_errors and suppress_errors
 
         if tools is None:
             tools = DEFAULT_SHED
@@ -182,7 +187,7 @@ class HandyMan:
         try:
             tool.fix(job, new_job)
         except Exception as e:
-            if self._suppress_fix_errors:
+            if self._suppress_errors:
                 raise FixFailed(e) from None
             else:
                 raise
@@ -228,7 +233,10 @@ class HandyMan:
                 if tool.match(job):
                     return tool
             except Exception as e:
-                logger.warn(f"Matching {tool} on job {job.id} failed with {e}!")
+                if self._suppress_errors:
+                    logger.warn(f"Matching {tool} on job {job.id} failed with {e}!")
+                else:
+                    raise
         raise NoMatchingTool("Cannot find stuitable tool!")
 
     def fix_project(
@@ -252,7 +260,8 @@ class HandyMan:
         fixing = defaultdict(list)
         status_list = set([k[0] for k in self.shed.keys()])
         job_ids = tqdm(
-            project.job_table(**kwargs).query("status.isin(@status_list)").id
+            project.job_table(**kwargs).query("status.isin(@status_list)").id,
+            desc="Repairing Jobs",
         )
         for jid in job_ids:
             try:
@@ -286,6 +295,14 @@ class HandyMan:
                 hopeless.append(job.id)
             except RepairError as e:
                 failed[job.id] = e
+            except tarfile.ReadError as e:
+                TimeoutTool().fix_inplace(job, self)
+            except EOFError as e:
+                if (
+                    e.args[0]
+                    == "Compressed file ended before the end-of-stream marker was reached"
+                ):
+                    TimeoutTool().fix_inplace(job, self)
 
         return ConstructionSite(fixing, hopeless, failed)
 
@@ -448,6 +465,12 @@ class VaspDisableIsymTool(VaspTool):
                     "(probably precision problem, try to change SYMPREC in INCAR ?):",
                     " VERY BAD NEWS! internal error in subroutine INVGRP:",
                     PartialLine(
+                        "PRICELV: current lattice and primitive lattice are incommensurate"
+                    ),
+                    PartialLine(
+                        "IBZKPT: not all point group operations associated with the symmetry"
+                    ),
+                    PartialLine(
                         "VERY BAD NEWS! internal error in subroutine POSMAP: symmetry"
                     ),
                     PartialLine(
@@ -515,6 +538,8 @@ class VaspZbrentTool(VaspTool):
         ediff = old_job.input.incar.get("EDIFF", 1e-4)
         if ediff > 1e-6:
             new_job.input.incar["EDIFF"] = 1e-6
+        if old_job.input.incar.get("IBRION", 2) != 1:
+            new_job.input.incar["IBRION"] = 1
         else:
             contcar = ase_to_pyiron(ase_read(str(old_job.files.CONTCAR)))
             # VASP manual recommend to copy CONTCAR to POSCAR, but if we
@@ -750,10 +775,13 @@ class VaspMemoryErrorTool(VaspTool):
         else:
             new_cores = old_job.server.cores
         new_job.server.cores = new_cores
-        if new_cores >= 40:
-            new_job.input.incar["NCORE"] = 20
-        elif new_cores >= 20:
-            new_job.input.incar["NCORE"] = 10
+        old_ncore = old_job.input.incar.get("NCORE", 1)
+        if old_ncore > 1:
+            # keep NCORE below smallest node size on our cluster, so that wave
+            # info is kept in one cache
+            new_job.input.incar["NCORE"] = min(old_ncore * 2, 40)
+        else:
+            new_job.input.incar["NCORE"] = int(new_cores // 2)
 
     applicable_status = ("aborted",)
 
@@ -933,28 +961,37 @@ class VaspRhosygSymprecTool(VaspTool):
 
 
 class VaspElectronicConvergenceTool(VaspTool):
-    def __init__(self, factor=2, max_steps=200, reset_ediff=None, **kwargs):
+    def __init__(
+        self, factor=2, max_steps=200, reset_ediff=None, reset_algo=None, **kwargs
+    ):
+        super().__init__(**kwargs)
         self.factor = factor
         self.max_steps = max_steps
         self.reset_ediff = reset_ediff
+        self.reset_algo = reset_algo
 
     def match(self, job):
         ef = job.content["output/generic/dft/scf_energy_free"]
         n = job.input.incar.get("NELM", 60)
         electronically_converged = all(len(l) < n for l in ef)
-        return (
-            super().match(job) and n < self.max_steps and not electronically_converged
-        )
+        try_fix = n < self.max_steps
+        if self.reset_ediff is not None:
+            try_fix |= job.input.incar.get("EDIFF") < self.reset_ediff
+        if self.reset_algo is not None:
+            try_fix |= job.input.incar.get("ALGO", "Fast") != self.reset_algo
+        return super().match(job) and try_fix and not electronically_converged
 
     def fix(self, old_job, new_job):
         super().fix(old_job, new_job)
-        new_job.input.incar["NELM"] = old_job.input.incar("NELM", 60) * self.max_factor
+        new_job.input.incar["NELM"] = old_job.input.incar.get("NELM", 60) * self.factor
         if self.reset_ediff is not None:
             new_job.input.incar["EDIFF"] = max(
                 old_job.input.incar.get("EDIFF"), self.reset_ediff
             )
+        if self.reset_algo is not None:
+            new_job.input.incar["ALGO"] = self.reset_algo
 
-    applicable_status = ("not_converged", "aborted")
+    applicable_status = ("not_converged",)
 
 
 class VaspMetaGGAElectronicConvergenceTool(VaspTool):
@@ -973,6 +1010,12 @@ class VaspMetaGGAElectronicConvergenceTool(VaspTool):
         self.reset_ediff = reset_ediff
 
     def match(self, job):
+        try:
+            if job.content["user/handyman/last"] == type(self).__name__:
+                return False
+        except KeyError:
+            pass
+
         def electronically_converged(job):
             ef = job.content["output/generic/dft/scf_energy_free"]
             n = job.input.incar.get("NELM", 60)
@@ -1018,4 +1061,5 @@ DEFAULT_SHED = [
     VaspNbandsTool(1.5),
     VaspMinimizeStepsTool(2),
     VaspEddrmmTool(),
+    VaspElectronicConvergenceTool(reset_algo="Normal"),
 ]

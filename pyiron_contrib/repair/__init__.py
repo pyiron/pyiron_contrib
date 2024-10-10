@@ -293,6 +293,11 @@ class HandyMan:
                 hopeless.append(job.id)
             except RepairError as e:
                 failed[job.id] = e
+            except tarfile.ReadError as e:
+                TimeoutTool().fix_inplace(job, self)
+            except EOFError as e:
+                if e.args[0] == "Compressed file ended before the end-of-stream marker was reached":
+                    TimeoutTool().fix_inplace(job, self)
 
         return ConstructionSite(fixing, hopeless, failed)
 

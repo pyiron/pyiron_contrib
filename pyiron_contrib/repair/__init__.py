@@ -948,28 +948,33 @@ class VaspRhosygSymprecTool(VaspTool):
 
 
 class VaspElectronicConvergenceTool(VaspTool):
-    def __init__(self, factor=2, max_steps=200, reset_ediff=None, **kwargs):
+    def __init__(self, factor=2, max_steps=200, reset_ediff=None, reset_algo=None, **kwargs):
+        super().__init__(**kwargs)
         self.factor = factor
         self.max_steps = max_steps
         self.reset_ediff = reset_ediff
+        self.reset_algo = reset_algo
 
     def match(self, job):
         ef = job.content["output/generic/dft/scf_energy_free"]
         n = job.input.incar.get("NELM", 60)
         electronically_converged = all(len(l) < n for l in ef)
-        return (
-            super().match(job) and n < self.max_steps and not electronically_converged
-        )
+        try_fix = n < self.max_steps
+        if self.reset_ediff is not None:
+            try_fix |= job.input.incar.get("EDIFF") < self.reset_ediff
+        if self.reset_algo is not None:
+            try_fix |= job.input.incar.get("ALGO", "Fast") != self.reset_algo
+        return super().match(job) and try_fix and not electronically_converged
 
     def fix(self, old_job, new_job):
         super().fix(old_job, new_job)
-        new_job.input.incar["NELM"] = old_job.input.incar("NELM", 60) * self.max_factor
+        new_job.input.incar['NELM'] = old_job.input.incar.get('NELM', 60) * self.factor
         if self.reset_ediff is not None:
-            new_job.input.incar["EDIFF"] = max(
-                old_job.input.incar.get("EDIFF"), self.reset_ediff
-            )
+            new_job.input.incar["EDIFF"] = max(old_job.input.incar.get("EDIFF"), self.reset_ediff)
+        if self.reset_algo is not None:
+            new_job.input.incar["ALGO"] = self.reset_algo
 
-    applicable_status = ("not_converged", "aborted")
+    applicable_status = ("not_converged",)
 
 
 class VaspMetaGGAElectronicConvergenceTool(VaspTool):
@@ -988,6 +993,11 @@ class VaspMetaGGAElectronicConvergenceTool(VaspTool):
         self.reset_ediff = reset_ediff
 
     def match(self, job):
+        try:
+            if job.content['user/handyman/last'] == type(self).__name__:
+                return False
+        except KeyError:
+            pass
         def electronically_converged(job):
             ef = job.content["output/generic/dft/scf_energy_free"]
             n = job.input.incar.get("NELM", 60)
@@ -1033,4 +1043,5 @@ DEFAULT_SHED = [
     VaspNbandsTool(1.5),
     VaspMinimizeStepsTool(2),
     VaspEddrmmTool(),
+    VaspElectronicConvergenceTool(reset_algo="Normal"),
 ]

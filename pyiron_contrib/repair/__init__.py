@@ -525,6 +525,8 @@ class VaspZbrentTool(VaspTool):
         ediff = old_job.input.incar.get("EDIFF", 1e-4)
         if ediff > 1e-6:
             new_job.input.incar["EDIFF"] = 1e-6
+        if old_job.input.incar.get("IBRION", 2) != 1:
+            new_job.input.incar["IBRION"] = 1
         else:
             contcar = ase_to_pyiron(ase_read(str(old_job.files.CONTCAR)))
             # VASP manual recommend to copy CONTCAR to POSCAR, but if we

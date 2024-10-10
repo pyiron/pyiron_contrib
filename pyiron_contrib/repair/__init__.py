@@ -258,7 +258,8 @@ class HandyMan:
         fixing = defaultdict(list)
         status_list = set([k[0] for k in self.shed.keys()])
         job_ids = tqdm(
-            project.job_table(**kwargs).query("status.isin(@status_list)").id
+            project.job_table(**kwargs).query("status.isin(@status_list)").id,
+            desc="Repairing Jobs"
         )
         for jid in job_ids:
             try:

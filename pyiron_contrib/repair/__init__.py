@@ -143,8 +143,10 @@ class HandyMan:
 
     @deprecate(suppress_fix_errors="Use suppress_errors instead")
     def __init__(
-        self, tools: Union[None, Iterable[RepairTool]] = None,
-        suppress_errors=True, suppress_fix_errors=True
+        self,
+        tools: Union[None, Iterable[RepairTool]] = None,
+        suppress_errors=True,
+        suppress_fix_errors=True,
     ):
         self.shed = defaultdict(list)
         self._suppress_errors = suppress_fix_errors and suppress_errors
@@ -259,7 +261,7 @@ class HandyMan:
         status_list = set([k[0] for k in self.shed.keys()])
         job_ids = tqdm(
             project.job_table(**kwargs).query("status.isin(@status_list)").id,
-            desc="Repairing Jobs"
+            desc="Repairing Jobs",
         )
         for jid in job_ids:
             try:
@@ -296,7 +298,10 @@ class HandyMan:
             except tarfile.ReadError as e:
                 TimeoutTool().fix_inplace(job, self)
             except EOFError as e:
-                if e.args[0] == "Compressed file ended before the end-of-stream marker was reached":
+                if (
+                    e.args[0]
+                    == "Compressed file ended before the end-of-stream marker was reached"
+                ):
                     TimeoutTool().fix_inplace(job, self)
 
         return ConstructionSite(fixing, hopeless, failed)
@@ -459,10 +464,18 @@ class VaspDisableIsymTool(VaspTool):
                     " VERY BAD NEWS! internal error in subroutine PRICEL "
                     "(probably precision problem, try to change SYMPREC in INCAR ?):",
                     " VERY BAD NEWS! internal error in subroutine INVGRP:",
-                    PartialLine("PRICELV: current lattice and primitive lattice are incommensurate"),
-                    PartialLine("IBZKPT: not all point group operations associated with the symmetry"),
-                    PartialLine("VERY BAD NEWS! internal error in subroutine POSMAP: symmetry"),
-                    PartialLine("Inconsistent Bravais lattice types found for crystalline and"),
+                    PartialLine(
+                        "PRICELV: current lattice and primitive lattice are incommensurate"
+                    ),
+                    PartialLine(
+                        "IBZKPT: not all point group operations associated with the symmetry"
+                    ),
+                    PartialLine(
+                        "VERY BAD NEWS! internal error in subroutine POSMAP: symmetry"
+                    ),
+                    PartialLine(
+                        "Inconsistent Bravais lattice types found for crystalline and"
+                    ),
                     PartialLine("Found some non-integer element in rotation matrix"),
                 ],
                 job,
@@ -766,7 +779,7 @@ class VaspMemoryErrorTool(VaspTool):
         if old_ncore > 1:
             # keep NCORE below smallest node size on our cluster, so that wave
             # info is kept in one cache
-            new_job.input.incar["NCORE"] = min(old_ncore*2, 40)
+            new_job.input.incar["NCORE"] = min(old_ncore * 2, 40)
         else:
             new_job.input.incar["NCORE"] = int(new_cores // 2)
 
@@ -948,7 +961,9 @@ class VaspRhosygSymprecTool(VaspTool):
 
 
 class VaspElectronicConvergenceTool(VaspTool):
-    def __init__(self, factor=2, max_steps=200, reset_ediff=None, reset_algo=None, **kwargs):
+    def __init__(
+        self, factor=2, max_steps=200, reset_ediff=None, reset_algo=None, **kwargs
+    ):
         super().__init__(**kwargs)
         self.factor = factor
         self.max_steps = max_steps
@@ -968,9 +983,11 @@ class VaspElectronicConvergenceTool(VaspTool):
 
     def fix(self, old_job, new_job):
         super().fix(old_job, new_job)
-        new_job.input.incar['NELM'] = old_job.input.incar.get('NELM', 60) * self.factor
+        new_job.input.incar["NELM"] = old_job.input.incar.get("NELM", 60) * self.factor
         if self.reset_ediff is not None:
-            new_job.input.incar["EDIFF"] = max(old_job.input.incar.get("EDIFF"), self.reset_ediff)
+            new_job.input.incar["EDIFF"] = max(
+                old_job.input.incar.get("EDIFF"), self.reset_ediff
+            )
         if self.reset_algo is not None:
             new_job.input.incar["ALGO"] = self.reset_algo
 
@@ -994,10 +1011,11 @@ class VaspMetaGGAElectronicConvergenceTool(VaspTool):
 
     def match(self, job):
         try:
-            if job.content['user/handyman/last'] == type(self).__name__:
+            if job.content["user/handyman/last"] == type(self).__name__:
                 return False
         except KeyError:
             pass
+
         def electronically_converged(job):
             ef = job.content["output/generic/dft/scf_energy_free"]
             n = job.input.incar.get("NELM", 60)

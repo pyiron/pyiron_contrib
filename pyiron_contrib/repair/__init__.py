@@ -762,10 +762,13 @@ class VaspMemoryErrorTool(VaspTool):
         else:
             new_cores = old_job.server.cores
         new_job.server.cores = new_cores
-        if new_cores >= 40:
-            new_job.input.incar["NCORE"] = 20
-        elif new_cores >= 20:
-            new_job.input.incar["NCORE"] = 10
+        old_ncore = old_job.input.incar.get("NCORE", 1)
+        if old_ncore > 1:
+            # keep NCORE below smallest node size on our cluster, so that wave
+            # info is kept in one cache
+            new_job.input.incar["NCORE"] = min(old_ncore*2, 40)
+        else:
+            new_job.input.incar["NCORE"] = int(new_cores // 2)
 
     applicable_status = ("aborted",)
 

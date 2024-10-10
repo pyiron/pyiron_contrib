@@ -459,12 +459,10 @@ class VaspDisableIsymTool(VaspTool):
                     " VERY BAD NEWS! internal error in subroutine PRICEL "
                     "(probably precision problem, try to change SYMPREC in INCAR ?):",
                     " VERY BAD NEWS! internal error in subroutine INVGRP:",
-                    PartialLine(
-                        "VERY BAD NEWS! internal error in subroutine POSMAP: symmetry"
-                    ),
-                    PartialLine(
-                        "Inconsistent Bravais lattice types found for crystalline and"
-                    ),
+                    PartialLine("PRICELV: current lattice and primitive lattice are incommensurate"),
+                    PartialLine("IBZKPT: not all point group operations associated with the symmetry"),
+                    PartialLine("VERY BAD NEWS! internal error in subroutine POSMAP: symmetry"),
+                    PartialLine("Inconsistent Bravais lattice types found for crystalline and"),
                     PartialLine("Found some non-integer element in rotation matrix"),
                 ],
                 job,

@@ -2,7 +2,7 @@ import numpy as np
 
 from scipy.interpolate import CubicSpline
 from scipy.optimize import root_scalar, root
-from scipy.integrate import cumtrapz
+from scipy.integrate import cumulative_trapezoid
 from scipy.signal import argrelextrema
 from scipy.constants import physical_constants
 
@@ -693,6 +693,6 @@ class MeanField:
         ah_U_eqn = CubicSpline(x=temperatures, y=ah_U)
         return (
             fine_temperatures[1:],
-            cumtrapz(ah_U_eqn(fine_temperatures), 1 / fine_temperatures)
+            cumulative_trapezoid(ah_U_eqn(fine_temperatures), 1 / fine_temperatures)
             * fine_temperatures[1:],
         )

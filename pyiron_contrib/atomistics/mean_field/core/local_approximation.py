@@ -4,7 +4,7 @@
 
 import numpy as np
 from scipy.interpolate import CubicSpline
-from scipy.integrate import cumtrapz
+from scipy.integrate import cumulative_trapezoid
 from scipy.optimize import curve_fit
 
 from pyiron_contrib.atomistics.mean_field.core.bond_analysis import StaticBondAnalysis
@@ -412,9 +412,9 @@ class GenerateBondingPotential:
             arg_b_0 = np.argmin(abs(bonds))
         else:
             raise ValueError
-        up = cumtrapz(y=-force[arg_b_0:], x=bonds[arg_b_0:], initial=0.0)
+        up = cumulative_trapezoid(y=-force[arg_b_0:], x=bonds[arg_b_0:], initial=0.0)
         down = np.flip(
-            cumtrapz(y=-np.flip(force[: arg_b_0 + 1]), x=np.flip(bonds[: arg_b_0 + 1]))
+            cumulative_trapezoid(y=-np.flip(force[: arg_b_0 + 1]), x=np.flip(bonds[: arg_b_0 + 1]))
         )
         potential = np.concatenate((down, up))
         if tag == "long":
@@ -1064,9 +1064,9 @@ class GenerateLAPotentialv2:
         else:
             raise ValueError
 
-        up = cumtrapz(y=-force[arg_b_0:], x=bonds[arg_b_0:], initial=0.0)
+        up = cumulative_trapezoid(y=-force[arg_b_0:], x=bonds[arg_b_0:], initial=0.0)
         down = np.flip(
-            cumtrapz(y=-np.flip(force[: arg_b_0 + 1]), x=np.flip(bonds[: arg_b_0 + 1]))
+            cumulative_trapezoid(y=-np.flip(force[: arg_b_0 + 1]), x=np.flip(bonds[: arg_b_0 + 1]))
         )
         potential = np.concatenate((down, up))
         return bonds, force, potential
@@ -1710,9 +1710,9 @@ class GenerateLAPotential:
         else:
             raise ValueError
 
-        up = cumtrapz(y=-force[arg_b_0:], x=bonds[arg_b_0:], initial=0.0)
+        up = cumulative_trapezoid(y=-force[arg_b_0:], x=bonds[arg_b_0:], initial=0.0)
         down = np.flip(
-            cumtrapz(y=-np.flip(force[: arg_b_0 + 1]), x=np.flip(bonds[: arg_b_0 + 1]))
+            cumulative_trapezoid(y=-np.flip(force[: arg_b_0 + 1]), x=np.flip(bonds[: arg_b_0 + 1]))
         )
         potential = np.concatenate((down, up))
         return bonds, force, potential

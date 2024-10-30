@@ -2,7 +2,7 @@ import numpy as np
 import os
 
 from scipy.optimize import root, root_scalar
-from scipy.interpolate import CubicSpline
+from scipy.interpolate import CubicSpline, RegularGridInterpolator
 from scipy.integrate import cumulative_trapezoid
 from scipy.constants import physical_constants
 KB = physical_constants['Boltzmann constant in eV/K'][0]
@@ -153,6 +153,16 @@ class MeanFieldModel():
         for inp, inp_str in zip(inputs, inputs_str):
             if len(inp) != self.shells:
                 raise TypeError(f'length of {inp_str} is not equal to shells.')
+            
+    @staticmethod
+    def V1_transversal_helper(bond_grid, basis_vector, t_potential):
+        if t_potential is not None:
+            if np.ndim(bond_grid) == 5:
+                t = np.einsum('lijkm,m->lijk', bond_grid, basis_vector)
+            else:
+                t = np.dot(bond_grid, basis_vector)
+            return t_potential(t)
+        return 0.
 
     def V1_template(self, bond_grid=None, shell=None, harmonic=False):
         """
@@ -172,12 +182,12 @@ class MeanFieldModel():
         t1_potential = self.t1_harm_potentials[shell] if harmonic else self.t1_potentials[shell]
         t2_potential = self.t2_harm_potentials[shell] if harmonic else self.t2_potentials[shell]
 
-        r = np.dot(bond_grid, self.basis[shell][0]) if harmonic else np.linalg.norm(bond_grid, axis=-1)
-        # r = np.linalg.norm(bond_grid, axis=-1)
-        
-        v1 =  r_potential(r)
-        v1 += t1_potential(np.dot(bond_grid, self.basis[shell][1])) if t1_potential is not None else 0
-        v1 += t2_potential(np.dot(bond_grid, self.basis[shell][2])) if t2_potential is not None else 0
+        v1 = np.zeros_like(bond_grid[..., 0])
+        if r_potential is not None:
+            r = np.linalg.norm(bond_grid, axis=-1)
+            v1 +=  r_potential(r)
+        v1 += self.V1_transversal_helper(bond_grid=bond_grid, basis_vector=self.basis[shell][1], t_potential=t1_potential)
+        v1 += self.V1_transversal_helper(bond_grid=bond_grid, basis_vector=self.basis[shell][2], t_potential=t2_potential)
 
         return v1
     
@@ -201,30 +211,74 @@ class MeanFieldModel():
         gradient = np.gradient(V, lo_mesh[:, 0, 0], t1_mesh[0, :, 0], t2_mesh[0, 0, :], edge_order=2)
         return gradient
     
-    def Veff(self, eps=1.):
-        """
-        Calculate the mean-field effective potential.
+    # def Veff(self, eps=1.):
+    #     """
+    #     Calculate the mean-field effective potential.
 
-        Parameters:
-            eps (float, optional): Strain on bond b_0. Defaults to 1, no strain.
+    #     Parameters:
+    #         eps (float, optional): Strain on bond b_0. Defaults to 1, no strain.
 
-        Returns:
-            vmfc (np.ndarray): The correlated mean-field effective potential.
-        """
-        vmf = 0.
+    #     Returns:
+    #         vmfc (np.ndarray): The correlated mean-field effective potential.
+    #     """
+    #     vmf = 0.
+    #     for shell in range(len(self.alphas)):
+    #         b_l = self.bond_grid
+    #         a_l = self.b_0s[self.ref_shell]*self.basis[self.ref_shell][0]*eps
+    #         a_k = self.b_0s[shell]*self.basis[shell][0]*eps
+    #         for alphas, alphas_rot_ids in zip(self.alphas[shell], self.alphas_rot_ids[shell]):
+    #             # we scale first, rotate next, and then add a_k
+    #             # Note that the rotation is done on db and not a_k! This lets us circumvent the rotation that needs to be made for the transveral components in V1
+    #             # for future optimization.
+    #             for alpha, rot in zip(alphas, self.rotations[shell][alphas_rot_ids]):
+    #                 b_k = (b_l-a_l)@alpha@rot.T+a_k
+    #                 vmf += 0.5*self.V1(bond_grid=b_k, shell=shell)
+    #     return vmf - vmf.min()
+    
+    def get_coarse_lo_t1_t2(self):
+        lo_mesh, t1_mesh, t2_mesh = self.meshes
+        lo_coarse = np.linspace(lo_mesh[:, 0, 0][0], lo_mesh[:, 0, 0][-1], 30)
+        t1_coarse = np.linspace(t1_mesh[0, :, 0][0], t1_mesh[0, :, 0][-1], 15)
+        t2_coarse = np.linspace(t2_mesh[0, 0, :][0], t2_mesh[0, 0, :][-1], 15)
+        return lo_coarse, t1_coarse, t2_coarse
+    
+    def get_coarse_bond_grid(self):
+        lo_coarse, t1_coarse, t2_coarse = self.get_coarse_lo_t1_t2()
+        bond_grid_coarse = GenerateBonds(b_0=self.b_0s[self.ref_shell], basis=self.basis[self.ref_shell], 
+                                         lo_disps=lo_coarse, t1_disps=t1_coarse, t2_disps=t2_coarse).get_bond_grid()
+        return bond_grid_coarse
+    
+    def coarse_Veff(self, eps=1.):
+        bond_grid_coarse = self.get_coarse_bond_grid()
+        vmf = np.zeros_like(bond_grid_coarse[:, :, :, 0])
         for shell in range(len(self.alphas)):
-            b_l = self.bond_grid
+            b_l = bond_grid_coarse
             a_l = self.b_0s[self.ref_shell]*self.basis[self.ref_shell][0]*eps
             a_k = self.b_0s[shell]*self.basis[shell][0]*eps
+            b_l_minus_a_l = b_l-a_l
+            # for alphas, alphas_rot_ids in zip(self.alphas[shell], self.alphas_rot_ids[shell]):
+            #     # we scale first, rotate next, and then add a_k
+            #     # Note that the rotation is done on db and not a_k! This lets us circumvent the rotation that needs to be made for the transveral components in V1
+            #     # for future optimization.
+            #     b_k = np.einsum('ijkm,lmn,lpn->lijkp', b_l_minus_a_l, np.array(alphas), self.rotations[shell][alphas_rot_ids], optimize='greedy')+a_k[None, None, None, None, :]
+            #     vmf += 0.5*self.V1(bond_grid=b_k, shell=shell).sum(axis=0)
             for alphas, alphas_rot_ids in zip(self.alphas[shell], self.alphas_rot_ids[shell]):
                 # we scale first, rotate next, and then add a_k
                 # Note that the rotation is done on db and not a_k! This lets us circumvent the rotation that needs to be made for the transveral components in V1
                 # for future optimization.
                 for alpha, rot in zip(alphas, self.rotations[shell][alphas_rot_ids]):
-                    if len(alpha) != 0:
-                        b_k = (b_l-a_l)@alpha@rot.T+a_k
-                        vmf += 0.5*self.V1(bond_grid=b_k, shell=shell)
+                    b_k = (b_l_minus_a_l)@alpha@rot.T+a_k
+                    vmf += 0.5*self.V1(bond_grid=b_k, shell=shell)
         return vmf - vmf.min()
+    
+    def Veff(self, eps=1.):
+        lo_coarse, t1_coarse, t2_coarse = self.get_coarse_lo_t1_t2()
+        vmf = self.coarse_Veff(eps=eps)
+        fit = RegularGridInterpolator((lo_coarse, t1_coarse, t2_coarse), vmf, method='cubic', bounds_error=False, fill_value=None)
+        lo_fine, t1_fine, t2_fine = self.meshes
+        fine_points = np.array([lo_fine.ravel(), t1_fine.ravel(), t2_fine.ravel()]).T
+        veff = fit(fine_points).reshape(lo_fine.shape)
+        return veff
     
 class VirialQuantities():
     """
@@ -278,13 +332,12 @@ class VirialQuantities():
         Veff -= Veff.min()
         lm += 1e-20
         rho_1 = np.exp(-(Veff+lm*(self.meshes[0]-self.b_0*eps))/KB/temperature)
-        rho_1 /= rho_1.sum()
         if not np.isnan(rho_1).any():
             self._rho_1_temp = rho_1
         else:
             rho_1 = self._rho_1_temp
-        num_offset = np.min(rho_1[rho_1>0])  # add a numerical offset to avoid divide by zero errors
-        return rho_1+num_offset
+        rho_1 += np.min(rho_1[rho_1>0])  # add a numerical offset to avoid divide by zero errors
+        return rho_1 / rho_1.sum()
 
     def get_virial_quantities(self, Veff, dV1, temperature=100., eps=1., lm=0., shell=0, return_rho_1=False):
         """
@@ -310,8 +363,8 @@ class VirialQuantities():
         dV1 = np.array(dV1, dtype=float)
         rho_1 = self.get_rho(Veff=Veff, temperature=temperature, eps=eps, lm=lm)
         b_eps = (lo_mesh*rho_1).sum()
-        db_dV1 = -((lo_mesh-b_eps)*dV1[0]+t1_mesh*dV1[1]+t2_mesh*dV1[2])
-        T_vir = -(db_dV1*rho_1).sum()*self.n_bonds_per_shell[shell]/6/KB*self.scale
+        db_dV1 = ((lo_mesh-b_eps)*dV1[0]+t1_mesh*dV1[1]+t2_mesh*dV1[2])
+        T_vir = self.n_bonds_per_shell[shell]/6/KB*(db_dV1*rho_1).sum()
         
         if self.crystal == 'fcc':
             N_by_V = 4/(b_eps*self.factors[shell])**3
@@ -319,8 +372,8 @@ class VirialQuantities():
             N_by_V = 2/(b_eps*self.factors[shell])**3
         else:
             raise TypeError('crystal must be fcc or bcc.')
-        b_dV1 = -(lo_mesh*dV1[0]+t1_mesh*dV1[1]+t2_mesh*dV1[2])
-        P_vir = N_by_V*(KB*T_vir+(b_dV1*rho_1).sum()*self.n_bonds_per_shell[shell]/6)
+        b_dV1 = (lo_mesh*dV1[0]+t1_mesh*dV1[1]+t2_mesh*dV1[2])
+        P_vir = N_by_V*(KB*T_vir-self.n_bonds_per_shell[shell]/6*(b_dV1*rho_1).sum())
 
         if not return_rho_1:
             rho_1 = np.array([None])  
@@ -395,14 +448,14 @@ class Optimizer():
             if not self._ev_fit_initialized:
                 strains = 1+self.strain_list
                 self._u_md_fit_eqn = np.poly1d(np.polyfit(strains, self.energy_list, deg=4))
-                self._du_md_fit_eqn = np.poly1d(np.polyfit(strains, np.gradient(self.energy_list, strains, edge_order=2), deg=4))
+                self._du_md_fit_eqn = self._u_md_fit_eqn.deriv(m=1)
 
                 u_mf = np.zeros(len(strains))
                 for shell in range(self.r_order):
                     s_b_xyz = self.basis[shell][0]*(strains*self.b_0s[shell])[:, np.newaxis]
                     u_mf += 0.5*self.n_bonds_per_shell[shell]*self.mfm_instances[shell].V1(s_b_xyz)
                 self._u_mf_fit_eqn = np.poly1d(np.polyfit(strains, u_mf, deg=4))
-                self._du_mf_fit_eqn = np.poly1d(np.polyfit(strains, np.gradient(u_mf, strains, edge_order=2), deg=4))
+                self._du_mf_fit_eqn = self._u_mf_fit_eqn.deriv(m=1)
 
                 if self.crystal == 'fcc':
                     self._N_by_V_0 = 4/(self.b_0s[0]*self.factors[0])**3
@@ -413,8 +466,10 @@ class Optimizer():
                 
                 self._ev_fit_initialized = True
 
+            P_offset = -self._N_by_V_0/(6*eps**2)*(self._du_md_fit_eqn(eps)-self._du_mf_fit_eqn(eps))
+            # P_offset = 0.
             E_offset = self._u_md_fit_eqn(eps)-self._u_mf_fit_eqn(eps)
-            P_offset = -self._N_by_V_0/(3*eps**2)*(self._du_md_fit_eqn(eps)-self._du_mf_fit_eqn(eps))
+
             return P_offset, E_offset
 
     def collect_properties(self, temperature, lms, eps, Veffs=None, dV1s=None, fix_T=False, return_rho_1=False):
@@ -498,7 +553,7 @@ class Optimizer():
                 def objective_function(args):
                     _, _, b_eps, _ = self.vq_instances[shell].get_virial_quantities(Veff=Veffs[shell], dV1=dV1s[shell], temperature=temperature, eps=eps, lm=args, shell=shell)
                     return np.abs(self.b_0s[shell]*eps-b_eps)
-                solver = root_scalar(objective_function, x0=0., x1=0.001, rtol=1e-20)
+                solver = root_scalar(objective_function, x0=0., x1=0.001, rtol=1e-10)
                 # print('Optimization complete.')
                 lms.append(solver.root)
             lms = np.array(lms)
@@ -514,7 +569,7 @@ class Optimizer():
                 return np.concatenate((np.array(b_eps_diff), np.array([T_diff])))
             # print('Optimizing all shells at once...')
             x0 = np.concatenate((np.zeros(self.r_order), np.array([temperature])))
-            solver = root(objective_function, x0=x0, method='lm', tol=1e-20)
+            solver = root(objective_function, x0=x0, tol=1e-10, method='lm')
             # print('Optimization complete.')
             lms = solver.x[:-1]
             temperature = solver.x[-1]
@@ -544,7 +599,7 @@ class Optimizer():
         """
         # Here, the Veff is redefined inside the objective function for each new value of eps.
         # Further, as the total pressure of the system is the sum of the pressures due to each shell, all shells are considered simultaneously in the objective function.
-        print('Running T: {temperature}; P: {pressure}\n')
+        print('Running T: {}; P: {}'.format(temperature, pressure))
         # print('Optimizing all shells at once. This might take a while...')
         dV1s = np.array([self.mfm_instances[shell].V1_gradient() for shell in range(self.r_order)]) 
         if not fix_T:
@@ -561,9 +616,9 @@ class Optimizer():
                 print(args)
                 return np.concatenate((np.array(b_eps_diff), np.array([P_diff])))
             x0 = np.concatenate((np.zeros(self.r_order), np.array([eps])))
-            solver = root(objective_function, x0=x0, method='lm', tol=1e-20)
+            solver = root(objective_function, x0=x0, tol=1e-10, method='lm')
             # print('Optimization complete.')
-            lms = solver.x[:self.r_order+1]
+            lms = solver.x[:-1]
             eps = solver.x[-1]
         else:
             def objective_function(args):
@@ -582,7 +637,7 @@ class Optimizer():
                 print(args)
                 return np.concatenate((np.array(b_eps_diff), np.array([T_diff]), np.array([P_diff])))
             x0 = np.concatenate((np.zeros(self.r_order), np.array([temperature]), np.array([eps])))
-            solver = root(objective_function, x0=x0, method='lm', tol=1e-20)
+            solver = root(objective_function, x0=x0, tol=1e-10, method='lm')
             # print('Optimization complete.')
             lms = solver.x[:-2]
             temperature = solver.x[-2]
@@ -611,7 +666,7 @@ class GenerateAlphas():
         alpha_threshold (float): Value above which each element of the alpha matrix should be for it to be considered. Defaults to 1e-3.
     """
     def __init__(self, project_path, b_0s, basis, rotations, bloch_hessians, kpoint_vectors, kpoint_weights, shells=1, r_order=1, s_order=0, crystal='fcc',  
-                 cutoff_radius=25., rewrite_alphas=False, alpha_threshold=1e-3):
+                 cutoff_radius=None, rewrite_alphas=False, alpha_threshold=1e-3):
         self.project_path = project_path
         self.b_0s = b_0s
         self.basis = basis
@@ -623,7 +678,7 @@ class GenerateAlphas():
         self.kpoint_vectors = kpoint_vectors
         self.kpoint_weights = kpoint_weights
         self.crystal = crystal
-        self.cutoff_radius = cutoff_radius
+        self.cutoff_radius = cutoff_radius if cutoff_radius is not None else 100.
         self.rewrite_alphas = rewrite_alphas
         self.alpha_threshold = alpha_threshold
 
@@ -674,23 +729,36 @@ class GenerateAlphas():
         else:
             raise ValueError('crystal must be fcc or bcc')
         
+    # def make_model(self):
+    #     """
+    #     Helper method to calulate the required terms for the covariance matrices.
+    #     """
+    #     # Iterate over all Bloch modes
+    #     nu_sq, eig_vecs = [], []
+    #     for H in self.bloch_hessians:
+    #         eval, evec = np.linalg.eigh(H)
+    #         nu_sq.append(eval)
+    #         eig_vecs.append(evec.T)
+    #     eig_vecs = np.array(eig_vecs).reshape((-1, 3))
+        
+    #     self.nu_sq = np.array(nu_sq).flatten()
+    #     nu_sq_inv = 1/self.nu_sq
+        
+    #     eig_vecs_outer = np.einsum('ij,ik->ijk', eig_vecs, eig_vecs)
+    #     self.nu_factor = np.einsum('i,ijk->ijk', nu_sq_inv, eig_vecs_outer)
+
     def make_model(self):
         """
         Helper method to calulate the required terms for the covariance matrices.
         """
         # Iterate over all Bloch modes
-        nu_sq, eig_vecs = [], []
-        for H in self.bloch_hessians:
-            eval, evec = np.linalg.eig(H)
-            nu_sq.append(eval)
-            eig_vecs.append(evec.T)
-        eig_vecs = np.array(eig_vecs).reshape((-1, 3))
+        nu_sq, eig_vecs = np.linalg.eigh(self.bloch_hessians)
         
         self.nu_sq = np.array(nu_sq).flatten()
         nu_sq_inv = 1/self.nu_sq
+        eig_vecs = eig_vecs.transpose(0, 2, 1).reshape((-1, 3))
         
-        eig_vecs_outer = np.einsum('ij,ik->ijk', eig_vecs, eig_vecs)
-        self.nu_factor = np.einsum('i,ijk->ijk', nu_sq_inv, eig_vecs_outer)
+        self.nu_factor = np.einsum('i,ij,ik->ijk', nu_sq_inv, eig_vecs, eig_vecs, optimize='greedy')
     
     def get_covariance(self, bond, ref_bond, position):
         """
@@ -709,7 +777,7 @@ class GenerateAlphas():
         # we match terms k,-k as this is the noise correlation
         r_p = np.exp(1j*kps@position)+np.exp(1j*kps@(position+bond-ref_bond))-np.exp(1j*kps@(position-ref_bond))-np.exp(1j*kps@(position+bond))
         sel = self.nu_sq > self.nu_sq.max()*1e-3
-        return np.einsum('i,i,ijk->jk', kpsw[sel]**2, r_p[sel], self.nu_factor[sel])/self.kpoint_weights.sum()
+        return np.einsum('i,ijk->jk', kpsw[sel]*r_p[sel], self.nu_factor[sel])/self.kpoint_weights.sum()
         
     def generate_alphas(self, write=True):
         """
@@ -747,9 +815,9 @@ class GenerateAlphas():
                                                 np.round(self.cutoff_radius, decimals=5)).flatten()
                     for b, bond in zip(within_radius, nn[within_radius]):
                         bond_cov = self.get_covariance(bond=bond, ref_bond=ref_bond, position=pos)
-                        norm_bond_cov = np.real(bond_cov@np.linalg.inv(ref_bond_cov))
-                        if np.round(abs(norm_bond_cov), decimals=self.count_decimals(self.alpha_threshold)).max() >= self.alpha_threshold:
-                            al.append(norm_bond_cov)
+                        alpha = np.real(bond_cov@np.linalg.inv(ref_bond_cov))
+                        if np.any(abs(alpha) >= self.alpha_threshold):
+                            al.append(alpha)
                             al_ids.append(b)
                     al_p.append(al)
                     al_p_ids.append(al_ids)
@@ -794,7 +862,7 @@ class MeanFieldJob():
 
     def __init__(self, project_path, bond_grids, b_0s, basis, rotations, bloch_hessians, kpoint_vectors, kpoint_weights, r_potentials, t1_potentials=None, t2_potentials=None, 
                  r_harm_potentials=None, t1_harm_potentials=None, t2_harm_potentials=None, shells=1, r_order=1, s_order=0, crystal='fcc', energy_list=None, 
-                 strain_list=None, cutoff_radius=25., rewrite_alphas=False, alpha_threshold=1e-3):
+                 strain_list=None, cutoff_radius=None, rewrite_alphas=False, alpha_threshold=1e-3):
         self.project_path = project_path
         self.bond_grids = bond_grids
         self.b_0s = b_0s
@@ -1003,6 +1071,7 @@ class MeanFieldJob():
             key: [o[i] for o in outs] 
             for i, key in enumerate(['T', 'T_eff', 'T_vir', 'P', 'P_offset', 'E_offset', 'b_eps', 'eps', 'lms'])
             }
+        self.output['E_offset'] = list(np.array(self.output['E_offset'])*1000)
         self.rho_1s = [o[9] for o in outs]
 
         if eta is not None:
@@ -1034,7 +1103,6 @@ class MeanFieldJob():
         """
         # assert self.output is not None, 'run_ensemble() must be run first.'
         T_vir = out[2]
-        P_offset = out[4]
         E_offset = out[5]
         rho_1s = out[9]
         
@@ -1046,9 +1114,7 @@ class MeanFieldJob():
         else:
             per_atom_energy = self.n_bonds_per_shell[:self.r_order]/2*per_bond_energy
             per_shell_ah_U = per_atom_energy-1.5*KB*np.array(T_vir)
-            ah_U = per_shell_ah_U.sum()
-            if not np.isclose(P_offset, 0.):
-                ah_U += E_offset
+            ah_U = per_shell_ah_U.sum()+E_offset
             if return_components:
                 return ah_U, per_shell_ah_U
             return ah_U

@@ -154,9 +154,9 @@ class StaticBondAnalysis(_BondAnalysisParent):
         neighbors = structure.get_neighbors(
             num_neighbors=None, cutoff_radius=cutoff_radius
         )
-        nn_distances = np.around(neighbors.distances, decimals=5)
+        nn_distances = np.around(neighbors.distances, decimals=10)
         _, _, n_bonds_per_shell = np.unique(
-            np.around(nn_distances[0], decimals=5),
+            np.around(nn_distances[0], decimals=10),
             return_inverse=True,
             return_counts=True,
         )
@@ -174,7 +174,7 @@ class StaticBondAnalysis(_BondAnalysisParent):
             n_shells
         """
         if n_shells is None:
-            nn_dists = np.around(nn_distances[0], decimals=5)
+            nn_dists = np.around(nn_distances[0], decimals=10)
             n_shells = int(np.unique(nn_dists, return_index=True)[1][-1] + 1)
         return n_shells
 
@@ -198,84 +198,6 @@ class StaticBondAnalysis(_BondAnalysisParent):
             sums += n
         return vectors_per_shell
 
-    # @staticmethod
-    # def _rotation_matrix_from_vectors(vec_1, vec_2):
-    #     """
-    #     Find the rotation matrix that aligns vec_1 to vec_2.
-    #     Args:
-    #         vec_1: A 3d "source" vector
-    #         vec_2: A 3d "destination" vector
-
-    #     Returns:
-    #         A transformation matrix (3x3) which when applied to vec1, aligns it with vec2.
-    #     """
-    #     a, b = (vec_1 / np.linalg.norm(vec_1)).reshape(3), (
-    #         vec_2 / np.linalg.norm(vec_2)
-    #     ).reshape(3)
-    #     v = np.cross(a, b)
-    #     c = np.dot(a, b)
-    #     if np.any(v):  # if not all zeros then
-    #         s = np.linalg.norm(v)
-    #         kmat = np.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
-    #         return np.eye(3) + kmat + kmat.dot(kmat) * ((1 - c) / (s**2))
-    #     elif not np.any(v) and c < 0.0:
-    #         return np.eye(3) * -1  # for opposite directions
-    #     else:
-    #         return np.eye(3)  # for identical directions
-
-    @staticmethod
-    def _rotation_matrix_from_vectors(v1, v2):
-        """
-        Compute the rotation matrix between two vectors.
-        """
-        v1 = np.array(v1)
-        v2 = np.array(v2)
-
-        # Normalize vectors
-        v1_norm = np.linalg.norm(v1)
-        v2_norm = np.linalg.norm(v2)
-
-        if v1_norm == 0 or v2_norm == 0:
-            raise ValueError("Input vectors cannot be zero vectors.")
-
-        v1 /= v1_norm
-        v2 /= v2_norm
-
-        # Check if vectors are parallel
-        if np.allclose(np.abs(np.dot(v1, v2)), 1.0):
-            # Check if vectors are parallel and in opposite directions
-            if np.allclose(np.dot(v1, v2), -1.0):
-                # Return -1 times the identity matrix
-                return -1 * np.eye(3)
-            else:
-                # Vectors are parallel and in the same direction, no rotation needed
-                return np.eye(3)
-        else:
-            # Compute rotation axis
-            axis = np.cross(v1, v2)
-            axis_norm = np.linalg.norm(axis)
-
-            if axis_norm == 0:
-                raise ValueError("Vectors are collinear but not parallel.")
-
-            axis /= axis_norm
-
-            # Compute rotation angle
-            angle = np.arccos(np.clip(np.dot(v1, v2), -1.0, 1.0))
-
-            # Rodrigues' rotation formula
-            c = np.cos(angle)
-            s = np.sin(angle)
-            t = 1 - c
-            x, y, z = axis
-            rotation_matrix = np.array([
-                [t*x*x + c,    t*x*y - z*s,  t*x*z + y*s],
-                [t*x*y + z*s,  t*y*y + c,    t*y*z - x*s],
-                [t*x*z - y*s,  t*y*z + x*s,  t*z*z + c]
-            ])
-
-            return rotation_matrix.T
-
     def _get_irreducible_bond_vector_per_shell(self, nn, n_bonds_per_shell):
         """
         Get one irreducible bond vector per nearest neighbor shell. If symmetries are known, this irreducible bond can
@@ -283,7 +205,7 @@ class StaticBondAnalysis(_BondAnalysisParent):
         """
         # arrange bond vectors according to their shells
         bond_vectors_per_shell = self._populate_shells(
-            vectors=np.around(nn.vecs[0], decimals=5),
+            vectors=np.around(nn.vecs[0], decimals=10),
             indices=nn.indices[0],
             n_bonds_per_shell=n_bonds_per_shell,
         )
@@ -291,15 +213,6 @@ class StaticBondAnalysis(_BondAnalysisParent):
         per_shell_irreducible_bond_vectors = np.array(
             [b[0] for b in bond_vectors_per_shell]
         )
-
-        # without using symmetries
-        # per_shell_0K_rotations = []
-        # for i, b in enumerate(per_shell_irreducible_bond_vectors):
-        #     rots = []
-        #     for bond in bond_vectors_per_shell[i]:
-        #         rots.append(self._rotation_matrix_from_vectors(b, bond))
-        #     per_shell_0K_rotations.append(np.array(rots))
-        # all_nn_bond_vectors_list = np.array([bond for bvs in bond_vectors_per_shell for bond in bvs])
 
         # get all the rotations from spglib
         data = self.input.structure.get_symmetry()
@@ -318,7 +231,7 @@ class StaticBondAnalysis(_BondAnalysisParent):
                 # collect the arguments of the rotations that that give the unique bonds
                 args = []
                 for i, bd in enumerate(np.dot(b, all_rotations)):
-                    if np.array_equal(np.round(bd, decimals=5), np.round(bond, decimals=5)):
+                    if np.array_equal(np.round(bd, decimals=10), np.round(bond, decimals=10)):
                         args.append(i)
                 args_list.append(args[0])
             # sort the arguments and append the rotations to a list...
@@ -367,13 +280,13 @@ class StaticBondAnalysis(_BondAnalysisParent):
                 # second bond is normal to the first (transverse1). If multiple normal bonds, select 1
                 try:
                     b2 = bonds[
-                        np.argwhere(np.round(bonds@b1, decimals=5) == 0.0).flatten()[
+                        np.argwhere(np.round(bonds@b1, decimals=10) == 0.0).flatten()[
                             0
                         ]
                     ]
                 except IndexError:
                     # if in case a normal bond is not found for the shell, traverse through the other input shells as well
-                    b2 = all_bonds[np.argwhere(np.round(all_bonds@b1, decimals=5) == 0.).flatten()[0]]
+                    b2 = all_bonds[np.argwhere(np.round(all_bonds@b1, decimals=10) == 0.).flatten()[0]]
                 b3 = np.cross(b1, b2)
                 if b1.dot(np.cross(b2, b3)) < 0.0:  # if this condition is not met
                     b2, b3 = b3, b2  # reverse b2 and b3
@@ -404,7 +317,7 @@ class StaticBondAnalysis(_BondAnalysisParent):
         Returns:
             per_shell_bond_indexed_neighbor_list
         """
-        nn_vecs = np.around(nn.vecs, decimals=5)
+        nn_vecs = np.around(nn.vecs, decimals=10)
         nn_indices = nn.indices
         sums = 0
         per_shell_bond_indexed_neighbor_list = []
@@ -414,7 +327,7 @@ class StaticBondAnalysis(_BondAnalysisParent):
             bond_vectors_list = all_nn_bond_vectors[sums : sums + n].copy()
             sums += n
             # initialize the M_ij matrix with shape [atoms x unique_bonds]
-            x_0 = np.around(structure.positions, decimals=5)  # zero Kelvin positions
+            x_0 = np.around(structure.positions, decimals=10)  # zero Kelvin positions
             M_ij = np.zeros([len(x_0), len(nn_vecs_per_shell[0])]).astype(int)
             # populate the M_ij matrix
             for i, per_atom_nn in enumerate(nn_vecs_per_shell):

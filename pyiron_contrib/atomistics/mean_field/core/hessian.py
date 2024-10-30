@@ -8,7 +8,8 @@ from phonopy.structure.grid_points import get_qpoints
 
 class GenerateHessian():
     """
-    Class to generate the Hessians for a bulk fcc or bcc crystal, used for the generation of covariance matrices alpha_{rpl} for the Mean-field model.
+    Class to generate the Hessian blocks for a reference atom in a bulk fcc or bcc crystal.
+    Used to generate covariance matrices alpha_{rpl} for the mean-field model.
 
     Args:
         project (str): Name of the pyiron project for storing the jobs.
@@ -16,17 +17,17 @@ class GenerateHessian():
         potential (potential function): A valid interatomic potential.
         ref_atom (int): The id of the atom which will be displaced. Defaults to 0.
         delta_x (float): Displacement of the reference atom from its equilibrium position. Defaults to 0.01 Angstroms.
-        kpoints (float): Kpoints along each direction (the mesh will be kpoints x kpoints x kpoints). Defaults to 10.
+        qpoints (float): Qpoints along each direction (the mesh will be qpoints x qpoints x qpoints). Defaults to 10.
         cutoff_radius (float): The cutoff radius upto which the nearest neighbors are considered. Defaults to None, consider all atoms as neighbors.
     """
-    def __init__(self, project, ref_job, potential, structure=None, ref_atom=0, delta_x=0.01, kpoints=10, cutoff_radius=None):
+    def __init__(self, project, ref_job, potential, structure=None, ref_atom=0, delta_x=0.01, qpoints=10, cutoff_radius=None):
         self.project = project
         self.ref_job = ref_job
         self.potential = potential
         self.structure = structure
         self.ref_atom = ref_atom
         self.delta_x = delta_x
-        self.kpoints = kpoints
+        self.qpoints = qpoints
         self.cutoff_radius = cutoff_radius
 
         self._jobs = None
@@ -85,9 +86,9 @@ class GenerateHessian():
         self.load_jobs()
         return np.array([job['output/generic/forces'][-1] for job in self._jobs])
     
-    def get_hessian_crystal(self):
+    def get_hessian_direct(self):
         """
-        Get the Hessians wrt to the reference atom.
+        Get the Hessian blocks for the reference atom in direct space.
 
         Returns:
             hessian (np.ndarray): n_atoms x 3 x 3 array of hessians.
@@ -97,16 +98,16 @@ class GenerateHessian():
         forces_xyz = np.array([(forces[0]-forces[1]).T, 
                                (forces[2]-forces[3]).T, 
                                (forces[4]-forces[5]).T])/2.
-        hessian = (-forces_xyz/self.delta_x).transpose(2, 0, 1)  # shape (n_atoms, 3, 3)
-        return hessian
+        hessian_direct = (-forces_xyz/self.delta_x).transpose(2, 0, 1)  # shape (n_atoms, 3, 3)
+        return hessian_direct
     
-    def get_kpoint_vectors(self):
+    def get_qpoint_vectors(self):
         """
-        Get kpoint vectors and their weights, without any rotational symmetry applied.
+        Get qpoint vectors and their weights (without rotational symmetry).
 
         Returns:
-            kpoint_vectors (np.ndarray): Reduced kpoints**3 x 3 vectors.
-            weights (np.array): Weights of the reduced kpoint vectors.
+            qpoint_vectors (np.ndarray): Reduced qpoints**3 x 3 vectors.
+            qpoint_weights (np.array): Weights of the reduced qpoint vectors.
         """
         structure = self.structure.copy()
         # box = structure.get_symmetry().info['std_lattice']
@@ -116,52 +117,51 @@ class GenerateHessian():
         # ix = np.array([n//self.kpoints**2, (n//self.kpoints)%self.kpoints, n%self.kpoints]).T.astype(float)
         # kpoint_vectors = (2.0*np.pi/float(self.kpoints))*(ix+0.5)@reciprocal_cell
         # kpoint_vectors -= kpoint_vectors.mean(0)
-        mesh = [self.kpoints, self.kpoints, self.kpoints]
+        mesh = [self.qpoints, self.qpoints, self.qpoints]
         sym = structure.get_symmetry()
         reciprocal_cell = sym.get_primitive_cell().cell.reciprocal()
-        grid, weights = get_qpoints(mesh_numbers=mesh, reciprocal_lattice=reciprocal_cell)
-        kpoint_vectors = (2.0*np.pi*grid)@reciprocal_cell
-        return kpoint_vectors, weights
+        grid, qpoint_weights = get_qpoints(mesh_numbers=mesh, reciprocal_lattice=reciprocal_cell)
+        qpoint_vectors = (2.0*np.pi*grid)@reciprocal_cell
+        return qpoint_vectors, qpoint_weights
     
-    def get_hessian_reciprocal(self, structure=None, hessian_real=None, rewrite=False):
+    def get_hessian_reciprocal(self, structure=None, hessian_direct=None, rewrite=False):
         """
-        Get the Hessians in reciprocal space, along with the kpoint vectors and their weights, for use with the GenerateAlphas class.
+        Get the Hessian blocks for the reference atom in reciprocal space, along with the qpoint vectors and their weights.
 
         Parameters:
-            rewrite (boolean): Whether or not to rewrite the hessians, kpoint vectors, and kpoint weights. Defaults to False.
+            rewrite (boolean): Whether or not to rewrite the reciprocal hessians, qpoint vectors, and qpoint weights. Defaults to False.
 
         Returns:
-            hessian_k (np.ndarray): Reduced kpoints**3 x 3 x 3 Hessians.
-            kpoint_vectors (np.ndarray): Reduced kpoints**3 x 3 vectors.
-            weights (np.array): Weights of the reduced kpoint vectors.
+            hessian_reciprocal (np.ndarray): Reduced qpoints**3 x 3 x 3 Hessians.
+            qpoint_vectors (np.ndarray): Reduced qpoints**3 x 3 vectors.
+            qpoint_weights (np.array): Weights of the reduced qpoint vectors.
         """
         if not os.path.exists(os.path.join(self.project.path, 'resources')):
             os.mkdir(os.path.join(self.project.path, 'resources'))
-        exists = [os.path.exists(os.path.join(self.project.path, 'resources', file)) for file in ['hessian_k.npy', 'kpoint_vectors.npy', 'kpoint_weights.npy']]
+        exists = [os.path.exists(os.path.join(self.project.path, 'resources', file)) for file in ['hessian_reciprocal.npy', 'qpoint_vectors.npy', 'qpoint_weights.npy']]
         if np.all(exists) and (not rewrite):
-            return (np.load(os.path.join(self.project.path, 'resources', 'hessian_k.npy')),
-                    np.load(os.path.join(self.project.path, 'resources', 'kpoint_vectors.npy')),
-                    np.load(os.path.join(self.project.path, 'resources', 'kpoint_weights.npy'))
+            return (np.load(os.path.join(self.project.path, 'resources', 'hessian_reciprocal.npy')),
+                    np.load(os.path.join(self.project.path, 'resources', 'qpoint_vectors.npy')),
+                    np.load(os.path.join(self.project.path, 'resources', 'qpoint_weights.npy'))
                     )
         else:
-            if hessian_real is None:
-                hessian_real = self.get_hessian_crystal()
-            kpoint_vectors, weights = self.get_kpoint_vectors()
+            if hessian_direct is None:
+                hessian_direct = self.get_hessian_direct()
+            qpoint_vectors, qpoint_weights = self.get_qpoint_vectors()
             structure = self.structure.copy()
             X = structure.positions.copy()
             if self.cutoff_radius is not None:
-                select = structure.get_neighborhood(positions=X[self.ref_atom], cutoff_radius=self.cutoff_radius, 
-                                                    num_neighbors=None).indices
+                select = structure.get_neighborhood(positions=X[self.ref_atom], cutoff_radius=self.cutoff_radius, num_neighbors=None).indices
                 if len(select)>structure.get_number_of_atoms():
                     select = np.ones(structure.get_number_of_atoms(), dtype=bool)
             else:
-                sq_trace = np.einsum('ijk,ikj->i', hessian_real, hessian_real)
+                sq_trace = np.einsum('ijk,ikj->i', hessian_direct, hessian_direct)
                 select = sq_trace > 1e-3
             dX = structure.find_mic(X-X[self.ref_atom])
-            k_dX = kpoint_vectors@dX[select].T
-            hessian_k = np.einsum('il,ijk->ljk', np.exp(1j*k_dX.T), hessian_real[select])
+            q_dX = qpoint_vectors@dX[select].T
+            hessian_reciprocal = np.einsum('il,ijk->ljk', np.exp(1j*q_dX.T), hessian_direct[select])
              
-            np.save(os.path.join(self.project.path, 'resources', 'hessian_k.npy'), hessian_k)
-            np.save(os.path.join(self.project.path, 'resources', 'kpoint_vectors.npy'), kpoint_vectors)
-            np.save(os.path.join(self.project.path, 'resources', 'kpoint_weights.npy'), weights)
-            return hessian_k, kpoint_vectors, weights
+            np.save(os.path.join(self.project.path, 'resources', 'hessian_reciprocal.npy'), hessian_reciprocal)
+            np.save(os.path.join(self.project.path, 'resources', 'qpoint_vectors.npy'), qpoint_vectors)
+            np.save(os.path.join(self.project.path, 'resources', 'qpoint_weights.npy'), qpoint_weights)
+            return hessian_reciprocal, qpoint_vectors, qpoint_weights

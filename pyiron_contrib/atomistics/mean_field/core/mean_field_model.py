@@ -44,7 +44,7 @@ def get_anharmonic_F(anharmonic_U, temperatures, n_fine_samples=10000, offset=Tr
     fine_temps = np.linspace(temperatures[0], temperatures[-1], n_fine_samples, endpoint=True)
     if offset:
         off = anharmonic_U[0]
-        ah_U = anharmonic_U-anharmonic_U[0]
+        ah_U = np.array(anharmonic_U)-np.array(anharmonic_U[0])
     else:
         off = 0.
         ah_U = anharmonic_U
@@ -155,16 +155,16 @@ class MeanFieldModel():
                 raise TypeError(f'length of {inp_str} is not equal to shells.')
             
     @staticmethod
-    def V1_transversal_helper(bond_grid, basis_vector, t_potential):
+    def V1_transversal_helper(bond_grid, basis_vector, t_potential, eps=1.):
         if t_potential is not None:
             if np.ndim(bond_grid) == 5:
                 t = np.einsum('lijkm,m->lijk', bond_grid, basis_vector)
             else:
                 t = np.dot(bond_grid, basis_vector)
-            return t_potential(t)
+            return t_potential(t, eps=eps)
         return 0.
 
-    def V1_template(self, bond_grid=None, shell=None, harmonic=False):
+    def V1_template(self, bond_grid=None, shell=None, harmonic=False, eps=1.):
         """
         Calculate the bonding potential for a shell.
 
@@ -185,28 +185,28 @@ class MeanFieldModel():
         v1 = np.zeros_like(bond_grid[..., 0])
         if r_potential is not None:
             r = np.linalg.norm(bond_grid, axis=-1)
-            v1 +=  r_potential(r)
-        v1 += self.V1_transversal_helper(bond_grid=bond_grid, basis_vector=self.basis[shell][1], t_potential=t1_potential)
-        v1 += self.V1_transversal_helper(bond_grid=bond_grid, basis_vector=self.basis[shell][2], t_potential=t2_potential)
+            v1 +=  r_potential(r, eps=eps)
+        v1 += self.V1_transversal_helper(bond_grid=bond_grid, basis_vector=self.basis[shell][1], t_potential=t1_potential, eps=eps)
+        v1 += self.V1_transversal_helper(bond_grid=bond_grid, basis_vector=self.basis[shell][2], t_potential=t2_potential, eps=eps)
 
         return v1
     
-    def V1(self, bond_grid=None, shell=None):
-        v1 = self.V1_template(bond_grid=bond_grid, shell=shell)
+    def V1(self, bond_grid=None, shell=None, eps=1.):
+        v1 = self.V1_template(bond_grid=bond_grid, shell=shell, eps=eps)
         if self.eta is not None:
-            v1_harm = self.V1_template(bond_grid=bond_grid, shell=shell, harmonic=True)
+            v1_harm = self.V1_template(bond_grid=bond_grid, shell=shell, harmonic=True, eps=eps)
             v1_mix = self.eta*v1+(1-self.eta)*v1_harm
             return v1_mix
         return v1
 
-    def V1_gradient(self):
+    def V1_gradient(self, eps=1.):
         """
         Calculate the gradient of the bonding potential for the reference shell.
 
         Returns:
             dv1 (3, np.ndarray): Gradients of the bonding potential along the long, t1, and t2 directions.
         """
-        V = self.V1()
+        V = self.V1(eps=eps)
         lo_mesh, t1_mesh, t2_mesh = self.meshes
         gradient = np.gradient(V, lo_mesh[:, 0, 0], t1_mesh[0, :, 0], t2_mesh[0, 0, :], edge_order=2)
         return gradient
@@ -232,14 +232,14 @@ class MeanFieldModel():
     #             # for future optimization.
     #             for alpha, rot in zip(alphas, self.rotations[shell][alphas_rot_ids]):
     #                 b_k = (b_l-a_l)@alpha@rot.T+a_k
-    #                 vmf += 0.5*self.V1(bond_grid=b_k, shell=shell)
+    #                 vmf += 0.5*self.V1(bond_grid=b_k, shell=shell, eps=eps)
     #     return vmf - vmf.min()
     
     def get_coarse_lo_t1_t2(self):
         lo_mesh, t1_mesh, t2_mesh = self.meshes
-        lo_coarse = np.linspace(lo_mesh[:, 0, 0][0], lo_mesh[:, 0, 0][-1], 30)
-        t1_coarse = np.linspace(t1_mesh[0, :, 0][0], t1_mesh[0, :, 0][-1], 15)
-        t2_coarse = np.linspace(t2_mesh[0, 0, :][0], t2_mesh[0, 0, :][-1], 15)
+        lo_coarse = np.linspace(lo_mesh[:, 0, 0][0], lo_mesh[:, 0, 0][-1], 20)
+        t1_coarse = np.linspace(t1_mesh[0, :, 0][0], t1_mesh[0, :, 0][-1], 10)
+        t2_coarse = np.linspace(t2_mesh[0, 0, :][0], t2_mesh[0, 0, :][-1], 10)
         return lo_coarse, t1_coarse, t2_coarse
     
     def get_coarse_bond_grid(self):
@@ -261,14 +261,14 @@ class MeanFieldModel():
             #     # Note that the rotation is done on db and not a_k! This lets us circumvent the rotation that needs to be made for the transveral components in V1
             #     # for future optimization.
             #     b_k = np.einsum('ijkm,lmn,lpn->lijkp', b_l_minus_a_l, np.array(alphas), self.rotations[shell][alphas_rot_ids], optimize='greedy')+a_k[None, None, None, None, :]
-            #     vmf += 0.5*self.V1(bond_grid=b_k, shell=shell).sum(axis=0)
+            #     vmf += 0.5*self.V1(bond_grid=b_k, shell=shell, eps=eps).sum(axis=0)
             for alphas, alphas_rot_ids in zip(self.alphas[shell], self.alphas_rot_ids[shell]):
                 # we scale first, rotate next, and then add a_k
                 # Note that the rotation is done on db and not a_k! This lets us circumvent the rotation that needs to be made for the transveral components in V1
                 # for future optimization.
                 for alpha, rot in zip(alphas, self.rotations[shell][alphas_rot_ids]):
                     b_k = (b_l_minus_a_l)@alpha@rot.T+a_k
-                    vmf += 0.5*self.V1(bond_grid=b_k, shell=shell)
+                    vmf += 0.5*self.V1(bond_grid=b_k, shell=shell, eps=eps)
         return vmf - vmf.min()
     
     def Veff(self, eps=1.):
@@ -372,8 +372,9 @@ class VirialQuantities():
             N_by_V = 2/(b_eps*self.factors[shell])**3
         else:
             raise TypeError('crystal must be fcc or bcc.')
-        b_dV1 = (lo_mesh*dV1[0]+t1_mesh*dV1[1]+t2_mesh*dV1[2])
-        P_vir = N_by_V*(KB*T_vir-self.n_bonds_per_shell[shell]/6*(b_dV1*rho_1).sum())
+        # b_dV1 = (lo_mesh*dV1[0]+t1_mesh*dV1[1]+t2_mesh*dV1[2])
+        a_dV1 = b_eps*dV1[0]
+        P_vir = -N_by_V*self.n_bonds_per_shell[shell]/6*(a_dV1*rho_1).sum()
 
         if not return_rho_1:
             rho_1 = np.array([None])  
@@ -466,9 +467,10 @@ class Optimizer():
                 
                 self._ev_fit_initialized = True
 
-            P_offset = -self._N_by_V_0/(6*eps**2)*(self._du_md_fit_eqn(eps)-self._du_mf_fit_eqn(eps))
+            P_offset = -self._N_by_V_0/(3*eps**2)*self._du_md_fit_eqn(eps)#-self._du_mf_fit_eqn(eps))
             # P_offset = 0.
-            E_offset = self._u_md_fit_eqn(eps)-self._u_mf_fit_eqn(eps)
+            E_offset = self._u_md_fit_eqn(eps)#-self._u_mf_fit_eqn(eps)
+            # E_offset = 0.
 
             return P_offset, E_offset
 
@@ -501,7 +503,7 @@ class Optimizer():
         rho_1s = []
         for shell in range(self.r_order):
             Veff = self.mfm_instances[shell].Veff(eps=eps) if Veffs is None else Veffs[shell]
-            dV1 = self.mfm_instances[shell].V1_gradient() if dV1s is None else dV1s[shell]    
+            dV1 = self.mfm_instances[shell].V1_gradient(eps=eps) if dV1s is None else dV1s[shell]    
             t, p, b, r = self.vq_instances[shell].get_virial_quantities(Veff=Veff, dV1=dV1, temperature=temperature, eps=eps, lm=lms[shell], shell=shell, return_rho_1=return_rho_1)
             T_vir.append(t)
             P_vir.append(p)
@@ -544,7 +546,7 @@ class Optimizer():
         """
         # For each shell, find a lagrange multiplier that enforces bond length.
         Veffs = [self.load_Veff(shell=shell, eps=eps, eta=eta) for shell in range(self.r_order)]
-        dV1s = [self.mfm_instances[shell].V1_gradient() for shell in range(self.r_order)]
+        dV1s = [self.mfm_instances[shell].V1_gradient(eps=eps) for shell in range(self.r_order)]
         lms = []
         print(f'Running T: {temperature}; eps: {eps}; eta: {eta}\n')
         if not fix_T:
@@ -564,8 +566,8 @@ class Optimizer():
                 for shell in range(self.r_order):
                     t_vir, _, b_eps, _ = self.vq_instances[shell].get_virial_quantities(Veff=Veffs[shell], dV1=dV1s[shell], temperature=args[-1], eps=eps, lm=args[shell], shell=shell)
                     T_virs.append(t_vir)
-                    b_eps_diff.append(np.abs(self.b_0s[shell]-b_eps))
-                T_diff = np.abs(np.sum(T_virs)-temperature)
+                    b_eps_diff.append(np.abs(self.b_0s[shell]*eps-b_eps))
+                T_diff = np.abs(temperature-np.sum(T_virs))
                 return np.concatenate((np.array(b_eps_diff), np.array([T_diff])))
             # print('Optimizing all shells at once...')
             x0 = np.concatenate((np.zeros(self.r_order), np.array([temperature])))
@@ -601,18 +603,18 @@ class Optimizer():
         # Further, as the total pressure of the system is the sum of the pressures due to each shell, all shells are considered simultaneously in the objective function.
         print('Running T: {}; P: {}'.format(temperature, pressure))
         # print('Optimizing all shells at once. This might take a while...')
-        dV1s = np.array([self.mfm_instances[shell].V1_gradient() for shell in range(self.r_order)]) 
         if not fix_T:
             def objective_function(args):
                 P_virs = []
                 b_eps_diff = []
                 for shell in range(self.r_order):
                     Veff = self.mfm_instances[shell].Veff(eps=args[-1])
-                    _, p_vir, b_eps, _ = self.vq_instances[shell].get_virial_quantities(Veff=Veff, dV1=dV1s[shell], temperature=temperature, eps=args[-1], lm=args[shell], shell=shell)
+                    dV1 = self.mfm_instances[shell].V1_gradient(eps=args[-1])
+                    _, p_vir, b_eps, _ = self.vq_instances[shell].get_virial_quantities(Veff=Veff, dV1=dV1, temperature=temperature, eps=args[-1], lm=args[shell], shell=shell)
                     P_virs.append(p_vir)
                     b_eps_diff.append(np.abs(self.b_0s[shell]*args[-1]-b_eps))
                 P_offset, _ = self.get_epsilon_pressure(eps=args[-1])
-                P_diff = np.abs(np.sum(P_virs)+P_offset-pressure)
+                P_diff = np.abs(pressure-np.sum(P_virs)-P_offset)
                 print(args)
                 return np.concatenate((np.array(b_eps_diff), np.array([P_diff])))
             x0 = np.concatenate((np.zeros(self.r_order), np.array([eps])))
@@ -627,13 +629,14 @@ class Optimizer():
                 b_eps_diff = []
                 for shell in range(self.r_order):
                     Veff = self.mfm_instances[shell].Veff(eps=args[-1])
-                    t_vir, p_vir, b_eps, _ = self.vq_instances[shell].get_virial_quantities(Veff=Veff, dV1=dV1s[shell], temperature=args[-2], eps=args[-1], lm=args[shell], shell=shell)
+                    dV1 = self.mfm_instances[shell].V1_gradient(eps=args[-1])
+                    t_vir, p_vir, b_eps, _ = self.vq_instances[shell].get_virial_quantities(Veff=Veff, dV1=dV1, temperature=args[-2], eps=args[-1], lm=args[shell], shell=shell)
                     T_virs.append(t_vir)
                     P_virs.append(p_vir)
                     b_eps_diff.append(np.abs(self.b_0s[shell]*args[-1]-b_eps))
                 P_offset, _ = self.get_epsilon_pressure(eps=args[-1])
-                P_diff = np.abs(np.sum(P_virs)+P_offset-pressure)
-                T_diff = np.abs(np.sum(T_virs)-temperature)
+                P_diff = np.abs(pressure-np.sum(P_virs)-P_offset)
+                T_diff = np.abs(temperature-np.sum(T_virs))
                 print(args)
                 return np.concatenate((np.array(b_eps_diff), np.array([T_diff]), np.array([P_diff])))
             x0 = np.concatenate((np.zeros(self.r_order), np.array([temperature]), np.array([eps])))
@@ -642,7 +645,7 @@ class Optimizer():
             lms = solver.x[:-2]
             temperature = solver.x[-2]
             eps = solver.x[-1]
-        return self.collect_properties(temperature=temperature, lms=lms, eps=eps, dV1s=dV1s, fix_T=fix_T, return_rho_1=return_rho_1)
+        return self.collect_properties(temperature=temperature, lms=lms, eps=eps, fix_T=fix_T, return_rho_1=return_rho_1)
     
 class GenerateAlphas():
     """
@@ -1051,12 +1054,12 @@ class MeanFieldJob():
                 raise ValueError('either pressure or eps must be specified.')
             
             if eta is not None:
-                per_atom_dU_deta = self.get_anharmonic_U(eta=eta, out=out, return_components=True)
+                per_atom_dU_deta = self.get_anharmonic_U(eta=eta, pressure=pressure, out=out, return_components=True)
                 # print(f'eta: {eta}\n')
                 # print(f'per_atom_dU_deta: {per_atom_dU_deta*1000} meV/atom\n')
                 out.append(per_atom_dU_deta*1000)
             else:
-                ah_U, per_shell_ah_U = self.get_anharmonic_U(out=out, return_components=True)
+                ah_U, per_shell_ah_U = self.get_anharmonic_U(out=out, pressure=pressure, return_components=True)
                 # print(f'per_shell_ah_U: {per_shell_ah_U*1000} meV/atom\n')
                 # print(f'ah_U: {ah_U*1000} meV/atom\n')
                 out.append((per_shell_ah_U*1000).tolist())
@@ -1093,7 +1096,7 @@ class MeanFieldJob():
         assert self.rho_1s is not None, 'run_ensemble() must be run first.'
         return self.rho_1s
     
-    def get_anharmonic_U(self, out, eta=None, return_components=False):
+    def get_anharmonic_U(self, out, pressure=None, eta=None, return_components=False):
         """
         Get the anharmonic internal energy in [eV/atom] estimated by the model.
 
@@ -1104,17 +1107,20 @@ class MeanFieldJob():
         # assert self.output is not None, 'run_ensemble() must be run first.'
         T_vir = out[2]
         E_offset = out[5]
+        eps = out[7]
         rho_1s = out[9]
         
-        per_bond_energy = np.array([(self._mfms[s].V1_template()*rho_1s[s]).sum() for s in range(self.r_order)])
+        per_bond_energy = np.array([(self._mfms[s].V1_template(eps=eps)*rho_1s[s]).sum() for s in range(self.r_order)])
         if eta is not None:
-            per_bond_energy -= np.array([(self._mfms[s].V1_template(harmonic=True)*rho_1s[s]).sum() for s in range(self.r_order)])
+            per_bond_energy -= np.array([(self._mfms[s].V1_template(harmonic=True, eps=eps)*rho_1s[s]).sum() for s in range(self.r_order)])
             per_atom_dU_deta = self.n_bonds_per_shell[:self.r_order]/2*per_bond_energy
             return per_atom_dU_deta.sum()
         else:
             per_atom_energy = self.n_bonds_per_shell[:self.r_order]/2*per_bond_energy
             per_shell_ah_U = per_atom_energy-1.5*KB*np.array(T_vir)
-            ah_U = per_shell_ah_U.sum()+E_offset
+            ah_U = per_shell_ah_U.sum()
+            if pressure is not None:
+                ah_U += E_offset
             if return_components:
                 return ah_U, per_shell_ah_U
             return ah_U

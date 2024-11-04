@@ -49,7 +49,7 @@ def get_anharmonic_F(anharmonic_U, temperatures, n_fine_samples=10000, offset=Tr
         off = 0.
         ah_U = anharmonic_U
     ah_U_eqn = CubicSpline(x=temperatures, y=ah_U)
-    ah_F = -cumulative_trapezoid(ah_U_eqn(fine_temps), 1/fine_temps)*fine_temps[1:]
+    ah_F = cumulative_trapezoid(ah_U_eqn(fine_temps), 1/fine_temps)*fine_temps[1:]
     return CubicSpline(fine_temps[1:], ah_F)(temperatures)+off
 
 def scaled_bonding_potential(r, eps, potential_func, vd_coeffs, offset_coeffs, b_0=0.):

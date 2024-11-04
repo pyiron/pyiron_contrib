@@ -43,7 +43,7 @@ def get_anharmonic_F(anharmonic_U, temperatures, n_fine_samples=10000, offset=Tr
     #     temps = np.concatenate(([1.], temperatures))
     fine_temps = np.linspace(temperatures[0], temperatures[-1], n_fine_samples, endpoint=True)
     if offset:
-        off = anharmonic_U[0]
+        off = -anharmonic_U[0]
         ah_U = np.array(anharmonic_U)-np.array(anharmonic_U[0])
     else:
         off = 0.

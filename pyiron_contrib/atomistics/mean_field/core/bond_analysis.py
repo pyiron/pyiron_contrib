@@ -154,9 +154,9 @@ class StaticBondAnalysis(_BondAnalysisParent):
         neighbors = structure.get_neighbors(
             num_neighbors=None, cutoff_radius=cutoff_radius
         )
-        nn_distances = np.around(neighbors.distances, decimals=10)
+        nn_distances = np.around(neighbors.distances, decimals=8)
         _, _, n_bonds_per_shell = np.unique(
-            np.around(nn_distances[0], decimals=10),
+            np.around(nn_distances[0], decimals=8),
             return_inverse=True,
             return_counts=True,
         )
@@ -174,7 +174,7 @@ class StaticBondAnalysis(_BondAnalysisParent):
             n_shells
         """
         if n_shells is None:
-            nn_dists = np.around(nn_distances[0], decimals=10)
+            nn_dists = np.around(nn_distances[0], decimals=8)
             n_shells = int(np.unique(nn_dists, return_index=True)[1][-1] + 1)
         return n_shells
 
@@ -205,7 +205,7 @@ class StaticBondAnalysis(_BondAnalysisParent):
         """
         # arrange bond vectors according to their shells
         bond_vectors_per_shell = self._populate_shells(
-            vectors=np.around(nn.vecs[0], decimals=10),
+            vectors=np.around(nn.vecs[0], decimals=8),
             indices=nn.indices[0],
             n_bonds_per_shell=n_bonds_per_shell,
         )
@@ -231,7 +231,7 @@ class StaticBondAnalysis(_BondAnalysisParent):
                 # collect the arguments of the rotations that that give the unique bonds
                 args = []
                 for i, bd in enumerate(np.dot(b, all_rotations)):
-                    if np.array_equal(np.round(bd, decimals=10), np.round(bond, decimals=10)):
+                    if np.array_equal(np.round(bd, decimals=8), np.round(bond, decimals=8)):
                         args.append(i)
                 args_list.append(args[0])
             # sort the arguments and append the rotations to a list...
@@ -280,13 +280,13 @@ class StaticBondAnalysis(_BondAnalysisParent):
                 # second bond is normal to the first (transverse1). If multiple normal bonds, select 1
                 try:
                     b2 = bonds[
-                        np.argwhere(np.round(bonds@b1, decimals=10) == 0.0).flatten()[
+                        np.argwhere(np.round(bonds@b1, decimals=8) == 0.0).flatten()[
                             0
                         ]
                     ]
                 except IndexError:
                     # if in case a normal bond is not found for the shell, traverse through the other input shells as well
-                    b2 = all_bonds[np.argwhere(np.round(all_bonds@b1, decimals=10) == 0.).flatten()[0]]
+                    b2 = all_bonds[np.argwhere(np.round(all_bonds@b1, decimals=8) == 0.).flatten()[0]]
                 b3 = np.cross(b1, b2)
                 if b1.dot(np.cross(b2, b3)) < 0.0:  # if this condition is not met
                     b2, b3 = b3, b2  # reverse b2 and b3
@@ -317,7 +317,7 @@ class StaticBondAnalysis(_BondAnalysisParent):
         Returns:
             per_shell_bond_indexed_neighbor_list
         """
-        nn_vecs = np.around(nn.vecs, decimals=10)
+        nn_vecs = np.around(nn.vecs, decimals=8)
         nn_indices = nn.indices
         sums = 0
         per_shell_bond_indexed_neighbor_list = []
@@ -327,7 +327,7 @@ class StaticBondAnalysis(_BondAnalysisParent):
             bond_vectors_list = all_nn_bond_vectors[sums : sums + n].copy()
             sums += n
             # initialize the M_ij matrix with shape [atoms x unique_bonds]
-            x_0 = np.around(structure.positions, decimals=10)  # zero Kelvin positions
+            x_0 = np.around(structure.positions, decimals=8)  # zero Kelvin positions
             M_ij = np.zeros([len(x_0), len(nn_vecs_per_shell[0])]).astype(int)
             # populate the M_ij matrix
             for i, per_atom_nn in enumerate(nn_vecs_per_shell):

@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
 
-lmp_serial -in control.inp
+lmp_mpi -in control.inp

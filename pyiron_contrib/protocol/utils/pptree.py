@@ -55,8 +55,8 @@ def print_tree(current_node, indent="", last="downup", name="root", file=sys.std
     Returns:
 
     """
-    children = (
-        lambda node: [
+    children = lambda node: (
+        [
             (k, v) if isinstance(v, dict) else ("%s: %s" % (k, v), None)
             for k, v in node.items()
         ]

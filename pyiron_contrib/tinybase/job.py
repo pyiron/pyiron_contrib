@@ -8,10 +8,8 @@ from pyiron_contrib.tinybase.storage import (
     GenericStorage,
 )
 from pyiron_contrib.tinybase.executor import (
-    Executor,
+    Submitter,
     ExecutionContext,
-    BackgroundExecutor,
-    ProcessExecutor,
 )
 from pyiron_contrib.tinybase.database import DatabaseEntry
 from pyiron_contrib.tinybase.project import ProjectInterface, ProjectAdapter
@@ -20,26 +18,13 @@ from pyiron_base.state import state
 
 class TinyJob(Storable):
     """
-    A tiny job unifies an executor, a task and its output.
+    A tiny job unifies an submitter, a task and its output.
 
     The job adds the task to the database and persists its input and output in a storage location.
 
     The input of the task is available from :attr:`~.input`. After the job has
     finished the output of the task can be
     accessed from :attr:`~.output` and the data written to storage from :attr:`.~storage`.
-
-    This is an abstracat base class that works with any execution task without specifying it.  To create specialized
-    jobs you can derive from it and overload :meth:`._get_task()` to return an
-    instance of the task, e.g.
-
-    >>> from somewhere import MyTask
-    >>> class MyJob(TinyJob):
-    ...     def _get_task(self):
-    ...         return MyTask()
-
-    The return value of :meth:`._get_task()` is persisted during the life time of the job.
-
-    You can use :class:`.GenericTinyJob` to dynamically specify which task the job should execute.
     """
 
     def __init__(self, task: AbstractTask, project: ProjectInterface, job_name: str):
@@ -58,7 +43,7 @@ class TinyJob(Storable):
         self._task = task
         self._output = None
         self._storage = None
-        self._executor = None
+        self._submitter = None
         self._id = None
 
     @property
@@ -111,20 +96,24 @@ class TinyJob(Storable):
     def _set_output(self, data):
         self._output = data["output"][0]
 
-    def _setup_executor_callbacks(self):
-        self._executor._run_machine.observe("ready", lambda _: self.store(self.storage))
-        self._executor._run_machine.observe("finished", self._set_output)
-        self._executor._run_machine.observe(
+    def _setup_submitter_callbacks(self):
+        self._submitter._run_machine.observe(
+            "ready", lambda _: self.store(self.storage)
+        )
+        self._submitter._run_machine.observe("finished", self._set_output)
+        self._submitter._run_machine.observe(
             "finished", lambda _: self.store(self.storage)
         )
 
-        self._executor._run_machine.observe("ready", self._add_to_database)
-        self._executor._run_machine.observe("running", self._update_status("running"))
-        self._executor._run_machine.observe("collect", self._update_status("collect"))
-        self._executor._run_machine.observe("finished", self._update_status("finished"))
+        self._submitter._run_machine.observe("ready", self._add_to_database)
+        self._submitter._run_machine.observe("running", self._update_status("running"))
+        self._submitter._run_machine.observe("collect", self._update_status("collect"))
+        self._submitter._run_machine.observe(
+            "finished", self._update_status("finished")
+        )
 
     def run(
-        self, executor: Union[Executor, str, None] = None
+        self, submitter: Union[Submitter, str, None] = None
     ) -> Optional[ExecutionContext]:
         """
         Start execution of the job.
@@ -132,23 +121,26 @@ class TinyJob(Storable):
         If the job already has a database id and is not in "ready" state, do nothing.
 
         Args:
-            executor (:class:`~.Executor`, str): specifies which executor to
+            submitter (:class:`~.Submitter`, str): specifies which submitter to
                 use, if `str` must be a method name of :class:`.ExecutorCreator`;
-                if not given use the last created executor
+                if not given use the last created submitter
 
         Returns:
-            :class:`.Executor`: the executor that is running the task or nothing.
+            :class:`.ExecutionContext`: the submitter that is running the task or nothing.
         """
         if (
             self._id is None
             or self.project.database.get_item(self.id).status == "ready"
         ):
-            if executor is None:
-                executor = "most_recent"
-            if isinstance(executor, str):
-                executor = getattr(self.project.create.executor, executor)()
-            exe = self._executor = executor.submit(tasks=[self.task])
-            self._setup_executor_callbacks()
+            if submitter is None:
+                submitter = "most_recent"
+            if isinstance(submitter, str):
+                submitter = getattr(self.project.create.executor, submitter)()
+            self.task.context.working_directory = self.project.request_directory(
+                self.name
+            )
+            exe = self._submitter = submitter.submit(tasks=[self.task])
+            self._setup_submitter_callbacks()
             exe.run()
             return exe
         else:
@@ -169,7 +161,7 @@ class TinyJob(Storable):
             return
         if self.status != "running":
             raise ValueError("Job not running!")
-        self._executor.wait(timeout=timeout)
+        self._submitter.wait(timeout=timeout)
 
     def remove(self):
         """
@@ -181,7 +173,7 @@ class TinyJob(Storable):
         self._id = None
         self._output = None
         self._storage = None
-        self._executor = None
+        self._submitter = None
 
     def _add_to_database(self, _data):
         if self._id is None:
@@ -201,6 +193,7 @@ class TinyJob(Storable):
     # Storable Impl'
     def _store(self, storage):
         storage["task"] = self.task
+        storage["project"] = self.project
         if self._output is not None:
             storage["output"] = self._output
 
@@ -223,6 +216,7 @@ class TinyJob(Storable):
     @classmethod
     def _restore(cls, storage, version):
         task = storage["task"].to_object()
-        job = cls(task=task, project=storage.project, job_name=storage.name)
+        project = storage["project"].to_object()
+        job = cls(task=task, project=project, job_name=storage.name)
         job.load(storage=storage)
         return job

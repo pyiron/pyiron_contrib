@@ -4,7 +4,7 @@ from pyiron_contrib import Project
 
 from abc import ABC, abstractmethod
 import contextlib
-from typing import Optional, Callable
+from typing import Optional, Callable, Dict
 
 
 class JobFactory(HasStorage, ABC):
@@ -304,14 +304,32 @@ class VaspFactory(DftFactory):
     def __init__(self):
         super().__init__()
         self.storage.incar = {}
+        self.storage.potential = {}
         self.storage.nband_nelec_map = None
 
     @property
     def incar(self):
+        """
+        Values are set on job.input.incar on job creation.
+        """
         return self.storage.incar
 
-    def enable_nband_hack(self, nelec: dict):
+    def enable_nband_hack(self, nelec: Dict[str, int]):
+        """
+        Set a per element NBANDS estimate.
+
+        Structures far from (global) equilibrium may require more empty states than the default VASP provides.
+        This allows to provide a mapping between elements and integers that give a "per element" NBAND that is summed
+        over all atoms in a structure.
+        """
         self.storage.nband_nelec_map = nelec
+
+    @property
+    def potential(self):
+        """
+        Values are set as job.potential.<elem> = <value>
+        """
+        return self.storage.potential
 
     def _get_hamilton(self):
         return "Vasp"
@@ -333,10 +351,14 @@ class VaspFactory(DftFactory):
         job = super()._prepare_job(job, structure)
         for k, v in self.incar.items():
             job.input.incar[k] = v
+        for k, v in self.potential.items():
+            try:
+                job.potential[k] = v
+            except AttributeError:
+                pass  # element k does not exist in the current structure
         if self.storage.nband_nelec_map is not None:
-            # weird structure sometimes require more bands
-            # HACK: for Mg/Al/Ca, since Ca needs a lot of electrons
-            elems = {"Mg", "Al", "Ca"}
+            # ensure we apply the hack only for structures where we know an NBAND estimate for all elements
+            elems = set(self.storage.nband_nelec_map.keys())
             if elems.union(set(structure.get_chemical_symbols())) == elems:
                 nelect = sum(
                     self.storage.nband_nelec_map[el]

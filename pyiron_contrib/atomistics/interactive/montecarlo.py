@@ -297,9 +297,9 @@ class MonteCarloMaster(InteractiveWrapper):
             h5[
                 "energy_accepted_" + str(int(temperature)) + "_" + str(int(round_nr))
             ] = np.array(energy_accepted_lst)
-            h5[
-                "energy_total_" + str(int(temperature)) + "_" + str(int(round_nr))
-            ] = np.array(energy_total_lst)
+            h5["energy_total_" + str(int(temperature)) + "_" + str(int(round_nr))] = (
+                np.array(energy_total_lst)
+            )
 
     @staticmethod
     def _monte_carlo_accept_step(temperature, e_step, e_prev):

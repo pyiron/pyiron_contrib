@@ -27,11 +27,20 @@ class CoscineMetadata(coscine.resource.MetadataForm, MetaDataTemplate):
     """Add a proper representation to the coscine version"""
 
     def __init__(self, meta_data_form: coscine.resource.MetadataForm):
-        super().__init__(client=meta_data_form.client, graph=meta_data_form.profile)
+        if hasattr(meta_data_form, '_fixed_values'):
+            super().__init__(application_profile=meta_data_form.application_profile,
+                             fixed_values=meta_data_form._fixed_values)
+        else:
+            super().__init__(application_profile=meta_data_form.application_profile)
 
     def to_dict(self):
         result = {}
         for key, value in self.items():
+            result[key] = value
+        return result
+
+        if 'upper' is 'wrong':
+            # ToDo: This has to be updated to the newer coscine API:
             if len(str(value)) > 0 and not self.is_controlled(key):
                 result[key] = value.raw()
             elif len(str(value)) > 0:
@@ -94,14 +103,16 @@ class CoscineFileData(FileDataTemplate):
                     file_name = new_name
                 self._data = file_name
             else:
-                self._data = self._coscine_object.content()
+                data = io.BytesIO()
+                self._coscine_object.stream(data)
+                self._data = data
 
     def download(self, path="./"):
         self._coscine_object.download(path=path)
 
     def _get_metadata(self):
-        form = CoscineMetadata(self._coscine_object.form())
-        form.parse(self._coscine_object.metadata(force_update=True))
+        form = CoscineMetadata(self._coscine_object.metadata_form())
+        form.parse(self._coscine_object.metadata(refresh=True))
         return form
 
     def _set_metadata(self, metadata):
@@ -118,6 +129,15 @@ def _list_filter(list_to_filter, **kwargs):
         return True
 
     return list(filter(filter_func, list_to_filter))
+
+
+def _get_entry_from_filter(list_to_filter, **kwargs):
+    filtered_list = _list_filter(list_to_filter, **kwargs)
+    if len(filtered_list) != 1:
+        print('Warning: No a single value list')
+    if len(filtered_list) == 0:
+        return None
+    return filtered_list[0]
 
 
 class Job2CoscineMetadataConverter:
@@ -265,7 +285,7 @@ class CoscineResource(StorageInterface):
         return str(self.list_all())
 
     def _list_nodes(self):
-        return [obj.name for obj in self._resource.objects()]
+        return [obj.name for obj in self._resource.files()]
 
     def _list_groups(self):
         # Right now a coscine resource is flat.
@@ -384,7 +404,7 @@ class CoscineResource(StorageInterface):
         if item not in self.list_nodes():
             return None
 
-        objects = _list_filter(self._resource.objects(), name=item)
+        objects = _list_filter(self._resource.files(), name=item)
         if len(objects) == 1:
             return objects[0]
         elif len(objects) > 1:
@@ -630,7 +650,8 @@ class CoscineProject(HasGroups):
         if key in self.list_groups() and self._project is not None:
             try:
                 return self.__class__(
-                    self._project.subproject(display_name=key), parent_path=self._path
+                    _get_entry_from_filter(self._project.subprojects(), display_name=key),
+                    parent_path=self._path
                 )
             except IndexError:
                 warnings.warn("More than one project matches - returning first match!")

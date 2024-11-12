@@ -27,9 +27,11 @@ class CoscineMetadata(coscine.resource.MetadataForm, MetaDataTemplate):
     """Add a proper representation to the coscine version"""
 
     def __init__(self, meta_data_form: coscine.resource.MetadataForm):
-        if hasattr(meta_data_form, '_fixed_values'):
-            super().__init__(application_profile=meta_data_form.application_profile,
-                             fixed_values=meta_data_form._fixed_values)
+        if hasattr(meta_data_form, "_fixed_values"):
+            super().__init__(
+                application_profile=meta_data_form.application_profile,
+                fixed_values=meta_data_form._fixed_values,
+            )
         else:
             super().__init__(application_profile=meta_data_form.application_profile)
 
@@ -119,7 +121,7 @@ def _list_filter(list_to_filter, **kwargs):
 def _get_entry_from_filter(list_to_filter, **kwargs):
     filtered_list = _list_filter(list_to_filter, **kwargs)
     if len(filtered_list) != 1:
-        print('Warning: No a single value list')
+        print("Warning: No a single value list")
     if len(filtered_list) == 0:
         return None
     return filtered_list[0]
@@ -540,7 +542,9 @@ class CoscineConnect:
 
         maintenance = self._client.maintenances()
         if len(maintenance) > 0:
-            state.logger.warn(f"Coscine is a maintenance mode: {[str(m) for m in maintenance]}")
+            state.logger.warn(
+                f"Coscine is a maintenance mode: {[str(m) for m in maintenance]}"
+            )
 
     @staticmethod
     def _connect_client(token: str):
@@ -635,8 +639,10 @@ class CoscineProject(HasGroups):
         if key in self.list_groups() and self._project is not None:
             try:
                 return self.__class__(
-                    _get_entry_from_filter(self._project.subprojects(), display_name=key),
-                    parent_path=self._path
+                    _get_entry_from_filter(
+                        self._project.subprojects(), display_name=key
+                    ),
+                    parent_path=self._path,
                 )
             except IndexError:
                 warnings.warn("More than one project matches - returning first match!")

@@ -39,14 +39,6 @@ class CoscineMetadata(coscine.resource.MetadataForm, MetaDataTemplate):
             result[key] = value
         return result
 
-        if 'upper' is 'wrong':
-            # ToDo: This has to be updated to the newer coscine API:
-            if len(str(value)) > 0 and not self.is_controlled(key):
-                result[key] = value.raw()
-            elif len(str(value)) > 0:
-                result[key] = str(value)
-        return result
-
     def __repr__(self):
         return self.__str__()
 

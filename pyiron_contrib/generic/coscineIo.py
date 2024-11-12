@@ -82,25 +82,18 @@ class CoscineFileData(FileDataTemplate):
         if self._data is None or force_update:
             if (
                 "Software IDs" in self.metadata
-                and self.metadata["Software IDs"].raw().lower().startswith("pyiron")
+                and self.metadata["Software IDs"][0].lower().startswith("pyiron")
                 and self.filetype in ["h5", "hdf"]
             ):
                 tmp_dir = os.path.join(os.curdir, "coscine_downloaded_h5")
                 if not os.path.exists(tmp_dir):
                     os.mkdir(tmp_dir)
-                self.download(tmp_dir)
-                file_name = os.path.abspath(os.path.join(tmp_dir, self._filename))
-                if len(self.metadata["External/alias ID"].raw()) > 0:
-                    new_name = os.path.abspath(
-                        os.path.join(
-                            tmp_dir,
-                            "pyiron_"
-                            + self.metadata["External/alias ID"].raw()
-                            + ".h5",
-                        )
-                    )
-                    os.rename(file_name, new_name)
-                    file_name = new_name
+                if len(self.metadata["External/alias ID"][0]) > 0:
+                    new_name = f"pyiron_{self.metadata['External/alias ID'][0]}.h5"
+                else:
+                    new_name = self._filename
+                file_name = os.path.abspath(os.path.join(tmp_dir, new_name))
+                self.download(file_name)
                 self._data = file_name
             else:
                 data = io.BytesIO()
@@ -554,8 +547,8 @@ class CoscineConnect:
             self._client = token
 
         maintenance = self._client.maintenances()
-        if len(maintenance) > 0 :
-            state.logger.warn(f"Coscine is a maintenance mode: {maintenance}")
+        if len(maintenance) > 0:
+            state.logger.warn(f"Coscine is a maintenance mode: {[str(m) for m in maintenance]}")
 
     @staticmethod
     def _connect_client(token: str):

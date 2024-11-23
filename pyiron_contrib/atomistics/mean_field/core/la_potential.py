@@ -180,7 +180,7 @@ class GenerateLAPotential():
                     self._run_job(project=pr_tag, job_name=job_name, position=pos)
                 else:
                     job = pr_tag.inspect(job_name)
-                    if job.status in ['aborted'] or self.delete_existing_jobs:
+                    if job.status in ['aborted', 'running'] or self.delete_existing_jobs:
                         pr_tag.remove_job(job_name)
                         self._run_job(project=pr_tag, job_name=job_name, position=pos) 
         

@@ -27,15 +27,18 @@ class CoscineMetadata(coscine.resource.MetadataForm, MetaDataTemplate):
     """Add a proper representation to the coscine version"""
 
     def __init__(self, meta_data_form: coscine.resource.MetadataForm):
-        super().__init__(client=meta_data_form.client, graph=meta_data_form.profile)
+        if hasattr(meta_data_form, "_fixed_values"):
+            super().__init__(
+                application_profile=meta_data_form.application_profile,
+                fixed_values=meta_data_form._fixed_values,
+            )
+        else:
+            super().__init__(application_profile=meta_data_form.application_profile)
 
     def to_dict(self):
         result = {}
         for key, value in self.items():
-            if len(str(value)) > 0 and not self.is_controlled(key):
-                result[key] = value.raw()
-            elif len(str(value)) > 0:
-                result[key] = str(value)
+            result[key] = value
         return result
 
     def __repr__(self):
@@ -73,35 +76,30 @@ class CoscineFileData(FileDataTemplate):
         if self._data is None or force_update:
             if (
                 "Software IDs" in self.metadata
-                and self.metadata["Software IDs"].raw().lower().startswith("pyiron")
+                and self.metadata["Software IDs"][0].lower().startswith("pyiron")
                 and self.filetype in ["h5", "hdf"]
             ):
                 tmp_dir = os.path.join(os.curdir, "coscine_downloaded_h5")
                 if not os.path.exists(tmp_dir):
                     os.mkdir(tmp_dir)
-                self.download(tmp_dir)
-                file_name = os.path.abspath(os.path.join(tmp_dir, self._filename))
-                if len(self.metadata["External/alias ID"].raw()) > 0:
-                    new_name = os.path.abspath(
-                        os.path.join(
-                            tmp_dir,
-                            "pyiron_"
-                            + self.metadata["External/alias ID"].raw()
-                            + ".h5",
-                        )
-                    )
-                    os.rename(file_name, new_name)
-                    file_name = new_name
+                if len(self.metadata["External/alias ID"][0]) > 0:
+                    new_name = f"pyiron_{self.metadata['External/alias ID'][0]}.h5"
+                else:
+                    new_name = self._filename
+                file_name = os.path.abspath(os.path.join(tmp_dir, new_name))
+                self.download(file_name)
                 self._data = file_name
             else:
-                self._data = self._coscine_object.content()
+                data = io.BytesIO()
+                self._coscine_object.stream(data)
+                self._data = data
 
     def download(self, path="./"):
         self._coscine_object.download(path=path)
 
     def _get_metadata(self):
-        form = CoscineMetadata(self._coscine_object.form())
-        form.parse(self._coscine_object.metadata(force_update=True))
+        form = CoscineMetadata(self._coscine_object.metadata_form())
+        form.parse(self._coscine_object.metadata(refresh=True))
         return form
 
     def _set_metadata(self, metadata):
@@ -118,6 +116,15 @@ def _list_filter(list_to_filter, **kwargs):
         return True
 
     return list(filter(filter_func, list_to_filter))
+
+
+def _get_entry_from_filter(list_to_filter, **kwargs):
+    filtered_list = _list_filter(list_to_filter, **kwargs)
+    if len(filtered_list) != 1:
+        print("Warning: No a single value list")
+    if len(filtered_list) == 0:
+        return None
+    return filtered_list[0]
 
 
 class Job2CoscineMetadataConverter:
@@ -265,7 +272,7 @@ class CoscineResource(StorageInterface):
         return str(self.list_all())
 
     def _list_nodes(self):
-        return [obj.name for obj in self._resource.objects()]
+        return [obj.name for obj in self._resource.files()]
 
     def _list_groups(self):
         # Right now a coscine resource is flat.
@@ -384,7 +391,7 @@ class CoscineResource(StorageInterface):
         if item not in self.list_nodes():
             return None
 
-        objects = _list_filter(self._resource.objects(), name=item)
+        objects = _list_filter(self._resource.files(), name=item)
         if len(objects) == 1:
             return objects[0]
         elif len(objects) > 1:
@@ -506,7 +513,7 @@ class CoscineConnect:
             coscine.Project,
             coscine.FileObject,
             coscine.Resource,
-            coscine.Client,
+            coscine.client.ApiClient,
             str,
             None,
         ],
@@ -533,13 +540,15 @@ class CoscineConnect:
         else:
             self._client = token
 
-        maintenance = self._client.get_maintenance()
-        if maintenance["displayName"] is not None:
-            state.logger.warn(f"Coscine is a maintenance mode: {maintenance}")
+        maintenance = self._client.maintenances()
+        if len(maintenance) > 0:
+            state.logger.warn(
+                f"Coscine is a maintenance mode: {[str(m) for m in maintenance]}"
+            )
 
     @staticmethod
     def _connect_client(token: str):
-        client = coscine.Client(token)
+        client = coscine.client.ApiClient(token, verbose=False)
         try:
             client.projects()
         except (PermissionError, RuntimeError, ConnectionError) as e:
@@ -555,7 +564,7 @@ class CoscineConnect:
 class CoscineProject(HasGroups):
     def __init__(
         self,
-        project: Union[coscine.Project, coscine.Client, str, None] = None,
+        project: Union[coscine.Project, coscine.client.ApiClient, str, None] = None,
         parent_path=None,
     ):
         """
@@ -630,7 +639,10 @@ class CoscineProject(HasGroups):
         if key in self.list_groups() and self._project is not None:
             try:
                 return self.__class__(
-                    self._project.subproject(display_name=key), parent_path=self._path
+                    _get_entry_from_filter(
+                        self._project.subprojects(), display_name=key
+                    ),
+                    parent_path=self._path,
                 )
             except IndexError:
                 warnings.warn("More than one project matches - returning first match!")

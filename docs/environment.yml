@@ -21,7 +21,7 @@ dependencies:
 - seaborn =0.13.2
 - scikit-image =0.24.0
 - randspg =0.0.1
-- boto3 =1.35.14
+- boto3 =1.35.72
 - moto =5.0.16
 - aws-sam-translator =1.77.0
 - distributed =2024.8.0

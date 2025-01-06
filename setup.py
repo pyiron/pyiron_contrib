@@ -34,7 +34,7 @@ setup(
         'matplotlib==3.9.2',
         'numpy==1.26.4',
         'pyiron_snippets==0.1.3',
-        'pyiron_base==0.10.1',
+        'pyiron_base==0.10.9',
         'scipy==1.14.1',
         'seaborn==0.13.2',
         'pyparsing==3.1.4',
@@ -51,11 +51,11 @@ setup(
         ],
         'image': ['scikit-image==0.24.0'],
         'generic': [
-            'boto3==1.35.14', 
+            'boto3==1.35.90', 
             'moto==5.0.16'
         ],
         'tinybase': [
-            'distributed==2024.8.0',
+            'distributed==2024.12.1',
             'pymatgen==2024.9.17.1',
             'pympipool==0.8.4',
             'h5io_browser==0.1.1',

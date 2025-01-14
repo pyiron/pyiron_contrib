@@ -52,12 +52,6 @@ def get_anharmonic_F(anharmonic_U, temperatures, n_fine_samples=10000, offset=Tr
     ah_F = cumulative_trapezoid(ah_U_eqn(fine_temps), 1/fine_temps)*fine_temps[1:]
     return CubicSpline(fine_temps[1:], ah_F)(temperatures)+off
 
-def scaled_bonding_potential(r, eps, potential_func, vd_coeffs, offset_coeffs, b_0=0.):
-    scale = np.poly1d(vd_coeffs)
-    offset = np.poly1d(offset_coeffs)
-    pot = potential_func(r+b_0-b_0*eps)*scale(eps-1)+2*(eps-1)*offset(r)
-    return pot
-
 class GenerateBonds():
     """
     Class that takes a reference bond length b_0, basis and displacements along the longitudinal and 2 transversal directions and generates a grid of bond vectors in Cartesian xyz coordinates.
@@ -119,7 +113,7 @@ class MeanFieldModel():
     """
 
     def __init__(self, bond_grid, b_0s, basis, rotations, alphas, alphas_rot_ids, r_potentials, t1_potentials=None, t2_potentials=None, eta=None,
-                 r_harm_potentials=None, t1_harm_potentials=None, t2_harm_potentials=None, ref_shell=0, shells=1):
+                 r_harm_potentials=None, t1_harm_potentials=None, t2_harm_potentials=None, ref_shell=0, shells=1, la_shells=1, scaled=True):
         self.bond_grid = bond_grid
         self.b_0s = b_0s
         self.basis = basis
@@ -133,11 +127,16 @@ class MeanFieldModel():
         self.r_harm_potentials = r_harm_potentials
         self.t1_harm_potentials = t1_harm_potentials
         self.t2_harm_potentials = t2_harm_potentials
-        self.shells = shells
         self.ref_shell = ref_shell
+        self.shells = shells
+        self.la_shells = la_shells
+        self.scaled = scaled
+        
 
         self.meshes = get_meshes(self.bond_grid, self.basis[ref_shell])
         self.check_inputs()
+
+        self._coarse_vmfs = None
 
     def check_inputs(self):
         """
@@ -161,14 +160,14 @@ class MeanFieldModel():
                 raise TypeError(f'length of {inp_str} is not equal to shells.')
             
     @staticmethod
-    def V1_transversal_helper(bond_grid, basis_vector, t_potential, eps=1.):
-        if t_potential is not None:
-            if np.ndim(bond_grid) == 5:
-                t = np.einsum('lijkm,m->lijk', bond_grid, basis_vector)
-            else:
-                t = np.dot(bond_grid, basis_vector)
-            return t_potential(t, eps=eps)
-        return 0.
+    def V1_projected(bond_grid, basis_vector, potential, eps=1.,scaled=True):
+        t = np.einsum('lijkm,m->lijk', bond_grid, basis_vector) if np.ndim(bond_grid) == 5 else np.dot(bond_grid, basis_vector)
+        return potential(t) if not scaled else potential(t, eps=eps)
+    
+    @staticmethod
+    def V1_r(bond_grid, potential, eps=1.,scaled=True):
+        r = np.linalg.norm(bond_grid, axis=-1)
+        return potential(r) if not scaled else potential(r, eps=eps)
 
     def V1_template(self, bond_grid=None, shell=None, harmonic=False, eps=1.):
         """
@@ -183,17 +182,23 @@ class MeanFieldModel():
         """
         bond_grid = self.bond_grid if bond_grid is None else bond_grid
         shell = self.ref_shell if shell is None else shell
-        
         r_potential  = self.r_harm_potentials[shell]  if harmonic else self.r_potentials[shell]
         t1_potential = self.t1_harm_potentials[shell] if harmonic else self.t1_potentials[shell]
         t2_potential = self.t2_harm_potentials[shell] if harmonic else self.t2_potentials[shell]
 
         v1 = np.zeros_like(bond_grid[..., 0])
+        
         if r_potential is not None:
-            r = np.linalg.norm(bond_grid, axis=-1)
-            v1 +=  r_potential(r, eps=eps)
-        v1 += self.V1_transversal_helper(bond_grid=bond_grid, basis_vector=self.basis[shell][1], t_potential=t1_potential, eps=eps)
-        v1 += self.V1_transversal_helper(bond_grid=bond_grid, basis_vector=self.basis[shell][2], t_potential=t2_potential, eps=eps)
+            if self.ref_shell < self.la_shells-1:
+                v1 += self.V1_r(bond_grid=bond_grid, potential=r_potential, eps=eps, scaled=self.scaled)
+            else:
+                v1 += self.V1_projected(bond_grid=bond_grid, basis_vector=self.basis[shell][0], potential=r_potential, eps=eps, scaled=self.scaled)
+
+        if t1_potential is not None:
+            v1 += self.V1_projected(bond_grid=bond_grid, basis_vector=self.basis[shell][1], potential=t1_potential, eps=eps, scaled=self.scaled)
+
+        if t2_potential is not None:
+            v1 += self.V1_projected(bond_grid=bond_grid, basis_vector=self.basis[shell][2], potential=t2_potential, eps=eps, scaled=self.scaled)
 
         return v1
     
@@ -243,9 +248,9 @@ class MeanFieldModel():
     
     def get_coarse_lo_t1_t2(self):
         lo_mesh, t1_mesh, t2_mesh = self.meshes
-        lo_coarse = np.linspace(lo_mesh[:, 0, 0][0], lo_mesh[:, 0, 0][-1], 20)
-        t1_coarse = np.linspace(t1_mesh[0, :, 0][0], t1_mesh[0, :, 0][-1], 10)
-        t2_coarse = np.linspace(t2_mesh[0, 0, :][0], t2_mesh[0, 0, :][-1], 10)
+        lo_coarse = np.linspace(lo_mesh[:, 0, 0][0], lo_mesh[:, 0, 0][-1], 30)
+        t1_coarse = np.linspace(t1_mesh[0, :, 0][0], t1_mesh[0, :, 0][-1], 15)
+        t2_coarse = np.linspace(t2_mesh[0, 0, :][0], t2_mesh[0, 0, :][-1], 15)
         return lo_coarse, t1_coarse, t2_coarse
     
     def get_coarse_bond_grid(self):
@@ -297,24 +302,24 @@ class VirialQuantities():
         crystal (str): Crystal structure. Defaults to 'fcc'.
     """
 
-    def __init__(self, bond_grid, b_0, basis, crystal='fcc', scale=1.):
+    def __init__(self, bond_grid, b_0, basis, crystal='fcc'):
         self.bond_grid = bond_grid
         self.b_0 = b_0
         self.basis = basis
         self.crystal = crystal
-        self.scale = scale
 
         self.meshes = get_meshes(self.bond_grid, self.basis)
         self._rho_1_temp = None
 
         if self.crystal == 'fcc':
-            # set the number of bonds per shell.
             self.n_bonds_per_shell = np.array([12, 6, 24, 12, 24, 8])
-            # factors to obtain the correct volume from the bond length of each shell
             self.factors = np.array([np.sqrt(2), 1., np.sqrt(2/3), np.sqrt(1/2), np.sqrt(2/5), np.sqrt(1/3)])
         elif self.crystal == 'bcc':
             self.n_bonds_per_shell = np.array([8, 6, 12, 24, 8, 6, 24, 24])
             self.factors = np.array([2/np.sqrt(3), 1., 1/np.sqrt(2), 2/np.sqrt(11), 1/np.sqrt(3), 1/2, 2/np.sqrt(19), 1/np.sqrt(5)])
+        elif self.crystal == 'diamond_cubic':
+            self.n_bonds_per_shell = np.array([4, 12, 12, 8, 24])
+            self.factors = np.array([4/np.sqrt(3), np.sqrt(2), 4/np.sqrt(11), 1., 4/np.sqrt(19)])
         else:
             raise TypeError('crystal must be fcc or bcc.')
 
@@ -369,18 +374,19 @@ class VirialQuantities():
         dV1 = np.array(dV1, dtype=float)
         rho_1 = self.get_rho(Veff=Veff, temperature=temperature, eps=eps, lm=lm)
         b_eps = (lo_mesh*rho_1).sum()
-        db_dV1 = ((lo_mesh-b_eps)*dV1[0]+t1_mesh*dV1[1]+t2_mesh*dV1[2])
+        db_dV1 = (lo_mesh-b_eps)*dV1[0]+t1_mesh*dV1[1]+t2_mesh*dV1[2]
         T_vir = self.n_bonds_per_shell[shell]/6/KB*(db_dV1*rho_1).sum()
         
         if self.crystal == 'fcc':
             N_by_V = 4/(b_eps*self.factors[shell])**3
         elif self.crystal == 'bcc':
             N_by_V = 2/(b_eps*self.factors[shell])**3
+        elif self.crystal == 'diamond_cubic':
+            N_by_V = 8/(b_eps*self.factors[shell])**3
         else:
-            raise TypeError('crystal must be fcc or bcc.')
-        # b_dV1 = (lo_mesh*dV1[0]+t1_mesh*dV1[1]+t2_mesh*dV1[2])
-        a_dV1 = b_eps*dV1[0]
-        P_vir = -N_by_V*self.n_bonds_per_shell[shell]/6*(a_dV1*rho_1).sum()
+            raise TypeError('crystal must be fcc, bcc, or diamond_cubic.')
+        b_dV1 = lo_mesh*dV1[0]+t1_mesh*dV1[1]+t2_mesh*dV1[2]
+        P_vir = N_by_V*(KB*T_vir-self.n_bonds_per_shell[shell]/6*(b_dV1*rho_1).sum())
 
         if not return_rho_1:
             rho_1 = np.array([None])  
@@ -398,13 +404,14 @@ class Optimizer():
         strain_list (list/np.array): Strains corresponding to the volumes of the energy-volume curve. Defaults to None, where no correction terms are added.
         rewrite_veff (boolean): Whether or not to rewrite the mean-field effective potential for a particular value of eps. Defaults to False. Ignored for an NPT optimization.
     """
-    def __init__(self, project_path, mfm_instances, vq_instances, energy_list=None, strain_list=None, r_order=1, rewrite_veff=False):
+    def __init__(self, project_path, mfm_instances, vq_instances, energy_list=None, strain_list=None, r_order=1, rewrite_veff=False, scaled=True):
         self.project_path = project_path
         self.mfm_instances = mfm_instances
         self.vq_instances = vq_instances
         self.energy_list = energy_list
         self.strain_list = strain_list
         self.r_order = r_order
+        self.scaled = scaled
         
         self.rewrite_veff = rewrite_veff
 
@@ -459,8 +466,8 @@ class Optimizer():
 
                 u_mf = np.zeros(len(strains))
                 for shell in range(self.r_order):
-                    s_b_xyz = self.basis[shell][0]*(strains*self.b_0s[shell])[:, np.newaxis]
-                    u_mf += 0.5*self.n_bonds_per_shell[shell]*self.mfm_instances[shell].V1(s_b_xyz)
+                    s_b_xyz = (strains*(self.basis[shell][0]*self.b_0s[shell])[:, None]).T
+                    u_mf += 0.5*self.n_bonds_per_shell[shell]*self.mfm_instances[shell].V1(s_b_xyz, eps=eps)
                 self._u_mf_fit_eqn = np.poly1d(np.polyfit(strains, u_mf, deg=4))
                 self._du_mf_fit_eqn = self._u_mf_fit_eqn.deriv(m=1)
 
@@ -468,14 +475,20 @@ class Optimizer():
                     self._N_by_V_0 = 4/(self.b_0s[0]*self.factors[0])**3
                 elif self.crystal == 'bcc':
                     self._N_by_V_0 = 2/(self.b_0s[0]*self.factors[0])**3
+                elif self.crystal == 'diamond_cubic':
+                    self._N_by_V_0 = 8/(self.b_0s[0]*self.factors[0])**3
                 else:
-                    raise TypeError('crystal must be fcc or bcc.')
+                    raise TypeError('crystal must be fcc, bcc, or diamond_cubic.')
                 
                 self._ev_fit_initialized = True
 
-            P_offset = -self._N_by_V_0/(3*eps**2)*self._du_md_fit_eqn(eps)#-self._du_mf_fit_eqn(eps))
+            P_offset = -self._N_by_V_0/(3*eps**2)*self._du_md_fit_eqn(eps)
+            if not self.scaled:
+                P_offset += self._N_by_V_0/(3*eps**2)*self._du_mf_fit_eqn(eps)
             # P_offset = 0.
-            E_offset = self._u_md_fit_eqn(eps)#-self._u_mf_fit_eqn(eps)
+            E_offset = self._u_md_fit_eqn(eps)
+            if not self.scaled:
+                E_offset -=  self._u_mf_fit_eqn(eps)
             # E_offset = 0.
 
             return P_offset, E_offset
@@ -735,8 +748,10 @@ class GenerateAlphas():
             self.n_bonds_per_shell = np.array([12, 6, 24, 12, 24, 8])
         elif self.crystal == 'bcc':
             self.n_bonds_per_shell = np.array([8, 6, 12, 24, 8, 6, 24, 24])
+        elif self.crystal == 'diamond_cubic':
+            self.n_bonds_per_shell = np.array([4, 12, 12, 8, 24])
         else:
-            raise ValueError('crystal must be fcc or bcc')
+            raise ValueError('crystal must be fcc, bcc, or diamon_cubic.')
         
     # def make_model(self):
     #     """
@@ -870,8 +885,8 @@ class MeanFieldJob():
     """
 
     def __init__(self, project_path, bond_grids, b_0s, basis, rotations, bloch_hessians, kpoint_vectors, kpoint_weights, r_potentials, t1_potentials=None, t2_potentials=None, 
-                 r_harm_potentials=None, t1_harm_potentials=None, t2_harm_potentials=None, shells=1, r_order=1, s_order=0, crystal='fcc', energy_list=None, 
-                 strain_list=None, cutoff_radius=None, rewrite_alphas=False, alpha_threshold=1e-3):
+                 r_harm_potentials=None, t1_harm_potentials=None, t2_harm_potentials=None, shells=1, la_shells=1, r_order=1, s_order=0, crystal='fcc', energy_list=None, 
+                 strain_list=None, scaled=True, cutoff_radius=None, rewrite_alphas=False, alpha_threshold=1e-3):
         self.project_path = project_path
         self.bond_grids = bond_grids
         self.b_0s = b_0s
@@ -887,6 +902,7 @@ class MeanFieldJob():
         self.t1_harm_potentials = t1_harm_potentials
         self.t2_harm_potentials = t2_harm_potentials
         self.shells = shells
+        self.la_shells = la_shells
         self.r_order = r_order
         self.s_order = s_order
         self.crystal = crystal
@@ -895,6 +911,7 @@ class MeanFieldJob():
         self.cutoff_radius = cutoff_radius
         self.rewrite_alphas = rewrite_alphas
         self.alpha_threshold = alpha_threshold
+        self.scaled = scaled
 
         self.output = None
         self.rho_1s = None
@@ -957,7 +974,9 @@ class MeanFieldJob():
                                              alphas=self.alphas[r], 
                                              alphas_rot_ids=self.alphas_rotation_ids[r], 
                                              ref_shell=r, 
-                                             shells=self.shells, 
+                                             shells=self.shells,
+                                             la_shells=self.la_shells,
+                                             scaled=self.scaled, 
                                              r_potentials=self.r_potentials, 
                                              t1_potentials=self.t1_potentials, 
                                              t2_potentials=self.t2_potentials,
@@ -969,8 +988,7 @@ class MeanFieldJob():
             self._vqs.append(VirialQuantities(bond_grid=self.bond_grids[r], 
                                               b_0=self.b_0s[r], 
                                               basis=self.basis[r], 
-                                              crystal=self.crystal,
-                                              scale=1.)
+                                              crystal=self.crystal)
                                               )
         # print('Instances initialized.')
 
@@ -1043,7 +1061,7 @@ class MeanFieldJob():
 
         self.initialize_instances(eta=eta)
         opt = Optimizer(project_path=self.project_path, mfm_instances=self._mfms, vq_instances=self._vqs, energy_list=self.energy_list, strain_list=self.strain_list, r_order=self.r_order, 
-                        rewrite_veff=rewrite_veff)
+                        rewrite_veff=rewrite_veff, scaled=self.scaled)
         if pressure is None:
             self.create_Veffs(eps=eps, eta=eta, rewrite_veff=rewrite_veff)
         

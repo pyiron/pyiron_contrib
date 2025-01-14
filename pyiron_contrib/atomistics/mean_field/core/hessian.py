@@ -110,16 +110,14 @@ class GenerateHessian():
             qpoint_weights (np.array): Weights of the reduced qpoint vectors.
         """
         structure = self.structure.copy()
-        # box = structure.get_symmetry().info['std_lattice']
-        # primitive_cell = structure.get_symmetry().get_primitive_cell(standardize=False).cell.array/box[0][0]
-        # reciprocal_cell = np.linalg.inv(primitive_cell)
-        # n = np.arange(self.kpoints**3)
-        # ix = np.array([n//self.kpoints**2, (n//self.kpoints)%self.kpoints, n%self.kpoints]).T.astype(float)
-        # kpoint_vectors = (2.0*np.pi/float(self.kpoints))*(ix+0.5)@reciprocal_cell
-        # kpoint_vectors -= kpoint_vectors.mean(0)
-        mesh = [self.qpoints, self.qpoints, self.qpoints]
         sym = structure.get_symmetry()
         reciprocal_cell = sym.get_primitive_cell().cell.reciprocal()
+        # n = np.arange(self.qpoints**3)
+        # ix = np.array([n//self.qpoints**2, (n//self.qpoints)%self.qpoints, n%self.qpoints]).T.astype(float)
+        # qpoint_vectors = (2.0*np.pi/float(self.qpoints))*(ix+0.5)@reciprocal_cell
+        # qpoint_vectors -= qpoint_vectors.mean(0)
+        # qpoint_weights = np.ones(len(qpoint_vectors))
+        mesh = [self.qpoints, self.qpoints, self.qpoints]
         grid, qpoint_weights = get_qpoints(mesh_numbers=mesh, reciprocal_lattice=reciprocal_cell)
         qpoint_vectors = (2.0*np.pi*grid)@reciprocal_cell
         return qpoint_vectors, qpoint_weights

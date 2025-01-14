@@ -802,7 +802,7 @@ class BccLAPotential(GenerateLAPotential):
                 s (int): Index of the shell.
                 basis (numpy.ndarray): Basis array.
                 atom_ids (list): List of atom IDs.
-                a (int): Index of the column in the basis array.
+                a (int): Index of the row in the basis array.
                 b (float): Value to compare with.
 
             Returns:
@@ -912,6 +912,8 @@ class BccLAPotential(GenerateLAPotential):
             return self._plane_nn
         
     def _validate_ready_to_run(self):
+        if self.shells in [1, 2]:
+            raise ValueError('At least 3 shells are required, in order to parameterize t1_1nn.')
         if self._stat_ba is None:
             self.run_static_analysis()
         if self._pos is None:
@@ -1165,6 +1167,327 @@ class BccLAPotential(GenerateLAPotential):
             bonds, force = self._concatenate_t(out=out) 
         elif tag == 't2_8nn':
             out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[31], jth_atom_id=self._plane_nn[7][1], tag='2', nn='8', l_force_func=self._l_force_func) 
+            bonds, force = self._concatenate_t(out=out)
+        else:
+            raise ValueError
+        return bonds, force
+    
+class DiamondCubicLAPotential(GenerateLAPotential):
+    """
+    Generates the 'local anharmonic' (LA) potential and force functions for the 1st and 2nd NN shells of an FCC crystal.
+
+    4 potential and 4 force functions are generated (l0_1nn, t1_1nn, t2_1nn, l0_2nn).
+    
+    An atom i is displaced along the line that connects it to a 1NN atom j, and the forces on atom j are collected. From these forces, the longitudinal 
+    'bonding potential' between the 2 atoms can be parameterized. Because of the symmetry in FCC crystals, the potential on another 1NN atom on the same 
+    plane, but along the transversal direction (t1) can also be parameterized. The NN atom perpendicular to this plane is a 2NN atom. Atom i is once again 
+    displaced along the normal to the plane, now towards a 2NN atom, to parameterize the out-of-plane transversal potential (t2). From the same displacements, 
+    the longitudinal potential along the line connecting atom i to atom j (now, a 2NN neighbor) is parameterized.
+    
+    Parameters:
+    - project_name (str): Name of the pyiron project for storing the jobs.
+    - ref_job (pyiron Job): Reference job containing an appropriate FCC structure and an interatomic potential.
+    - ith_atom_id (int, optional): Index of the atom that will be displaced (default is 0).
+    - disp (float, optional): Maximum displacement for atom perturbations in lattice units (default is 1.0).
+    - n_disps (int, optional): Number of displacement steps (default is 5).
+    - uneven (bool, optional): Flag to use uneven spacing for displacement samples (default is False).
+    - delete_existing_jobs (bool, optional): Flag to delete all existing jobs within the project. Cannot be used for individual jobs!
+      (default is False)
+    """
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+    def run_static_analysis(self):
+        """
+        Run static bond analysis on the reference job and assign hidden variables.
+        """
+        if self.delete_existing_jobs:
+            self.delete_static_job = True
+        self._stat_ba = self._project.create_job(StaticBondAnalysis, 'static_ba', delete_existing_job=self.delete_static_job)
+        self._stat_ba.input.structure = self.structure.copy()
+        self._stat_ba.input.n_shells = self.shells
+        self._stat_ba.run()
+
+        self._b0 = np.linalg.norm(self._stat_ba.output.per_shell_irreducible_bond_vectors, axis=-1)
+        self._rotations = self._stat_ba.output.per_shell_0K_rotations
+        atom_ids = [self._stat_ba.output.per_shell_bond_indexed_neighbor_list[i][self.ith_atom_id]
+                    for i in range(self.shells)]
+
+        # 1nn basis, strightforward
+        self._basis = [self._stat_ba.output.per_shell_transformation_matrices[0][0]]
+        self._nn_atom_ids = (atom_ids[0]).tolist()
+        self._nn_bond_vecs = (self._basis[0][0]@self._rotations[0]).tolist()
+        self.disp_dir = [self._basis[0][0], -self._basis[0][0], self._basis[0][1], self._basis[0][2]]
+
+        def update_basis_rotations(s, basis, atom_ids, a, b):
+            """
+            Update the basis rotations.
+
+            Args:
+                s (int): Index of the shell.
+                basis (numpy.ndarray): Basis array.
+                atom_ids (list): List of atom IDs.
+                a (int): Index of the row in the basis array.
+                b (float): Value to compare with.
+
+            Returns:
+                None
+            """
+            roll_arg = np.argwhere(np.all(np.isclose(a=(basis@self._rotations[s])[:, a], b=b, atol=1e-10), axis=-1))[0][-1]
+            roll_id = int(len(self._rotations[s]) - roll_arg)
+            self._basis.append((basis@self._rotations[s])[roll_arg])
+            rolled_vecs = np.roll(basis[0]@self._rotations[s], roll_id, axis=0)
+            rolled_basis = np.roll(basis@self._rotations[s], roll_id, axis=0)
+            self._rotations[s] = np.array([self._find_rotation_matrix(rolled_basis[0], rb) for rb in rolled_basis])
+            self._nn_atom_ids += np.roll(atom_ids[s], roll_id).tolist()
+            self._nn_bond_vecs += (rolled_vecs).tolist()
+
+        if self.shells >= 2:
+            s = 1
+            basis = self._stat_ba.output.per_shell_transformation_matrices[s][0]
+            update_basis_rotations(s, basis, atom_ids, a=0, b=self._basis[0][1])
+            self.disp_dir.append(self._basis[s][2])
+
+        if self.shells >= 3:
+            s = 2
+            basis = self._stat_ba.output.per_shell_transformation_matrices[s][0]
+            update_basis_rotations(s, basis, atom_ids, a=1, b=self._basis[0][1])
+            self.disp_dir.extend([self._basis[s][0], -self._basis[s][0], self._basis[s][2]])
+
+        if self.shells >= 4:
+            s = 3
+            basis = self._stat_ba.output.per_shell_transformation_matrices[s][0]
+            update_basis_rotations(s, basis, atom_ids, a=0, b=self._basis[1][2])
+
+        if self.shells >= 5:
+            s = 4
+            basis = self._stat_ba.output.per_shell_transformation_matrices[s][0]
+            update_basis_rotations(s, basis, atom_ids, a=1, b=self._basis[0][1])
+            self.disp_dir.extend([self._basis[s][0], -self._basis[s][0], self._basis[s][2]])
+            
+        self._nn_bond_vecs = np.array(self._nn_bond_vecs)
+        self._nn_atom_ids = np.array(self._nn_atom_ids)
+        
+    def get_plane_neighbors(self, output=False):
+        """
+        Retrieve atom indices (jth atom) for in-plane and out-of-plane NNs. 
+        """
+        self._plane_nn = [[self._nn_atom_ids[i] for i in [0]]]
+        
+        if self.shells >= 2:
+            anti_l_id_2nn = np.argwhere(np.isclose(a=self._nn_bond_vecs[:16]@self._basis[1][0], b=-1., atol=1e-10))[-1][-1]
+            l_id_2nn = np.argwhere(np.isclose(a=self._nn_bond_vecs[:16]@self._basis[1][0], b=1., atol=1e-10))[-1][-1]
+            t1_id_2nn = np.argwhere(np.all(np.isclose(a=self._nn_bond_vecs[:16], b=self._basis[1][1], atol=1e-10), axis=-1))[-1][-1]
+            self._plane_nn.append([self._nn_atom_ids[i] for i in [anti_l_id_2nn, l_id_2nn, t1_id_2nn]])
+        
+        if self.shells >= 3:
+            l_id_3nn = np.argwhere(np.isclose(a=self._nn_bond_vecs[:28]@self._basis[2][0], b=1., atol=1e-10))[-1][-1]
+            self._plane_nn.append([self._nn_atom_ids[i] for i in [l_id_3nn]])
+
+        if self.shells >= 4:
+            anti_l_id_4nn = np.argwhere(np.isclose(a=self._nn_bond_vecs[:34]@self._basis[3][0], b=-1., atol=1e-10))[-1][-1]
+            l_id_4nn = np.argwhere(np.isclose(a=self._nn_bond_vecs[:34]@self._basis[3][0], b=1., atol=1e-10))[-1][-1]
+            t1_id_4nn = np.argwhere(np.all(np.isclose(a=self._nn_bond_vecs[:34], b=self._basis[3][1], atol=1e-10), axis=-1))[-1][-1]
+            t2_id_4nn = np.argwhere(np.all(np.isclose(a=self._nn_bond_vecs[:34], b=self._basis[3][2], atol=1e-10), axis=-1))[-1][-1]
+            self._plane_nn.append([self._nn_atom_ids[i] for i in [anti_l_id_4nn, l_id_4nn, t1_id_4nn, t2_id_4nn]])
+
+        if self.shells >= 5:
+            l_id_5nn = np.argwhere(np.isclose(a=self._nn_bond_vecs[:46]@self._basis[4][0], b=1., atol=1e-10))[-1][-1]
+            self._plane_nn.append([self._nn_atom_ids[i] for i in [l_id_5nn]])
+        
+        if output:
+            return self._plane_nn
+        
+    def _validate_ready_to_run(self):
+        if self.shells == 1:
+            raise ValueError('At least 2 shells are required, in order to parameterize t1_1nn.')
+        if self._stat_ba is None:
+            self.run_static_analysis()
+        if self._pos is None:
+            self._pos = [self.generate_atom_positions(direction=self.disp_dir[i], spacing=self.uneven) for i in range(4)]
+
+            if self.shells >= 2:
+                self._pos.append(self.generate_atom_positions(direction=self.disp_dir[4], spacing=self.uneven))
+                
+            if self.shells >= 3:
+                for i in range(5, 8):
+                    self._pos.append(self.generate_atom_positions(direction=self.disp_dir[i], spacing=self.uneven))
+
+            if self.shells >= 5:
+                for i in range(8, 11):
+                    self._pos.append(self.generate_atom_positions(direction=self.disp_dir[i], spacing=self.uneven))
+        
+        # set the tags to correspond to the directions along which static calcuations are actually performed
+        self._tags = np.arange(len(self._pos)).astype(str).tolist()
+    
+    def get_force_on_j(self, output=False):
+        """
+        Retrieve forces on the jth atoms at each dislacement.
+        """
+        if self._force_on_j_list is None:
+            self.load_disp_jobs()
+        if self._plane_nn is None:
+            self.get_plane_neighbors()  
+        
+        self._force_on_j_list = [self._force_on_j(self._plane_nn[0][0], tag='1')]
+        self._force_on_j_list.append(self._force_on_j(self._plane_nn[0][0], tag='0'))
+        self._force_on_j_list.append(self._force_on_j(self._plane_nn[0][0], tag='2'))
+        self._force_on_j_list.append(self._force_on_j(self._plane_nn[0][0], tag='3'))
+        
+        if self.shells >= 2:
+            s = 1
+            for i in self._plane_nn[s]:
+                self._force_on_j_list.append(self._force_on_j(i, tag='2'))
+            self._force_on_j_list.append(self._force_on_j(self._plane_nn[s][1], tag='4'))
+                
+        if self.shells >= 3:
+            s = 2
+            self._force_on_j_list.append(self._force_on_j(self._plane_nn[s][0], tag='6'))
+            self._force_on_j_list.append(self._force_on_j(self._plane_nn[s][0], tag='5'))
+            self._force_on_j_list.append(self._force_on_j(self._plane_nn[s][0], tag='2'))
+            self._force_on_j_list.append(self._force_on_j(self._plane_nn[s][0], tag='7'))
+
+        if self.shells >= 4:
+            s = 3
+            for i in self._plane_nn[s]:
+                self._force_on_j_list.append(self._force_on_j(i, tag='4'))
+
+        if self.shells >= 5:
+            s = 4
+            self._force_on_j_list.append(self._force_on_j(self._plane_nn[s][0], tag='9'))
+            self._force_on_j_list.append(self._force_on_j(self._plane_nn[s][0], tag='8'))
+            self._force_on_j_list.append(self._force_on_j(self._plane_nn[s][0], tag='2'))
+            self._force_on_j_list.append(self._force_on_j(self._plane_nn[s][0], tag='10'))
+        
+        if output:
+            return self._force_on_j_list
+    
+    def get_t_bond_force(self, jth_atom_id, jth_atom_forces, tag='1', nn='1', l_force_func=None, return_prime=False):
+        """
+        Compute the bonding forces along a transversal direction.
+        
+        For a displacement 'u' along a transversal direction, there is also a displacement r = sqrt(u**2+b0**2) along ij or 'r' 
+        or the 'central' direction. The force on atom j for a displacement u along a transversal direction is then F_j = F_t(u) +
+        F_ij(r), where F_t(u) is the force along the transversal direction and F_ij(r) is the force along the ij.
+        
+        Further, for each transversal displacment u != 0, ij is not perpendicular to the original transversal direction. By using 
+        the Gram-Schmit process, we can orthogonalize the transversal direction to ij and parameterize the forces along the new 
+        transversal direction 't_prime' as 'F_t_prime'. While the effect of this orthogonalization is minimial, we by default will 
+        consider this for the parameterization.
+
+        Parameters:
+        - jth_atom_id (array-like): id of the jth atom.
+        - j_atom_forces (array-like): Forces on the jth atom.
+        - tag (str): 't1' or 't2'.
+        - return_prime (bool): Whether to return the t_prime directions, for debugging. 
+
+        Returns:
+        - tuple: A tuple containing the displacements u and bond forces F_t_prime along the 'tag' direction.
+        """
+        l_hat, t1_hat, t2_hat = self._basis[int(nn)-1]
+        if nn == '1':
+            pos_t1, pos_t2 = self._pos[2], self._pos[3]
+        elif nn == '2':
+            pos_t1, pos_t2 = self._pos[2], self._pos[4]
+        elif nn == '3':
+            pos_t1, pos_t2 = self._pos[2], self._pos[7]
+        elif nn == '4':
+            pos_t1, pos_t2 = self._pos[4], self._pos[4]
+        elif nn == '5':
+            pos_t1, pos_t2 = self._pos[2], self._pos[10]
+        else:
+            raise ValueError
+        
+        if tag == '1':
+            r, F_ij, ij_direcs = self.get_ij_bond_force(jth_atom_id, jth_atom_forces, pos_t1)
+            if nn in ['2', '4']:
+                u = ij_direcs*r[:, np.newaxis]@l_hat
+                basis = np.array([t1_hat, l_hat, t2_hat])
+            elif nn in ['1', '3', '5']:
+                u = ij_direcs*r[:, np.newaxis]@t1_hat
+                basis = np.array([l_hat, t1_hat, t2_hat])
+        elif tag == '2':
+            r, F_ij, ij_direcs = self.get_ij_bond_force(jth_atom_id, jth_atom_forces, pos_t2)
+            if nn in ['1', '2', '3', '5']:
+                u = ij_direcs*r[:, np.newaxis]@t2_hat
+                basis = np.array([l_hat, t2_hat, t1_hat])
+            elif nn in ['4']:
+                u = ij_direcs*r[:, np.newaxis]@l_hat
+                basis = np.array([t2_hat, l_hat, t1_hat])
+            else:
+                raise ValueError
+        else:
+            raise ValueError
+        F_ij = l_force_func(r) if l_force_func is not None else F_ij
+        F_t = jth_atom_forces-ij_direcs*F_ij[:, np.newaxis]
+        F_t_prime = []
+        prime = []
+        for ij_dir, f_t in zip(ij_direcs, F_t):
+            new_basis = basis.copy()
+            new_basis[0] = ij_dir
+            t_prime = self.orthogonalize(new_basis)[1]
+            F_t_prime.append(f_t@t_prime)
+            prime.append(t_prime)
+        if return_prime:
+            return u, np.array(F_t_prime), np.array(prime)
+        return u, np.array(F_t_prime)
+    
+    def _bond_force(self, tag='l_1nn'):
+        if tag == 'l_1nn':
+            out = [self.get_ij_bond_force(jth_atom_forces=forces, jth_atom_id=self._plane_nn[0][0], ith_atom_positions=self._pos[i]) 
+                   for i, forces in zip([1, 0], self._force_on_j_list[:2])]
+            bonds, force = self._concatenate_l(out=out, nn='1')
+            self._l_force_func = CubicSpline(bonds, force)
+        elif tag == 't1_1nn':
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[2], jth_atom_id=self._plane_nn[0][0], tag='1', nn='1', l_force_func=self._l_force_func)
+            bonds, force = self._concatenate_t(out=out) 
+        elif tag == 't2_1nn':
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[3], jth_atom_id=self._plane_nn[0][0], tag='2', nn='1', l_force_func=self._l_force_func) 
+            bonds, force = self._concatenate_t(out=out) 
+        elif tag == 'l_2nn':
+            out = [self.get_ij_bond_force(jth_atom_forces=forces, jth_atom_id=atom_id, ith_atom_positions=self._pos[2]) 
+                   for forces, atom_id in zip(self._force_on_j_list[4:6], self._plane_nn[1][:2])]
+            bonds, force = self._concatenate_l(out=out, nn='2')
+            self._l_force_func = CubicSpline(bonds, force)
+        elif tag == 't1_2nn':
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[6], jth_atom_id=self._plane_nn[1][2], tag='1', nn='2', l_force_func=self._l_force_func)
+            bonds, force = self._concatenate_t(out=out) 
+        elif tag == 't2_2nn':
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[7], jth_atom_id=self._plane_nn[1][1], tag='2', nn='2', l_force_func=self._l_force_func) 
+            bonds, force = self._concatenate_t(out=out) 
+        elif tag == 'l_3nn':
+            out = [self.get_ij_bond_force(jth_atom_forces=forces, jth_atom_id=self._plane_nn[2][0], ith_atom_positions=self._pos[i]) 
+                   for i, forces in zip([6, 5], self._force_on_j_list[8:10])]
+            bonds, force = self._concatenate_l(out=out, nn='3')
+            self._l_force_func = CubicSpline(bonds, force)
+        elif tag == 't1_3nn':
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[10], jth_atom_id=self._plane_nn[2][0], tag='1', nn='3', l_force_func=self._l_force_func)
+            bonds, force = self._concatenate_t(out=out) 
+        elif tag == 't2_3nn':
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[11], jth_atom_id=self._plane_nn[2][0], tag='2', nn='3', l_force_func=self._l_force_func)
+            bonds, force = self._concatenate_t(out=out) 
+        elif tag == 'l_4nn':
+            out = [self.get_ij_bond_force(jth_atom_forces=forces, jth_atom_id=atom_id, ith_atom_positions=self._pos[4]) 
+                   for forces, atom_id in zip(self._force_on_j_list[12:14], self._plane_nn[3][:2])]
+            bonds, force = self._concatenate_l(out=out, nn='4')
+            self._l_force_func = CubicSpline(bonds, force)
+        elif tag == 't1_4nn':
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[14], jth_atom_id=self._plane_nn[3][2], tag='1', nn='4', l_force_func=self._l_force_func)
+            bonds, force = self._concatenate_t(out=out) 
+        elif tag == 't2_4nn':
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[15], jth_atom_id=self._plane_nn[3][3], tag='2', nn='4', l_force_func=self._l_force_func) 
+            bonds, force = self._concatenate_t(out=out) 
+        elif tag == 'l_5nn':
+            out = [self.get_ij_bond_force(jth_atom_forces=forces, jth_atom_id=self._plane_nn[4][0], ith_atom_positions=self._pos[i]) 
+                   for i, forces in zip([9, 8], self._force_on_j_list[16:18])]
+            bonds, force = self._concatenate_l(out=out, nn='5')
+            self._l_force_func = CubicSpline(bonds, force)
+        elif tag == 't1_5nn':
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[18], jth_atom_id=self._plane_nn[4][0], tag='1', nn='5', l_force_func=self._l_force_func)
+            bonds, force = self._concatenate_t(out=out) 
+        elif tag == 't2_5nn':
+            out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[19], jth_atom_id=self._plane_nn[4][0], tag='2', nn='5', l_force_func=self._l_force_func)
             bonds, force = self._concatenate_t(out=out)
         else:
             raise ValueError

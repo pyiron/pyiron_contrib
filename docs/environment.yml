@@ -25,5 +25,5 @@ dependencies:
 - moto =5.0.16
 - aws-sam-translator =1.77.0
 - distributed =2024.12.1
-- h5io_browser =0.1.4
+- h5io_browser =0.1.6
 - pymatgen =2024.9.17.1

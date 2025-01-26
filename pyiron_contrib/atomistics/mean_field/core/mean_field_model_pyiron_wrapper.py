@@ -46,6 +46,7 @@ class MeanFieldPyironJob(PythonTemplateJob):
         self.input['t1_harm_potentials'] = None
         self.input['t2_harm_potentials'] = None
         self.input['shells'] = 1
+        self.input['la_shells'] = 1
         self.input['energy_list'] = None
         self.input['strain_list'] = None
         self.input['r_order'] = 1
@@ -65,6 +66,7 @@ class MeanFieldPyironJob(PythonTemplateJob):
         self.input['fix_T'] = True 
         self.input['return_rho_1s'] = False 
         self.input['rewrite_veff'] = False
+        self.input['scaled'] = False
         self.mf_job = None
 
     def initialize_job(self):
@@ -80,6 +82,7 @@ class MeanFieldPyironJob(PythonTemplateJob):
                                    t1_harm_potentials=self.input['t1_harm_potentials'],
                                    t2_harm_potentials=self.input['t2_harm_potentials'],
                                    shells=self.input['shells'],
+                                   la_shells=self.input['la_shells'],
                                    energy_list=self.input['energy_list'],
                                    strain_list=self.input['strain_list'],
                                    r_order=self.input['r_order'],
@@ -90,7 +93,8 @@ class MeanFieldPyironJob(PythonTemplateJob):
                                    crystal=self.input['crystal'],
                                    alpha_threshold=self.input['alpha_threshold'],
                                    cutoff_radius=self.input['cutoff_radius'],
-                                   rewrite_alphas=self.input['rewrite_alphas']
+                                   rewrite_alphas=self.input['rewrite_alphas'],
+                                   scaled=self.input['scaled']
                                    )
 
     def validate_ready_to_run(self):

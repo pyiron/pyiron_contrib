@@ -839,7 +839,7 @@ class GenerateAlphas():
                                                 np.round(self.cutoff_radius, decimals=5)).flatten()
                     for b, bond in zip(within_radius, nn[within_radius]):
                         bond_cov = self.get_covariance(bond=bond, ref_bond=ref_bond, position=pos)
-                        alpha = np.real(bond_cov@np.linalg.inv(ref_bond_cov))
+                        alpha = np.round(np.real(bond_cov@np.linalg.inv(ref_bond_cov)), decimals=3)
                         if np.any(abs(alpha) >= self.alpha_threshold):
                             al.append(alpha)
                             al_ids.append(b)

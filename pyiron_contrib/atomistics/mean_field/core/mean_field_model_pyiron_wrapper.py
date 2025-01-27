@@ -1,23 +1,29 @@
 import os
 import dill
+import cloudpickle
 import codecs
 from pyiron_base import PythonTemplateJob, DataContainer
+from pyiron_base.interfaces.has_dict import (
+    HasDict,
+    HasDictfromHDF,
+    _from_dict_children,
+    _to_dict_children,
+)
 from pyiron_base.interfaces.has_hdf import HasHDF
 from pyiron_contrib.atomistics.mean_field.core.mean_field_model import MeanFieldJob
 
 def _to_pickle(value):
-    return codecs.encode(dill.dumps(value), "base64").decode()
-
+    return codecs.encode(cloudpickle.dumps(value), "base64").decode()
 
 def _from_pickle(value):
-    return dill.loads(codecs.decode(value.encode(), "base64"))
-
+    return cloudpickle.loads(codecs.decode(value.encode(), "base64"))
 
 class FunctionContainer(HasHDF):
     __slots__ = ("func",)
 
-    def __init__(self, func=None):
+    def __init__(self, func=None, read_only=True):
         self.func = func
+        self.read_only = read_only
         self.__doc__ = func.__doc__
 
     def _to_hdf(self, hdf):
@@ -28,6 +34,34 @@ class FunctionContainer(HasHDF):
 
     def __call__(self, *args, **kwargs):
         return self.func(*args, **kwargs)
+
+    def _to_dict(self):
+        # stringify keys in case we are acting like a list
+        # data = {str(k): v for k, v in dict(self).items()}
+        # order = list(data)
+        data = {}
+        data["dill"] = _to_pickle(self.func)
+        data["READ_ONLY"] = self.read_only
+        # data["KEY_ORDER"] = order
+        return _to_dict_children(data)
+
+    def _from_dict(self, obj_dict, version=None):
+        obj_dict = _from_dict_children(obj_dict)
+        # if version == "0.2.0":
+        #     order = obj_dict.pop("KEY_ORDER")
+        # else:
+        #     order = None
+        order = None
+        self.read_only = obj_dict.pop("READ_ONLY", False)
+        for key in _internal_hdf_nodes:
+            obj_dict.pop(key, None)
+        with self.unlocked():
+            self.clear()
+            if order is not None:
+                for key in order:
+                    self[key] = obj_dict[key]
+            else:
+                self.update(obj_dict)
 
 class MeanFieldPyironJob(PythonTemplateJob):
     """
@@ -160,7 +194,7 @@ class MeanFieldPyironJob(PythonTemplateJob):
         self.input['r_harm_potentials'] = self.convert_to_data_container(self.input['r_harm_potentials'])
         self.input['t1_harm_potentials'] = self.convert_to_data_container(self.input['t1_harm_potentials'])
         self.input['t2_harm_potentials'] = self.convert_to_data_container(self.input['t2_harm_potentials'])
-        self.input['rotations'] = DataContainer(self.input['rotations'])
+        # self.input['rotations'] = DataContainer(self.input['rotations'])
         super(MeanFieldPyironJob, self).to_hdf(hdf=hdf, group_name=group_name)
 
     def from_hdf(self, hdf=None, group_name=None):
@@ -171,4 +205,4 @@ class MeanFieldPyironJob(PythonTemplateJob):
         self.input['r_harm_potentials'] = self.convert_from_data_container(self.input['r_harm_potentials'])
         self.input['t1_harm_potentials'] = self.convert_from_data_container(self.input['t1_harm_potentials'])
         self.input['t2_harm_potentials'] = self.convert_from_data_container(self.input['t2_harm_potentials'])
-        self.input['rotations'] = self.input['rotations'].to_builtin()
+        # self.input['rotations'] = self.input['rotations'].to_builtin()

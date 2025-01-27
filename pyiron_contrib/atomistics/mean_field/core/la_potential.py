@@ -1119,11 +1119,11 @@ class BccLAPotential(GenerateLAPotential):
             # self._l_force_func = CubicSpline(bonds, force)
         elif tag == 't1_4nn':
             out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[14], jth_atom_id=self._plane_nn[3][1], tag='1', nn='4', l_force_func=self._l_force_func)
-            bonds, force = self._concatenate_t(out=out) 
+            bonds, force = self._concatenate_t(out=out)
         elif tag == 't2_4nn':
             out = self.get_t_bond_force(jth_atom_forces=self._force_on_j_list[15], jth_atom_id=self._plane_nn[3][1], tag='2', nn='4', l_force_func=self._l_force_func)
             # bonds, force = self._concatenate_t_special(out=out)
-            bonds, force = self._concatenate_t(out=out) 
+            bonds, force = self._concatenate_t(out=out)
         elif tag == 'l_5nn':
             out = [self.get_ij_bond_force(jth_atom_forces=forces, jth_atom_id=atom_id, ith_atom_positions=self._pos[0]) 
                    for forces, atom_id in zip(self._force_on_j_list[16:18], self._plane_nn[4][:2])]

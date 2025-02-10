@@ -51,7 +51,7 @@ setup(
         ],
         'image': ['scikit-image==0.24.0'],
         'generic': [
-            'boto3==1.35.90', 
+            'boto3==1.36.16', 
             'moto==5.0.16'
         ],
         'tinybase': [

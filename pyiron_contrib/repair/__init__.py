@@ -432,11 +432,11 @@ class VaspNbandsTool(VaspTool):
 
     def fix(self, old_job, new_job):
         super().fix(old_job, new_job)
-        old_states = old_job.content["output/generic/dft/bands/occ_matrix"].shape[0]
+        old_states = old_job.content["output/generic/dft/bands/occ_matrix"].shape[-1]
         n_elect = old_job.get_nelect()
-        # double free states
+        current_empty_bands = old_states - n_elect // 2
         new_job.set_empty_states(
-            math.ceil((old_states - n_elect // 2) * self._state_factor)
+                math.ceil(max(2, current_empty_bands) * self._state_factor)
         )
 
         try:

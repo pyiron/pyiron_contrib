@@ -240,7 +240,8 @@ class HandyMan:
         raise NoMatchingTool("Cannot find stuitable tool!")
 
     def fix_project(
-        self, project, server_override={}, refresh=True, graveyard=None, **kwargs
+        self, project, server_override={}, refresh=True, graveyard=None,
+        shuffle=False, **kwargs
     ):
         """
         Fix broken jobs.
@@ -248,7 +249,9 @@ class HandyMan:
         Args:
             project (Project): search this project for broken jobs
             server_override (dict): override these values on the restarted jobs
+            refresh (bool): refresh job status before fixing
             graveyard (Project): move fixed projects here, instead of deleting
+            shuffle (bool): fix jobs in random order not in database order
             **kwargs: pass through project.job_table when searching; use to
                       restrict what jobs are fixed
         """
@@ -259,15 +262,15 @@ class HandyMan:
         failed = {}
         fixing = defaultdict(list)
         status_list = set([k[0] for k in self.shed.keys()])
-        job_ids = tqdm(
-            project.job_table(**kwargs).query("status.isin(@status_list)").id,
-            desc="Repairing Jobs",
-        )
-        for jid in job_ids:
+        job_ids = project.job_table(**kwargs).query("status.isin(@status_list)").id
+        if shuffle:
+            job_ids.sample(frac=1)
+        for jid in tqdm(job_ids, desc="Repairing Jobs"):
             try:
                 job = project.load(jid)
             except IndexError:
                 logger.warning(f"Failed to load job {jid}, skipping.")
+                continue
             try:
                 if (
                     job.master_id is not None

@@ -298,6 +298,9 @@ class MasterJobFactory(GenericJobFactory):
 
 
 class DftFactory(JobFactory):
+    pass
+
+class SphinxFactory(DftFactory):
     def set_empty_states(self, states_per_atom):
         self.storage.empty_states_per_atom = states_per_atom
 

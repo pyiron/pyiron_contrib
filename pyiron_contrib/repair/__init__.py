@@ -468,6 +468,9 @@ class VaspDisableIsymTool(VaspTool):
                     "(probably precision problem, try to change SYMPREC in INCAR ?):",
                     " VERY BAD NEWS! internal error in subroutine INVGRP:",
                     PartialLine(
+                        "VERY BAD NEWS! internal error in subroutineRHOSYG:stars are not"
+                    ),
+                    PartialLine(
                         "PRICELV: current lattice and primitive lattice are incommensurate"
                     ),
                     PartialLine(

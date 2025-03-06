@@ -522,15 +522,26 @@ class VaspZbrentTool(VaspTool):
     Lifted from custodian.
     """
 
+    def __init__(self, *, rattle=False, **kwargs):
+        """
+        Args:
+            rattle (bool): if all else fails, try to read CONTCAR and apply a
+            small rattle to atomic positions to try and break some symmetry;
+            this will change the initial structure of the job!
+        """
+        super().__init__(**kwargs)
+        self._rattle = rattle
+
     def match(self, job):
         if (
-            job.input.incar["EDIFF"] <= 1e-6
+            job.input.incar.get("EDIFF", 1e-4) <= 1e-6
             and job["user/handyman/last"] == "VaspZbrentTool"
         ):
             logger.warning(
                 "Bailing to apply VaspZbrentTool! Already tried once and "
                 "you didn't think it through this far yet!"
             )
+            return False
         return match_in_error_log(
             [
                 PartialLine("ZBRENT: fatal error in bracketing"),
@@ -546,7 +557,7 @@ class VaspZbrentTool(VaspTool):
             new_job.input.incar["EDIFF"] = 1e-6
         if old_job.input.incar.get("IBRION", 2) != 1:
             new_job.input.incar["IBRION"] = 1
-        else:
+        elif self._rattle:
             contcar = ase_to_pyiron(ase_read(str(old_job.files.CONTCAR)))
             # VASP manual recommend to copy CONTCAR to POSCAR, but if we
             # overwrite the structure in pyiron directly with the one read from

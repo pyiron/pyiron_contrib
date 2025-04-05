@@ -180,7 +180,7 @@ class GenerateLAPotential():
                     self._run_job(project=pr_tag, job_name=job_name, position=pos)
                 else:
                     job = pr_tag.inspect(job_name)
-                    if job.status in ['aborted', 'running'] or self.delete_existing_jobs:
+                    if job.status in ['aborted', 'submitted'] or self.delete_existing_jobs:
                         pr_tag.remove_job(job_name)
                         self._run_job(project=pr_tag, job_name=job_name, position=pos) 
         
@@ -499,6 +499,8 @@ class FccLAPotential(GenerateLAPotential):
             
         self._nn_bond_vecs = np.array(self._nn_bond_vecs)
         self._nn_atom_ids = np.array(self._nn_atom_ids)
+        if isinstance(self._rotations, np.ndarray):
+            self._rotations = self._rotations.tolist()
         
     def get_plane_neighbors(self, output=False):
         """
@@ -861,6 +863,8 @@ class BccLAPotential(GenerateLAPotential):
             
         self._nn_bond_vecs = np.array(self._nn_bond_vecs)
         self._nn_atom_ids = np.array(self._nn_atom_ids)
+        if isinstance(self._rotations, np.ndarray):
+            self._rotations = self._rotations.tolist()
         
     def get_plane_neighbors(self, output=False):
         """
@@ -1270,6 +1274,8 @@ class DiamondCubicLAPotential(GenerateLAPotential):
             
         self._nn_bond_vecs = np.array(self._nn_bond_vecs)
         self._nn_atom_ids = np.array(self._nn_atom_ids)
+        if isinstance(self._rotations, np.ndarray):
+            self._rotations = self._rotations.tolist()
         
     def get_plane_neighbors(self, output=False):
         """

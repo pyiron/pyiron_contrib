@@ -9,6 +9,7 @@ unit = pint.UnitRegistry()
 from pyiron_base import Project
 from pyiron_base.jobs.job.generic import GenericJob
 from pyiron_base.storage.datacontainer import DataContainer
+from scipy.integrate import simpson
 
 import scipy.constants
 KB = scipy.constants.physical_constants['Boltzmann constant in eV/K'][0]
@@ -22,6 +23,7 @@ class _TRInput(DataContainer):
         self._ref_job = None
         self._temperatures = None
         self._interaction_range = 10
+        self._qpoints = 20
 
     @property
     def ref_job(self):
@@ -46,6 +48,14 @@ class _TRInput(DataContainer):
     @interaction_range.setter
     def interaction_range(self, i_range):
         self._interaction_range = i_range
+
+    @property
+    def qpoints(self):
+        return self._qpoints
+
+    @qpoints.setter
+    def qpoints(self, q):
+        self._qpoints = q
         
 class TemperatureRemapping(GenericJob):
     def __init__(self, project, job_name):
@@ -64,71 +74,96 @@ class TemperatureRemapping(GenericJob):
         if self.harm_job is None:
             self.input.ref_job.status.initialized = True
             sub_pr = Project(self.working_directory)
-            self.harm_job = sub_pr.create.job.PhonopyJob('ha_job', delete_existing_job=True)
+            self.harm_job = sub_pr.create.job.PhonopyJob(self.job_name + '_ha_job', delete_existing_job=True)
             self.harm_job.ref_job = self.input.ref_job
             self.harm_job.input['interaction_range'] = self.input.interaction_range
+            self.harm_job.input['dos_mesh'] = self.input.qpoints
+            self.harm_job.input['primitive_matrix'] = 'auto'
             self.harm_job.run()
         return self.harm_job
-    
-    def get_nu_data(self):
-        self.output.dos_nu = self.harm_job['output/dos_energies']
-        self.output.dos_total = self.harm_job['output/dos_total']
-        
-        sel = self.output.dos_nu > 0.
-        nu_real = self.output.dos_nu[sel]
-        dos_real = self.output.dos_nu[sel]/self.output.dos_nu[sel].sum()
-        self.output.effective_nu = (nu_real*dos_real).sum()
-        
-        hessian = self.get_hessian()
-        nu_v = self.get_vibrational_frequencies(hessian, return_eigenvectors=False)
-        self.output.frequencies_at_gamma = nu_v
-        
-    @staticmethod
-    def reshape_hessian(hessian):
-        n_atoms = hessian.shape[0]
-        reshaped_hessian = hessian.transpose(0, 2, 1, 3)
-        reshaped_hessian = reshaped_hessian.reshape(n_atoms*3, n_atoms*3)
-        return reshaped_hessian
 
-    def get_hessian(self, reshape=True):
-        hessian = self.harm_job['output/force_constants']
-        if reshape:
-            hessian = self.reshape_hessian(hessian)
-        return hessian
-
-    def get_vibrational_frequencies(self, hessian, masses=None, return_eigenvectors=True):
-        n_atoms = hessian.shape[0] // 3
-        if masses is None:
-            mass = self.structure.get_masses()[0]
-            masses = np.array([mass]*n_atoms)
-        m = np.tile(masses, (3, 1)).T.flatten()
-        mass_tensor = np.sqrt(m * m[:, np.newaxis])
-        eigvals, eigvecs = np.linalg.eigh(hessian / mass_tensor)
-        nu_square = (eigvals * unit.electron_volt / unit.angstrom**2 / unit.amu).to("THz**2").magnitude
-        nu = np.sign(nu_square) * np.sqrt(np.absolute(nu_square)) / (2 * np.pi)
-        if return_eigenvectors:
-            return nu, eigvecs
-        return nu
+    def get_nu_dos(self):
+        return self.harm_job['output/dos_energies'].copy(), self.harm_job['output/dos_total'].copy()
     
     @staticmethod
-    def delta_function(x, x0, sigma=0.025):
-        return np.exp(-(x - x0)**2 / (2 * sigma**2)) / (np.sqrt(2 * np.pi) * sigma)
+    def remap_function(nu, dos, temperature):
+        return simpson(y=H*dos*nu*(0.5+(1/(np.exp(H*nu/(KB*temperature))-1))), x=nu)/KB
+        
+    def remap_temperatures(self):
+        nu, dos = self.get_nu_dos()
+        sel = nu > 0.
+        nu_sel  = nu[sel]*1e12  # from THz to Hz
+        dos_sel = dos[sel]
+        dos_sel /= simpson(y=dos_sel, x=nu_sel)
+        remapped_temperatures = np.array([self.remap_function(nu=nu_sel, dos=dos_sel, temperature=temp) for temp in self.input.temperatures])
+        return remapped_temperatures
 
-    @staticmethod
-    def rho_i_alpha(nu, eigvectors, nu_v):
-        return np.sum((eigvectors**2) * delta_function(nu, nu_v), axis=-1)
-    
     def get_remapped_temperatures(self):
         if self.output.remapped_temperatures is None:
-            nu = self.output.effective_nu
-            self.output.remapped_temperatures = np.array([H*nu*1e12*(0.5+(1/(np.exp(H*nu*1e12/(KB*temp))-1)))/KB
-                                                          for temp in self.input.temperatures])
+            self.output.remapped_temperatures = self.remap_temperatures()
+
+    def plot_phonon_dispersion(self, label=None, *args, **kwargs):
+        return self.harm_job.plot_band_structure(label=label, *args, **kwargs)
+    
+    # def get_nu_data(self):
+    #     self.output.dos_nu = self.harm_job['output/dos_energies']
+    #     self.output.dos_total = self.harm_job['output/dos_total']
+        
+    #     sel = self.output.dos_nu > 0.
+    #     nu_real = self.output.dos_nu[sel]
+    #     dos_real = self.output.dos_nu[sel]/self.output.dos_nu[sel].sum()
+    #     self.output.effective_nu = (nu_real*dos_real).sum()
+        
+    #     hessian = self.get_hessian()
+    #     nu_v = self.get_vibrational_frequencies(hessian, return_eigenvectors=False)
+    #     self.output.frequencies_at_gamma = nu_v
+        
+    # @staticmethod
+    # def reshape_hessian(hessian):
+    #     n_atoms = hessian.shape[0]
+    #     reshaped_hessian = hessian.transpose(0, 2, 1, 3)
+    #     reshaped_hessian = reshaped_hessian.reshape(n_atoms*3, n_atoms*3)
+    #     return reshaped_hessian
+
+    # def get_hessian(self, reshape=True):
+    #     hessian = self.harm_job['output/force_constants']
+    #     if reshape:
+    #         hessian = self.reshape_hessian(hessian)
+    #     return hessian
+
+    # def get_vibrational_frequencies(self, hessian, masses=None, return_eigenvectors=True):
+    #     n_atoms = hessian.shape[0] // 3
+    #     if masses is None:
+    #         mass = self.structure.get_masses()[0]
+    #         masses = np.array([mass]*n_atoms)
+    #     m = np.tile(masses, (3, 1)).T.flatten()
+    #     mass_tensor = np.sqrt(m * m[:, np.newaxis])
+    #     eigvals, eigvecs = np.linalg.eigh(hessian / mass_tensor)
+    #     nu_square = (eigvals * unit.electron_volt / unit.angstrom**2 / unit.amu).to("THz**2").magnitude
+    #     nu = np.sign(nu_square) * np.sqrt(np.absolute(nu_square)) / (2 * np.pi)
+    #     if return_eigenvectors:
+    #         return nu, eigvecs
+    #     return nu
+    
+    # @staticmethod
+    # def delta_function(x, x0, sigma=0.025):
+    #     return np.exp(-(x - x0)**2 / (2 * sigma**2)) / (np.sqrt(2 * np.pi) * sigma)
+
+    # @staticmethod
+    # def rho_i_alpha(nu, eigvectors, nu_v):
+    #     return np.sum((eigvectors**2) * delta_function(nu, nu_v), axis=-1)
+    
+    # def get_remapped_temperatures(self):
+    #     if self.output.remapped_temperatures is None:
+    #         nu = self.output.effective_nu
+    #         self.output.remapped_temperatures = np.array([H*nu*1e12*(0.5+(1/(np.exp(H*nu*1e12/(KB*temp))-1)))/KB
+    #                                                       for temp in self.input.temperatures])
     
     def run_static(self):
         self.status.running = True
         self.run_ha()
         self.status.finished = True
-        self.get_nu_data()
+        # self.get_nu_data()
         self.get_remapped_temperatures()
         self.to_hdf()
     
@@ -141,4 +176,4 @@ class TemperatureRemapping(GenericJob):
         super(TemperatureRemapping, self).from_hdf()
         self.input.from_hdf(self.project_hdf5)
         self.output.from_hdf(self.project_hdf5)
-        # self.harm_job = self.project.load('ha_job')
+        self.harm_job = self.project.load(self.job_name + '_ha_job')

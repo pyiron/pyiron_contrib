@@ -148,13 +148,10 @@ class GenerateHessian():
             qpoint_vectors, qpoint_weights = self.get_qpoint_vectors()
             structure = self.structure.copy()
             X = structure.positions.copy()
+            sq_trace = np.einsum('ijk,ikj->i', hessian_direct, hessian_direct)
+            select = sq_trace > 1e-3
             if self.cutoff_radius is not None:
                 select = structure.get_neighborhood(positions=X[self.ref_atom], cutoff_radius=self.cutoff_radius, num_neighbors=None).indices
-                if len(select)>structure.get_number_of_atoms():
-                    select = np.ones(structure.get_number_of_atoms(), dtype=bool)
-            else:
-                sq_trace = np.einsum('ijk,ikj->i', hessian_direct, hessian_direct)
-                select = sq_trace > 1e-3
             dX = structure.find_mic(X-X[self.ref_atom])
             q_dX = qpoint_vectors@dX[select].T
             hessian_reciprocal = np.einsum('il,ijk->ljk', np.exp(1j*q_dX.T), hessian_direct[select])

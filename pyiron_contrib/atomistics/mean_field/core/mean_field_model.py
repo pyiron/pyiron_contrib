@@ -1,5 +1,6 @@
 import numpy as np
 import os
+from timeit import time
 
 from scipy.optimize import root, root_scalar
 from scipy.interpolate import CubicSpline, RegularGridInterpolator
@@ -544,7 +545,7 @@ class Optimizer():
         Veff = np.load(os.path.join(self.project_path, filename), allow_pickle=True)
         return Veff
 
-    def run_nvt(self, temperature=100., eps=1., eta=None, return_rho_1=False, fix_T=False):
+    def run_nvt(self, temperature=100., eps=1., eta=None, return_rho_1=False, fix_T=False, tol=1e-8):
         """
         Runs the mean-field NVT optimization.
         
@@ -566,19 +567,25 @@ class Optimizer():
         # For each shell, find a lagrange multiplier that enforces bond length.
         Veffs = [self.load_Veff(shell=shell, eps=eps, eta=eta) for shell in range(self.r_order)]
         dV1s = [self.mfm_instances[shell].V1_gradient(eps=eps) for shell in range(self.r_order)]
-        lms = []
-        print(f'Running T: {temperature}; eps: {eps}; eta: {eta}\n')
+        
+        if eta is not None:
+            print(f'Running T: {temperature}; eps: {eps}; eta: {eta}\n')
+        else:
+            print(f'Running T: {temperature}; eps: {eps}\n')
+            
         if not fix_T:
+            lms = []
             for shell in range(self.r_order):
                 # print('Optimizing shell {}...'.format(shell))
                 def objective_function(args):
                     _, _, b_eps, _ = self.vq_instances[shell].get_virial_quantities(Veff=Veffs[shell], dV1=dV1s[shell], temperature=temperature, eps=eps, lm=args, shell=shell)
                     return np.abs(self.b_0s[shell]*eps-b_eps)
-                solver = root_scalar(objective_function, x0=0., x1=0.001, rtol=1e-10)
+                solver = root_scalar(objective_function, x0=0., x1=0.001, rtol=tol)
                 # print('Optimization complete.')
                 lms.append(solver.root)
             lms = np.array(lms)
         else:
+            
             def objective_function(args):
                 T_virs = []
                 b_eps_diff = []
@@ -588,10 +595,29 @@ class Optimizer():
                     b_eps_diff.append(np.abs(self.b_0s[shell]*eps-b_eps))
                 T_diff = np.abs(temperature-np.sum(T_virs))
                 return np.concatenate((np.array(b_eps_diff), np.array([T_diff])))
+
+            def objective_function_backup(args):
+                T_virs = []
+                b_eps_diff = []
+                for shell in range(self.r_order):
+                    t_vir, _, b_eps, _ = self.vq_instances[shell].get_virial_quantities(Veff=Veffs[shell], dV1=dV1s[shell], temperature=args[-1], eps=eps, lm=args[shell], shell=shell)
+                    T_virs.append(t_vir)
+                    b_eps_diff.append((self.b_0s[shell]*eps-b_eps)**2)
+                T_diff = (temperature-np.sum(T_virs))**2
+                return np.concatenate((np.array(b_eps_diff), np.array([T_diff])))
+                
             # print('Optimizing all shells at once...')
             x0 = np.concatenate((np.zeros(self.r_order), np.array([temperature])))
-            solver = root(objective_function, x0=x0, tol=1e-10, method='lm')
-            # print('Optimization complete.')
+            start_time = time.time()
+            solver = root(objective_function, x0=x0, tol=tol, method='lm')
+            if not solver.success:
+                stop_time = time.time()
+                print(f'Optimization success: {solver.success}; Time: {np.round(stop_time-start_time, decimals=5)} seconds\n')
+                print('Switching objective function to least squares...\n')
+                start_time = time.time()
+                solver = root(objective_function_backup, x0=x0, tol=tol, method='lm')
+            stop_time = time.time()
+            print(f'Optimization success: {solver.success}; Time: {np.round(stop_time-start_time, decimals=5)} seconds\n')
             lms = solver.x[:-1]
             temperature = solver.x[-1]
             # print('Effective/renormlaized temperature: {}'.format(temperature))
@@ -637,7 +663,7 @@ class Optimizer():
                 print(args)
                 return np.concatenate((np.array(b_eps_diff), np.array([P_diff])))
             x0 = np.concatenate((np.zeros(self.r_order), np.array([eps])))
-            solver = root(objective_function, x0=x0, tol=1e-10, method='lm')
+            solver = root(objective_function, x0=x0, tol=1e-8, method='lm')
             # print('Optimization complete.')
             lms = solver.x[:-1]
             eps = solver.x[-1]
@@ -659,7 +685,7 @@ class Optimizer():
                 print(args)
                 return np.concatenate((np.array(b_eps_diff), np.array([T_diff]), np.array([P_diff])))
             x0 = np.concatenate((np.zeros(self.r_order), np.array([temperature]), np.array([eps])))
-            solver = root(objective_function, x0=x0, tol=1e-10, method='lm')
+            solver = root(objective_function, x0=x0, tol=1e-8, method='lm')
             # print('Optimization complete.')
             lms = solver.x[:-2]
             temperature = solver.x[-2]
@@ -1134,13 +1160,13 @@ class MeanFieldJob():
         eps = out[7]
         rho_1s = out[9]
         
-        per_bond_energy = np.array([(self._mfms[s].V1_template(eps=eps)*rho_1s[s]).sum() for s in range(self.r_order)])
+        per_bond_energy = np.array([(self._mfms[s].V1_template(eps=eps)*rho_1s[s]).sum() for s in range(self.r_order)])/2
         if eta is not None:
             per_bond_energy -= np.array([(self._mfms[s].V1_template(harmonic=True, eps=eps)*rho_1s[s]).sum() for s in range(self.r_order)])
             per_atom_dU_deta = self.n_bonds_per_shell[:self.r_order]/2*per_bond_energy
             return per_atom_dU_deta.sum()
         else:
-            per_atom_energy = self.n_bonds_per_shell[:self.r_order]/2*per_bond_energy
+            per_atom_energy = self.n_bonds_per_shell[:self.r_order]*per_bond_energy
             per_shell_ah_U = per_atom_energy-1.5*KB*np.array(T_vir)
             ah_U = per_shell_ah_U.sum()
             if pressure is not None:

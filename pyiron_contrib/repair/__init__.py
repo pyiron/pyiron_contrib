@@ -493,6 +493,27 @@ class VaspDisableIsymTool(VaspTool):
 
     applicable_status = ("aborted",)
 
+class VaspDecreaseSymprecTool(VaspTool):
+    """Small strains can confuse the default SYMPREC settings of VASP. Try tighter ones."""
+    def match(self, job):
+        return (super().match(job)
+                and job.input.incar.get("SYMPREC", 1e-5) != 1e-7
+                and match_in_error_log(
+                [PartialLine("Inconsistent Bravais lattice types found for crystalline and")],
+                job
+        ))
+
+    def fix(self, old_job, new_job):
+        super().fix(old_job, new_job)
+        new_job.input.incar["SYMPREC"] = 1e-7
+        # in case VaspDisableIsymTool ran before us, try and go back to cheaper settings
+        if new_job.input.incar.get("ISYM", 2) == -1:
+            new_job.input.incar["ISYM"] = 1
+        return new_job
+
+    applicable_status = ("aborted",)
+    # higher priority than VaspDisableIsymTool
+    priority = 1
 
 class VaspSubspaceTool(VaspTool):
     """

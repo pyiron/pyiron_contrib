@@ -842,7 +842,10 @@ class VaspSgrconTool(VaspTool):
             super().match(job)
             and job.input.kpoints[2] == "Monkhorst_Pack"
             and match_in_error_log(
-                PartialLine("VERY BAD NEWS! internal error in subroutine SGRCON"), job
+                [
+                    PartialLine("VERY BAD NEWS! internal error in subroutine SGRCON"),
+                    PartialLine("VERY BAD NEWS! internal error in subroutineSGRCON:Found some")
+                ], job
             )
         )
 

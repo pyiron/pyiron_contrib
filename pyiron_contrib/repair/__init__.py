@@ -493,15 +493,23 @@ class VaspDisableIsymTool(VaspTool):
 
     applicable_status = ("aborted",)
 
+
 class VaspDecreaseSymprecTool(VaspTool):
     """Small strains can confuse the default SYMPREC settings of VASP. Try tighter ones."""
+
     def match(self, job):
-        return (super().match(job)
-                and job.input.incar.get("SYMPREC", 1e-5) != 1e-7
-                and match_in_error_log(
-                [PartialLine("Inconsistent Bravais lattice types found for crystalline and")],
-                job
-        ))
+        return (
+            super().match(job)
+            and job.input.incar.get("SYMPREC", 1e-5) != 1e-7
+            and match_in_error_log(
+                [
+                    PartialLine(
+                        "Inconsistent Bravais lattice types found for crystalline and"
+                    )
+                ],
+                job,
+            )
+        )
 
     def fix(self, old_job, new_job):
         super().fix(old_job, new_job)
@@ -514,6 +522,7 @@ class VaspDecreaseSymprecTool(VaspTool):
     applicable_status = ("aborted",)
     # higher priority than VaspDisableIsymTool
     priority = 1
+
 
 class VaspSubspaceTool(VaspTool):
     """
@@ -844,8 +853,11 @@ class VaspSgrconTool(VaspTool):
             and match_in_error_log(
                 [
                     PartialLine("VERY BAD NEWS! internal error in subroutine SGRCON"),
-                    PartialLine("VERY BAD NEWS! internal error in subroutineSGRCON:Found some")
-                ], job
+                    PartialLine(
+                        "VERY BAD NEWS! internal error in subroutineSGRCON:Found some"
+                    ),
+                ],
+                job,
             )
         )
 

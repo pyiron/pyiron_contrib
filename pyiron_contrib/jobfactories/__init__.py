@@ -5,6 +5,7 @@ from pyiron_contrib import Project
 from abc import ABC, abstractmethod
 import contextlib
 from typing import Optional, Callable, Dict
+import warnings
 
 
 class JobFactory(HasStorage, ABC):
@@ -151,7 +152,7 @@ class JobFactory(HasStorage, ABC):
         return self.storage.create_group("input")
 
     def __getattr__(self, name):
-        if name.startswith("__") and name.endswith("__"):
+        if (name.startswith("__") and name.endswith("__")) or name == "getdoc":
             raise AttributeError(name)
 
         def wrapper(*args, **kwargs):
@@ -170,11 +171,22 @@ class JobFactory(HasStorage, ABC):
             job.server.cores = self.cores
         if self.run_time is not None:
             job.server.run_time = self.run_time
+        if "memory_limit" in self.server:
+            job.server.memory_limit = self.server.memory_limit
         for k, v in self.storage.input.items():
             job.input[k] = v
         if "methods" in self.storage:
             for meth, ka in self.storage.methods.items():
-                getattr(job, meth)(*ka.args, **ka.kwargs)
+                if meth == "getdoc":
+                    # garbage introduced by ipython notebooks
+                    del self.storage.methods[meth]
+                    continue
+                if hasattr(job, meth):
+                    getattr(job, meth)(*ka.args, **ka.kwargs)
+                else:
+                    warnings.warn(
+                        f"Could not call method {meth} on job type {self.hamilton}, skipping it!"
+                    )
         if "attributes" in self.storage:
             for attr, val in self.storage.attributes.items():
                 setattr(job, attr, val)
@@ -288,6 +300,10 @@ class MasterJobFactory(GenericJobFactory):
 
 
 class DftFactory(JobFactory):
+    pass
+
+
+class SphinxFactory(DftFactory):
     def set_empty_states(self, states_per_atom):
         self.storage.empty_states_per_atom = states_per_atom
 

@@ -240,7 +240,13 @@ class HandyMan:
         raise NoMatchingTool("Cannot find stuitable tool!")
 
     def fix_project(
-        self, project, server_override={}, refresh=True, graveyard=None, **kwargs
+        self,
+        project,
+        server_override={},
+        refresh=True,
+        graveyard=None,
+        shuffle=False,
+        **kwargs,
     ):
         """
         Fix broken jobs.
@@ -248,7 +254,9 @@ class HandyMan:
         Args:
             project (Project): search this project for broken jobs
             server_override (dict): override these values on the restarted jobs
+            refresh (bool): refresh job status before fixing
             graveyard (Project): move fixed projects here, instead of deleting
+            shuffle (bool): fix jobs in random order not in database order
             **kwargs: pass through project.job_table when searching; use to
                       restrict what jobs are fixed
         """
@@ -259,15 +267,15 @@ class HandyMan:
         failed = {}
         fixing = defaultdict(list)
         status_list = set([k[0] for k in self.shed.keys()])
-        job_ids = tqdm(
-            project.job_table(**kwargs).query("status.isin(@status_list)").id,
-            desc="Repairing Jobs",
-        )
-        for jid in job_ids:
+        job_ids = project.job_table(**kwargs).query("status.isin(@status_list)").id
+        if shuffle:
+            job_ids.sample(frac=1)
+        for jid in tqdm(job_ids, desc="Repairing Jobs"):
             try:
                 job = project.load(jid)
             except IndexError:
                 logger.warning(f"Failed to load job {jid}, skipping.")
+                continue
             try:
                 if (
                     job.master_id is not None
@@ -429,11 +437,11 @@ class VaspNbandsTool(VaspTool):
 
     def fix(self, old_job, new_job):
         super().fix(old_job, new_job)
-        old_states = old_job.content["output/generic/dft/bands/occ_matrix"].shape[0]
+        old_states = old_job.content["output/generic/dft/bands/occ_matrix"].shape[-1]
         n_elect = old_job.get_nelect()
-        # double free states
+        current_empty_bands = old_states - n_elect // 2
         new_job.set_empty_states(
-            math.ceil((old_states - n_elect // 2) * self._state_factor)
+            math.ceil(max(2, current_empty_bands) * self._state_factor)
         )
 
         try:
@@ -464,6 +472,9 @@ class VaspDisableIsymTool(VaspTool):
                     " VERY BAD NEWS! internal error in subroutine PRICEL "
                     "(probably precision problem, try to change SYMPREC in INCAR ?):",
                     " VERY BAD NEWS! internal error in subroutine INVGRP:",
+                    PartialLine(
+                        "VERY BAD NEWS! internal error in subroutineRHOSYG:stars are not"
+                    ),
                     PartialLine(
                         "PRICELV: current lattice and primitive lattice are incommensurate"
                     ),
@@ -516,15 +527,26 @@ class VaspZbrentTool(VaspTool):
     Lifted from custodian.
     """
 
+    def __init__(self, *, rattle=False, **kwargs):
+        """
+        Args:
+            rattle (bool): if all else fails, try to read CONTCAR and apply a
+            small rattle to atomic positions to try and break some symmetry;
+            this will change the initial structure of the job!
+        """
+        super().__init__(**kwargs)
+        self._rattle = rattle
+
     def match(self, job):
         if (
-            job.input.incar["EDIFF"] <= 1e-6
+            job.input.incar.get("EDIFF", 1e-4) <= 1e-6
             and job["user/handyman/last"] == "VaspZbrentTool"
         ):
             logger.warning(
                 "Bailing to apply VaspZbrentTool! Already tried once and "
                 "you didn't think it through this far yet!"
             )
+            return False
         return match_in_error_log(
             [
                 PartialLine("ZBRENT: fatal error in bracketing"),
@@ -540,7 +562,7 @@ class VaspZbrentTool(VaspTool):
             new_job.input.incar["EDIFF"] = 1e-6
         if old_job.input.incar.get("IBRION", 2) != 1:
             new_job.input.incar["IBRION"] = 1
-        else:
+        elif self._rattle:
             contcar = ase_to_pyiron(ase_read(str(old_job.files.CONTCAR)))
             # VASP manual recommend to copy CONTCAR to POSCAR, but if we
             # overwrite the structure in pyiron directly with the one read from

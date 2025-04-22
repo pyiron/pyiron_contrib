@@ -240,8 +240,13 @@ class HandyMan:
         raise NoMatchingTool("Cannot find stuitable tool!")
 
     def fix_project(
-        self, project, server_override={}, refresh=True, graveyard=None,
-        shuffle=False, **kwargs
+        self,
+        project,
+        server_override={},
+        refresh=True,
+        graveyard=None,
+        shuffle=False,
+        **kwargs,
     ):
         """
         Fix broken jobs.
@@ -436,7 +441,7 @@ class VaspNbandsTool(VaspTool):
         n_elect = old_job.get_nelect()
         current_empty_bands = old_states - n_elect // 2
         new_job.set_empty_states(
-                math.ceil(max(2, current_empty_bands) * self._state_factor)
+            math.ceil(max(2, current_empty_bands) * self._state_factor)
         )
 
         try:

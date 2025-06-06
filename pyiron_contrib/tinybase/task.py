@@ -1,7 +1,10 @@
 import abc
 from copy import deepcopy
+import contextlib
+from dataclasses import asdict
 import enum
-from typing import Optional, Callable, List, Generator, Tuple
+from tempfile import TemporaryDirectory
+from typing import Optional, Callable, List, Generator, Tuple, Any, Union
 
 from pyiron_base import HasStorage
 
@@ -10,6 +13,8 @@ from pyiron_contrib.tinybase.container import (
     AbstractInput,
     AbstractOutput,
     StorageAttribute,
+    USER_REQUIRED,
+    field,
 )
 
 
@@ -57,17 +62,30 @@ class ReturnStatus:
         return self.code == self.Code.DONE
 
 
+class ComputeContext(AbstractInput):
+    cores: int = None
+    gpus: int = None
+    runtime: float = None
+    memory: float = None
+    working_directory: str = None
+
+
 class AbstractTask(Storable, abc.ABC):
     """
     Basic unit of calculations.
 
-    Subclasses must implement :meth:`._get_input()`, :meth:`._get_output()` and :meth:`._execute()` and generally supply
-    their own :class:`.AbstractInput` and :class:`.AbstractOutput`.
+    Subclasses must implement :meth:`._get_input()` and :meth:`._execute()` and generally supply
+    their own :class:`.AbstractInput` and :class:`.AbstractOutput` (as returned from `_execute()`).
     """
 
     def __init__(self, capture_exceptions=True):
         self._input = None
+        self._context = ComputeContext()
         self._capture_exceptions = capture_exceptions
+
+    @property
+    def context(self):
+        return self._context
 
     @abc.abstractmethod
     def _get_input(self) -> AbstractInput:
@@ -85,45 +103,39 @@ class AbstractTask(Storable, abc.ABC):
         return self._input
 
     @abc.abstractmethod
-    def _get_output(self) -> AbstractOutput:
-        """
-        Return an instance of the output class.
-
-        This is called every time :meth:`.execute()` is called.
-        """
-        pass
-
-    @abc.abstractmethod
-    def _execute(self, output) -> Optional[ReturnStatus]:
+    def _execute(self) -> Union[Tuple[ReturnStatus, AbstractOutput], AbstractOutput]:
         """
         Run the calculation.
 
-        Every time this method is called a new instance of the output is created and passed as the argument.  This
-        method should populate it.
-
-        If no value is returned from the method, a return status of DONE is assumed implicitly.
-
-        Args:
-            output (:class:`.AbstractOutput`): instance returned by :meth:`._get_output()`.
+        Should return either the output object or a :class:`.ReturnStatus`
 
         Returns:
             :class:`.ReturnStatus`: optional
         """
         pass
 
-    def execute(self) -> Tuple[ReturnStatus, AbstractOutput]:
+    def execute(self) -> Tuple[ReturnStatus, Optional[AbstractOutput]]:
         if not self.input.check_ready():
-            return ReturnStatus.aborted("Input not ready!")
-        output = self._get_output()
+            return ReturnStatus.aborted("Input not ready!"), None
+        if self.context.working_directory is not None:
+            nwd = contextlib.nullcontext(self.context.working_directory)
+        else:
+            nwd = TemporaryDirectory()
         try:
-            ret = self._execute(output)
-            if ret is None:
+            with nwd as path, contextlib.chdir(path):
+                ret = self._execute()
+            if isinstance(ret, tuple):
+                ret, output = ret
+            elif isinstance(ret, AbstractOutput):
+                output = ret
                 ret = ReturnStatus("done")
+            else:
+                raise ValueError("Must return tuple or output!")
+            return ret, output
         except Exception as e:
-            ret = ReturnStatus("aborted", msg=e)
             if not self._capture_exceptions:
                 raise
-        return ret, output
+            return ReturnStatus("aborted", msg=e), None
 
     # TaskIterator Impl'
     def __iter__(
@@ -140,12 +152,20 @@ class AbstractTask(Storable, abc.ABC):
     # We might even avoid this by deriving from HasStorage and put _input in there
     def _store(self, storage):
         storage["input"] = self.input
+        storage["context"] = self.context
 
     @classmethod
     def _restore(cls, storage, version):
         task = cls()
         task._input = storage["input"].to_object()
+        task._context = storage["context"].to_object()
         return task
+
+    def then(self, body, task=None):
+        series = SeriesTask()
+        series.input.first(self)
+        series.input.then(FunctionTask(body), lambda inp, out: inp.args.append(out))
+        return series
 
 
 class TaskGenerator(AbstractTask, abc.ABC):
@@ -168,7 +188,7 @@ class TaskGenerator(AbstractTask, abc.ABC):
     ]:
         pass
 
-    def _execute(self, output):
+    def _execute(self):
         gen = iter(self)
         tasks = next(gen)
         while True:
@@ -176,9 +196,8 @@ class TaskGenerator(AbstractTask, abc.ABC):
             try:
                 tasks = gen.send(ret)
             except StopIteration as stop:
-                ret, out = stop.args[0]
-                output.take(out)
-                return ret
+                # forward return value of the generator
+                return stop.args[0]
 
 
 # TaskGenerator.register(AbstractTask)
@@ -186,12 +205,12 @@ class TaskGenerator(AbstractTask, abc.ABC):
 
 
 class FunctionInput(AbstractInput):
-    args = StorageAttribute().type(list).constructor(list)
-    kwargs = StorageAttribute().type(dict).constructor(dict)
+    args: list = field(default_factory=list)
+    kwargs: dict = field(default_factory=dict)
 
 
 class FunctionOutput(AbstractOutput):
-    result = StorageAttribute()
+    result: Any
 
 
 class FunctionTask(AbstractTask):
@@ -202,18 +221,19 @@ class FunctionTask(AbstractTask):
     `**kwargs` respectively.  The return value is set to :attr:`.FunctionOutput.result`.
     """
 
-    def __init__(self, function):
-        super().__init__()
+    def __init__(self, function, **kwargs):
+        super().__init__(**kwargs)
         self._function = function
 
     def _get_input(self):
         return FunctionInput()
 
-    def _get_output(self):
-        return FunctionOutput()
-
-    def _execute(self, output):
-        output.result = self._function(*self.input.args, **self.input.kwargs)
+    def _execute(self):
+        res = self._function(*self.input.args, **self.input.kwargs)
+        if isinstance(res, AbstractOutput):
+            return res
+        else:
+            return FunctionOutput(result=res)
 
 
 class ListInput(abc.ABC):
@@ -244,29 +264,35 @@ class ListTaskGenerator(TaskGenerator, abc.ABC):
         return ListInput()
 
     @abc.abstractmethod
-    def _extract_output(self, output, step, task, ret, task_output):
+    def _extract_output(self, step, task, ret, output) -> dict:
         """
         Extract the output of each task.
 
         Args:
-            output (:class:`.AbstractOutput`): output of this task to populate
             step (int): index of the task to extract the output from,
             corresponds to the index of the task in the list returned by :meth:`.ListInput._create_tasks()`.
             task (:class:`.AbstractTask`): task to extract the output from, you can use this to extract parts of the input as well
             ret (:class:`.ReturnStatus`): the return status of the execution of the task
-            task_output (:class:`.AbstractOutput`): the output of the task to extract
+            output (:class:`.AbstractOutput`): the output of the task to extract
         """
+        pass
+
+    @abc.abstractmethod
+    def _join_output(self, outputs) -> AbstractOutput:
         pass
 
     def __iter__(self):
         tasks = self.input._create_tasks()
         returns, outputs = zip(*(yield tasks))
 
-        output = self._get_output()
-        for i, (task, ret, task_output) in enumerate(zip(tasks, returns, outputs)):
-            self._extract_output(output, i, task, ret, task_output)
+        if any(not r.is_done() for r in returns):
+            return ReturnStatus("aborted"), None
 
-        return ReturnStatus("done"), output
+        extracted_outputs = []
+        for i, (task, ret, output) in enumerate(zip(tasks, returns, outputs)):
+            extracted_outputs.append(self._extract_output(i, task, ret, output))
+
+        return ReturnStatus("done"), self._join_output(extracted_outputs)
 
 
 class SeriesInput(AbstractInput):
@@ -284,17 +310,23 @@ class SeriesInput(AbstractInput):
     >>> task.input.first(MyNode()).then(MyNode(), transfer)
     """
 
-    tasks = StorageAttribute().type(list)
-    connections = StorageAttribute().type(list)
+    tasks: list = USER_REQUIRED
+    connections: list = USER_REQUIRED
 
     def check_ready(self):
-        return len(self.tasks) == len(self.connections) + 1
+        if not super().check_ready():
+            return False
+        if not (0 < len(self.tasks) == len(self.connections) + 1):
+            return False
+        if not self.tasks[0].input.check_ready():
+            return False
+        return True
 
     def first(self, task):
         """
         Set initial task.
 
-        Resets whole input
+        Resets whole input.
 
         Args:
             task (AbstractTask): the first task to execute
@@ -314,12 +346,33 @@ class SeriesInput(AbstractInput):
             next_task (:class:`~.AbstractTask`): next task to execute
             connection (function): takes the input of next_task and the output
             of the previous task
+
         Returns:
             self: the input object
         """
         self.tasks.append(next_task)
         self.connections.append(connection)
         return self
+
+    # FIXME: error handling
+    def __setattr__(self, name, value):
+        if self.tasks is not USER_REQUIRED and len(self.tasks) > 0:
+            field_names = [f.name for f in self.tasks[0].input.fields()]
+            if name in field_names:
+                setattr(self.tasks[0].input, name, value)
+                return
+        super().__setattr__(name, value)
+
+    def __getattr__(self, name):
+        if self.tasks is USER_REQUIRED or len(self.tasks) == 0:
+            raise AttributeError(name)
+        return getattr(self.tasks[0].input, name)
+
+    def fields(self):
+        base = super().fields()
+        if self.tasks is not USER_REQUIRED and len(self.tasks) > 0:
+            base += self.tasks[0].input.fields()
+        return base
 
 
 class SeriesTask(TaskGenerator):
@@ -403,8 +456,8 @@ class LoopInput(AbstractInput):
         control (:class:`.LoopControl`): encapsulates control flow of the loop
     """
 
-    trace = StorageAttribute().type(bool).default(False)
-    control = StorageAttribute().type(LoopControl)
+    trace: bool = False
+    control: LoopControl = USER_REQUIRED
 
     def repeat(
         self,
@@ -443,9 +496,6 @@ class LoopTask(TaskGenerator):
 
     def _get_input(self):
         return LoopInput()
-
-    def _get_output(self):
-        return self.input.task._get_output()
 
     def __iter__(self):
         task = deepcopy(self.input.task)

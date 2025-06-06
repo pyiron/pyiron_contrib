@@ -11,7 +11,8 @@ import shutil
 from pyiron_atomistics.atomistics.structure.structurestorage import StructureStorage
 from pyiron_atomistics.atomistics.structure.atoms import Atoms
 from pyiron_atomistics.atomistics.structure.has_structure import HasStructure
-from pyiron_base import GenericParameters, GenericJob, deprecate
+from pyiron_base import GenericParameters, GenericJob
+from pyiron_snippets.deprecate import deprecate
 from pyiron_atomistics.vasp.structure import read_atoms
 
 __author__ = "Jan Janssen"

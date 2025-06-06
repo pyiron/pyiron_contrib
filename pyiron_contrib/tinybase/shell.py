@@ -7,7 +7,8 @@ from pyiron_base import state
 from pyiron_contrib.tinybase.container import (
     AbstractInput,
     AbstractOutput,
-    StorageAttribute,
+    USER_REQUIRED,
+    field,
 )
 
 from pyiron_contrib.tinybase.task import AbstractTask, ReturnStatus
@@ -103,28 +104,29 @@ class ExecutablePathResolver:
         return self.path()
 
 
+def _zero_list():
+    return [0]
+
+
 class ShellInput(AbstractInput):
-    command = StorageAttribute()
-    arguments = StorageAttribute().type(list).constructor(list)
-    environ = StorageAttribute().type(dict).constructor(dict)
-    working_directory = StorageAttribute().type(str)
-    allowed_returncode = StorageAttribute().type(list)
+    command: str = USER_REQUIRED
+    working_directory: str = USER_REQUIRED
+    arguments: list = field(default_factory=list)
+    environ: dict = field(default_factory=dict)
+    allowed_returncode: list = field(default_factory=_zero_list)
 
 
 class ShellOutput(AbstractOutput):
-    stdout = StorageAttribute()
-    stderr = StorageAttribute()
-    returncode = StorageAttribute().type(int)
+    stdout: str
+    stderr: str
+    returncode: int
 
 
 class ShellTask(AbstractTask):
     def _get_input(self):
         return ShellInput()
 
-    def _get_output(self):
-        return ShellOutput()
-
-    def _execute(self, output):
+    def _execute(self):
         environ = dict(os.environ)
         environ.update({k: str(v) for k, v in self.input.environ.items()})
         proc = subprocess.run(
@@ -134,11 +136,18 @@ class ShellTask(AbstractTask):
             encoding="utf8",
             env=environ,
         )
-        output.stdout = proc.stdout
-        output.stderr = proc.stderr
-        output.returncode = proc.returncode
+        output = ShellOutput(
+            stdout=proc.stdout,
+            stderr=proc.stderr,
+            returncode=proc.returncode,
+        )
         allowed_returncode = self.input.allowed_returncode
         if allowed_returncode is None:
             allowed_returncode = [0]
         if proc.returncode not in allowed_returncode:
-            return ReturnStatus("aborted", f"non-zero error code {proc.returncode}")
+            return (
+                ReturnStatus("aborted", f"non-zero error code {proc.returncode}"),
+                output,
+            )
+        else:
+            return output

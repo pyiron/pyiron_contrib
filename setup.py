@@ -25,48 +25,41 @@ setup(
         'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: 3.11',
+        'Programming Language :: Python :: 3.12',
     ],
 
     keywords='pyiron',
     packages=find_packages(exclude=["*tests*"]),
     install_requires=[        
-        'matplotlib==3.7.2',
-        'numpy==1.24.3',
+        'matplotlib==3.9.2',
+        'numpy==1.26.4',
+        'pyiron_snippets==0.1.3',
         'pyiron_base==0.13.0',
-        'scipy==1.11.2',
-        'seaborn==0.12.2',
-        'pyparsing==3.0.9',
+        'scipy==1.14.1',
+        'seaborn==0.13.2',
+        'pyparsing==3.1.4',
     ],
     extras_require={
         'atomistic': [
-            'ase==3.22.1',
+            'ase==3.23.0',
             'pyiron_atomistics==0.7.8',
             'pycp2k==0.2.2',
-        ],
-        'executors': [
-            'cloudpickle',
         ],
         'fenics': [
             'fenics==2019.1.0',
             'mshr==2019.1.0',
         ],
-        'image': ['scikit-image==0.21.0'],
+        'image': ['scikit-image==0.24.0'],
         'generic': [
-            'boto3==1.28.25', 
-            'moto==4.1.14'
-        ],
-        'workflow': [
-            'cloudpickle',
-            'python>=3.10',
-            'graphviz',
-            'toposort',
-            'typeguard==4.1.0'
+            'boto3==1.37.9',
+            'moto==5.0.16'
         ],
         'tinybase': [
-            'distributed==2023.8.0',
-            'pympipool==0.6.2'
+            'distributed==2024.12.1',
+            'pymatgen==2024.9.17.1',
+            'pympipool==0.8.4',
+            'h5io_browser==0.1.4',
         ]
     },
     cmdclass=versioneer.get_cmdclass(),
-    
 )

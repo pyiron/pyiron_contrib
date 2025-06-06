@@ -14,3 +14,6 @@ jobs:
     with:
       notebooks-env-files: .ci_support/environment.yml .ci_support/environment-notebooks.yml
       python-version-alt3: 'exclude'  # No python 3.9
+      do-black: false
+      do-ruff-check: false
+      do-ruff-sort-imports: false

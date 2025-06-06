@@ -21,7 +21,6 @@ if [ -d "${HOME}/pyiron_contrib" ]; then
             ${HOME}/.gitpod \
             ${HOME}/.readthedocs.yml \
             ${HOME}/CODE_OF_CONDUCT.md \
-            ${HOME}/CONTRIBUTING.rst \
             ${HOME}/LICENSE \
             ${HOME}/MANIFEST.in \
             ${HOME}/README.md \

@@ -3,7 +3,7 @@ from copy import deepcopy
 import enum
 from typing import Optional, Callable, List, Generator, Tuple
 
-from pyiron_base.interfaces.object import HasStorage
+from pyiron_base import HasStorage
 
 from pyiron_contrib.tinybase.storage import Storable
 from pyiron_contrib.tinybase.container import (

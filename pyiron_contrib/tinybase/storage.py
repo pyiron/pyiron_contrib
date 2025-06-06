@@ -2,8 +2,7 @@ import abc
 import importlib
 from typing import Any, Union, Optional
 
-from pyiron_base import DataContainer
-from pyiron_base.storage.hdfio import ProjectHDFio
+from pyiron_base import DataContainer, ProjectHDFio
 from pyiron_contrib.tinybase import __version__ as base__version__
 
 import pickle

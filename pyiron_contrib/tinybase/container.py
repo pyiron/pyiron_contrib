@@ -5,7 +5,7 @@ from copy import deepcopy
 
 from pyiron_contrib.tinybase.storage import HasHDFAdapaterMixin
 
-from pyiron_base.interfaces.object import HasStorage
+from pyiron_base import HasStorage
 from pyiron_atomistics.atomistics.structure.has_structure import HasStructure
 
 from ase import Atoms

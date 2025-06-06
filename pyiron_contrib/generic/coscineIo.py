@@ -10,8 +10,7 @@ import io
 import warnings
 
 import pyiron_base
-from pyiron_base import state, ProjectHDFio
-from pyiron_base.interfaces.has_groups import HasGroups
+from pyiron_base import state, ProjectHDFio, HasGroups
 from pyiron_contrib.generic.filedata import StorageInterface
 from pyiron_contrib.generic.filedata import (
     FileDataTemplate,

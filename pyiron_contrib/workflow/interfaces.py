@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from pyiron_base.interfaces.singleton import Singleton
+from pyiron_snippets.singleton import Singleton
 
 from pyiron_contrib.executors import CloudpickleProcessPoolExecutor
 from pyiron_contrib.workflow.function import (

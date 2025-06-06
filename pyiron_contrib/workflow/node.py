@@ -20,7 +20,7 @@ from pyiron_contrib.workflow.util import SeabornColors
 if TYPE_CHECKING:
     import graphviz
 
-    from pyiron_base.jobs.job.extension.server.generic import Server
+    from pyiron_base import Server
 
     from pyiron_contrib.workflow.composite import Composite
     from pyiron_contrib.workflow.io import Inputs, Outputs

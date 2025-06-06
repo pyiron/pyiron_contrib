@@ -2,7 +2,7 @@ import os
 import subprocess
 from glob import glob
 
-from pyiron_base.state import state
+from pyiron_base import state
 
 from pyiron_contrib.tinybase.container import (
     AbstractInput,

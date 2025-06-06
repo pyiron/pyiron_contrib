@@ -6,8 +6,7 @@ import numpy as np
 from scipy import stats
 from scipy.constants import physical_constants
 
-from pyiron_base.jobs.job.generic import GenericJob
-from pyiron_base.storage.datacontainer import DataContainer
+from pyiron_base import DataContainer, GenericJob
 from pyiron_atomistics.atomistics.structure.atoms import Atoms
 
 from matplotlib.colors import LinearSegmentedColormap

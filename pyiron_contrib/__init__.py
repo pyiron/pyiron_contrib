@@ -3,8 +3,7 @@ __all__ = []
 
 import warnings
 
-from pyiron_base import Project as BaseProject, JOB_CLASS_DICT
-from pyiron_base.project.maintenance import add_module_conversion
+from pyiron_base import Project as BaseProject, JOB_CLASS_DICT, add_module_conversion
 
 
 class Project(BaseProject):

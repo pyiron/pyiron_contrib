@@ -2,7 +2,12 @@
 # Copyright (c) Max-Planck-Institut für Eisenforschung GmbH - Computational Materials Design (CM) Department
 # Distributed under the terms of "New BSD License", see the LICENSE file.
 
-from pyiron_contrib.atomistics.lammps.potentials import Library, Morse, CustomPotential, LammpsPotentials
+from pyiron_contrib.atomistics.lammps.potentials import (
+    Library,
+    Morse,
+    CustomPotential,
+    LammpsPotentials,
+)
 import unittest
 import pandas as pd
 import numpy as np
@@ -76,7 +81,7 @@ class TestPotentials(unittest.TestCase):
             pair_style=["a", "b"],
             interacting_species=[["Al"], ["Ni"]],
             pair_coeff=["one", "two"],
-            model=["first", "second"]
+            model=["first", "second"],
         )
         self.assertEqual(pot.model, "first_and_second")
 
@@ -88,7 +93,7 @@ class TestPotentials(unittest.TestCase):
             pair_style=["a", "b"],
             interacting_species=[["Al"], ["Ni"]],
             pair_coeff=["one", "two"],
-            potential_name=["first", "second"]
+            potential_name=["first", "second"],
         )
         self.assertEqual(pot.potential_name, "first_and_second")
 
@@ -106,14 +111,14 @@ class TestPotentials(unittest.TestCase):
             pair_style=["a"],
             interacting_species=[["Al"]],
             pair_coeff=["one"],
-            potential_name=["first"]
+            potential_name=["first"],
         )
         self.assertEqual(pot.pair_style, "pair_style a\n")
         pot._initialize_df(
             pair_style=["a", "b"],
             interacting_species=[["Al"], ["Ni"]],
             pair_coeff=["one", "two"],
-            potential_name=["first", "second"]
+            potential_name=["first", "second"],
         )
         self.assertEqual(pot.pair_style, "pair_style hybrid a b\n")
         pot._initialize_df(
@@ -186,7 +191,7 @@ class TestPairCoeff(unittest.TestCase):
         self.assertEqual(pc.counter, ["1", "2", ""])
         self.assertTrue(pc.is_hybrid)
         self.assertEqual(pc.pair_style, ["my_style", "my_style", "another_style"])
-        self.assertEqual(pc.s_dict, {'Al': '1', 'Fe': '2', '*': '*'})
+        self.assertEqual(pc.s_dict, {"Al": "1", "Fe": "2", "*": "*"})
         self.assertEqual(pc.interacting_species, 3 * ["1 2"])
 
     def test_results(self):
@@ -198,11 +203,11 @@ class TestPairCoeff(unittest.TestCase):
             preset_species=2 * [[]],
         )
         self.assertEqual(
-            pc.results, 
+            pc.results,
             [
                 "pair_coeff 1 2 style_one arg_one\n",
-                "pair_coeff 1 1 style_two arg_two\n"
-            ]
+                "pair_coeff 1 1 style_two arg_two\n",
+            ],
         )
 
 
@@ -213,7 +218,7 @@ class TestMorse(unittest.TestCase):
 
     def test_pair_coeff(self):
         morse = Morse("Al", D_0=0.5, alpha=1.1, r_0=2.1, cutoff=6)
-        self.assertEqual(morse.pair_coeff, ['pair_coeff 1 1 0.5 1.1 2.1 6\n'])
+        self.assertEqual(morse.pair_coeff, ["pair_coeff 1 1 0.5 1.1 2.1 6\n"])
 
 
 if __name__ == "__main__":

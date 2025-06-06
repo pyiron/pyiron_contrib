@@ -9,8 +9,11 @@ on:
 
 jobs:
   pyiron:
-    uses: pyiron/actions/.github/workflows/push-pull.yml@actions-3.3.3
+    uses: pyiron/actions/.github/workflows/push-pull.yml@actions-4.0.2
     secrets: inherit
     with:
       notebooks-env-files: .ci_support/environment.yml .ci_support/environment-notebooks.yml
       python-version-alt3: 'exclude'  # No python 3.9
+      do-black: false
+      do-ruff-check: false
+      do-ruff-sort-imports: false

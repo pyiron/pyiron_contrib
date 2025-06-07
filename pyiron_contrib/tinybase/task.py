@@ -6,7 +6,7 @@ import enum
 from tempfile import TemporaryDirectory
 from typing import Optional, Callable, List, Generator, Tuple, Any, Union
 
-from pyiron_base.interfaces.object import HasStorage
+from pyiron_base import HasStorage
 
 from pyiron_contrib.tinybase.storage import Storable
 from pyiron_contrib.tinybase.container import (

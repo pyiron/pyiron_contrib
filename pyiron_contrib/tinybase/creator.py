@@ -34,7 +34,7 @@ from pyiron_atomistics import ase_to_pyiron, Atoms
 
 import ase.build
 
-from executorlib import Executor as PyMPIPoolExecutor
+from executorlib import SingleNodeExecutor as PyMPIPoolExecutor
 from dask.distributed import Client, LocalCluster
 
 

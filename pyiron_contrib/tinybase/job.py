@@ -13,7 +13,7 @@ from pyiron_contrib.tinybase.executor import (
 )
 from pyiron_contrib.tinybase.database import DatabaseEntry
 from pyiron_contrib.tinybase.project import ProjectInterface, ProjectAdapter
-from pyiron_base.state import state
+from pyiron_base import state
 
 
 class TinyJob(Storable):

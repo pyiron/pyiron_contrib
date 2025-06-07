@@ -4,7 +4,7 @@
 
 from pyiron_atomistics.lammps.interactive import LammpsInteractive
 from pyiron_atomistics.lammps.base import Input
-from pyiron_base.storage.datacontainer import DataContainer
+from pyiron_base import DataContainer
 
 import numpy as np
 import subprocess

@@ -34,15 +34,15 @@ setup(
         'matplotlib==3.9.2',
         'numpy==1.26.4',
         'pyiron_snippets==0.1.3',
-        'pyiron_base==0.10.9',
-        'scipy==1.14.1',
+        'pyiron_base==0.13.0',
+        'scipy==1.15.0',
         'seaborn==0.13.2',
         'pyparsing==3.1.4',
     ],
     extras_require={
         'atomistic': [
             'ase==3.23.0',
-            'pyiron_atomistics==0.6.18',
+            'pyiron_atomistics==0.7.8',
             'pycp2k==0.2.2',
         ],
         'fenics': [
@@ -51,7 +51,7 @@ setup(
         ],
         'image': ['scikit-image==0.24.0'],
         'generic': [
-            'boto3==1.37.9', 
+            'boto3==1.37.9',
             'moto==5.0.16'
         ],
         'tinybase': [

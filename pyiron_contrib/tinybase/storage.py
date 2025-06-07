@@ -4,9 +4,7 @@ import importlib
 import pickle
 from typing import Any, Union, Optional
 
-from pyiron_base import DataContainer
-from pyiron_base.interfaces.has_groups import HasGroups
-from pyiron_base.storage.hdfio import ProjectHDFio
+from pyiron_base import DataContainer, HasGroups, ProjectHDFio
 from pyiron_contrib.tinybase import __version__ as base__version__
 
 from h5io_browser import Pointer as Hdf5Pointer

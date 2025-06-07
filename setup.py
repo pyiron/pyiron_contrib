@@ -41,7 +41,7 @@ setup(
     ],
     extras_require={
         'atomistic': [
-            'ase==3.23.0',
+            'ase==3.25.0',
             'pyiron_atomistics==0.7.8',
             'pycp2k==0.2.2',
         ],

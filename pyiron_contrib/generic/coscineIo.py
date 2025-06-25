@@ -9,6 +9,7 @@ import os.path
 import io
 import warnings
 
+from concurrent.futures import Future
 import pyiron_base
 from pyiron_base import state, ProjectHDFio, HasGroups
 from pyiron_contrib.generic.filedata import StorageInterface
@@ -219,6 +220,8 @@ class CoscineResource(StorageInterface):
             self._resource = resource._resource
             self._path = resource._path
             return
+        elif isinstance(resource, Future):
+            self._resource = resource.result(timeout=15)
         else:
             raise TypeError(f"Unknown resource type {type(resource)}!")
 
